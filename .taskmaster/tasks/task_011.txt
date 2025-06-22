@@ -1,0 +1,100 @@
+# Task ID: 11
+# Title: Install ArgoCD in Virtual Kubernetes Cluster
+# Status: pending
+# Dependencies: 10
+# Priority: medium
+# Description: Install and configure ArgoCD in the existing virtual Kubernetes cluster to enable GitOps-based continuous delivery for the application components.
+# Details:
+1. Access the existing virtual Kubernetes cluster (vcluster) that has been set up with Karpenter and autoscaling capabilities.
+2. Add the ArgoCD Helm repository:
+   
+   helm repo add argo https://argoproj.github.io/argo-helm
+   helm repo update
+   
+3. Create a dedicated namespace for ArgoCD:
+   
+   kubectl create namespace argocd
+   
+4. Install ArgoCD using Helm with customized values:
+   
+   helm install argocd argo/argo-cd \
+     --namespace argocd \
+     --set server.service.type=LoadBalancer \
+     --set controller.metrics.enabled=true \
+     --set server.metrics.enabled=true
+   
+5. Configure RBAC for ArgoCD to ensure proper access controls:
+   
+   kubectl apply -f argocd-rbac-config.yaml -n argocd
+   
+6. Set up the initial admin password and secure it using Kubernetes secrets:
+   
+   kubectl -n argocd patch secret argocd-secret \
+     -p '{"stringData": {"admin.password": "$2a$10$..."}}'
+   
+7. Configure ArgoCD to monitor the application Git repositories:
+   
+   kubectl apply -f application-repos.yaml -n argocd
+   
+8. Create ArgoCD Application manifests for each component of the system:
+   
+   kubectl apply -f applications/ -n argocd
+   
+9. Set up ArgoCD projects to organize applications and enforce security boundaries:
+   
+   kubectl apply -f projects/ -n argocd
+   
+10. Integrate ArgoCD with the monitoring stack (Prometheus/Grafana) installed in Task 10:
+    
+    kubectl apply -f argocd-servicemonitor.yaml -n argocd
+    
+11. Document the ArgoCD access URLs, credentials (stored securely), and usage instructions for the development team.
+
+Key Considerations:
+- Ensure ArgoCD has appropriate resource requests and limits to function properly in the vcluster environment
+- Configure network policies to secure ArgoCD components
+- Set up proper backup for ArgoCD configurations and state
+- Implement GitOps principles for managing the application deployment lifecycle
+
+# Test Strategy:
+1. Verify ArgoCD installation and pod health:
+   
+   kubectl get pods -n argocd
+   kubectl get svc -n argocd
+   
+   All pods should be in Running state with appropriate readiness and liveness.
+
+2. Test ArgoCD UI accessibility:
+   - Access the ArgoCD UI through the LoadBalancer service
+   - Verify successful login with admin credentials
+   - Confirm the dashboard loads correctly
+
+3. Validate ArgoCD CLI functionality:
+   
+   argocd login <ARGOCD_SERVER>
+   argocd cluster list
+   argocd app list
+   
+   Commands should execute successfully without errors.
+
+4. Test application deployment workflow:
+   - Create a test application in ArgoCD pointing to a sample repository
+   - Verify the application syncs correctly
+   - Make a change to the repository and confirm ArgoCD detects and applies the change
+
+5. Verify RBAC configurations:
+   - Test access with different user roles
+   - Confirm appropriate permissions are enforced
+
+6. Test integration with monitoring:
+   - Verify ArgoCD metrics are being collected by Prometheus
+   - Check that ArgoCD dashboards are available in Grafana
+
+7. Perform a disaster recovery test:
+   - Backup ArgoCD state
+   - Simulate a failure scenario
+   - Restore from backup and verify functionality
+
+8. Validate resource usage and scaling:
+   - Monitor ArgoCD resource consumption under load
+   - Verify Karpenter properly scales nodes when needed

@@ -1,0 +1,19 @@
+sync:
+  toHost:
+    pods:
+      enabled: true
+      enforceTolerations:
+        - vclusterID=architecture-vizualisation:NoSchedule
+    ingresses:
+      enabled: true
+    persistentVolumeClaims:
+      enabled: true
+    persistentVolumes:
+      enabled: true
+    storageClasses:
+      enabled: true
+
+controlPlane:
+  coredns:
+    enabled: true
+    embedded: true

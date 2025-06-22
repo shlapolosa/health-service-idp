@@ -1,0 +1,219 @@
+# Task ID: 14
+# Title: Configure Knative Python Function Backend with FastAPI and Pydantic
+# Status: pending
+# Dependencies: 12, 13, 3
+# Priority: medium
+# Description: Set up a serverless Python backend using Knative Functions with FastAPI, Pydantic for data validation, and Poetry for dependency management.
+# Details:
+1. Set up a Knative Python function project structure:
+
+mkdir -p knative-python-backend/src
+cd knative-python-backend
+
+
+2. Initialize Poetry project for dependency management:
+
+poetry init --name knative-python-backend --description "Serverless Python backend with Knative Functions"
+poetry add fastapi pydantic uvicorn httpx
+poetry add --dev pytest pytest-asyncio black isort mypy
+
+
+3. Create a fallback requirements.txt for Knative compatibility:
+
+poetry export -f requirements.txt --output requirements.txt
+
+
+4. Create the main function file (src/func.py):
+python
+import os
+from typing import Dict, Any, List, Optional
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
+from contextlib import asynccontextmanager
+
+# Define data models with Pydantic
+class RequestModel(BaseModel):
+    query: str = Field(..., description="The query to process")
+    parameters: Optional[Dict[str, Any]] = Field(default=None, description="Optional parameters")
+
+class ResponseModel(BaseModel):
+    result: Any = Field(..., description="The result of the operation")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Optional metadata")
+
+# Create lifespan context for startup/shutdown tasks
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup logic (load models, connect to services, etc.)
+    print("Starting up the function...")
+    yield
+    # Shutdown logic
+    print("Shutting down the function...")
+
+# Initialize FastAPI app
+app = FastAPI(lifespan=lifespan)
+
+@app.post("/", response_model=ResponseModel)
+async def handle_request(request: RequestModel) -> ResponseModel:
+    """
+    Main function handler that processes incoming requests
+    """
+    try:
+        # Process the request (implement your business logic here)
+        result = {"message": f"Processed query: {request.query}"}
+        
+        # Return formatted response
+        return ResponseModel(
+            result=result,
+            metadata={"timestamp": "2023-01-01T00:00:00Z"}  # Replace with actual timestamp
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+5. Create a Knative function configuration (func.yaml):
+yaml
+apiVersion: func.knative.dev/v1
+kind: Function
+metadata:
+  name: python-backend
+spec:
+  runtime: python
+  entrypoint: src/func.py
+  builder: pack
+  buildEnvs:
+    - name: BP_PYTHON_VERSION
+      value: "3.11"
+  envs:
+    - name: PYTHONPATH
+      value: /src
+
+
+6. Create a Dockerfile for custom builds if needed:
+dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+ENV PYTHONPATH=/app
+
+CMD ["uvicorn", "src.func:app", "--host", "0.0.0.0", "--port", "${PORT:-8080}"]
+
+
+7. Set up integration with the Streamlit frontend:
+   - Implement WebSocket support for real-time communication
+   - Add CORS configuration for frontend access
+   - Create API endpoints that align with frontend requirements
+
+8. Implement connection to other backend services:
+   - Add authentication and authorization
+   - Set up logging and monitoring
+   - Configure error handling and retry mechanisms
+
+9. Deploy the function to Knative:
+
+func deploy --registry gcr.io/your-project
+
+
+10. Configure autoscaling settings in Knative:
+yaml
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: python-backend
+  annotations:
+    autoscaling.knative.dev/minScale: "1"
+    autoscaling.knative.dev/maxScale: "10"
+    autoscaling.knative.dev/target: "50"
+spec:
+  template:
+    spec:
+      containers:
+        - image: gcr.io/your-project/python-backend:latest
+
+
+# Test Strategy:
+1. Set up local testing environment:
+
+poetry install
+poetry run pytest
+
+
+2. Create unit tests for the FastAPI endpoints (tests/test_func.py):
+python
+import pytest
+from fastapi.testclient import TestClient
+from src.func import app
+
+client = TestClient(app)
+
+def test_handle_request():
+    response = client.post("/", json={"query": "test query", "parameters": {"param1": "value1"}})
+    assert response.status_code == 200
+    data = response.json()
+    assert "result" in data
+    assert "metadata" in data
+    assert "message" in data["result"]
+
+
+3. Test Pydantic model validation:
+python
+from src.func import RequestModel
+import pytest
+from pydantic import ValidationError
+
+def test_request_model_validation():
+    # Valid data
+    valid_data = {"query": "test query", "parameters": {"param1": "value1"}}
+    model = RequestModel(**valid_data)
+    assert model.query == "test query"
+    
+    # Invalid data (missing required field)
+    invalid_data = {"parameters": {"param1": "value1"}}
+    with pytest.raises(ValidationError):
+        RequestModel(**invalid_data)
+
+
+4. Test local Knative function deployment:
+
+func run
+
+
+5. Verify the function responds correctly:
+
+curl -X POST http://localhost:8080 \
+  -H "Content-Type: application/json" \
+  -d '{"query": "test query", "parameters": {"param1": "value1"}}'
+
+
+6. Test integration with Streamlit frontend:
+   - Create a mock Streamlit app that connects to the local function
+   - Verify data flow between frontend and backend
+   - Test WebSocket connections if implemented
+
+7. Perform load testing:
+
+pip install locust
+locust -f load_tests.py
+
+
+8. Verify Knative deployment and scaling:
+
+kubectl get ksvc python-backend
+kubectl get pods -n knative-serving
+
+
+9. Test cold start performance:
+   - Measure response time after idle period
+   - Verify function scales to zero when unused
+   - Test scaling behavior under increasing load
+
+10. Integration testing with ArgoCD deployment:
+    - Verify the function deploys correctly through ArgoCD
+    - Test rollback capabilities
+    - Verify configuration changes are applied correctly

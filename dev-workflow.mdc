@@ -1,0 +1,54 @@
+we will use task master to guide our Development. always follow prime directives, 
+employ the development worflow process and reference the command list when needed.
+
+
+
+**Common Taskmaster Commands**
+# Initialize a new project
+task-master init
+
+# Parse a PRD and generate tasks
+task-master parse-prd your-prd.txt
+
+# List all tasks
+task-master list
+
+# Show the next task to work on
+task-master next
+
+# Show specific task(s) - supports comma-separated IDs
+task-master show 1,3,5
+
+# Research fresh information with project context
+task-master research "What are the latest best practices for JWT authentication?"
+
+# Generate task files
+task-master generate
+
+# Add rules after initialization
+task-master rules add windsurf,roo,vscode
+
+**Prime Directives***
+
+assume all cli installed on system
+look at vcluster-knative.sh script if you need to interact with aws and prompt user
+use context7 for any task that requires any library versions, dont use whats stated in the tasks
+use github mcp if you need to interact with github
+prioritise using func cli to setup souce repo's, unless task too complicated for func cli, then setup manually
+
+**Development Workflow Process**
+
+- Begin coding sessions with `task-master list` to see current tasks, status, and IDs
+
+- Select tasks based on dependencies (all marked 'done'), priority level, and ID order
+- Clarify tasks by checking task files in .taskmaster/tasks directory or asking for user input
+- View specific task details using `task-master show <id>` to understand implementation requirements
+
+- Implement code following task details, dependencies, and project standards
+- Verify tasks according to test strategies before marking as complete
+- Mark completed tasks with `task-master set-status --id=<id> --status=done`
+- Update dependent tasks when implementation differs from original plan
+- Generate task files with `task-master generate` after updating tasks.json
+- Maintain valid dependency structure with `task-master fix-dependencies` when needed
+- Respect dependency chains and task priorities when selecting work
+- Report progress regularly using the list command

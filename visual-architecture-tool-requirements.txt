@@ -1,0 +1,342 @@
+<context>
+# Overview
+The Visual Architecture Maintenance Tool is an AI-powered web application that enables enterprise architects and product owners to create, view, and update enterprise architectures using natural language. The system addresses the complexity of maintaining multi-layered enterprise architectures by automating change propagation across business, application, infrastructure, and implementation layers. It serves architects who need to design and make architectural decisions, as well as product owners who need to make financial and strategic decisions.
+
+The tool eliminates the manual effort of updating architecture diagrams across multiple layers when changes occur, ensures consistency through automated validation, and provides real-time cost and impact analysis for architectural decisions.
+
+# Core Features
+## Natural Language Architecture Interface
+- Chat-based interface for making architecture changes through conversational commands
+- Supports three main interaction types: design (making changes), information (querying architecture), decision (comparing options)
+- Context-aware processing that understands architectural terminology and relationships
+- Multi-modal communication supporting both text and visual feedback
+
+## Multi-Agent Architecture Processing
+- Business Analyst Agent: Structures requirements using Subject-Action-Object format, creates project requirements documents
+- Business Architect Agent: Processes strategic and business layer changes, accesses industry capability maps
+- Application Architect Agent: Handles application layer updates, accesses reference architectures (AWS, Azure, Kubernetes, MLOps)
+- Infrastructure Architect Agent: Manages infrastructure and DevOps changes, integrates cloud-native techniques
+- Solution Architect Agent: Consolidates cross-layer changes, applies architectural patterns
+- Project Manager Agent: Creates implementation work packages and manages dependencies
+- Accountant Agent: Provides cost analysis and budget impact assessment
+- Developer Agent: Generates actual code and infrastructure changes from user stories
+
+## ArchiMate Visual Architecture Representation
+- Standardized ArchiMate notation with specific color coding: Purple (#CC99FF) for strategy, Yellow (#FFFF99) for business, Light Brown (#E6CC99) for passive structures, Blue (#99CCFF) for application, Orange (#FFCC99) for implementation
+- Embedded HTML architecture visualization in center pane showing all architecture aspects
+- Change highlighting system: pending changes shown in gray, approved changes rendered in full color
+- Multi-layer architecture visualization supporting business, application, infrastructure, and implementation views
+
+## Change Management and Approval Workflow
+- Automated change impact analysis across all architecture layers
+- Preview system showing proposed changes before implementation
+- User approval gates preventing unauthorized architecture modifications
+- Change propagation engine that cascades updates through dependent layers
+- Audit trail tracking all architecture modifications and approvals
+
+## Architecture Repository and Persistence
+- Git-based architecture storage with version control
+- Architecture switching capability through hamburger menu navigation
+- Persistent storage of architecture artifacts, change logs, and approval records
+- Integration with reference architecture libraries and pattern catalogs
+
+# User Experience
+## User Personas
+- Enterprise Architects: Primary users who create and maintain architectural designs across all layers
+- Product Owners: Strategic decision makers who need financial impact analysis and architectural options comparison
+- Solution Architects: Technical specialists who focus on technology-specific implementation details
+- Project Managers: Users who need implementation planning and work package organization
+
+## Key User Flows
+### Architecture Creation Flow
+1. User selects "Create New Architecture" from hamburger menu
+2. System prompts for architecture name, description, and optional template selection
+3. User provides natural language description of system requirements
+4. Business Analyst agent structures requirements and passes to other agents
+5. Each agent contributes their layer-specific expertise in sequence
+6. System presents complete architecture visualization for user review and approval
+
+### Architecture Modification Flow
+1. User types natural language change request in chat interface
+2. System analyzes request type (design/information/decision) and routes to appropriate agents
+3. Agents process changes and update their respective layers
+4. System highlights proposed changes in gray on architecture visualization
+5. User reviews changes and either approves or requests modifications
+6. Upon approval, changes are implemented and visualization updated in full color
+
+### Decision Support Flow
+1. User requests comparison of architectural options through chat
+2. System engages relevant agents to analyze current state and proposed alternatives
+3. Agents provide layer-specific impact analysis, cost estimates, and risk assessments
+4. System presents multiple architecture options on same visualization
+5. User selects preferred option and system implements chosen architecture
+
+## UI/UX Considerations
+- Streamlit-based responsive web interface optimized for desktop and tablet use
+- Three-pane layout: hamburger menu (left), architecture visualization (center), chat interface (bottom)
+- Conversational UI design with context-aware responses and suggestions
+- Visual feedback system with clear distinction between pending and approved changes
+- Accessibility features supporting keyboard navigation and screen readers
+</context>
+
+<PRD>
+# Technical Architecture
+## System Components
+### Frontend Layer
+- Streamlit web application providing responsive user interface
+- HTML/JavaScript architecture visualization component with ArchiMate rendering
+- WebSocket connections for real-time chat and architecture updates
+- Hamburger menu component for architecture navigation and creation
+
+### Agent Orchestration Layer
+- Agent Orchestration Service managing workflow between specialized agents
+- Event-driven architecture using message queues for agent communication
+- Workflow engine with configurable agent sequences and decision points
+- Agent status monitoring and error handling with fallback mechanisms
+
+### Specialized AI Agents
+- Business Analyst Agent with NLP processing and requirements structuring capabilities
+- Business/Application/Infrastructure/Solution Architect Agents with domain-specific knowledge bases
+- Project Manager Agent with task breakdown and dependency management
+- Accountant Agent with cost modeling and financial analysis
+- Developer Agent with code generation and infrastructure automation
+
+### Data Management Layer
+- PostgreSQL database for architecture persistence and metadata
+- Redis caching layer for agent communication and session management
+- Git integration for version control and architecture artifact storage
+- S3-compatible storage for large architecture diagrams and documents
+
+### Integration Services
+- Reference Architecture Service providing access to industry patterns and standards
+- Pattern Library Service with reusable architectural components
+- Cloud Integration Service for infrastructure cost analysis and deployment
+- Authentication Service supporting enterprise SSO and role-based access
+
+## Data Models
+### Architecture Entity
+- Unique identifier, name, description, creation/modification timestamps
+- Layer definitions (business, application, infrastructure, implementation)
+- Status tracking (draft, pending_approval, approved, implemented)
+- Relationship mappings between architecture elements
+
+### Change Request Entity
+- Change identifier, description, requesting user, timestamps
+- Affected layers and components with impact assessment
+- Agent responses and recommendations for each layer
+- Approval status and implementation tracking
+
+### Agent Workflow Entity
+- Workflow identifier and current state
+- Agent sequence configuration and execution status
+- Inter-agent message passing and coordination
+- Error handling and retry mechanisms
+
+## APIs and Integrations
+### Core API Endpoints
+- RESTful API with OpenAPI 3.0 specification
+- Architecture CRUD operations (GET/POST/PUT/DELETE /api/v1/architectures)
+- Natural language processing endpoint (POST /api/v1/architectures/{id}/chat)
+- Change management endpoints for approval workflows
+- Architecture rendering endpoint supporting HTML, SVG, and PNG formats
+
+### External Integrations
+- MCP (Model Context Protocol) servers for Context7, TaskMaster, GitHub integration
+- Cloud provider APIs (AWS, Azure, GCP) for cost analysis and deployment
+- Reference architecture repositories and pattern libraries
+- Enterprise authentication systems (LDAP, Active Directory, SAML)
+
+## Infrastructure Requirements
+### Kubernetes Platform
+- AWS EKS host cluster with Karpenter auto-scaling
+- vcluster isolation for architecture-visualization workloads
+- Knative Serving for serverless agent scaling with cold start optimization
+- Istio service mesh providing single ingress point and traffic management
+
+### Storage and Networking
+- Persistent storage using AWS EBS with gp3 storage class
+- Redis cluster for caching and inter-agent communication
+- PostgreSQL with read replicas for high availability
+- Single Istio ingress gateway with SSL termination and routing
+
+### Deployment Pipeline
+- ArgoCD GitOps workflow for continuous deployment
+- KubeVela application definitions for declarative deployments
+- Container registry integration for agent and service images
+- Automated testing pipeline with integration and performance tests
+
+# Development Roadmap
+## Phase 1: Foundation Platform (MVP)
+### Infrastructure Setup
+- Deploy AWS EKS cluster with Karpenter auto-scaling
+- Configure vcluster with Knative and Istio integration
+- Install ArgoCD for GitOps deployment workflow
+- Set up persistent storage and networking components
+
+### Core Data Layer
+- Implement PostgreSQL database with architecture and change schemas
+- Deploy Redis cluster for caching and message passing
+- Create basic authentication service with JWT token management
+- Develop fundamental CRUD API for architecture entities
+
+### Basic Frontend
+- Build Streamlit application with three-pane layout
+- Implement hamburger menu for architecture navigation
+- Create simple chat interface with message history
+- Develop basic HTML architecture visualization component
+
+## Phase 2: Agent Framework
+### Agent Orchestration System
+- Build agent orchestration service with workflow management
+- Implement event-driven messaging between agents using Redis
+- Create agent registration and discovery mechanisms
+- Develop basic error handling and retry logic for agent failures
+
+### Core Agents Implementation
+- Business Analyst Agent with natural language processing capabilities
+- Business Architect Agent with basic business layer manipulation
+- Application Architect Agent with reference architecture access
+- Simple Developer Agent for basic code generation
+
+### Basic Change Management
+- Implement change request creation and tracking
+- Build basic approval workflow with user confirmation
+- Create change visualization showing pending modifications
+- Develop change propagation logic across architecture layers
+
+## Phase 3: Advanced Visualization and Agents
+### Enhanced Architecture Visualization
+- Implement full ArchiMate notation with standardized color coding
+- Build interactive architecture diagrams with zoom and pan capabilities
+- Create change highlighting system (gray for pending, color for approved)
+- Develop multi-layer architecture view switching
+
+### Remaining Agents
+- Infrastructure Architect Agent with cloud integration capabilities
+- Solution Architect Agent with pattern library access
+- Project Manager Agent with work package generation
+- Accountant Agent with cost analysis and budget tracking
+
+### Advanced Change Management
+- Build sophisticated change impact analysis across all layers
+- Implement change approval workflows with role-based permissions
+- Create change rollback and versioning capabilities
+- Develop audit trail and compliance reporting features
+
+## Phase 4: Integration and Optimization
+### External Integrations
+- MCP server integration for Context7, TaskMaster, and GitHub
+- Cloud provider API integration for cost analysis and deployment
+- Reference architecture library integration
+- Enterprise authentication system integration
+
+### Performance and Scalability
+- Implement agent auto-scaling based on workload
+- Optimize database queries and caching strategies
+- Build monitoring and alerting for system health
+- Create performance testing and load balancing
+
+### Advanced Features
+- Multi-architecture comparison and decision support
+- Automated code generation and infrastructure deployment
+- Advanced natural language processing with context awareness
+- Real-time collaborative editing capabilities
+
+# Logical Dependency Chain
+## Foundation Dependencies (Must Build First)
+1. **Infrastructure Platform**: EKS cluster, vcluster, Knative, Istio setup - provides runtime environment
+2. **Data Layer**: PostgreSQL, Redis, basic authentication - enables data persistence and security
+3. **Basic API**: CRUD operations for architectures - enables frontend data interaction
+4. **Frontend Shell**: Streamlit app with layout, navigation, chat interface - provides user interaction
+
+## Agent Framework Dependencies (Build After Foundation)
+1. **Agent Orchestration**: Workflow engine, messaging, coordination - enables multi-agent processing
+2. **Business Analyst Agent**: Requirements processing, NLP - first agent in processing chain
+3. **Core Architect Agents**: Business, Application, Infrastructure - handle main architecture layers
+4. **Change Management**: Request tracking, approval workflow - enables controlled architecture updates
+
+## Visualization Dependencies (Build After Agents)
+1. **Basic Architecture Rendering**: HTML visualization - shows architecture to users
+2. **ArchiMate Standards**: Color coding, notation - provides standard visualization
+3. **Change Highlighting**: Gray/color system - shows pending vs approved changes
+4. **Interactive Features**: Zoom, pan, layer switching - enhances user experience
+
+## Integration Dependencies (Build After Core System)
+1. **Reference Architecture Access**: Pattern libraries, standards - enhances agent capabilities
+2. **Cloud Integration**: Cost analysis, deployment - provides real-world context
+3. **Version Control**: Git integration, audit trails - enables enterprise governance
+4. **Advanced Agents**: Solution Architect, Project Manager, Accountant, Developer - completes agent ecosystem
+
+## Optimization Dependencies (Build Last)
+1. **Performance Tuning**: Caching, auto-scaling - improves system performance
+2. **Advanced Features**: Collaboration, complex decision support - adds advanced capabilities
+3. **Enterprise Integration**: SSO, compliance, monitoring - enables enterprise deployment
+
+# Risks and Mitigations
+## Technical Challenges
+### Multi-Agent Coordination Complexity
+- **Risk**: Agents may produce conflicting recommendations or fail to coordinate effectively
+- **Mitigation**: Implement robust workflow engine with clear handoff protocols, conflict resolution mechanisms, and rollback capabilities
+
+### ArchiMate Visualization Performance
+- **Risk**: Large, complex architectures may render slowly or become unresponsive
+- **Mitigation**: Implement client-side rendering with incremental updates, lazy loading of architecture elements, and progressive disclosure
+
+### Single Ingress Bottleneck
+- **Risk**: All traffic routing through one Istio gateway may create performance bottleneck
+- **Mitigation**: Configure Istio with proper load balancing, implement traffic management policies, and monitor gateway performance
+
+## MVP Definition and Scope
+### Agent Knowledge Consistency
+- **Risk**: Different agents may have inconsistent understanding of architecture standards and patterns
+- **Mitigation**: Implement centralized knowledge base with version control, regular agent knowledge synchronization, and validation checkpoints
+
+### Change Approval Workflow Complexity
+- **Risk**: Complex approval workflows may slow down architecture evolution and user adoption
+- **Mitigation**: Start with simple approval mechanisms, gather user feedback, and incrementally add workflow complexity based on actual usage patterns
+
+### Natural Language Processing Accuracy
+- **Risk**: Misinterpreting user requests may lead to incorrect architecture changes
+- **Mitigation**: Implement confidence scoring for NLP results, require user confirmation for significant changes, and provide clear change previews
+
+## Resource and Infrastructure Constraints
+### Knative Cold Start Latency
+- **Risk**: Agent services may experience cold start delays affecting user experience
+- **Mitigation**: Configure minimum instance counts for critical agents, implement pre-warming strategies, and optimize container startup times
+
+### vcluster Resource Limitations
+- **Risk**: vcluster may not provide sufficient isolation or resources for complex workloads
+- **Mitigation**: Monitor resource usage, implement auto-scaling policies, and plan for migration to dedicated clusters if needed
+
+### Cost Management
+- **Risk**: Multi-agent system with auto-scaling may incur unexpected cloud costs
+- **Mitigation**: Implement cost monitoring and alerting, set resource limits, and optimize agent resource usage through profiling
+
+# Appendix
+## Research Findings
+### ArchiMate Standards Compliance
+- ArchiMate 3.2 specification provides comprehensive notation standards for enterprise architecture
+- Color coding standards ensure consistency across different architecture tools and organizations
+- Layer separation (business, application, technology) aligns with standard enterprise architecture practices
+
+### Multi-Agent System Patterns
+- Sequential agent processing reduces coordination complexity compared to parallel processing
+- Event-driven architecture enables loose coupling between agents and improved scalability
+- Workflow engines provide better control and monitoring compared to ad-hoc agent communication
+
+## Technical Specifications
+### Performance Requirements
+- Architecture rendering should complete within 3 seconds for diagrams up to 100 elements
+- Agent processing should complete within 30 seconds for typical change requests
+- System should support concurrent users with less than 5% performance degradation
+
+### Scalability Requirements
+- Support for architectures with up to 1000 elements across all layers
+- Handle up to 50 concurrent users during peak usage periods
+- Auto-scale agents based on queue depth with maximum 10 instances per agent type
+
+### Security Requirements
+- All API endpoints require JWT authentication with role-based access control
+- Architecture data encrypted at rest using AES-256 encryption
+- All inter-service communication encrypted using TLS 1.3
+- Audit logging for all architecture changes and user actions

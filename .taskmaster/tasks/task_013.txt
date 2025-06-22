@@ -1,0 +1,204 @@
+# Task ID: 13
+# Title: Set Up ArgoCD App of Apps Structure with Vela Components
+# Status: pending
+# Dependencies: 11, 12
+# Priority: medium
+# Description: Create the project structure for an ArgoCD app of apps pattern that integrates with KubeVela applications, including repository setup for components and container image storage.
+# Details:
+1. Create the base directory structure for the ArgoCD app of apps pattern:
+
+mkdir -p argocd-vela-project/apps
+mkdir -p argocd-vela-project/components
+
+
+2. Set up the root application in ArgoCD (root-app.yaml):
+yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root-application
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/your-org/argocd-vela-project.git
+    targetRevision: HEAD
+    path: apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+
+3. Create GitHub repositories for each component:
+
+# Example using GitHub CLI
+gh repo create your-org/component-one --public
+gh repo create your-org/component-two --public
+gh repo create your-org/component-three --public
+
+
+4. Set up Google Container Registry (GCR) for image storage:
+
+# Authenticate with GCR
+gcloud auth configure-docker gcr.io
+
+# Create project structure for each component with Dockerfile
+for component in component-one component-two component-three; do
+  mkdir -p $component/src
+  cat > $component/Dockerfile << EOF
+FROM node:16-alpine
+WORKDIR /app
+COPY src/ .
+RUN npm install
+CMD ["npm", "start"]
+EOF
+done
+
+
+5. Create KubeVela application definition for each component (component-one.yaml):
+yaml
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: component-one
+  namespace: applications
+spec:
+  components:
+    - name: component-one
+      type: webservice
+      properties:
+        image: gcr.io/your-project/component-one:latest
+        ports:
+          - port: 8080
+            expose: true
+      traits:
+        - type: scaler
+          properties:
+            replicas: 2
+
+
+6. Create ArgoCD application definitions for each KubeVela application (apps/component-one.yaml):
+yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: component-one
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/your-org/component-one.git
+    targetRevision: HEAD
+    path: deploy
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: applications
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+
+7. Set up CI/CD workflows for each component repository to build and push images to GCR:
+yaml
+# .github/workflows/build.yaml
+name: Build and Push
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: your-project
+          service_account_key: ${{ secrets.GCR_KEY }}
+          
+      - name: Build and push
+        run: |
+          gcloud auth configure-docker gcr.io
+          docker build -t gcr.io/your-project/component-one:${{ github.sha }} .
+          docker push gcr.io/your-project/component-one:${{ github.sha }}
+          docker tag gcr.io/your-project/component-one:${{ github.sha }} gcr.io/your-project/component-one:latest
+          docker push gcr.io/your-project/component-one:latest
+
+
+8. Configure ArgoCD to monitor the repositories:
+
+argocd repo add https://github.com/your-org/argocd-vela-project.git --name root-repo
+argocd repo add https://github.com/your-org/component-one.git --name component-one
+argocd repo add https://github.com/your-org/component-two.git --name component-two
+argocd repo add https://github.com/your-org/component-three.git --name component-three
+
+
+9. Apply the root application to bootstrap the entire system:
+
+kubectl apply -f root-app.yaml
+
+
+# Test Strategy:
+1. Verify the GitHub repositories are correctly created and accessible:
+
+gh repo list your-org --limit 10
+
+
+2. Validate GCR access and permissions:
+
+gcloud container images list --repository=gcr.io/your-project
+
+
+3. Test the ArgoCD root application deployment:
+
+kubectl apply -f root-app.yaml
+kubectl get applications -n argocd
+argocd app get root-application
+
+Verify the root application is synced and healthy.
+
+4. Validate that child applications are automatically created:
+
+kubectl get applications -n argocd
+
+Confirm that component-one, component-two, etc. applications appear.
+
+5. Test the end-to-end workflow by making a change to a component repository:
+
+cd component-one
+# Make a change to the code
+git add .
+git commit -m "Test change"
+git push
+
+Verify in ArgoCD UI or CLI that the change is detected and deployed.
+
+6. Validate KubeVela application deployment:
+
+kubectl get application.core.oam.dev -n applications
+kubectl get deployment -n applications
+
+Confirm that the deployments are created as expected.
+
+7. Test container image build and push workflow:
+
+# Trigger GitHub Actions workflow manually or via commit
+gh workflow run build.yaml -R your-org/component-one
+
+Verify the image is built and pushed to GCR.
+
+8. Perform an integration test by accessing the deployed services:
+
+kubectl get svc -n applications
+# Use port-forward or ingress to access the service
+kubectl port-forward svc/component-one 8080:8080 -n applications
+curl http://localhost:8080
+
