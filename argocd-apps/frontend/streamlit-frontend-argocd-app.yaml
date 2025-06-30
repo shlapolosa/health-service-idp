@@ -1,0 +1,46 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: streamlit-frontend
+  namespace: argocd
+  labels:
+    app: streamlit-frontend
+    tier: frontend
+    dependency-tier: "5"
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/shlapolosa/health-service-idp
+    targetRevision: HEAD
+    path: oam-applications/frontend
+    directory:
+      include: "streamlit-frontend-app.yaml"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - PruneLast=true
+    - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  revisionHistoryLimit: 10
+  info:
+  - name: Description
+    value: Streamlit Frontend for Architecture Tool
+  - name: Dependencies
+    value: orchestration-service, solution-architect-anthropic

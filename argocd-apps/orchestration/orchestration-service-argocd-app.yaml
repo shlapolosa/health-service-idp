@@ -1,0 +1,46 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: orchestration-service
+  namespace: argocd
+  labels:
+    app: orchestration-service
+    tier: orchestration
+    dependency-tier: "1"
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/shlapolosa/health-service-idp
+    targetRevision: HEAD
+    path: oam-applications/orchestration
+    directory:
+      include: "orchestration-service-app.yaml"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - PruneLast=true
+    - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  revisionHistoryLimit: 10
+  info:
+  - name: Description
+    value: Orchestration service for managing agent workflows
+  - name: Dependencies
+    value: redis-infrastructure

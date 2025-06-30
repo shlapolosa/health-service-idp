@@ -1,0 +1,120 @@
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: orchestration-service
+  namespace: default
+  labels:
+    app: orchestration-service
+    tier: orchestration
+    managed-by: argocd
+    dependency-tier: "1"
+  annotations:
+    app.oam.dev/depends-on: "redis-infrastructure"
+spec:
+  components:
+  - name: orchestration-knative-service
+    type: raw
+    properties:
+      apiVersion: serving.knative.dev/v1
+      kind: Service
+      metadata:
+        name: orchestration-service
+        namespace: default
+        labels:
+          app: orchestration-service
+          version: v1.0.0
+          service-type: orchestration
+      spec:
+        template:
+          metadata:
+            labels:
+              app: orchestration-service
+              version: v1.0.0
+            annotations:
+              autoscaling.knative.dev/minScale: "1"
+              autoscaling.knative.dev/maxScale: "5"
+              autoscaling.knative.dev/target: "80"
+              autoscaling.knative.dev/scaleDownDelay: "60s"
+          spec:
+            serviceAccountName: default
+            containers:
+            - name: orchestration-service
+              image: socrates12345/orchestration-service:latest
+              ports:
+              - containerPort: 8080
+                protocol: TCP
+              env:
+              - name: LOG_LEVEL
+                value: "INFO"
+              - name: REDIS_URL
+                value: "redis://redis-service:6379"
+              - name: MAX_CONCURRENT_WORKFLOWS
+                value: "10"
+              - name: MAX_CONCURRENT_TASKS
+                value: "50"
+              - name: WORKFLOW_TIMEOUT
+                value: "3600"
+              resources:
+                requests:
+                  memory: "512Mi"
+                  cpu: "500m"
+                limits:
+                  memory: "1Gi"
+                  cpu: "1000m"
+              livenessProbe:
+                httpGet:
+                  path: /health
+                  port: 8080
+                initialDelaySeconds: 15
+                periodSeconds: 20
+                timeoutSeconds: 5
+                failureThreshold: 3
+              readinessProbe:
+                httpGet:
+                  path: /health
+                  port: 8080
+                initialDelaySeconds: 10
+                periodSeconds: 10
+                timeoutSeconds: 3
+                failureThreshold: 3
+
+  policies:
+  - name: dependency-policy
+    type: topology
+    properties:
+      namespace: default
+      if: "status.phase != 'Running'"
+      message: "Waiting for Redis infrastructure to be ready"
+
+  - name: health-policy
+    type: health
+    properties:
+      probeInterval: 30
+      probeTimeout: 10
+
+  workflow:
+    steps:
+    - name: check-redis-dependency
+      type: read-object
+      properties:
+        apiVersion: v1
+        kind: Service
+        name: redis-service
+        namespace: default
+      timeout: 300s
+    - name: wait-for-redis
+      type: step-group
+      subSteps:
+      - name: test-redis-connectivity
+        type: suspend
+        properties:
+          duration: "10s"
+    - name: deploy-orchestration-service
+      type: apply-component
+      properties:
+        component: orchestration-knative-service
+    - name: verify-orchestration-ready
+      type: wait-for-healthy
+      properties:
+        component: orchestration-knative-service
+        timeout: 300s

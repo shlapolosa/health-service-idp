@@ -1,0 +1,100 @@
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: redis-infrastructure
+  namespace: default
+  labels:
+    app: redis
+    tier: infrastructure
+    managed-by: argocd
+    dependency-tier: "0"
+spec:
+  components:
+  - name: redis-deployment
+    type: raw
+    properties:
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: redis
+        namespace: default
+        labels:
+          app: redis
+      spec:
+        replicas: 1
+        selector:
+          matchLabels:
+            app: redis
+        template:
+          metadata:
+            labels:
+              app: redis
+          spec:
+            containers:
+            - name: redis
+              image: redis:7.2-alpine
+              ports:
+              - containerPort: 6379
+              resources:
+                requests:
+                  memory: "128Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "256Mi"
+                  cpu: "200m"
+              readinessProbe:
+                exec:
+                  command:
+                  - redis-cli
+                  - ping
+                initialDelaySeconds: 5
+                periodSeconds: 5
+              livenessProbe:
+                exec:
+                  command:
+                  - redis-cli
+                  - ping
+                initialDelaySeconds: 10
+                periodSeconds: 10
+
+  - name: redis-service
+    type: raw
+    properties:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: redis-service
+        namespace: default
+        labels:
+          app: redis
+      spec:
+        selector:
+          app: redis
+        ports:
+        - port: 6379
+          targetPort: 6379
+          protocol: TCP
+        type: ClusterIP
+
+  policies:
+  - name: health-policy
+    type: health
+    properties:
+      probeInterval: 30
+      probeTimeout: 10
+
+  workflow:
+    steps:
+    - name: deploy-redis-deployment
+      type: apply-component
+      properties:
+        component: redis-deployment
+    - name: deploy-redis-service
+      type: apply-component
+      properties:
+        component: redis-service
+    - name: verify-redis-health
+      type: wait-for-healthy
+      properties:
+        component: redis-deployment
+        timeout: 300s

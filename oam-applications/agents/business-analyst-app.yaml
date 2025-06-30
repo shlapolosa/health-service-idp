@@ -1,0 +1,122 @@
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: business-analyst-anthropic
+  namespace: default
+  labels:
+    app: business-analyst-anthropic
+    tier: agents
+    agent-type: anthropic
+    managed-by: argocd
+    dependency-tier: "2"
+  annotations:
+    app.oam.dev/depends-on: "orchestration-service,redis-infrastructure"
+spec:
+  components:
+  - name: business-analyst-knative-service
+    type: raw
+    properties:
+      apiVersion: serving.knative.dev/v1
+      kind: Service
+      metadata:
+        name: business-analyst-anthropic
+        namespace: default
+        labels:
+          app: business-analyst-anthropic
+          version: v1.0.0
+          agent-type: anthropic
+          agent-role: business-analyst
+      spec:
+        template:
+          metadata:
+            labels:
+              app: business-analyst-anthropic
+              version: v1.0.0
+            annotations:
+              autoscaling.knative.dev/minScale: "0"
+              autoscaling.knative.dev/maxScale: "3"
+              autoscaling.knative.dev/target: "70"
+              autoscaling.knative.dev/scaleToZeroGracePeriod: "300s"
+          spec:
+            serviceAccountName: default
+            containers:
+            - name: business-analyst-anthropic
+              image: socrates12345/business-analyst-anthropic:latest
+              ports:
+              - containerPort: 8080
+                protocol: TCP
+              env:
+              - name: LOG_LEVEL
+                value: "INFO"
+              - name: REDIS_URL
+                value: "redis://redis-service:6379"
+              - name: ORCHESTRATION_SERVICE_URL
+                value: "http://orchestration-service.default.svc.cluster.local"
+              - name: AGENT_ROLE
+                value: "business-analyst"
+              - name: AGENT_TYPE
+                value: "anthropic"
+              resources:
+                requests:
+                  memory: "256Mi"
+                  cpu: "200m"
+                limits:
+                  memory: "512Mi"
+                  cpu: "500m"
+              livenessProbe:
+                httpGet:
+                  path: /health
+                  port: 8080
+                initialDelaySeconds: 30
+                periodSeconds: 30
+                timeoutSeconds: 10
+              readinessProbe:
+                httpGet:
+                  path: /health
+                  port: 8080
+                initialDelaySeconds: 15
+                periodSeconds: 15
+                timeoutSeconds: 5
+
+  policies:
+  - name: dependency-policy
+    type: topology
+    properties:
+      namespace: default
+      if: "status.phase != 'Running'"
+      message: "Waiting for orchestration service and Redis to be ready"
+
+  - name: health-policy
+    type: health
+    properties:
+      probeInterval: 60
+      probeTimeout: 15
+
+  workflow:
+    steps:
+    - name: check-dependencies
+      type: step-group
+      subSteps:
+      - name: check-redis
+        type: read-object
+        properties:
+          apiVersion: v1
+          kind: Service
+          name: redis-service
+          namespace: default
+      - name: check-orchestration
+        type: read-object
+        properties:
+          apiVersion: serving.knative.dev/v1
+          kind: Service
+          name: orchestration-service
+          namespace: default
+    - name: deploy-business-analyst
+      type: apply-component
+      properties:
+        component: business-analyst-knative-service
+    - name: verify-agent-ready
+      type: wait-for-healthy
+      properties:
+        component: business-analyst-knative-service
+        timeout: 300s

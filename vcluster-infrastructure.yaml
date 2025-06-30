@@ -1,0 +1,315 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Complete vcluster infrastructure with Istio, ArgoCD, Knative, and KubeVela'
+
+Parameters:
+  ClusterName:
+    Type: String
+    Default: socrateshlapolosa-karpenter-demo
+    Description: EKS cluster name
+  VClusterName:
+    Type: String
+    Default: architecture-vizualisation
+    Description: vcluster name
+  VClusterNamespace:
+    Type: String
+    Default: vcluster-platform
+    Description: Namespace for vcluster
+  DockerHubUsername:
+    Type: String
+    Description: Docker Hub username for image pulls
+    NoEcho: false
+  DockerHubPassword:
+    Type: String
+    Description: Docker Hub password/token for image pulls
+    NoEcho: true
+
+Resources:
+  # SSM Parameters for secure configuration storage
+  DockerHubUsernameParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/vcluster/${VClusterName}/dockerhub/username"
+      Type: String
+      Value: !Ref DockerHubUsername
+      Description: Docker Hub username for vcluster
+
+  DockerHubPasswordParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/vcluster/${VClusterName}/dockerhub/password"
+      Type: SecureString
+      Value: !Ref DockerHubPassword
+      Description: Docker Hub password for vcluster
+
+  # IAM Role for EKS service account (for SSM access)
+  VClusterServiceAccountRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${VClusterName}-service-account-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/${ClusterOIDCProvider}"
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                !Sub "${ClusterOIDCProvider}:sub": !Sub "system:serviceaccount:${VClusterNamespace}:vcluster-${VClusterName}"
+                !Sub "${ClusterOIDCProvider}:aud": "sts.amazonaws.com"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess
+      Policies:
+        - PolicyName: SSMParameterAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                Resource:
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/vcluster/${VClusterName}/*"
+
+  # Lambda function to deploy vcluster and tools
+  VClusterDeploymentFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${VClusterName}-deployment"
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Timeout: 900
+      Role: !GetAtt VClusterDeploymentRole.Arn
+      Environment:
+        Variables:
+          CLUSTER_NAME: !Ref ClusterName
+          VCLUSTER_NAME: !Ref VClusterName
+          VCLUSTER_NAMESPACE: !Ref VClusterNamespace
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import subprocess
+          import os
+          import base64
+          
+          def lambda_handler(event, context):
+              try:
+                  cluster_name = os.environ['CLUSTER_NAME']
+                  vcluster_name = os.environ['VCLUSTER_NAME']
+                  vcluster_namespace = os.environ['VCLUSTER_NAMESPACE']
+                  
+                  # Update kubeconfig
+                  subprocess.run([
+                      'aws', 'eks', 'update-kubeconfig',
+                      '--region', context.invoked_function_arn.split(':')[3],
+                      '--name', cluster_name
+                  ], check=True)
+                  
+                  # Create vcluster namespace
+                  subprocess.run([
+                      'kubectl', 'create', 'namespace', vcluster_namespace
+                  ], check=False)  # Ignore if exists
+                  
+                  # Create vcluster values file with Karpenter tolerations
+                  vcluster_values = """
+platform:
+  api:
+    ingressPrefixPath: /vcluster/api
+vcluster:
+  image: rancher/k3s:v1.28.2-k3s1
+storage:
+  size: 20Gi
+tolerations:
+  - key: karpenter.sh/provisioner-name
+    operator: Exists
+    effect: NoSchedule
+  - key: node.kubernetes.io/not-ready
+    operator: Exists
+    effect: NoExecute
+    tolerationSeconds: 300
+  - key: node.kubernetes.io/unreachable
+    operator: Exists
+    effect: NoExecute
+    tolerationSeconds: 300
+nodeSelector:
+  karpenter.sh/provisioner-name: default
+syncer:
+  nodeSelector:
+    karpenter.sh/provisioner-name: default
+  tolerations:
+    - key: karpenter.sh/provisioner-name
+      operator: Exists
+      effect: NoSchedule
+"""
+                  
+                  with open('/tmp/vcluster-values.yaml', 'w') as f:
+                      f.write(vcluster_values)
+                  
+                  # Install vcluster using Helm
+                  subprocess.run([
+                      'helm', 'repo', 'add', 'loft', 'https://charts.loft.sh'
+                  ], check=True)
+                  
+                  subprocess.run(['helm', 'repo', 'update'], check=True)
+                  
+                  subprocess.run([
+                      'helm', 'install', vcluster_name, 'loft/vcluster',
+                      '--namespace', vcluster_namespace,
+                      '--values', '/tmp/vcluster-values.yaml',
+                      '--wait'
+                  ], check=True)
+                  
+                  return {
+                      'statusCode': 200,
+                      'body': json.dumps(f'vcluster {vcluster_name} deployed successfully')
+                  }
+                  
+              except Exception as e:
+                  return {
+                      'statusCode': 500,
+                      'body': json.dumps(f'Error: {str(e)}')
+                  }
+
+  VClusterDeploymentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+      Policies:
+        - PolicyName: EKSAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - eks:DescribeCluster
+                  - eks:ListClusters
+                Resource: !Sub "arn:aws:eks:${AWS::Region}:${AWS::AccountId}:cluster/${ClusterName}"
+
+  # Custom resource to trigger vcluster deployment
+  VClusterDeployment:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !GetAtt VClusterDeploymentFunction.Arn
+
+  # Lambda function for tool installation
+  ToolInstallationFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${VClusterName}-tools-installation"
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Timeout: 900
+      Role: !GetAtt VClusterDeploymentRole.Arn
+      Environment:
+        Variables:
+          CLUSTER_NAME: !Ref ClusterName
+          VCLUSTER_NAME: !Ref VClusterName
+          VCLUSTER_NAMESPACE: !Ref VClusterNamespace
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import subprocess
+          import os
+          import time
+          
+          def lambda_handler(event, context):
+              try:
+                  cluster_name = os.environ['CLUSTER_NAME']
+                  vcluster_name = os.environ['VCLUSTER_NAME']
+                  vcluster_namespace = os.environ['VCLUSTER_NAMESPACE']
+                  
+                  # Connect to vcluster
+                  subprocess.run([
+                      'vcluster', 'connect', vcluster_name,
+                      '--namespace', vcluster_namespace
+                  ], check=True)
+                  
+                  # Install Istio
+                  subprocess.run([
+                      'kubectl', 'apply', '-f',
+                      'https://github.com/istio/istio/releases/download/1.18.2/istio-1.18.2-linux-amd64.tar.gz'
+                  ], check=False)
+                  
+                  # Install Knative Serving
+                  subprocess.run([
+                      'kubectl', 'apply', '-f',
+                      'https://github.com/knative/serving/releases/download/knative-v1.18.1/serving-crds.yaml'
+                  ], check=True)
+                  
+                  subprocess.run([
+                      'kubectl', 'apply', '-f',
+                      'https://github.com/knative/serving/releases/download/knative-v1.18.1/serving-core.yaml'
+                  ], check=True)
+                  
+                  # Install ArgoCD
+                  subprocess.run([
+                      'kubectl', 'create', 'namespace', 'argocd'
+                  ], check=False)
+                  
+                  subprocess.run([
+                      'kubectl', 'apply', '-n', 'argocd', '-f',
+                      'https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml'
+                  ], check=True)
+                  
+                  # Install KubeVela
+                  subprocess.run([
+                      'helm', 'repo', 'add', 'kubevela', 'https://kubevela.github.io/charts'
+                  ], check=True)
+                  
+                  subprocess.run(['helm', 'repo', 'update'], check=True)
+                  
+                  subprocess.run([
+                      'helm', 'install', 'vela-core', 'kubevela/vela-core',
+                      '--namespace', 'vela-system',
+                      '--create-namespace',
+                      '--wait'
+                  ], check=True)
+                  
+                  return {
+                      'statusCode': 200,
+                      'body': json.dumps('All tools installed successfully')
+                  }
+                  
+              except Exception as e:
+                  return {
+                      'statusCode': 500,
+                      'body': json.dumps(f'Error: {str(e)}')
+                  }
+
+  # Custom resource to trigger tool installation
+  ToolInstallation:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: VClusterDeployment
+    Properties:
+      ServiceToken: !GetAtt ToolInstallationFunction.Arn
+
+Outputs:
+  VClusterName:
+    Description: Name of the created vcluster
+    Value: !Ref VClusterName
+    Export:
+      Name: !Sub "${AWS::StackName}-VClusterName"
+  
+  VClusterNamespace:
+    Description: Namespace where vcluster is deployed
+    Value: !Ref VClusterNamespace
+    Export:
+      Name: !Sub "${AWS::StackName}-VClusterNamespace"
+  
+  DockerHubParameterPath:
+    Description: SSM parameter path for Docker Hub credentials
+    Value: !Sub "/vcluster/${VClusterName}/dockerhub/"
+    Export:
+      Name: !Sub "${AWS::StackName}-DockerHubParameterPath"

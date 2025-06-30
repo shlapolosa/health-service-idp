@@ -1,0 +1,107 @@
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: infrastructure-architect-anthropic
+  namespace: default
+  labels:
+    app: infrastructure-architect-anthropic
+    tier: agents
+    agent-type: anthropic
+    managed-by: argocd
+    dependency-tier: "3"
+  annotations:
+    app.oam.dev/depends-on: "application-architect-anthropic,orchestration-service"
+spec:
+  components:
+  - name: infrastructure-architect-knative-service
+    type: raw
+    properties:
+      apiVersion: serving.knative.dev/v1
+      kind: Service
+      metadata:
+        name: infrastructure-architect-anthropic
+        namespace: default
+        labels:
+          app: infrastructure-architect-anthropic
+          version: v1.0.0
+          agent-type: anthropic
+          agent-role: infrastructure-architect
+      spec:
+        template:
+          metadata:
+            labels:
+              app: infrastructure-architect-anthropic
+              version: v1.0.0
+            annotations:
+              autoscaling.knative.dev/minScale: "0"
+              autoscaling.knative.dev/maxScale: "3"
+              autoscaling.knative.dev/target: "70"
+              autoscaling.knative.dev/scaleToZeroGracePeriod: "300s"
+          spec:
+            serviceAccountName: default
+            containers:
+            - name: infrastructure-architect-anthropic
+              image: socrates12345/infrastructure-architect-anthropic:latest
+              ports:
+              - containerPort: 8080
+                protocol: TCP
+              env:
+              - name: LOG_LEVEL
+                value: "INFO"
+              - name: REDIS_URL
+                value: "redis://redis-service:6379"
+              - name: ORCHESTRATION_SERVICE_URL
+                value: "http://orchestration-service.default.svc.cluster.local"
+              - name: AGENT_ROLE
+                value: "infrastructure-architect"
+              - name: AGENT_TYPE
+                value: "anthropic"
+              - name: APPLICATION_ARCHITECT_URL
+                value: "http://application-architect-anthropic.default.svc.cluster.local"
+              resources:
+                requests:
+                  memory: "256Mi"
+                  cpu: "200m"
+                limits:
+                  memory: "512Mi"
+                  cpu: "500m"
+              livenessProbe:
+                httpGet:
+                  path: /health
+                  port: 8080
+                initialDelaySeconds: 30
+                periodSeconds: 30
+              readinessProbe:
+                httpGet:
+                  path: /health
+                  port: 8080
+                initialDelaySeconds: 15
+                periodSeconds: 15
+
+  policies:
+  - name: dependency-policy
+    type: topology
+    properties:
+      namespace: default
+      if: "status.phase != 'Running'"
+      message: "Waiting for application architect service"
+
+  workflow:
+    steps:
+    - name: check-application-architect
+      type: read-object
+      properties:
+        apiVersion: serving.knative.dev/v1
+        kind: Service
+        name: application-architect-anthropic
+        namespace: default
+      timeout: 300s
+    - name: deploy-infrastructure-architect
+      type: apply-component
+      properties:
+        component: infrastructure-architect-knative-service
+    - name: verify-agent-ready
+      type: wait-for-healthy
+      properties:
+        component: infrastructure-architect-knative-service
+        timeout: 300s

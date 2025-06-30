@@ -1,26 +1,24 @@
+# Minimal vcluster configuration that works with latest chart version
 sync:
   toHost:
     pods:
       enabled: true
       enforceTolerations:
         - vclusterID=architecture-vizualisation:NoSchedule
-    ingresses:
+    persistentVolumes:
       enabled: true
     persistentVolumeClaims:
       enabled: true
-    persistentVolumes:
-      enabled: true
     storageClasses:
       enabled: true
+    ingresses:
+      enabled: true
 
+# Enable CoreDNS (not embedded - that's pro only)
 controlPlane:
   coredns:
     enabled: true
     embedded: false
-  statefulSet:
-    scheduling:
-      tolerations:
-        - key: vclusterID
-          operator: Equal
-          value: architecture-vizualisation
-          effect: NoSchedule
+
+# Service CIDR
+serviceCIDR: "10.96.0.0/12"
