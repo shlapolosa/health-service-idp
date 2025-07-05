@@ -31,5 +31,10 @@ EXPOSE 8501
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8501/_stcore/health || exit 1
 
+# Add version label for GitOps tracking
+LABEL version="1.1.0" \
+      description="Visual Architecture Tool Frontend" \
+      maintainer="health-service-idp-team"
+
 # Run the application
 CMD ["streamlit", "run", "main.py", "--server.port=8501", "--server.address=0.0.0.0"]
