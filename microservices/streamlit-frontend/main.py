@@ -16,7 +16,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Test GitOps pipeline trigger - Fixed JSON dispatch formatting
+# Test GitOps pipeline trigger - JSON parsing fix deployed
 
 # Custom CSS for better styling
 st.markdown("""
