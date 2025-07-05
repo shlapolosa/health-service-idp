@@ -16,7 +16,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Test GitOps pipeline trigger - YAML syntax fixed
+# Test GitOps pipeline trigger - Repository dispatch events
 
 # Custom CSS for better styling
 st.markdown("""
