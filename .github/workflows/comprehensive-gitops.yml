@@ -319,7 +319,7 @@ jobs:
           git config --local user.name "GitOps Bot"
           
           # Configure git to use PERSONAL_ACCESS_TOKEN for authentication
-          git remote set-url origin https://${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/shlapolosa/${{ env.GITOPS_REPO }}.git
+          git remote set-url origin https://x-access-token:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/shlapolosa/${{ env.GITOPS_REPO }}.git
           
           for service in "${SERVICES[@]}"; do
             echo "🔄 Updating GitOps manifests for $service..."
