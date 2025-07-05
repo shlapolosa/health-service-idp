@@ -21,11 +21,11 @@ env:
 
 jobs:
   # Phase 1: Security Scanning
-  detect-services:
+  detect-changes:
     runs-on: ubuntu-latest
     outputs:
-      services: ${{ steps.services.outputs.matrix }}
       changed-services: ${{ steps.changes.outputs.changed-services }}
+      changed-services-json: ${{ steps.changes.outputs.changed-services-json }}
       should-deploy: ${{ steps.changes.outputs.should-deploy }}
     steps:
       - name: Checkout code
@@ -40,16 +40,20 @@ jobs:
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | grep -E '^microservices/' || true)
           elif [ "${{ github.event_name }}" = "schedule" ]; then
-            # For scheduled runs, scan all services
-            CHANGED_FILES=$(find microservices -name "*.py" -o -name "Dockerfile" | head -5)
+            # For scheduled runs, scan first few services
+            CHANGED_FILES=$(find microservices -name "Dockerfile" -type f | head -3)
           else
             CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -E '^microservices/' || true)
           fi
           
           # Extract unique service directories
           CHANGED_SERVICES=""
+          CHANGED_SERVICES_JSON="[]"
+          
           if [ ! -z "$CHANGED_FILES" ]; then
             CHANGED_SERVICES=$(echo "$CHANGED_FILES" | cut -d'/' -f1-2 | sort -u | grep '^microservices/' | cut -d'/' -f2 | tr '\n' ',' | sed 's/,$//')
+            # Create JSON array for matrix
+            CHANGED_SERVICES_JSON=$(echo "$CHANGED_SERVICES" | tr ',' '\n' | jq -R -n '[inputs | select(length>0)]')
           fi
           
           # Determine if we should deploy (only on main branch pushes)
@@ -59,32 +63,19 @@ jobs:
           fi
           
           echo "changed-services=$CHANGED_SERVICES" >> $GITHUB_OUTPUT
+          echo "changed-services-json=$CHANGED_SERVICES_JSON" >> $GITHUB_OUTPUT
           echo "should-deploy=$SHOULD_DEPLOY" >> $GITHUB_OUTPUT
           echo "Changed services: $CHANGED_SERVICES"
+          echo "Changed services JSON: $CHANGED_SERVICES_JSON"
           echo "Should deploy: $SHOULD_DEPLOY"
 
-      - name: Find all services with Dockerfiles
-        id: services
-        run: |
-          # Find services and create JSON array
-          SERVICES_LIST=$(find microservices -name "Dockerfile" -type f | sed 's|microservices/||g' | sed 's|/Dockerfile||g' | sort)
-          
-          if [ -z "$SERVICES_LIST" ]; then
-            SERVICES="[]"
-          else
-            SERVICES=$(echo "$SERVICES_LIST" | jq -R -n '[inputs | select(length>0)]')
-          fi
-          
-          echo "services=$SERVICES" >> $GITHUB_OUTPUT
-          echo "All services: $SERVICES"
-
   vulnerability-scan:
-    needs: detect-services
-    if: fromJson(needs.detect-services.outputs.services)[0] != null
+    needs: detect-changes
+    if: needs.detect-changes.outputs.changed-services != '' && fromJson(needs.detect-changes.outputs.changed-services-json)[0] != null
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: ${{ fromJson(needs.detect-services.outputs.services) }}
+        service: ${{ fromJson(needs.detect-changes.outputs.changed-services-json) }}
       fail-fast: false  # Continue scanning other services if one fails
     steps:
       - name: Checkout code
@@ -146,8 +137,8 @@ jobs:
 
   # Phase 2: Semantic Versioning and Build
   semantic-versioning:
-    needs: [detect-services, vulnerability-scan, dependency-check]
-    if: needs.detect-services.outputs.changed-services != '' && needs.detect-services.outputs.should-deploy == 'true'
+    needs: [detect-changes, vulnerability-scan, dependency-check]
+    if: needs.detect-changes.outputs.changed-services != '' && needs.detect-changes.outputs.should-deploy == 'true'
     runs-on: ubuntu-latest
     outputs:
       version-info: ${{ steps.versions.outputs.version-info }}
@@ -163,7 +154,7 @@ jobs:
           # Make version manager executable
           chmod +x .github/scripts/version-manager.sh
           
-          IFS=',' read -ra SERVICES <<< "${{ needs.detect-services.outputs.changed-services }}"
+          IFS=',' read -ra SERVICES <<< "${{ needs.detect-changes.outputs.changed-services }}"
           VERSION_INFO=""
           
           for service in "${SERVICES[@]}"; do
@@ -198,7 +189,7 @@ jobs:
         run: |
           chmod +x .github/scripts/version-manager.sh
           
-          IFS=',' read -ra SERVICES <<< "${{ needs.detect-services.outputs.changed-services }}"
+          IFS=',' read -ra SERVICES <<< "${{ needs.detect-changes.outputs.changed-services }}"
           
           for service in "${SERVICES[@]}"; do
             if [ -f "microservices/$service/Dockerfile" ]; then
@@ -255,8 +246,8 @@ jobs:
 
   # Phase 3: GitOps Update
   update-gitops:
-    needs: [detect-services, semantic-versioning]
-    if: needs.detect-services.outputs.changed-services != '' && needs.detect-services.outputs.should-deploy == 'true'
+    needs: [detect-changes, semantic-versioning]
+    if: needs.detect-changes.outputs.changed-services != '' && needs.detect-changes.outputs.should-deploy == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source code
@@ -279,7 +270,7 @@ jobs:
           # Make version manager executable
           chmod +x source/.github/scripts/version-manager.sh
           
-          IFS=',' read -ra SERVICES <<< "${{ needs.detect-services.outputs.changed-services }}"
+          IFS=',' read -ra SERVICES <<< "${{ needs.detect-changes.outputs.changed-services }}"
           
           cd gitops
           git config --local user.email "gitops-bot@github.com"
@@ -350,8 +341,8 @@ jobs:
 
   # Phase 4: Generate Summary
   deployment-summary:
-    needs: [detect-services, semantic-versioning, update-gitops]
-    if: always() && needs.detect-services.outputs.changed-services != ''
+    needs: [detect-changes, semantic-versioning, update-gitops]
+    if: always() && needs.detect-changes.outputs.changed-services != ''
     runs-on: ubuntu-latest
     steps:
       - name: Generate deployment summary
@@ -363,7 +354,7 @@ jobs:
           echo "- **Dependency Check**: ${{ needs.dependency-check.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🏗️ Build & Deploy" >> $GITHUB_STEP_SUMMARY
-          echo "- **Changed Services**: ${{ needs.detect-services.outputs.changed-services }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Changed Services**: ${{ needs.detect-changes.outputs.changed-services }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Semantic Versioning**: ${{ needs.semantic-versioning.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **GitOps Update**: ${{ needs.update-gitops.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Version Info**: ${{ needs.semantic-versioning.outputs.version-info }}" >> $GITHUB_STEP_SUMMARY
