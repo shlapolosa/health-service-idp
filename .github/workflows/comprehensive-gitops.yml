@@ -223,7 +223,17 @@ jobs:
               # Build primary image with rich metadata
               PRIMARY_TAG="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/$service:$COMMIT_SHA"
               
+              # Determine correct build context and dockerfile
+              if [[ "$service" == "orchestration-service" ]]; then
+                BUILD_CONTEXT="./microservices"
+                DOCKERFILE_PATH="-f orchestration-service/Dockerfile"
+              else
+                BUILD_CONTEXT="./microservices/$service"
+                DOCKERFILE_PATH=""
+              fi
+              
               docker build -t "$PRIMARY_TAG" \
+                $DOCKERFILE_PATH \
                 --label "org.opencontainers.image.version=$SEMVER" \
                 --label "org.opencontainers.image.revision=${{ github.sha }}" \
                 --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
@@ -238,7 +248,7 @@ jobs:
                 --label "build-date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
                 --label "build-number=${{ github.run_number }}" \
                 --label "workflow-run=${{ github.run_id }}" \
-                "./microservices/$service"
+                "$BUILD_CONTEXT"
               
               # Create all semantic version tags
               IFS=',' read -ra TAG_ARRAY <<< "$CONTAINER_TAGS"
