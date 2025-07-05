@@ -106,7 +106,17 @@ jobs:
       - name: Build image for scanning
         run: |
           echo "🔍 Building ${{ matrix.service }} for security scanning..."
-          docker build -t local-scan/${{ matrix.service }}:latest ./microservices/${{ matrix.service }}
+          
+          # Determine correct build context and dockerfile
+          if [[ "${{ matrix.service }}" == "orchestration-service" ]]; then
+            BUILD_CONTEXT="./microservices"
+            DOCKERFILE_PATH="-f orchestration-service/Dockerfile"
+          else
+            BUILD_CONTEXT="./microservices/${{ matrix.service }}"
+            DOCKERFILE_PATH=""
+          fi
+          
+          docker build -t local-scan/${{ matrix.service }}:latest $DOCKERFILE_PATH "$BUILD_CONTEXT"
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
