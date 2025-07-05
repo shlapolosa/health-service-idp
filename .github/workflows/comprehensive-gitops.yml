@@ -345,9 +345,10 @@ jobs:
             fi
           done
           
-          # Configure git
+          # Configure git with authentication
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
+          git remote set-url origin https://x-access-token:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/shlapolosa/${{ env.GITOPS_REPO }}.git
           
           # Check if there are changes
           if git diff --quiet; then
