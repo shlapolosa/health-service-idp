@@ -358,7 +358,7 @@ jobs:
             git add -A
             git commit -m "chore: update deployment manifests with semantic versioning
 
-            Services: ${{ needs.detect-services.outputs.changed-services }}
+            Services: ${{ needs.detect-changes.outputs.changed-services }}
             Versions: ${{ needs.semantic-versioning.outputs.version-info }}
             Source commit: ${{ github.sha }}
             
