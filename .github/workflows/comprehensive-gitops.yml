@@ -286,105 +286,88 @@ jobs:
             fi
           done
 
-  # Phase 3: GitOps Update
+  # Phase 3: GitOps Update via Direct Checkout and Push
   update-gitops:
     needs: [detect-changes, semantic-versioning]
     if: needs.detect-changes.outputs.changed-services != '' && needs.detect-changes.outputs.should-deploy == 'true' && needs.semantic-versioning.result == 'success'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout source code
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
-          path: source
-
       - name: Checkout GitOps repository
         uses: actions/checkout@v4
         with:
           repository: shlapolosa/${{ env.GITOPS_REPO }}
           token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-          ref: ${{ env.GITOPS_BRANCH }}
-          path: gitops
+          path: gitops-repo
 
-      - name: Update GitOps manifests with semantic versions
+      - name: Update GitOps manifests
         run: |
-          # Make version manager executable
-          chmod +x source/.github/scripts/version-manager.sh
+          echo "🚀 Updating GitOps repository manifests..."
           
-          IFS=',' read -ra SERVICES <<< "${{ needs.detect-changes.outputs.changed-services }}"
+          cd gitops-repo
           
-          cd gitops
-          git config --local user.email "gitops-bot@github.com"
-          git config --local user.name "GitOps Bot"
+          # Prepare deployment data
+          SERVICES="${{ needs.detect-changes.outputs.changed-services }}"
+          VERSION_INFO="${{ needs.semantic-versioning.outputs.version-info }}"
+          SOURCE_COMMIT="${{ github.sha }}"
+          COMMIT_SHA="${GITHUB_SHA:0:7}"
           
-          # Remove default GitHub token auth header that conflicts with PAT
-          git config --unset-all http.https://github.com/.extraheader || true
+          echo "Services to update: $SERVICES"
+          echo "Version info: $VERSION_INFO"
           
-          # Configure git to use PERSONAL_ACCESS_TOKEN for authentication
-          git remote set-url origin https://${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/shlapolosa/${{ env.GITOPS_REPO }}.git
+          # Update each service's manifest
+          IFS=',' read -ra SERVICE_ARRAY <<< "$SERVICES"
           
-          for service in "${SERVICES[@]}"; do
-            echo "🔄 Updating GitOps manifests for $service..."
+          for service in "${SERVICE_ARRAY[@]}"; do
+            echo "🔄 Updating $service manifest..."
             
-            # Generate new image with semantic version
-            COMMIT_SHA="${GITHUB_SHA:0:7}"
             NEW_IMAGE="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/$service:$COMMIT_SHA"
-            SEMVER=$(../source/.github/scripts/version-manager.sh version "$service")
             
-            echo "Service: $service"
-            echo "New Image: $NEW_IMAGE"
-            echo "Semantic Version: $SEMVER"
+            # Find OAM application file for the service
+            OAM_FILE="oam/frontend/${service}-app.yaml"
+            if [ ! -f "$OAM_FILE" ]; then
+              # Try other possible locations
+              OAM_FILE=$(find oam -name "*${service}*.yaml" | head -1)
+            fi
             
-            # Update OAM applications
-            case "$service" in
-              "streamlit-frontend")
-                if [ -f "oam/frontend/streamlit-frontend-app.yaml" ]; then
-                  sed -i "s|image: socrates12345/streamlit-frontend:.*|image: $NEW_IMAGE|g" oam/frontend/streamlit-frontend-app.yaml
-                  sed -i "s|version: .*|version: $SEMVER|g" oam/frontend/streamlit-frontend-app.yaml
-                fi
-                if [ -f "environments/dev/frontend-simple.yaml" ]; then
-                  sed -i "s|image: socrates12345/streamlit-frontend:.*|image: $NEW_IMAGE|g" environments/dev/frontend-simple.yaml
-                  sed -i "s|version: .*|version: $SEMVER|g" environments/dev/frontend-simple.yaml
-                fi
-                ;;
-              "orchestration-service")
-                if [ -f "oam/orchestration/orchestration-service-app.yaml" ]; then
-                  sed -i "s|image: socrates12345/orchestration-service:.*|image: $NEW_IMAGE|g" oam/orchestration/orchestration-service-app.yaml
-                  sed -i "s|version: .*|version: $SEMVER|g" oam/orchestration/orchestration-service-app.yaml
-                fi
-                if [ -f "environments/dev/orchestration-service-simple.yaml" ]; then
-                  sed -i "s|image: socrates12345/orchestration-service:.*|image: $NEW_IMAGE|g" environments/dev/orchestration-service-simple.yaml
-                  sed -i "s|version: .*|version: $SEMVER|g" environments/dev/orchestration-service-simple.yaml
-                fi
-                ;;
-              *)
-                # Handle other agent services
-                if [ -f "oam/agents/$service-app.yaml" ]; then
-                  sed -i "s|image: socrates12345/$service:.*|image: $NEW_IMAGE|g" oam/agents/$service-app.yaml
-                  sed -i "s|version: .*|version: $SEMVER|g" oam/agents/$service-app.yaml
-                fi
-                ;;
-            esac
+            if [ -f "$OAM_FILE" ]; then
+              echo "📝 Updating $OAM_FILE"
+              echo "  - Setting image to: $NEW_IMAGE"
+              
+              # Update the image in the OAM file
+              sed -i "s|image: .*/$service:.*|image: $NEW_IMAGE|g" "$OAM_FILE"
+              
+              # Update version labels if they exist
+              sed -i "s|version: .*|version: $COMMIT_SHA|g" "$OAM_FILE"
+              
+              echo "✅ Updated $service manifest successfully"
+            else
+              echo "⚠️ Warning: Could not find OAM file for $service"
+            fi
           done
           
-          # Check if there are changes to commit
-          if ! git diff --quiet; then
-            echo "📝 Committing GitOps updates..."
-            git add -A
-            git commit -m "chore: update deployment manifests with semantic versioning
-
-            Services: ${{ needs.detect-changes.outputs.changed-services }}
-            Versions: ${{ needs.semantic-versioning.outputs.version-info }}
-            Source commit: ${{ github.sha }}
-            
-            🏷️ GitOps automated update from source repository
-            
-            Co-Authored-By: GitOps Bot <gitops-bot@github.com>"
-            git push origin ${{ env.GITOPS_BRANCH }}
-            echo "✅ GitOps repository updated successfully!"
+          # Configure git
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          
+          # Check if there are changes
+          if git diff --quiet; then
+            echo "ℹ️ No changes detected in GitOps repository"
           else
-            echo "No changes to commit"
+            echo "📋 Changes detected:"
+            git diff --name-only
+            
+            # Commit and push changes
+            git add .
+            git commit -m "chore: update service images for commit $COMMIT_SHA
+
+Services updated: $SERVICES
+Source commit: $SOURCE_COMMIT
+Workflow: ${{ github.workflow }} #${{ github.run_number }}
+"
+            
+            git push
+            
+            echo "✅ GitOps repository updated successfully!"
           fi
 
   # Phase 4: Generate Summary
