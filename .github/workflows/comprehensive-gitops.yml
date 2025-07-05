@@ -13,6 +13,12 @@ on:
     # Run security scans daily at 2 AM UTC
     - cron: '0 2 * * *'
 
+permissions:
+  contents: read
+  actions: read
+  security-events: write
+  packages: write
+
 env:
   REGISTRY: docker.io
   REGISTRY_USERNAME: socrates12345
@@ -287,10 +293,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: shlapolosa/${{ env.GITOPS_REPO }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITOPS_TOKEN || secrets.GITHUB_TOKEN }}
           ref: ${{ env.GITOPS_BRANCH }}
           path: gitops
-        continue-on-error: true
 
       - name: Update GitOps manifests with semantic versions
         run: |
@@ -298,13 +303,6 @@ jobs:
           chmod +x source/.github/scripts/version-manager.sh
           
           IFS=',' read -ra SERVICES <<< "${{ needs.detect-changes.outputs.changed-services }}"
-          
-          # Check if GitOps repo was checked out successfully
-          if [ ! -d "gitops" ]; then
-            echo "❌ GitOps repository not found. Skipping GitOps update."
-            echo "This might be due to repository access permissions."
-            exit 0
-          fi
           
           cd gitops
           git config --local user.email "gitops-bot@github.com"
