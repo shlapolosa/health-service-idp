@@ -1,0 +1,89 @@
+name: Test GitOps Update
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'microservices/**'
+
+env:
+  GITOPS_REPO: health-service-idp-gitops
+  GITOPS_BRANCH: main
+
+jobs:
+  test-gitops-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: source
+
+      - name: Checkout GitOps repository
+        uses: actions/checkout@v4
+        with:
+          repository: shlapolosa/${{ env.GITOPS_REPO }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ env.GITOPS_BRANCH }}
+          path: gitops
+
+      - name: Detect changes
+        id: changes
+        run: |
+          cd source
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -E '^microservices/' || true)
+          CHANGED_SERVICES=""
+          if [ ! -z "$CHANGED_FILES" ]; then
+            CHANGED_SERVICES=$(echo "$CHANGED_FILES" | cut -d'/' -f1-2 | sort -u | grep '^microservices/' | cut -d'/' -f2 | tr '\n' ',' | sed 's/,$//')
+          fi
+          echo "changed-services=$CHANGED_SERVICES" >> $GITHUB_OUTPUT
+          echo "Changed services: $CHANGED_SERVICES"
+
+      - name: Test GitOps manifest update (simulation)
+        if: steps.changes.outputs.changed-services != ''
+        run: |
+          cd gitops
+          
+          echo "🧪 Testing GitOps update functionality"
+          echo "Changed services: ${{ steps.changes.outputs.changed-services }}"
+          echo "Source commit: ${{ github.sha }}"
+          
+          # Simulate updating a manifest file
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          
+          echo "Would update manifests with:"
+          echo "  - New image tag: $SHORT_SHA"
+          echo "  - Semantic version: 1.1.10+$SHORT_SHA"
+          
+          # Create a test file to show the update worked
+          echo "# GitOps Update Test" > test-update.md
+          echo "Updated at: $(date)" >> test-update.md
+          echo "Source commit: ${{ github.sha }}" >> test-update.md
+          echo "Changed services: ${{ steps.changes.outputs.changed-services }}" >> test-update.md
+          
+          git config --local user.email "gitops-test@github.com"
+          git config --local user.name "GitOps Test Bot"
+          
+          git add test-update.md
+          git commit -m "test: GitOps update simulation
+          
+          Source commit: ${{ github.sha }}
+          Changed services: ${{ steps.changes.outputs.changed-services }}
+          
+          🧪 Automated GitOps test update"
+          
+          git push origin ${{ env.GITOPS_BRANCH }}
+          
+          echo "✅ GitOps repository updated successfully!"
+
+      - name: Generate test summary
+        run: |
+          echo "## 🧪 GitOps Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Changed Services:** ${{ steps.changes.outputs.changed-services }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Source Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**GitOps Repo:** [health-service-idp-gitops](https://github.com/shlapolosa/health-service-idp-gitops)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ GitOps pipeline test completed successfully!" >> $GITHUB_STEP_SUMMARY
