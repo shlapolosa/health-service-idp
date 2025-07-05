@@ -1,0 +1,72 @@
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: streamlit-frontend
+  namespace: default
+  labels:
+    app: streamlit-frontend
+    tier: frontend
+    dependency-tier: "5"
+    version: "1.1.7+70470c6"
+  annotations:
+    semantic-version.gitops/enabled: "true"
+    commit-sha: "70470c6"
+spec:
+  components:
+  - name: streamlit-frontend-knative-service
+    type: raw
+    properties:
+      apiVersion: serving.knative.dev/v1
+      kind: Service
+      metadata:
+        name: streamlit-frontend
+        namespace: default
+        labels:
+          app: streamlit-frontend
+          version: v1.0.0
+      spec:
+        template:
+          metadata:
+            labels:
+              app: streamlit-frontend
+              version: "1.1.7+70470c6"
+              semantic-version: "1.1.7"
+              commit-sha: "70470c6"
+            annotations:
+              autoscaling.knative.dev/minScale: "1"
+              autoscaling.knative.dev/maxScale: "2"
+              semantic-version.gitops/version: "1.1.7+70470c6"
+              semantic-version.gitops/commit: "70470c6"
+          spec:
+            containers:
+            - name: streamlit-frontend
+              image: socrates12345/streamlit-frontend:latest
+              imagePullPolicy: Always
+              ports:
+              - containerPort: 8501
+              env:
+              - name: LOG_LEVEL
+                value: "INFO"
+              - name: ORCHESTRATION_SERVICE_URL
+                value: "http://orchestration-service.default.svc.cluster.local"
+              - name: REDIS_URL
+                value: "redis://redis-service:6379"
+              resources:
+                requests:
+                  memory: "128Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "256Mi"
+                  cpu: "200m"
+              livenessProbe:
+                httpGet:
+                  path: /_stcore/health
+                  port: 8501
+                initialDelaySeconds: 60
+                periodSeconds: 30
+              readinessProbe:
+                httpGet:
+                  path: /_stcore/health
+                  port: 8501
+                initialDelaySeconds: 30
+                periodSeconds: 15

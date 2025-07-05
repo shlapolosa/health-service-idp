@@ -1,0 +1,326 @@
+name: Semantic Versioning GitOps Pipeline
+
+on:
+  push:
+    branches: [ main, develop, 'feature/*', 'hotfix/*', 'release/*' ]
+    paths:
+      - 'microservices/**'
+      - 'oam-applications/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'microservices/**'
+      - 'oam-applications/**'
+
+env:
+  REGISTRY: docker.io
+  REGISTRY_USERNAME: socrates12345
+
+jobs:
+  semantic-version-build:
+    runs-on: ubuntu-latest
+    outputs:
+      changed-services: ${{ steps.changes.outputs.changed-services }}
+      version-info: ${{ steps.versions.outputs.version-info }}
+      should-deploy: ${{ steps.changes.outputs.should-deploy }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for semantic versioning
+
+      - name: Detect changes and deployment decision
+        id: changes
+        run: |
+          # Get list of changed files
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | grep -E '^microservices/' || true)
+          else
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -E '^microservices/' || true)
+          fi
+          
+          # Extract unique service directories
+          CHANGED_SERVICES=""
+          if [ ! -z "$CHANGED_FILES" ]; then
+            CHANGED_SERVICES=$(echo "$CHANGED_FILES" | cut -d'/' -f1-2 | sort -u | grep '^microservices/' | cut -d'/' -f2 | tr '\n' ',' | sed 's/,$//')
+          fi
+          
+          # Determine if we should deploy (only on main branch pushes)
+          SHOULD_DEPLOY="false"
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            SHOULD_DEPLOY="true"
+          fi
+          
+          echo "changed-services=$CHANGED_SERVICES" >> $GITHUB_OUTPUT
+          echo "should-deploy=$SHOULD_DEPLOY" >> $GITHUB_OUTPUT
+          echo "Changed services: $CHANGED_SERVICES"
+          echo "Should deploy: $SHOULD_DEPLOY"
+
+      - name: Generate semantic versions
+        if: steps.changes.outputs.changed-services != ''
+        id: versions
+        run: |
+          # Make version manager executable
+          chmod +x .github/scripts/version-manager.sh
+          
+          IFS=',' read -ra SERVICES <<< "${{ steps.changes.outputs.changed-services }}"
+          VERSION_INFO=""
+          
+          for service in "${SERVICES[@]}"; do
+            if [ -f "microservices/$service/Dockerfile" ]; then
+              echo "Generating semantic version for: $service"
+              
+              # Generate semantic version and tags
+              SEMVER=$(.github/scripts/version-manager.sh version "$service")
+              CONTAINER_TAGS=$(.github/scripts/version-manager.sh tags "$service" "${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}")
+              
+              echo "Service: $service, Version: $SEMVER"
+              
+              # Store version info
+              VERSION_INFO="$VERSION_INFO$service:$SEMVER,"
+            fi
+          done
+          
+          echo "version-info=${VERSION_INFO%,}" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        if: steps.changes.outputs.changed-services != ''
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Registry
+        if: steps.changes.outputs.changed-services != '' && steps.changes.outputs.should-deploy == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push with semantic versioning
+        if: steps.changes.outputs.changed-services != '' && steps.changes.outputs.should-deploy == 'true'
+        run: |
+          chmod +x .github/scripts/version-manager.sh
+          
+          IFS=',' read -ra SERVICES <<< "${{ steps.changes.outputs.changed-services }}"
+          
+          for service in "${SERVICES[@]}"; do
+            if [ -f "microservices/$service/Dockerfile" ]; then
+              echo "Building $service with semantic versioning..."
+              
+              # Generate semantic version and all tags
+              SEMVER=$(.github/scripts/version-manager.sh version "$service")
+              CONTAINER_TAGS=$(.github/scripts/version-manager.sh tags "$service" "${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}")
+              COMMIT_SHA="${GITHUB_SHA:0:7}"
+              
+              echo "🏷️ Service: $service"
+              echo "📦 Semantic Version: $SEMVER"
+              echo "🔖 All Tags: $CONTAINER_TAGS"
+              
+              # Build primary image with rich metadata
+              PRIMARY_TAG="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/$service:$COMMIT_SHA"
+              
+              docker build -t "$PRIMARY_TAG" \
+                --label "org.opencontainers.image.version=$SEMVER" \
+                --label "org.opencontainers.image.revision=${{ github.sha }}" \
+                --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
+                --label "org.opencontainers.image.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+                --label "org.opencontainers.image.title=$service" \
+                --label "org.opencontainers.image.description=Visual Architecture Tool - $service" \
+                --label "version=$SEMVER" \
+                --label "commit=${{ github.sha }}" \
+                --label "commit-short=$COMMIT_SHA" \
+                --label "branch=${{ github.ref_name }}" \
+                --label "service=$service" \
+                --label "build-date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+                --label "build-number=${{ github.run_number }}" \
+                --label "workflow-run=${{ github.run_id }}" \
+                "./microservices/$service"
+              
+              # Create all semantic version tags
+              IFS=',' read -ra TAG_ARRAY <<< "$CONTAINER_TAGS"
+              for tag in "${TAG_ARRAY[@]}"; do
+                if [ "$tag" != "$PRIMARY_TAG" ]; then
+                  echo "Tagging: $tag"
+                  docker tag "$PRIMARY_TAG" "$tag"
+                fi
+              done
+              
+              # Push all tags
+              echo "📤 Pushing all tags for $service..."
+              for tag in "${TAG_ARRAY[@]}"; do
+                echo "  Pushing: $tag"
+                docker push "$tag"
+              done
+              
+              echo "✅ Successfully built and pushed $service with version $SEMVER"
+            fi
+          done
+
+      - name: Test build only (for PRs and feature branches)
+        if: steps.changes.outputs.changed-services != '' && steps.changes.outputs.should-deploy == 'false'
+        run: |
+          chmod +x .github/scripts/version-manager.sh
+          
+          IFS=',' read -ra SERVICES <<< "${{ steps.changes.outputs.changed-services }}"
+          
+          for service in "${SERVICES[@]}"; do
+            if [ -f "microservices/$service/Dockerfile" ]; then
+              echo "Test building $service..."
+              
+              SEMVER=$(.github/scripts/version-manager.sh version "$service")
+              echo "Would build with version: $SEMVER"
+              
+              # Build without pushing
+              docker build -t "test-$service:$SEMVER" \
+                --label "version=$SEMVER" \
+                --label "test-build=true" \
+                "./microservices/$service"
+              
+              echo "✅ Test build successful for $service"
+            fi
+          done
+
+  update-gitops-manifests:
+    needs: semantic-version-build
+    if: needs.semantic-version-build.outputs.changed-services != '' && needs.semantic-version-build.outputs.should-deploy == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Update OAM applications with semantic versions
+        run: |
+          chmod +x .github/scripts/version-manager.sh
+          
+          IFS=',' read -ra SERVICES <<< "${{ needs.semantic-version-build.outputs.changed-services }}"
+          
+          git config --local user.email "semantic-versioning@github.com"
+          git config --local user.name "Semantic Versioning Bot"
+          
+          for service in "${SERVICES[@]}"; do
+            echo "Updating OAM applications for $service..."
+            
+            # Generate new image with semantic version
+            COMMIT_SHA="${GITHUB_SHA:0:7}"
+            NEW_IMAGE="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/$service:$COMMIT_SHA"
+            SEMVER=$(.github/scripts/version-manager.sh version "$service")
+            
+            echo "Service: $service"
+            echo "New Image: $NEW_IMAGE"
+            echo "Semantic Version: $SEMVER"
+            
+            # Update OAM applications
+            .github/scripts/version-manager.sh update-oam "$service" "$NEW_IMAGE"
+            
+            # Update additional manifest files
+            case "$service" in
+              "streamlit-frontend")
+                if [ -f "frontend-simple.yaml" ]; then
+                  sed -i "s|image: socrates12345/streamlit-frontend:.*|image: $NEW_IMAGE|g" frontend-simple.yaml
+                  # Add version annotation
+                  if ! grep -q "version:" frontend-simple.yaml; then
+                    sed -i "/labels:/a\\    version: \"$SEMVER\"" frontend-simple.yaml
+                  fi
+                fi
+                ;;
+              "orchestration-service")
+                if [ -f "orchestration-service-simple.yaml" ]; then
+                  sed -i "s|image: socrates12345/orchestration-service:.*|image: $NEW_IMAGE|g" orchestration-service-simple.yaml
+                  if ! grep -q "version:" orchestration-service-simple.yaml; then
+                    sed -i "/labels:/a\\    version: \"$SEMVER\"" orchestration-service-simple.yaml
+                  fi
+                fi
+                ;;
+            esac
+          done
+          
+          # Check if there are changes to commit
+          if ! git diff --quiet; then
+            echo "📝 Committing semantic versioning updates..."
+            git add -A
+            git commit -m "chore: update service versions with semantic versioning
+
+            Services: ${{ needs.semantic-version-build.outputs.changed-services }}
+            Versions: ${{ needs.semantic-version-build.outputs.version-info }}
+            
+            🏷️ Semantic versioning automated update
+            
+            Co-Authored-By: Semantic Versioning Bot <semantic-versioning@github.com>"
+            git push
+          else
+            echo "No changes to commit"
+          fi
+
+  deploy-to-cluster:
+    needs: [semantic-version-build, update-gitops-manifests]
+    if: needs.semantic-version-build.outputs.changed-services != '' && needs.semantic-version-build.outputs.should-deploy == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Deploy to vcluster with semantic versioning
+        run: |
+          # Install tools
+          curl -L -o vcluster "https://github.com/loft-sh/vcluster/releases/latest/download/vcluster-linux-amd64"
+          chmod +x vcluster && sudo mv vcluster /usr/local/bin
+          
+          # Connect to cluster
+          aws eks update-kubeconfig --region us-west-2 --name socrateshlapolosa-karpenter-demo
+          vcluster connect architecture-vizualisation --namespace arch-viz --server-name=vcluster-api
+          
+          # Deploy services with semantic versioning annotations
+          IFS=',' read -ra SERVICES <<< "${{ needs.semantic-version-build.outputs.changed-services }}"
+          for service in "${SERVICES[@]}"; do
+            if kubectl get application.core.oam.dev "$service" 2>/dev/null; then
+              echo "🚀 Triggering deployment for $service"
+              
+              # Add semantic versioning annotation to force deployment
+              kubectl annotate application.core.oam.dev "$service" \
+                deployment.kubernetes.io/revision=$(date +%s) \
+                semantic-version.gitops/commit="${{ github.sha }}" \
+                semantic-version.gitops/build-number="${{ github.run_number }}" \
+                --overwrite
+              
+              echo "⏳ Waiting for $service to be ready..."
+              kubectl wait --for=condition=Ready ksvc/"$service" --timeout=300s || true
+            else
+              echo "⚠️ OAM application $service not found"
+            fi
+          done
+
+      - name: Generate deployment summary
+        run: |
+          echo "## 🚀 Semantic Versioning Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Services Deployed:** ${{ needs.semantic-version-build.outputs.changed-services }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Version Info:** ${{ needs.semantic-version-build.outputs.version-info }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Number:** \`${{ github.run_number }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Get service status with versions
+          IFS=',' read -ra SERVICES <<< "${{ needs.semantic-version-build.outputs.changed-services }}"
+          echo "### 📦 Service Status" >> $GITHUB_STEP_SUMMARY
+          for service in "${SERVICES[@]}"; do
+            if kubectl get ksvc "$service" 2>/dev/null; then
+              STATUS=$(kubectl get ksvc "$service" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+              URL=$(kubectl get ksvc "$service" -o jsonpath='{.status.url}')
+              REVISION=$(kubectl get ksvc "$service" -o jsonpath='{.status.latestReadyRevisionName}')
+              echo "- **$service:** $STATUS | Revision: \`$REVISION\` | [URL]($URL)" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- **$service:** Not Found" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🌐 Access URLs" >> $GITHUB_STEP_SUMMARY
+          echo "- **Frontend:** http://streamlit-frontend.default.ae4fbc4769b974f419ce1f5fbd8e22a2-1357088313.us-west-2.elb.amazonaws.com" >> $GITHUB_STEP_SUMMARY
+          echo "- **Orchestration:** http://orchestration-service.default.ae4fbc4769b974f419ce1f5fbd8e22a2-1357088313.us-west-2.elb.amazonaws.com/health" >> $GITHUB_STEP_SUMMARY
