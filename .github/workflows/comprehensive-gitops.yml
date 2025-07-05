@@ -154,7 +154,7 @@ jobs:
   # Phase 2: Semantic Versioning and Build
   semantic-versioning:
     needs: [detect-changes, vulnerability-scan, dependency-check]
-    if: needs.detect-changes.outputs.changed-services != '' && needs.detect-changes.outputs.should-deploy == 'true'
+    if: always() && needs.detect-changes.outputs.changed-services != '' && needs.detect-changes.outputs.should-deploy == 'true' && needs.dependency-check.result == 'success'
     runs-on: ubuntu-latest
     outputs:
       version-info: ${{ steps.versions.outputs.version-info }}
@@ -273,7 +273,7 @@ jobs:
   # Phase 3: GitOps Update
   update-gitops:
     needs: [detect-changes, semantic-versioning]
-    if: needs.detect-changes.outputs.changed-services != '' && needs.detect-changes.outputs.should-deploy == 'true'
+    if: needs.detect-changes.outputs.changed-services != '' && needs.detect-changes.outputs.should-deploy == 'true' && needs.semantic-versioning.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source code
