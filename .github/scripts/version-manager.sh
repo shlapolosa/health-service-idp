@@ -51,20 +51,10 @@ is_hotfix() {
 # Function to generate semantic version
 generate_semantic_version() {
     local service_name="$1"
-    local patch_version=$(get_patch_version)
     local commit_sha=$(get_commit_sha)
-    local branch=$(get_branch_name)
     
-    # Base semantic version
-    local semver="$MAJOR_VERSION.$MINOR_VERSION.$patch_version"
-    
-    # Add pre-release identifier for non-release branches
-    if ! is_release_branch; then
-        semver="$semver-$branch"
-    fi
-    
-    # Add commit SHA as metadata
-    semver="$semver+$commit_sha"
+    # Use major.minor.sha format for Docker compatibility
+    local semver="$MAJOR_VERSION.$MINOR_VERSION.$commit_sha"
     
     echo "$semver"
 }
