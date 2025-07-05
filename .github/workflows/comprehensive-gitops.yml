@@ -325,47 +325,39 @@ jobs:
           # Set up GitHub CLI authentication
           export GH_TOKEN="${{ secrets.PERSONAL_ACCESS_TOKEN }}"
           
-          # Create dispatch payload
-          PAYLOAD=$(cat <<EOF
-          {
-            "services": "$SERVICES",
-            "version_info": "$VERSION_INFO",
-            "source_commit": "$SOURCE_COMMIT",
-            "deployments": {$DEPLOYMENTS},
-            "registry": "${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}",
-            "branch": "${{ github.ref_name }}",
-            "workflow_run": "${{ github.run_id }}"
-          }
-          EOF
-          )
-          
-          echo "Dispatch payload:"
-          echo "$PAYLOAD" | jq .
-          
-          # Trigger repository dispatch using GitHub CLI
           echo "📤 Sending dispatch event using GitHub CLI..."
           
+          # Trigger repository dispatch using GitHub CLI with proper JSON formatting
           if gh api repos/shlapolosa/${{ env.GITOPS_REPO }}/dispatches \
             --method POST \
             --field event_type=update-deployments \
-            --raw-field client_payload="$PAYLOAD"; then
+            --field client_payload[services]="$SERVICES" \
+            --field client_payload[version_info]="$VERSION_INFO" \
+            --field client_payload[source_commit]="$SOURCE_COMMIT" \
+            --field client_payload[registry]="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}" \
+            --field client_payload[branch]="${{ github.ref_name }}" \
+            --field client_payload[workflow_run]="${{ github.run_id }}" \
+            --raw-field client_payload[deployments]="{$DEPLOYMENTS}"; then
             echo "✅ GitOps repository dispatch event sent successfully!"
             echo "🔗 GitOps repository will handle the manifest updates"
           else
             echo "❌ Failed to send dispatch event via GitHub CLI"
-            echo "Trying alternative approach with workflow dispatch..."
+            echo "Trying simplified dispatch approach..."
             
-            # Fallback: Try workflow dispatch instead
-            if gh workflow run deployment-update.yml \
-              --repo shlapolosa/${{ env.GITOPS_REPO }} \
-              --field services="$SERVICES" \
-              --field version_info="$VERSION_INFO" \
-              --field source_commit="$SOURCE_COMMIT" \
-              --field registry="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}" \
-              --field workflow_run="${{ github.run_id }}"; then
-              echo "✅ Fallback workflow dispatch sent successfully!"
+            # Fallback: Simplified dispatch with just essential data
+            if gh api repos/shlapolosa/${{ env.GITOPS_REPO }}/dispatches \
+              --method POST \
+              --field event_type=simple-update \
+              --field client_payload[services]="$SERVICES" \
+              --field client_payload[source_commit]="$SOURCE_COMMIT" \
+              --field client_payload[commit_sha]="${COMMIT_SHA}" \
+              --field client_payload[registry]="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}"; then
+              echo "✅ Simplified dispatch sent successfully!"
             else
-              echo "❌ Both dispatch methods failed"
+              echo "❌ All dispatch methods failed"
+              echo "Manual GitOps update required:"
+              echo "  Services: $SERVICES"
+              echo "  Images: ${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/streamlit-frontend:$COMMIT_SHA"
               exit 1
             fi
           fi
