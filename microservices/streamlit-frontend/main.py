@@ -16,7 +16,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Test GitOps pipeline trigger
+# Test GitOps pipeline trigger - checkout/modify/push test
 
 # Custom CSS for better styling
 st.markdown("""
