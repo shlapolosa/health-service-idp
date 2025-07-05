@@ -1,0 +1,234 @@
+name: Build and Deploy Microservices
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'microservices/**'
+      - 'oam-applications/**'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'microservices/**'
+      - 'oam-applications/**'
+
+env:
+  REGISTRY: docker.io
+  REGISTRY_USERNAME: socrates12345
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      changed-services: ${{ steps.changes.outputs.changed-services }}
+      matrix: ${{ steps.changes.outputs.matrix }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed services
+        id: changes
+        run: |
+          # Get list of changed files
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -E '^microservices/' || true)
+          
+          # Extract unique service directories
+          CHANGED_SERVICES=""
+          if [ ! -z "$CHANGED_FILES" ]; then
+            CHANGED_SERVICES=$(echo "$CHANGED_FILES" | cut -d'/' -f1-2 | sort -u | grep '^microservices/' | cut -d'/' -f2)
+          fi
+          
+          # Create matrix for parallel builds
+          if [ ! -z "$CHANGED_SERVICES" ]; then
+            MATRIX=$(echo "$CHANGED_SERVICES" | jq -R -s 'split("\n") | map(select(length > 0))')
+            echo "changed-services=$CHANGED_SERVICES" >> $GITHUB_OUTPUT
+            echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+            echo "Found changed services: $CHANGED_SERVICES"
+          else
+            echo "changed-services=" >> $GITHUB_OUTPUT
+            echo "matrix=[]" >> $GITHUB_OUTPUT
+            echo "No microservice changes detected"
+          fi
+
+  build-and-push:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.changed-services != ''
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./microservices/${{ matrix.service }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  update-deployments:
+    needs: [detect-changes, build-and-push]
+    if: needs.detect-changes.outputs.changed-services != '' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Connect to vcluster
+        run: |
+          # Install vcluster CLI
+          curl -L -o vcluster "https://github.com/loft-sh/vcluster/releases/latest/download/vcluster-linux-amd64"
+          chmod +x vcluster
+          sudo mv vcluster /usr/local/bin
+          
+          # Configure AWS EKS access
+          aws eks update-kubeconfig --region us-west-2 --name socrateshlapolosa-karpenter-demo
+          
+          # Connect to vcluster
+          vcluster connect architecture-vizualisation --namespace arch-viz --server-name=vcluster-api
+
+      - name: Update OAM Application with new image
+        run: |
+          # Calculate new image tag
+          NEW_TAG="${GITHUB_SHA:0:7}"
+          NEW_IMAGE="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/${{ matrix.service }}:main-${NEW_TAG}"
+          
+          echo "Updating ${{ matrix.service }} to image: $NEW_IMAGE"
+          
+          # Update OAM application based on service type
+          case "${{ matrix.service }}" in
+            "streamlit-frontend")
+              OAM_FILE="oam-applications/frontend/streamlit-frontend-app.yaml"
+              if [ -f "$OAM_FILE" ]; then
+                # Update OAM application image
+                sed -i "s|image: socrates12345/streamlit-frontend:.*|image: $NEW_IMAGE|g" "$OAM_FILE"
+                kubectl apply -f "$OAM_FILE"
+              else
+                # Update simplified frontend
+                kubectl patch application.core.oam.dev streamlit-frontend --type='merge' -p="{\"spec\":{\"components\":[{\"name\":\"streamlit-frontend-knative-service\",\"properties\":{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"streamlit-frontend\",\"image\":\"$NEW_IMAGE\"}]}}}}}]}}"
+              fi
+              ;;
+            "orchestration-service")
+              kubectl patch application.core.oam.dev orchestration-service --type='merge' -p="{\"spec\":{\"components\":[{\"name\":\"orchestration-knative-service\",\"properties\":{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"orchestration-service\",\"image\":\"$NEW_IMAGE\"}]}}}}}]}}"
+              ;;
+            *-anthropic)
+              # For anthropic agent services
+              if kubectl get application.core.oam.dev "${{ matrix.service }}" 2>/dev/null; then
+                kubectl patch application.core.oam.dev "${{ matrix.service }}" --type='merge' -p="{\"spec\":{\"components\":[{\"name\":\"${{ matrix.service }}-knative-service\",\"properties\":{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"${{ matrix.service }}\",\"image\":\"$NEW_IMAGE\"}]}}}}}]}}"
+              else
+                echo "OAM application ${{ matrix.service }} not found, skipping"
+              fi
+              ;;
+          esac
+
+      - name: Wait for deployment
+        run: |
+          echo "Waiting for new revision to be ready..."
+          kubectl wait --for=condition=Ready ksvc/${{ matrix.service }} --timeout=300s || true
+          
+          # Show deployment status
+          kubectl get ksvc/${{ matrix.service }} -o wide
+          kubectl get pods -l app=${{ matrix.service }}
+
+      - name: Update deployment manifest in repo
+        run: |
+          # Update the OAM application file in the repo for GitOps consistency
+          NEW_TAG="${GITHUB_SHA:0:7}"
+          NEW_IMAGE="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/${{ matrix.service }}:main-${NEW_TAG}"
+          
+          # Update manifest files
+          case "${{ matrix.service }}" in
+            "streamlit-frontend")
+              if [ -f "frontend-simple.yaml" ]; then
+                sed -i "s|image: socrates12345/streamlit-frontend:.*|image: $NEW_IMAGE|g" frontend-simple.yaml
+              fi
+              ;;
+            "orchestration-service")
+              if [ -f "orchestration-service-simple.yaml" ]; then
+                sed -i "s|image: socrates12345/orchestration-service:.*|image: $NEW_IMAGE|g" orchestration-service-simple.yaml
+              fi
+              ;;
+          esac
+          
+          # Commit changes back to repo
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          if git diff --quiet; then
+            echo "No changes to commit"
+          else
+            git add -A
+            git commit -m "chore: update ${{ matrix.service }} image to $NEW_IMAGE
+
+            🤖 Automated deployment update via GitHub Actions
+            
+            Co-Authored-By: GitHub Actions <action@github.com>"
+            git push
+          fi
+
+  notify-deployment:
+    needs: [detect-changes, build-and-push, update-deployments]
+    if: always() && needs.detect-changes.outputs.changed-services != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deployment Summary
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Changed Services:** ${{ needs.detect-changes.outputs.changed-services }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Status:** ${{ needs.build-and-push.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployment Status:** ${{ needs.update-deployments.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🌐 Service URLs" >> $GITHUB_STEP_SUMMARY
+          echo "- **Frontend:** http://streamlit-frontend.default.ae4fbc4769b974f419ce1f5fbd8e22a2-1357088313.us-west-2.elb.amazonaws.com" >> $GITHUB_STEP_SUMMARY
+          echo "- **Orchestration:** http://orchestration-service.default.ae4fbc4769b974f419ce1f5fbd8e22a2-1357088313.us-west-2.elb.amazonaws.com/health" >> $GITHUB_STEP_SUMMARY

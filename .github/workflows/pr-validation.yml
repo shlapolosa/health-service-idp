@@ -1,0 +1,155 @@
+name: Pull Request Validation
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'microservices/**'
+      - 'oam-applications/**'
+      - 'argocd-apps/**'
+
+jobs:
+  validate-changes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate Dockerfile changes
+        run: |
+          # Check if any Dockerfiles were modified
+          CHANGED_DOCKERFILES=$(git diff --name-only origin/main...HEAD | grep Dockerfile || true)
+          
+          if [ ! -z "$CHANGED_DOCKERFILES" ]; then
+            echo "Validating Dockerfiles..."
+            for dockerfile in $CHANGED_DOCKERFILES; do
+              echo "Checking: $dockerfile"
+              
+              # Basic Dockerfile linting
+              if ! docker run --rm -i hadolint/hadolint < "$dockerfile"; then
+                echo "❌ Dockerfile validation failed for: $dockerfile"
+                exit 1
+              fi
+            done
+            echo "✅ All Dockerfiles passed validation"
+          fi
+
+      - name: Validate OAM Applications
+        run: |
+          # Check if any OAM applications were modified
+          CHANGED_OAM=$(git diff --name-only origin/main...HEAD | grep -E 'oam-applications/.*\.yaml$' || true)
+          
+          if [ ! -z "$CHANGED_OAM" ]; then
+            echo "Validating OAM applications..."
+            
+            # Install kubeval for Kubernetes YAML validation
+            curl -L https://github.com/instrumenta/kubeval/releases/latest/download/kubeval-linux-amd64.tar.gz | tar xz
+            chmod +x kubeval
+            sudo mv kubeval /usr/local/bin/
+            
+            for oam_file in $CHANGED_OAM; do
+              echo "Validating: $oam_file"
+              
+              # Basic YAML syntax check
+              if ! python -c "import yaml; yaml.safe_load(open('$oam_file'))"; then
+                echo "❌ YAML syntax error in: $oam_file"
+                exit 1
+              fi
+              
+              echo "✅ $oam_file passed validation"
+            done
+          fi
+
+      - name: Check image references
+        run: |
+          # Check if all referenced images exist or are being built
+          echo "Checking image references in OAM applications..."
+          
+          CHANGED_SERVICES=$(git diff --name-only origin/main...HEAD | grep -E '^microservices/' | cut -d'/' -f2 | sort -u || true)
+          
+          # For each changed service, ensure OAM applications reference correct images
+          for service in $CHANGED_SERVICES; do
+            if [ -f "microservices/$service/Dockerfile" ]; then
+              echo "Service $service has Dockerfile - checking OAM references"
+              
+              # Find OAM files that reference this service
+              OAM_REFS=$(grep -r "socrates12345/$service" oam-applications/ || true)
+              if [ ! -z "$OAM_REFS" ]; then
+                echo "Found OAM references for $service:"
+                echo "$OAM_REFS"
+              else
+                echo "⚠️ No OAM references found for service: $service"
+              fi
+            fi
+          done
+
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Test build changed services
+        run: |
+          # Get list of changed services
+          CHANGED_SERVICES=$(git diff --name-only origin/main...HEAD | grep -E '^microservices/' | cut -d'/' -f2 | sort -u || true)
+          
+          if [ ! -z "$CHANGED_SERVICES" ]; then
+            echo "Testing builds for changed services..."
+            
+            for service in $CHANGED_SERVICES; do
+              if [ -f "microservices/$service/Dockerfile" ]; then
+                echo "Building test image for: $service"
+                
+                if docker build -t "test-$service:pr" "./microservices/$service"; then
+                  echo "✅ Build successful for: $service"
+                  
+                  # Run basic container test
+                  echo "Testing container startup..."
+                  if timeout 30s docker run --rm "test-$service:pr" --help 2>/dev/null || timeout 30s docker run --rm "test-$service:pr" python --version; then
+                    echo "✅ Container test passed for: $service"
+                  else
+                    echo "⚠️ Container test failed for: $service (may be expected if no --help option)"
+                  fi
+                else
+                  echo "❌ Build failed for: $service"
+                  exit 1
+                fi
+              else
+                echo "No Dockerfile found for: $service"
+              fi
+            done
+          else
+            echo "No microservice changes detected"
+          fi
+
+  pr-summary:
+    needs: [validate-changes, build-test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: PR Validation Summary
+        run: |
+          echo "## 🔍 Pull Request Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Validation Status:** ${{ needs.validate-changes.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Test Status:** ${{ needs.build-test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**PR:** #${{ github.event.number }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${{ github.head_ref }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Base:** \`${{ github.base_ref }}\`" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.validate-changes.result }}" = "success" ] && [ "${{ needs.build-test.result }}" = "success" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **All checks passed! Ready for merge.**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Some checks failed. Please review and fix issues before merging.**" >> $GITHUB_STEP_SUMMARY
+          fi

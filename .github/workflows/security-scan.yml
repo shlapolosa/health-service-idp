@@ -1,0 +1,101 @@
+name: Security Scanning
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'microservices/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'microservices/**'
+  schedule:
+    # Run security scans daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  detect-services:
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.services.outputs.matrix }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Find services with Dockerfiles
+        id: services
+        run: |
+          SERVICES=$(find microservices -name "Dockerfile" -type f | sed 's|microservices/||g' | sed 's|/Dockerfile||g' | jq -R -s 'split("\n") | map(select(length > 0))')
+          echo "services=$SERVICES" >> $GITHUB_OUTPUT
+          echo "Found services: $SERVICES"
+
+  vulnerability-scan:
+    needs: detect-services
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.detect-services.outputs.services) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build image for scanning
+        run: |
+          docker build -t local-scan/${{ matrix.service }}:latest ./microservices/${{ matrix.service }}
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'local-scan/${{ matrix.service }}:latest'
+          format: 'sarif'
+          output: 'trivy-results-${{ matrix.service }}.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results-${{ matrix.service }}.sarif'
+          category: 'trivy-${{ matrix.service }}'
+
+      - name: Run Trivy for summary
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'local-scan/${{ matrix.service }}:latest'
+          format: 'table'
+        continue-on-error: true
+
+  dependency-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install safety
+        run: pip install safety
+
+      - name: Check Python dependencies
+        run: |
+          # Scan each service's requirements
+          for req_file in $(find microservices -name "requirements.txt" -o -name "pyproject.toml"); do
+            echo "Scanning: $req_file"
+            if [[ $req_file == *"requirements.txt" ]]; then
+              safety check -r "$req_file" || true
+            elif [[ $req_file == *"pyproject.toml" ]]; then
+              # Extract dependencies from pyproject.toml for scanning
+              service_dir=$(dirname "$req_file")
+              if command -v poetry &> /dev/null; then
+                cd "$service_dir"
+                poetry export -f requirements.txt --output temp-requirements.txt --without-hashes || true
+                if [ -f temp-requirements.txt ]; then
+                  safety check -r temp-requirements.txt || true
+                  rm temp-requirements.txt
+                fi
+                cd - > /dev/null
+              fi
+            fi
+          done

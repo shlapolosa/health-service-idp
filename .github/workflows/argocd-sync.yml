@@ -1,0 +1,112 @@
+name: ArgoCD GitOps Sync
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'oam-applications/**'
+      - 'argocd-apps/**'
+  workflow_dispatch:
+    inputs:
+      sync_all:
+        description: 'Force sync all applications'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  ARGOCD_SERVER: argocd.local
+  ARGOCD_APP_NAME: architecture-tool-app-of-apps
+
+jobs:
+  argocd-sync:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl and ArgoCD CLI
+        run: |
+          # Install kubectl
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+          
+          # Install ArgoCD CLI
+          curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+          chmod +x argocd-linux-amd64
+          sudo mv argocd-linux-amd64 /usr/local/bin/argocd
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Connect to vcluster and ArgoCD
+        run: |
+          # Install vcluster CLI
+          curl -L -o vcluster "https://github.com/loft-sh/vcluster/releases/latest/download/vcluster-linux-amd64"
+          chmod +x vcluster
+          sudo mv vcluster /usr/local/bin
+          
+          # Configure AWS EKS access
+          aws eks update-kubeconfig --region us-west-2 --name socrateshlapolosa-karpenter-demo
+          
+          # Connect to vcluster
+          vcluster connect architecture-vizualisation --namespace arch-viz --server-name=vcluster-api
+
+      - name: Login to ArgoCD
+        run: |
+          # Get ArgoCD admin password
+          ARGOCD_PASSWORD=$(kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}" | base64 -d)
+          
+          # Login to ArgoCD
+          argocd login ${{ env.ARGOCD_SERVER }} --username admin --password "$ARGOCD_PASSWORD" --insecure
+
+      - name: Update repository in ArgoCD
+        run: |
+          # Ensure the repository is configured
+          argocd repo add https://github.com/shlapolosa/health-service-idp.git --username shlapolosa --password ${{ secrets.GITHUB_TOKEN }} --upsert
+
+      - name: Sync ArgoCD Applications
+        run: |
+          if [ "${{ github.event.inputs.sync_all }}" = "true" ]; then
+            echo "Force syncing all applications..."
+            argocd app sync ${{ env.ARGOCD_APP_NAME }} --force
+          else
+            echo "Syncing applications with detected changes..."
+            argocd app sync ${{ env.ARGOCD_APP_NAME }}
+          fi
+          
+          # Wait for sync to complete
+          argocd app wait ${{ env.ARGOCD_APP_NAME }} --timeout 600
+
+      - name: Get application status
+        run: |
+          echo "## 🔄 ArgoCD Sync Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Get App-of-Apps status
+          APP_STATUS=$(argocd app get ${{ env.ARGOCD_APP_NAME }} -o json | jq -r '.status.sync.status')
+          APP_HEALTH=$(argocd app get ${{ env.ARGOCD_APP_NAME }} -o json | jq -r '.status.health.status')
+          
+          echo "**App-of-Apps Status:** $APP_STATUS" >> $GITHUB_STEP_SUMMARY
+          echo "**App-of-Apps Health:** $APP_HEALTH" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # List all applications
+          echo "### 📱 Individual Applications" >> $GITHUB_STEP_SUMMARY
+          argocd app list -o json | jq -r '.[] | "- **\(.metadata.name):** \(.status.sync.status) / \(.status.health.status)"' >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "## ❌ ArgoCD Sync Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check the workflow logs for detailed error information." >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,313 @@
+name: Hybrid GitOps Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'microservices/**'
+      - 'oam-applications/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'microservices/**'
+      - 'oam-applications/**'
+
+env:
+  REGISTRY: docker.io
+  REGISTRY_USERNAME: socrates12345
+
+jobs:
+  # Phase 1: CI/CD with GitHub Actions (Build & Test)
+  ci-cd:
+    runs-on: ubuntu-latest
+    outputs:
+      changed-services: ${{ steps.changes.outputs.changed-services }}
+      image-tags: ${{ steps.images.outputs.tags }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changes
+        id: changes
+        run: |
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -E '^microservices/' || true)
+          CHANGED_SERVICES=""
+          if [ ! -z "$CHANGED_FILES" ]; then
+            CHANGED_SERVICES=$(echo "$CHANGED_FILES" | cut -d'/' -f1-2 | sort -u | grep '^microservices/' | cut -d'/' -f2 | tr '\n' ',' | sed 's/,$//')
+          fi
+          echo "changed-services=$CHANGED_SERVICES" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        if: steps.changes.outputs.changed-services != ''
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Registry
+        if: steps.changes.outputs.changed-services != ''
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push images
+        if: steps.changes.outputs.changed-services != ''
+        id: images
+        run: |
+          IFS=',' read -ra SERVICES <<< "${{ steps.changes.outputs.changed-services }}"
+          IMAGE_TAGS=""
+          
+          for service in "${SERVICES[@]}"; do
+            if [ -f "microservices/$service/Dockerfile" ]; then
+              TAG="${GITHUB_SHA:0:7}"
+              IMAGE_NAME="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/$service"
+              FULL_TAG="$IMAGE_NAME:$TAG"
+              
+              echo "Building $service -> $FULL_TAG"
+              
+              docker build -t "$FULL_TAG" \
+                --label "commit=${{ github.sha }}" \
+                --label "branch=${{ github.ref_name }}" \
+                --label "service=$service" \
+                "./microservices/$service"
+              
+              docker push "$FULL_TAG"
+              
+              # Also tag as latest for main branch
+              if [ "${{ github.ref_name }}" = "main" ]; then
+                docker tag "$FULL_TAG" "$IMAGE_NAME:latest"
+                docker push "$IMAGE_NAME:latest"
+              fi
+              
+              IMAGE_TAGS="$IMAGE_TAGS$service:$TAG,"
+            fi
+          done
+          
+          echo "tags=${IMAGE_TAGS%,}" >> $GITHUB_OUTPUT
+
+  # Phase 2: GitOps with Repository Updates
+  gitops-update:
+    needs: ci-cd
+    if: needs.ci-cd.outputs.changed-services != '' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update GitOps manifests
+        run: |
+          # Create GitOps update script
+          cat > update-manifests.sh << 'EOF'
+          #!/bin/bash
+          set -e
+          
+          SERVICES="${{ needs.ci-cd.outputs.changed-services }}"
+          TAG="${GITHUB_SHA:0:7}"
+          
+          IFS=',' read -ra SERVICE_ARRAY <<< "$SERVICES"
+          
+          for service in "${SERVICE_ARRAY[@]}"; do
+            NEW_IMAGE="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/$service:$TAG"
+            echo "Updating $service to $NEW_IMAGE"
+            
+            # Update OAM applications
+            case "$service" in
+              "streamlit-frontend")
+                # Update main OAM application
+                if [ -f "oam-applications/frontend/streamlit-frontend-app.yaml" ]; then
+                  sed -i "s|image: socrates12345/streamlit-frontend:.*|image: $NEW_IMAGE|g" oam-applications/frontend/streamlit-frontend-app.yaml
+                fi
+                # Update simplified version
+                if [ -f "frontend-simple.yaml" ]; then
+                  sed -i "s|image: socrates12345/streamlit-frontend:.*|image: $NEW_IMAGE|g" frontend-simple.yaml
+                fi
+                ;;
+              "orchestration-service")
+                if [ -f "oam-applications/orchestration/orchestration-service-app.yaml" ]; then
+                  sed -i "s|image: socrates12345/orchestration-service:.*|image: $NEW_IMAGE|g" oam-applications/orchestration/orchestration-service-app.yaml
+                fi
+                if [ -f "orchestration-service-simple.yaml" ]; then
+                  sed -i "s|image: socrates12345/orchestration-service:.*|image: $NEW_IMAGE|g" orchestration-service-simple.yaml
+                fi
+                ;;
+              *-anthropic)
+                # Update agent services
+                OAM_FILE="oam-applications/agents/${service}-app.yaml"
+                if [ -f "$OAM_FILE" ]; then
+                  sed -i "s|image: socrates12345/${service}:.*|image: $NEW_IMAGE|g" "$OAM_FILE"
+                fi
+                ;;
+            esac
+          done
+          EOF
+          
+          chmod +x update-manifests.sh
+          ./update-manifests.sh
+
+      - name: Create ArgoWorkflow manifest
+        run: |
+          # Create Argo Workflow for deployment
+          cat > .argoworkflow-deploy.yaml << EOF
+          apiVersion: argoproj.io/v1alpha1
+          kind: Workflow
+          metadata:
+            generateName: deploy-services-
+            namespace: default
+            labels:
+              commit: "${{ github.sha }}"
+              branch: "${{ github.ref_name }}"
+          spec:
+            entrypoint: deploy-pipeline
+            arguments:
+              parameters:
+              - name: services
+                value: "${{ needs.ci-cd.outputs.changed-services }}"
+              - name: image-tags
+                value: "${{ needs.ci-cd.outputs.image-tags }}"
+            templates:
+            - name: deploy-pipeline
+              steps:
+              - - name: deploy-infrastructure
+                  template: deploy-tier
+                  arguments:
+                    parameters:
+                    - name: tier
+                      value: "0"
+                    - name: services
+                      value: "redis-infrastructure"
+              - - name: deploy-orchestration
+                  template: deploy-tier
+                  arguments:
+                    parameters:
+                    - name: tier
+                      value: "1"
+                    - name: services
+                      value: "orchestration-service"
+              - - name: deploy-agents
+                  template: deploy-tier
+                  arguments:
+                    parameters:
+                    - name: tier
+                      value: "2,3,4"
+                    - name: services
+                      value: "business-analyst-anthropic,application-architect-anthropic,infrastructure-architect-anthropic,solution-architect-anthropic"
+              - - name: deploy-frontend
+                  template: deploy-tier
+                  arguments:
+                    parameters:
+                    - name: tier
+                      value: "5"
+                    - name: services
+                      value: "streamlit-frontend"
+            - name: deploy-tier
+              inputs:
+                parameters:
+                - name: tier
+                - name: services
+              script:
+                image: bitnami/kubectl:latest
+                command: [bash]
+                source: |
+                  set -e
+                  echo "Deploying tier {{inputs.parameters.tier}}"
+                  
+                  IFS=',' read -ra SERVICES <<< "{{inputs.parameters.services}}"
+                  for service in "\${SERVICES[@]}"; do
+                    if kubectl get application.core.oam.dev "\$service" 2>/dev/null; then
+                      echo "Triggering redeploy for \$service"
+                      kubectl annotate application.core.oam.dev "\$service" deployment.kubernetes.io/revision=\$(date +%s) --overwrite
+                      kubectl wait --for=condition=Ready ksvc/"\$service" --timeout=300s || true
+                    fi
+                  done
+          EOF
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "gitops@github.com"
+          git config --local user.name "GitOps Bot"
+          
+          if git diff --quiet; then
+            echo "No changes to commit"
+          else
+            git add -A
+            git commit -m "feat: update service images for deployment
+
+            Services: ${{ needs.ci-cd.outputs.changed-services }}
+            Images: ${{ needs.ci-cd.outputs.image-tags }}
+            
+            🤖 GitOps automated update
+            
+            Co-Authored-By: GitOps Bot <gitops@github.com>"
+            git push
+          fi
+
+  # Phase 3: Trigger ArgoCD sync (if ArgoCD is working)
+  argocd-trigger:
+    needs: [ci-cd, gitops-update]
+    if: needs.ci-cd.outputs.changed-services != '' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Trigger ArgoCD sync via webhook
+        run: |
+          # If ArgoCD webhook is configured, trigger sync
+          # This is safer than direct API access
+          echo "Would trigger ArgoCD sync for changed services: ${{ needs.ci-cd.outputs.changed-services }}"
+          
+          # Alternative: Use ArgoCD webhook or git-based sync
+          # curl -X POST "https://argocd.example.com/api/v1/applications/architecture-tool-app-of-apps/sync" \
+          #   -H "Authorization: Bearer $ARGOCD_TOKEN"
+
+  # Phase 4: Direct Kubernetes deployment (fallback)
+  k8s-deploy:
+    needs: [ci-cd, gitops-update]
+    if: needs.ci-cd.outputs.changed-services != '' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS and K8s access
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Deploy to cluster
+        run: |
+          # Install tools
+          curl -L -o vcluster "https://github.com/loft-sh/vcluster/releases/latest/download/vcluster-linux-amd64"
+          chmod +x vcluster && sudo mv vcluster /usr/local/bin
+          
+          # Connect to cluster
+          aws eks update-kubeconfig --region us-west-2 --name socrateshlapolosa-karpenter-demo
+          vcluster connect architecture-vizualisation --namespace arch-viz --server-name=vcluster-api
+          
+          # Deploy services
+          IFS=',' read -ra SERVICES <<< "${{ needs.ci-cd.outputs.changed-services }}"
+          for service in "${SERVICES[@]}"; do
+            if kubectl get application.core.oam.dev "$service" 2>/dev/null; then
+              echo "Triggering deployment for $service"
+              kubectl annotate application.core.oam.dev "$service" deployment.kubernetes.io/revision=$(date +%s) --overwrite
+            fi
+          done
+
+      - name: Deployment status
+        run: |
+          echo "## 🚀 Deployment Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Services:** ${{ needs.ci-cd.outputs.changed-services }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Images:** ${{ needs.ci-cd.outputs.image-tags }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Get service status
+          IFS=',' read -ra SERVICES <<< "${{ needs.ci-cd.outputs.changed-services }}"
+          for service in "${SERVICES[@]}"; do
+            if kubectl get ksvc "$service" 2>/dev/null; then
+              STATUS=$(kubectl get ksvc "$service" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+              URL=$(kubectl get ksvc "$service" -o jsonpath='{.status.url}')
+              echo "- **$service:** $STATUS - [$URL]($URL)" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
