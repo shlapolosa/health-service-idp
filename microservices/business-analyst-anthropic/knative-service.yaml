@@ -1,0 +1,69 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: business-analyst-anthropic
+  namespace: default
+  labels:
+    app: business-analyst-anthropic
+    agent-type: business-analyst
+    implementation: anthropic
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "10"
+        autoscaling.knative.dev/target: "50"
+        autoscaling.knative.dev/scaleDownDelay: "30s"
+        autoscaling.knative.dev/scaleToZeroGracePeriod: "60s"
+      labels:
+        app: business-analyst-anthropic
+        agent-type: business-analyst
+        implementation: anthropic
+    spec:
+      containers:
+      - name: business-analyst-anthropic
+        image: socrates12345/business-analyst-anthropic:latest
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        env:
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: AGENT_TYPE
+          value: "business-analyst"
+        - name: IMPLEMENTATION_TYPE
+          value: "anthropic"
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: anthropic-api-key
+              key: api-key
+              optional: true
+        resources:
+          limits:
+            cpu: "2"
+            memory: "1Gi"
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL

@@ -2,8 +2,6 @@ sync:
   toHost:
     pods:
       enabled: true
-      enforceTolerations:
-        - vclusterID=architecture-vizualisation:NoSchedule
     ingresses:
       enabled: true
     persistentVolumeClaims:
@@ -19,8 +17,7 @@ controlPlane:
     embedded: false
   statefulSet:
     scheduling:
-      tolerations:
-        - key: vclusterID
-          operator: Equal
-          value: architecture-vizualisation
-          effect: NoSchedule
+      nodeSelector:
+        alpha.eksctl.io/nodegroup-name: socrateshlapolosa-karpenter-demo-ng-medium
+    nodeSelector:
+      alpha.eksctl.io/nodegroup-name: socrateshlapolosa-karpenter-demo-ng-medium

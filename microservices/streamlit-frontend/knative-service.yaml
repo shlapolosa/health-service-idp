@@ -1,0 +1,64 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: streamlit-frontend
+  namespace: default
+  labels:
+    app: streamlit-frontend
+    version: v1.0.0
+    service-type: frontend
+spec:
+  template:
+    metadata:
+      labels:
+        app: streamlit-frontend
+        version: v1.0.0
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "3"
+        autoscaling.knative.dev/target: "100"
+        autoscaling.knative.dev/targetUtilizationPercentage: "70"
+        autoscaling.knative.dev/scaleDownDelay: "60s"
+        autoscaling.knative.dev/scaleToZeroGracePeriod: "120s"
+    spec:
+      serviceAccountName: default
+      containers:
+      - name: streamlit-frontend
+        image: socrates12345/streamlit-frontend:latest
+        ports:
+        - containerPort: 8501
+          protocol: TCP
+        env:
+        - name: STREAMLIT_SERVER_PORT
+          value: "8501"
+        - name: STREAMLIT_SERVER_ADDRESS
+          value: "0.0.0.0"
+        - name: ORCHESTRATION_SERVICE_URL
+          value: "http://orchestration-service.default.svc.cluster.local"
+        - name: ORCHESTRATION_WS_URL
+          value: "ws://orchestration-service.default.svc.cluster.local"
+        - name: LOG_LEVEL
+          value: "INFO"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8501
+          initialDelaySeconds: 30
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8501
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3

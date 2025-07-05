@@ -1,0 +1,67 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: business-architect-anthropic
+  namespace: default
+  labels:
+    app: business-architect-anthropic
+    version: v1.0.0
+    agent-type: business-architect
+    implementation: anthropic
+spec:
+  template:
+    metadata:
+      labels:
+        app: business-architect-anthropic
+        version: v1.0.0
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "10"
+        autoscaling.knative.dev/target: "70"
+        autoscaling.knative.dev/targetUtilizationPercentage: "70"
+        autoscaling.knative.dev/scaleDownDelay: "30s"
+        autoscaling.knative.dev/scaleToZeroGracePeriod: "30s"
+    spec:
+      serviceAccountName: default
+      containers:
+      - name: business-architect-anthropic
+        image: socrates12345/business-architect-anthropic:latest
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        env:
+        - name: AGENT_TYPE
+          value: "business-architect"
+        - name: IMPLEMENTATION_TYPE
+          value: "anthropic"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: anthropic-secret
+              key: api-key
+              optional: true
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3

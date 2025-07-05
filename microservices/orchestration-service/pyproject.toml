@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "orchestration-service"
+version = "0.1.0"
+description = "Orchestration service for agent coordination and workflow management"
+authors = ["shlapolosa <socrates.hlapolosa@gmail.com>"]
+readme = "README.md"
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.14"
+fastapi = ">=0.115.14,<0.116.0"
+pydantic = ">=2.11.7,<3.0.0"
+uvicorn = ">=0.34.3,<0.35.0"
+httpx = ">=0.28.1,<0.29.0"
+redis = ">=5.0.0,<6.0.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.1"
+pytest-asyncio = "^1.0.0"
+black = "^25.1.0"
+isort = "^6.0.1"
+mypy = "^1.16.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

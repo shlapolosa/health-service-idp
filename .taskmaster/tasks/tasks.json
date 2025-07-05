@@ -9,7 +9,7 @@
         "testStrategy": "1. Unit tests for data models and CRUD operations\n2. Integration tests for API endpoints\n3. Load testing of database and Redis cluster\n4. Test database migration scripts\n5. Verify JWT token generation and validation\n6. Test concurrent access and data consistency\n7. Validate data persistence across system restarts",
         "priority": "high",
         "dependencies": [],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -17,7 +17,7 @@
             "description": "Set up PostgreSQL 14.7 on AWS RDS and Redis 7.0 cluster for caching and message passing",
             "dependencies": [],
             "details": "1. Create PostgreSQL 14.7 instance on AWS RDS with appropriate instance size, storage, and network settings\n2. Configure security groups and access policies\n3. Set up Redis 7.0 cluster with appropriate node configuration\n4. Configure Redis persistence, memory limits, and network access\n5. Document connection strings and access credentials in secure location",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify database connectivity from development environment, run basic queries to confirm proper setup, and test Redis read/write operations with appropriate latency"
           },
           {
@@ -26,7 +26,7 @@
             "description": "Create database schemas for architecture and change entities and set up migration framework",
             "dependencies": [],
             "details": "1. Design normalized database schema for architecture entities including tables, relationships, and constraints\n2. Implement SQLAlchemy 2.0 models corresponding to the database schema\n3. Set up Alembic 1.11 for database migrations\n4. Create initial migration script for schema creation\n5. Document entity relationships and schema design",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Validate schema with test data insertion, verify constraints work as expected, and ensure migrations apply and roll back cleanly"
           },
           {
@@ -35,7 +35,7 @@
             "description": "Implement SQLAlchemy-based data access layer with CRUD operations for architecture entities",
             "dependencies": [],
             "details": "1. Create repository classes for each entity type\n2. Implement standard CRUD operations in each repository\n3. Add query methods for common access patterns\n4. Implement caching strategy using Redis for frequently accessed data\n5. Add transaction management and error handling\n6. Create unit tests for repository classes",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit test each repository method with mock database, integration test with test database instance, and benchmark performance of common operations"
           },
           {
@@ -46,7 +46,7 @@
               3
             ],
             "details": "1. Implement user entity and repository in database\n2. Create authentication service using PyJWT 2.7.0\n3. Implement token generation, validation, and refresh logic\n4. Set up secure password hashing and storage\n5. Configure token expiration and refresh policies\n6. Implement login/logout endpoints",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test token generation and validation, verify token expiration works correctly, and ensure proper error handling for invalid credentials"
           },
           {
@@ -55,7 +55,7 @@
             "description": "Implement RESTful API endpoints for architecture entities using FastAPI",
             "dependencies": [],
             "details": "1. Set up FastAPI 0.95 application structure\n2. Implement the five required API endpoints for architectures\n3. Add request validation using Pydantic models\n4. Integrate authentication middleware for endpoint security\n5. Implement error handling and appropriate HTTP status codes\n6. Add API documentation using Swagger/OpenAPI\n7. Write integration tests for all endpoints",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test each endpoint with valid and invalid requests, verify authentication requirements, and ensure proper error responses for edge cases"
           }
         ]
@@ -70,7 +70,7 @@
         "dependencies": [
           2
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -78,7 +78,7 @@
             "description": "Initialize the Streamlit project with the required directory structure and implement the three-pane layout with hamburger menu, visualization area, and chat interface.",
             "dependencies": [],
             "details": "Create a new Streamlit project with appropriate directory structure (pages, components, utils, etc.). Implement the main layout using st.sidebar for the hamburger menu and st.columns for the visualization and chat areas. Set up basic CSS styling for the layout components. Create placeholder components for each section that will be enhanced in subsequent tasks.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Manually verify the layout renders correctly across different screen sizes. Test navigation between different sections of the application."
           },
           {
@@ -87,7 +87,7 @@
             "description": "Develop the hamburger menu in the sidebar with options for architecture navigation and creation. Implement the navigation logic between different sections of the application.",
             "dependencies": [],
             "details": "Use st.sidebar to create the hamburger menu with expandable sections. Implement menu items for architecture selection, creation, and settings. Add appropriate icons and styling. Create the state management logic to handle navigation between different views based on user selection. Implement session state variables to track the current view and selected architecture.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test navigation flow between different menu options. Verify that the correct content is displayed when menu items are selected. Test that state is properly maintained during navigation."
           },
           {
@@ -96,7 +96,7 @@
             "description": "Create the chat interface component with support for displaying message history, user input, and different message types (user, assistant, system).",
             "dependencies": [],
             "details": "Implement the chat interface using st.chat_message for displaying messages. Create a message input area with a send button. Implement functions to add messages to the chat history and display them with appropriate styling. Set up session state variables to store and persist chat history. Add support for different message types with distinct visual styling.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test sending and receiving messages in the chat interface. Verify message history is maintained during the session. Test different message types render with correct styling."
           },
           {
@@ -105,7 +105,7 @@
             "description": "Develop comprehensive session management and state handling to maintain application state across interactions and page refreshes.",
             "dependencies": [],
             "details": "Implement session state management using Streamlit's session_state. Create functions to initialize, update, and retrieve session state variables. Implement state persistence for user preferences, selected architectures, and chat history. Add functionality to handle page refreshes and maintain state. Create utility functions for state management that can be used across the application.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test state persistence across different user interactions. Verify state is maintained after page refreshes. Test edge cases like session expiration and browser navigation."
           },
           {
@@ -114,7 +114,7 @@
             "description": "Implement backend API integration using httpx and set up WebSocket connection for real-time updates.",
             "dependencies": [],
             "details": "Create API client using httpx 0.24 to communicate with backend services. Implement functions for all required API endpoints (architecture retrieval, creation, updates, etc.). Set up WebSocket connection using websockets 11.0 for real-time updates. Implement connection management, reconnection logic, and message handling. Create a background task to listen for WebSocket messages and update the UI accordingly. Add error handling and retry logic for both API calls and WebSocket connections.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test API integration with mock backend responses. Verify WebSocket connection establishes correctly and handles disconnections. Test real-time updates appear in the UI when received through WebSockets."
           }
         ]
@@ -129,7 +129,7 @@
         "dependencies": [
           2
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -137,7 +137,7 @@
             "description": "Create a detailed architecture design for the workflow engine that will orchestrate agent interactions",
             "dependencies": [],
             "details": "Develop a comprehensive architecture document that includes: workflow state management, transition rules, parallel execution capabilities, conditional branching logic, and workflow persistence. Define interfaces for workflow definition, execution, and monitoring. Include sequence diagrams for key workflows and component interaction diagrams. Specify data models for workflow definitions, instances, and execution history. Consider scalability requirements to handle at least 1000 concurrent workflow executions.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -146,7 +146,7 @@
             "description": "Develop the event-driven messaging system using Redis Streams for agent communication",
             "dependencies": [],
             "details": "Create a robust event bus implementation using Redis Streams with the following features: message serialization/deserialization with schema validation, consumer group management for load balancing, automatic reconnection and error recovery, backpressure handling, and dead letter queues for failed messages. Implement both synchronous and asynchronous messaging patterns. Include comprehensive logging and metrics collection. Develop unit tests that verify message delivery guarantees, ordering, and fault tolerance under various failure scenarios.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -157,7 +157,7 @@
               2
             ],
             "details": "Implement a registration system where agents can advertise their capabilities, resource requirements, and constraints. Develop a discovery mechanism that allows the orchestrator to find appropriate agents for specific tasks based on capability matching. Include health checking and automatic deregistration of failed agents. Design and implement a capability description language for precise matching. Create a persistent store for agent information with caching for performance. Implement versioning for agent capabilities to handle upgrades and compatibility.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -169,7 +169,7 @@
               3
             ],
             "details": "Design and implement a multi-layered error handling framework including: categorization of errors (transient vs. permanent), configurable retry policies with exponential backoff, circuit breaker patterns to prevent cascading failures, fallback mechanisms for degraded operation, and transaction compensation for partial workflow failures. Implement detailed error logging with contextual information. Create a test suite that simulates various failure scenarios including network partitions, agent crashes, and resource exhaustion. Ensure all error paths are properly documented.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -182,7 +182,7 @@
               4
             ],
             "details": "Integrate OpenTelemetry for distributed tracing across all system components. Implement custom metrics for workflow execution times, error rates, agent utilization, and message queue depths. Create dashboards for system health monitoring with alerting for anomalies. Implement trace context propagation across service boundaries. Develop structured logging that correlates with trace IDs. Create performance tests to establish baseline metrics and detect regressions. Document all observability touchpoints and provide runbooks for common operational scenarios.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -191,7 +191,7 @@
         "id": 5,
         "title": "Develop Core AI Agents",
         "description": "Implement the fundamental AI agents: Business Analyst, Business Architect, Application Architect, and Developer Agent.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           4
         ],
@@ -203,7 +203,7 @@
             "id": 1,
             "title": "Business Analyst Agent Implementation",
             "description": "Develop the Business Analyst agent with capabilities for requirements elicitation, stakeholder analysis, and business process modeling",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "details": "Implement NLP models for understanding business requirements, create knowledge base with business analysis frameworks (SWOT, PESTLE, etc.), develop algorithms for requirements prioritization, implement validation mechanisms for business rules, and create interfaces for stakeholder feedback integration. Select and train appropriate ML models for text classification, entity recognition, and semantic understanding of business documents.",
             "testStrategy": ""
@@ -212,7 +212,7 @@
             "id": 2,
             "title": "Business Architect Agent Implementation",
             "description": "Develop the Business Architect agent with capabilities for business domain modeling, strategy alignment, and organizational structure analysis",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "details": "Implement knowledge representation for business architecture frameworks, develop algorithms for business capability mapping, create models for value stream analysis, implement pattern recognition for identifying architectural opportunities, and develop visualization components for business architecture artifacts. Select and train ML models for strategic alignment assessment and business model classification.",
             "testStrategy": ""
@@ -221,7 +221,7 @@
             "id": 3,
             "title": "Application Architect Agent Implementation",
             "description": "Develop the Application Architect agent with capabilities for technical solution design, pattern application, and technology stack selection",
-            "status": "pending",
+            "status": "done",
             "dependencies": [
               2
             ],
@@ -232,7 +232,7 @@
             "id": 4,
             "title": "Developer Agent Implementation",
             "description": "Develop the Developer agent with capabilities for code generation, testing, and technical documentation",
-            "status": "pending",
+            "status": "done",
             "dependencies": [
               3
             ],
@@ -243,7 +243,7 @@
             "id": 5,
             "title": "Inter-Agent Communication Protocol Development",
             "description": "Design and implement communication protocols and interfaces between the specialized agents",
-            "status": "pending",
+            "status": "done",
             "dependencies": [
               2,
               3,
@@ -256,7 +256,7 @@
             "id": 6,
             "title": "Agent Evaluation and Performance Optimization",
             "description": "Develop evaluation frameworks and optimization strategies for each specialized agent",
-            "status": "pending",
+            "status": "done",
             "dependencies": [
               2,
               3,
@@ -270,7 +270,7 @@
             "id": 7,
             "title": "Business Analyst Agent Implementation",
             "description": "Develop the Business Analyst Agent with advanced NLP capabilities for requirements analysis and business process understanding",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "details": "Implement using spaCy 3.5 for NLP processing with custom entity recognition for business terminology. Train on business requirements documents and user stories. Integrate with Hugging Face Transformers 4.30 for semantic understanding. Leverage crewai and OpenAI-based agentic API for agent behavior and reasoning. Performance metrics: F1 score >0.85 for entity recognition, >90% accuracy in requirements classification, and <2s response time for standard queries.",
             "testStrategy": ""
@@ -279,7 +279,7 @@
             "id": 8,
             "title": "Business Architect Agent Development",
             "description": "Create the Business Architect Agent capable of business layer manipulation and strategic alignment",
-            "status": "pending",
+            "status": "done",
             "dependencies": [
               7
             ],
@@ -290,7 +290,7 @@
             "id": 9,
             "title": "Application Architect Agent Implementation",
             "description": "Build the Application Architect Agent with reference architecture access and technical design capabilities",
-            "status": "pending",
+            "status": "done",
             "dependencies": [
               8
             ],
@@ -301,7 +301,7 @@
             "id": 10,
             "title": "Developer Agent Creation",
             "description": "Develop the Developer Agent with code generation capabilities across multiple programming languages",
-            "status": "pending",
+            "status": "done",
             "dependencies": [
               9
             ],
@@ -312,7 +312,7 @@
             "id": 11,
             "title": "Knowledge Base Development",
             "description": "Create specialized knowledge bases for each agent with domain-specific information and decision-making logic",
-            "status": "pending",
+            "status": "done",
             "dependencies": [
               7,
               8,
@@ -326,7 +326,7 @@
             "id": 12,
             "title": "Inter-Agent Communication Protocol",
             "description": "Implement robust communication protocols between agents for collaborative problem-solving",
-            "status": "pending",
+            "status": "done",
             "dependencies": [
               7,
               8,
@@ -340,7 +340,7 @@
             "id": 13,
             "title": "Agent Evaluation Framework",
             "description": "Create comprehensive evaluation frameworks for measuring agent performance and continuous improvement",
-            "status": "pending",
+            "status": "done",
             "dependencies": [
               7,
               8,
@@ -355,7 +355,7 @@
             "id": 14,
             "title": "Orchestration System Integration",
             "description": "Integrate all agents with crewai and OpenAI-based agentic API for coordinated workflow execution",
-            "status": "pending",
+            "status": "done",
             "dependencies": [
               7,
               8,
@@ -378,7 +378,7 @@
         "dependencies": [
           3
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -386,7 +386,7 @@
             "description": "Research, evaluate, and select the most appropriate visualization library for implementing ArchiMate diagrams in Streamlit.",
             "dependencies": [],
             "details": "Compare libraries like D3.js, Cytoscape.js, vis.js, and GoJS based on: rendering performance with 500+ elements, ArchiMate symbol support, layout algorithms, interactive capabilities, Streamlit compatibility, and licensing. Create a comparison matrix with benchmarks for each option. Develop small proof-of-concept implementations with each viable library to test integration with Streamlit. Document findings and justify final selection.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -395,7 +395,7 @@
             "description": "Implement the complete ArchiMate 3.1 notation system using the selected visualization library.",
             "dependencies": [],
             "details": "Create visual representations for all ArchiMate 3.1 elements (Business, Application, Technology, Physical, Strategy, Implementation & Migration layers). Implement relationship types (structural, dependency, dynamic, other). Design a consistent visual styling system following ArchiMate specifications. Ensure proper element sizing, spacing, and relationship routing. Create a comprehensive test suite with examples of each element and relationship type. Document the implementation approach and any deviations from standard notation.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -406,7 +406,7 @@
               2
             ],
             "details": "Implement zoom and pan functionality with smooth transitions. Create element selection and highlighting features. Add tooltips showing detailed element information on hover. Develop filtering capabilities by layer, element type, and relationships. Implement collapsible/expandable element groups. Add search functionality to locate elements by name or properties. Create interactive layout controls (force-directed, hierarchical, circular). Ensure all interactions work with both mouse and keyboard for accessibility. Implement undo/redo functionality for user actions.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -417,7 +417,7 @@
               3
             ],
             "details": "Implement level-of-detail rendering based on zoom level. Create efficient data structures for quick element lookup and relationship traversal. Optimize rendering through element virtualization (only render visible elements). Implement incremental rendering for large diagrams. Add caching mechanisms for layout calculations. Conduct performance testing with models of varying sizes (100, 500, 1000+ elements). Optimize memory usage to prevent leaks during long sessions. Document performance benchmarks and optimization techniques applied.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -428,7 +428,7 @@
               4
             ],
             "details": "Create Streamlit-compatible component wrapper for the visualization. Implement bidirectional communication between Streamlit and the visualization component. Develop configuration controls in Streamlit UI for visualization settings. Create export functionality for diagrams (PNG, SVG, PDF). Implement state persistence to maintain visualization state between Streamlit reruns. Add responsive design to adapt to different screen sizes. Conduct cross-browser testing (Chrome, Firefox, Safari, Edge). Create comprehensive documentation including usage examples, API reference, and customization options. Perform final accessibility testing (WCAG 2.1 AA compliance).",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -445,7 +445,7 @@
           4,
           5
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -453,7 +453,7 @@
             "description": "Create a comprehensive data model for the Change Management System",
             "dependencies": [],
             "details": "Design database schema including tables for change requests, approval workflows, state transitions, and versioning. Define entity relationships between changes, affected components, approvers, and audit logs. Include fields for change type, priority, impact assessment, rollback plan, and implementation timeline. Specify constraints, indexes, and optimization strategies for query performance.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -462,7 +462,7 @@
             "description": "Develop the state machine for change request lifecycle management",
             "dependencies": [],
             "details": "Create a state transition engine that handles the complete lifecycle of change requests (Draft, Submitted, In Review, Approved, Rejected, Implemented, Rolled Back). Implement validation rules for state transitions based on role permissions. Design API endpoints for state transitions with appropriate authentication and authorization checks. Include notification triggers for state changes and SLA monitoring for time-sensitive states.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -473,7 +473,7 @@
               2
             ],
             "details": "Implement approval chains with configurable approval levels based on change type and impact. Create delegation mechanisms for approvals during absence. Design approval queues with prioritization logic. Develop API endpoints for approval actions (approve, reject, request more information). Implement conditional approval paths based on change attributes and organizational hierarchy.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -485,7 +485,7 @@
               3
             ],
             "details": "Implement change propagation algorithms to identify all affected components. Develop a sandbox environment for change previews before implementation. Create diff visualization tools for comparing before/after states. Build integration points with the agent orchestration system for executing changes. Implement rollback mechanisms for failed changes with state preservation.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -496,7 +496,7 @@
               4
             ],
             "details": "Develop immutable audit logging for all change-related actions with user attribution. Implement version control for configuration changes with diff capabilities. Create reporting APIs for compliance and governance requirements. Design archiving strategies for historical change data. Build dashboards for change analytics and trend visualization. Implement search capabilities across the audit history with filtering options.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -512,7 +512,7 @@
           2,
           4
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -520,7 +520,7 @@
             "description": "Implement the AWS cloud provider integration module with complete API connectivity, authentication, and service mapping",
             "dependencies": [],
             "details": "Create AWS SDK integration with support for EC2, S3, RDS, Lambda, and CloudFormation services. Implement IAM role-based authentication with MFA support. Develop API wrappers for resource provisioning, monitoring, and management. Include cost estimation API integration with AWS Cost Explorer. Create comprehensive unit and integration tests for all AWS service interactions.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -529,7 +529,7 @@
             "description": "Implement the Azure cloud provider integration module with complete API connectivity, authentication, and service mapping",
             "dependencies": [],
             "details": "Create Azure SDK integration with support for Virtual Machines, Blob Storage, Azure SQL, Functions, and Resource Manager. Implement service principal authentication with certificate-based security. Develop API wrappers for resource provisioning, monitoring, and management. Include cost estimation API integration with Azure Cost Management. Create comprehensive unit and integration tests for all Azure service interactions.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -538,7 +538,7 @@
             "description": "Implement the GCP cloud provider integration module with complete API connectivity, authentication, and service mapping",
             "dependencies": [],
             "details": "Create GCP SDK integration with support for Compute Engine, Cloud Storage, Cloud SQL, Cloud Functions, and Deployment Manager. Implement service account authentication with key management. Develop API wrappers for resource provisioning, monitoring, and management. Include cost estimation API integration with GCP Billing API. Create comprehensive unit and integration tests for all GCP service interactions.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -550,7 +550,7 @@
               3
             ],
             "details": "Create a provider-agnostic API for common cloud operations (compute, storage, database, serverless). Develop service mapping logic to translate between equivalent services across providers. Implement unified resource tagging and identification system. Create abstraction for authentication and credential management. Design and implement error handling and retry logic for cross-cloud operations. Develop comprehensive tests for the abstraction layer.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -561,7 +561,7 @@
               4
             ],
             "details": "Create unified cost modeling system that aggregates pricing data from all providers. Implement resource utilization analysis algorithms. Develop optimization engine for cost-effective deployment recommendations. Create deployment planning logic with support for constraints (region, compliance, performance). Implement orchestration system integration with Kubernetes, Terraform, and Ansible. Develop comprehensive testing suite for cost analysis accuracy and deployment plan validation.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -577,7 +577,7 @@
           5,
           8
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -585,7 +585,7 @@
             "description": "Develop the Infrastructure Architect agent with capabilities to analyze and recommend cloud infrastructure configurations, security protocols, and scalability options.",
             "dependencies": [],
             "details": "Implement using GPT-4 or equivalent LLM with fine-tuning on infrastructure design patterns, cloud service provider documentation, and security best practices. Create knowledge bases for AWS, Azure, and GCP services. Develop evaluation metrics including accuracy of recommendations, cost optimization capabilities, and security compliance assessment. Include infrastructure-as-code template generation capabilities.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -594,7 +594,7 @@
             "description": "Build the Solution Architect agent to design system architectures, evaluate technology stacks, and provide integration recommendations.",
             "dependencies": [],
             "details": "Utilize a combination of GPT-4 and specialized models for technical documentation analysis. Implement domain-specific reasoning for microservices, serverless, and monolithic architectures. Create evaluation framework for measuring solution quality, technical debt assessment, and architectural pattern recognition. Include visualization capabilities for system diagrams and dependency mapping.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -605,7 +605,7 @@
               2
             ],
             "details": "Implement Project Manager agent using LLMs fine-tuned on project management methodologies and historical project data. Develop Accountant agent with specialized models for TCO calculations, ROI analysis, and budget forecasting. Include integration with common project management tools and financial systems. Evaluation criteria should include accuracy of estimates, resource optimization, and financial projection reliability.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -617,7 +617,7 @@
               3
             ],
             "details": "Develop a shared NLP layer using transformer-based architectures with attention mechanisms. Implement context windows of at least 20k tokens. Create domain-specific embeddings for technical, financial, and project management terminology. Develop evaluation framework for measuring contextual understanding, terminology accuracy, and conversation coherence across multiple interactions.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -629,7 +629,7 @@
               4
             ],
             "details": "Implement a Bayesian decision framework with multi-criteria decision analysis capabilities. Develop visualization components for decision trees, sensitivity analysis, and confidence scoring. Create mechanisms for handling uncertainty and providing probabilistic recommendations. Include explainability features to document decision rationales. Evaluation should measure decision quality, consistency, and alignment with organizational objectives.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -641,7 +641,7 @@
               5
             ],
             "details": "Implement an event-driven architecture for agent coordination using a publish-subscribe model. Develop APIs for integration with CI/CD pipelines, project management tools, and financial systems. Create monitoring and logging capabilities for agent interactions and decision processes. Include failover mechanisms and performance optimization. Evaluation criteria should include system latency, throughput under load, and successful integration with target systems.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -663,7 +663,7 @@
           8,
           9
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -671,7 +671,7 @@
             "description": "Analyze and optimize database performance including query optimization, indexing strategies, and connection pooling configuration.",
             "dependencies": [],
             "details": "1. Perform query analysis to identify slow-running queries\n2. Implement appropriate indexing strategies for frequently accessed data\n3. Configure connection pooling for optimal resource utilization\n4. Optimize database schema for performance\n5. Implement query caching where appropriate\n6. Set up database monitoring with specific metrics: query execution time, index usage, cache hit ratio, and connection pool utilization",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -680,7 +680,7 @@
             "description": "Implement comprehensive monitoring using Prometheus and Grafana with appropriate alerting mechanisms.",
             "dependencies": [],
             "details": "1. Deploy Prometheus server in Kubernetes cluster\n2. Configure service discovery for automatic monitoring of new services\n3. Set up Grafana dashboards for visualizing system metrics\n4. Implement alerting rules for critical metrics: CPU/memory usage, error rates, latency thresholds\n5. Create custom exporters for application-specific metrics\n6. Configure persistent storage for monitoring data\n7. Document dashboard access and alert response procedures",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -691,7 +691,7 @@
               2
             ],
             "details": "1. Integrate OpenTelemetry or Jaeger instrumentation in all services\n2. Configure sampling strategies to balance performance and data collection\n3. Implement context propagation across service boundaries\n4. Set up trace visualization and analysis tools\n5. Create custom spans for critical business operations\n6. Establish baseline performance metrics for key transactions\n7. Document tracing analysis procedures for troubleshooting",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -702,7 +702,7 @@
               2
             ],
             "details": "1. Analyze resource usage patterns and right-size pod requests/limits\n2. Implement Horizontal Pod Autoscaling based on custom metrics\n3. Configure node affinity and pod anti-affinity rules for optimal distribution\n4. Optimize network policies and ingress configurations\n5. Implement resource quotas and limit ranges for namespaces\n6. Configure cluster autoscaling for dynamic workloads\n7. Benchmark and optimize storage performance\n8. Document resource allocation strategies and scaling policies",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -714,7 +714,7 @@
               4
             ],
             "details": "1. Implement Redis/Memcached for distributed caching\n2. Configure CDN for static asset caching\n3. Implement application-level caching with appropriate invalidation strategies\n4. Design and implement cache warming procedures\n5. Develop load testing scenarios using JMeter or Locust\n6. Establish performance baselines and targets for key user journeys\n7. Conduct incremental load tests to identify breaking points\n8. Implement log aggregation using ELK or similar stack\n9. Document caching strategies and load testing results with recommendations",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -725,7 +725,7 @@
         "description": "Install and configure ArgoCD in the existing virtual Kubernetes cluster to enable GitOps-based continuous delivery for the application components.",
         "details": "1. Access the existing virtual Kubernetes cluster (vcluster) that has been set up with Karpenter and autoscaling capabilities.\n2. Add the ArgoCD Helm repository:\n   \n   helm repo add argo https://argoproj.github.io/argo-helm\n   helm repo update\n   \n3. Create a dedicated namespace for ArgoCD:\n   \n   kubectl create namespace argocd\n   \n4. Install ArgoCD using Helm with customized values:\n   \n   helm install argocd argo/argo-cd \\\n     --namespace argocd \\\n     --set server.service.type=LoadBalancer \\\n     --set controller.metrics.enabled=true \\\n     --set server.metrics.enabled=true\n   \n5. Configure RBAC for ArgoCD to ensure proper access controls:\n   \n   kubectl apply -f argocd-rbac-config.yaml -n argocd\n   \n6. Set up the initial admin password and secure it using Kubernetes secrets:\n   \n   kubectl -n argocd patch secret argocd-secret \\\n     -p '{\"stringData\": {\"admin.password\": \"$2a$10$...\"}}'\n   \n7. Configure ArgoCD to monitor the application Git repositories:\n   \n   kubectl apply -f application-repos.yaml -n argocd\n   \n8. Create ArgoCD Application manifests for each component of the system:\n   \n   kubectl apply -f applications/ -n argocd\n   \n9. Set up ArgoCD projects to organize applications and enforce security boundaries:\n   \n   kubectl apply -f projects/ -n argocd\n   \n10. Integrate ArgoCD with the monitoring stack (Prometheus/Grafana) installed in Task 10:\n    \n    kubectl apply -f argocd-servicemonitor.yaml -n argocd\n    \n11. Document the ArgoCD access URLs, credentials (stored securely), and usage instructions for the development team.\n\nKey Considerations:\n- Ensure ArgoCD has appropriate resource requests and limits to function properly in the vcluster environment\n- Configure network policies to secure ArgoCD components\n- Set up proper backup for ArgoCD configurations and state\n- Implement GitOps principles for managing the application deployment lifecycle",
         "testStrategy": "1. Verify ArgoCD installation and pod health:\n   \n   kubectl get pods -n argocd\n   kubectl get svc -n argocd\n   \n   All pods should be in Running state with appropriate readiness and liveness.\n\n2. Test ArgoCD UI accessibility:\n   - Access the ArgoCD UI through the LoadBalancer service\n   - Verify successful login with admin credentials\n   - Confirm the dashboard loads correctly\n\n3. Validate ArgoCD CLI functionality:\n   \n   argocd login <ARGOCD_SERVER>\n   argocd cluster list\n   argocd app list\n   \n   Commands should execute successfully without errors.\n\n4. Test application deployment workflow:\n   - Create a test application in ArgoCD pointing to a sample repository\n   - Verify the application syncs correctly\n   - Make a change to the repository and confirm ArgoCD detects and applies the change\n\n5. Verify RBAC configurations:\n   - Test access with different user roles\n   - Confirm appropriate permissions are enforced\n\n6. Test integration with monitoring:\n   - Verify ArgoCD metrics are being collected by Prometheus\n   - Check that ArgoCD dashboards are available in Grafana\n\n7. Perform a disaster recovery test:\n   - Backup ArgoCD state\n   - Simulate a failure scenario\n   - Restore from backup and verify functionality\n\n8. Validate resource usage and scaling:\n   - Monitor ArgoCD resource consumption under load\n   - Verify Karpenter properly scales nodes when needed",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           10
         ],
@@ -738,7 +738,7 @@
         "description": "Set up an Open Application Model (OAM) project that leverages Knative for serverless capabilities and configure ArgoCD for GitOps-based deployment of the application components.",
         "details": "1. Verify Knative and Istio installation:\n   \n   kubectl get pods -n knative-serving\n   kubectl get pods -n istio-system\n   \n\n2. Install Vela CLI if not already available:\n   \n   curl -fsSl https://kubevela.io/script/install.sh | bash\n   \n\n3. Initialize OAM project structure:\n   \n   mkdir -p oam-knative-project/charts\n   mkdir -p oam-knative-project/applications\n   cd oam-knative-project\n   \n\n4. Create a KubeVela application definition file (application.yaml):\n   yaml\n   apiVersion: core.oam.dev/v1beta1\n   kind: Application\n   metadata:\n     name: agent-orchestration-system\n     namespace: default\n   spec:\n     components:\n       - name: orchestration-service\n         type: webservice\n         properties:\n           image: ${REGISTRY}/orchestration-service:${TAG}\n           ports:\n             - port: 8080\n               expose: true\n           env:\n             - name: REDIS_HOST\n               value: redis-service\n         traits:\n           - type: scaler\n             properties:\n               replicas: 2\n           - type: service-binding\n             properties:\n               envMappings:\n                 REDIS_PASSWORD:\n                   secret: redis-credentials\n                   key: password\n       - name: agent-function\n         type: knative-serving\n         properties:\n           image: ${REGISTRY}/agent-function:${TAG}\n           port: 8080\n   \n\n5. Create a Vela component definition for Knative integration:\n   yaml\n   apiVersion: core.oam.dev/v1beta1\n   kind: ComponentDefinition\n   metadata:\n     name: knative-serving\n     namespace: vela-system\n     annotations:\n       definition.oam.dev/description: \"Knative serving component for serverless workloads\"\n   spec:\n     workload:\n       definition:\n         apiVersion: serving.knative.dev/v1\n         kind: Service\n     schematic:\n       cue:\n         template: |\n           output: {\n             apiVersion: \"serving.knative.dev/v1\"\n             kind:       \"Service\"\n             metadata: name: context.name\n             spec: {\n               template: {\n                 spec: {\n                   containers: [{\n                     image: parameter.image\n                     ports: [{\n                       containerPort: parameter.port\n                     }]\n                     if parameter[\"env\"] != _|_ {\n                       env: parameter.env\n                     }\n                   }]\n                 }\n               }\n             }\n           }\n           parameter: {\n             image: string\n             port: *8080 | int\n             env?: [...{\n               name:  string\n               value: string\n             }]\n           }\n   \n\n6. Create ArgoCD application manifest for GitOps deployment:\n   yaml\n   apiVersion: argoproj.io/v1alpha1\n   kind: Application\n   metadata:\n     name: agent-orchestration-oam\n     namespace: argocd\n   spec:\n     project: default\n     source:\n       repoURL: https://github.com/yourusername/oam-knative-project.git\n       targetRevision: HEAD\n       path: ./\n     destination:\n       server: https://kubernetes.default.svc\n       namespace: default\n     syncPolicy:\n       automated:\n         prune: true\n         selfHeal: true\n       syncOptions:\n         - CreateNamespace=true\n   \n\n7. Configure Vela to use Knative for function deployment:\n   \n   vela component apply knative-serving --namespace vela-system\n   \n\n8. Test Knative function deployment using Vela:\n   \n   vela init sample-function --type knative-serving\n   cd sample-function\n   # Edit the function code as needed\n   vela up\n   \n\n9. Set up a Git repository for the OAM project:\n   \n   git init\n   git add .\n   git commit -m \"Initial OAM project setup with Knative integration\"\n   git remote add origin https://github.com/yourusername/oam-knative-project.git\n   git push -u origin main\n   \n\n10. Apply the ArgoCD application to enable GitOps deployment:\n    \n    kubectl apply -f argocd-application.yaml\n    \n\n11. Configure ArgoCD to monitor the Git repository for changes:\n    \n    argocd app sync agent-orchestration-oam\n    \n\n12. Implement CI pipeline to update application images and trigger ArgoCD sync:\n    - Create GitHub Actions or Jenkins pipeline\n    - Configure image build and push to registry\n    - Update image tags in OAM application definition\n    - Commit changes to trigger ArgoCD sync",
         "testStrategy": "1. Verify Vela and Knative CLI installation:\n   \n   vela version\n   kn version\n   func version\n   \n\n2. Test OAM component definition registration:\n   \n   vela component list\n   \n   Verify that the \"knative-serving\" component type is listed.\n\n3. Validate the OAM application configuration:\n   \n   vela validate -f application.yaml\n   \n\n4. Test deployment of a sample Knative function:\n   \n   func create -l python sample-function\n   cd sample-function\n   func deploy\n   \n   Verify the function is deployed and accessible.\n\n5. Test auto-scaling of the Knative service:\n   \n   # Generate load to the function\n   hey -z 1m -c 50 http://sample-function.default.example.com\n   # Check scaling behavior\n   kubectl get pods -n default\n   \n\n6. Verify ArgoCD deployment:\n   \n   argocd app get agent-orchestration-oam\n   \n   Ensure the application is synced and healthy.\n\n7. Test GitOps workflow:\n   \n   # Make a change to the application.yaml\n   git commit -am \"Update application configuration\"\n   git push\n   # Verify ArgoCD detects and applies changes\n   argocd app get agent-orchestration-oam\n   \n\n8. Validate service connectivity:\n   \n   # Test connectivity between components\n   kubectl exec -it deployment/orchestration-service -- curl agent-function.default.svc.cluster.local\n   \n\n9. Perform end-to-end testing:\n   - Deploy a complete application with multiple components\n   - Verify all components are running\n   - Test communication between components\n   - Verify Knative auto-scaling functionality\n\n10. Test rollback capability:\n    \n    argocd app history agent-orchestration-oam\n    argocd app rollback agent-orchestration-oam 1\n    \n    Verify the application rolls back to the previous version.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           11,
           4
@@ -751,7 +751,7 @@
             "description": "Ensure Knative Serving is properly installed and configured in the Kubernetes cluster before proceeding with OAM setup.",
             "dependencies": [],
             "details": "1. Check Knative Serving installation: `kubectl get pods -n knative-serving`\n2. Verify Knative version: `kubectl get namespace knative-serving -o jsonpath='{.metadata.labels.serving\\.knative\\.dev/release}'`\n3. Confirm Knative CRDs are installed: `kubectl get crd | grep knative`\n4. Test basic Knative functionality by deploying a sample service:\nyaml\napiVersion: serving.knative.dev/v1\nkind: Service\nmetadata:\n  name: hello\n  namespace: default\nspec:\n  template:\n    spec:\n      containers:\n        - image: gcr.io/knative-samples/helloworld-go\n          env:\n            - name: TARGET\n              value: \"Knative Test\"\n\n5. Verify the service is running: `kubectl get ksvc hello`\n6. Document any configuration issues and resolve them before proceeding.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -762,7 +762,7 @@
               1
             ],
             "details": "1. Create project directory structure:\n\nmkdir -p oam-project/{base,components,traits,applications,workflows}\n\n2. Initialize Git repository:\n\ncd oam-project\ngit init\n\n3. Create a README.md with project overview\n4. Set up .gitignore file for Kubernetes and development artifacts\n5. Create a basic project configuration file (project.yaml):\nyaml\nname: oam-project\ndescription: OAM-based application deployment with Knative and ArgoCD\nversion: 0.1.0\nmaintainers:\n  - name: DevOps Team\n    email: devops@example.com\n\n6. Document the project structure in README.md with explanations for each directory's purpose\n7. Commit the initial structure: `git add . && git commit -m \"Initial OAM project structure\"`",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -773,7 +773,7 @@
               2
             ],
             "details": "1. Install KubeVela CLI if not already installed: `curl -fsSl https://kubevela.io/script/install.sh | bash`\n2. Verify KubeVela installation: `vela version`\n3. Create a basic component definition in `components/web-service.yaml`:\nyaml\napiVersion: core.oam.dev/v1beta1\nkind: ComponentDefinition\nmetadata:\n  name: web-service\n  namespace: vela-system\nspec:\n  workload:\n    definition:\n      apiVersion: serving.knative.dev/v1\n      kind: Service\n  schematic:\n    cue:\n      template: |\n        output: {\n          apiVersion: \"serving.knative.dev/v1\"\n          kind:       \"Service\"\n          metadata: name: context.name\n          spec: {\n            template: {\n              spec: {\n                containers: [{\n                  image: parameter.image\n                  env: parameter.env\n                  ports: [{\n                    containerPort: parameter.port\n                  }]\n                }]\n              }\n            }\n          }\n        }\n        parameter: {\n          image: string\n          port: *80 | int\n          env: [...{\n            name:  string\n            value: string\n          }]\n        }\n\n4. Apply the component definition: `kubectl apply -f components/web-service.yaml`\n5. Verify the component is registered: `vela components`\n6. Test the component by creating a simple application that uses it\n7. Document the component parameters and usage examples",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -784,7 +784,7 @@
               3
             ],
             "details": "1. Create a trait definition for scaling in `traits/auto-scaler.yaml`:\nyaml\napiVersion: core.oam.dev/v1beta1\nkind: TraitDefinition\nmetadata:\n  name: auto-scaler\n  namespace: vela-system\nspec:\n  appliesToWorkloads:\n    - web-service\n  schematic:\n    cue:\n      template: |\n        patch: {\n          spec: {\n            template: {\n              metadata: annotations: {\n                \"autoscaling.knative.dev/minScale\": parameter.min\n                \"autoscaling.knative.dev/maxScale\": parameter.max\n                if parameter.target != _|_ {\n                  \"autoscaling.knative.dev/target\": parameter.target\n                }\n              }\n            }\n          }\n        }\n        parameter: {\n          min: *\"1\" | string\n          max: *\"10\" | string\n          target?: string\n        }\n\n2. Apply the trait definition: `kubectl apply -f traits/auto-scaler.yaml`\n3. Create an application configuration in `applications/web-app.yaml`:\nyaml\napiVersion: core.oam.dev/v1beta1\nkind: Application\nmetadata:\n  name: web-application\n  namespace: default\nspec:\n  components:\n    - name: frontend\n      type: web-service\n      properties:\n        image: nginx:latest\n        port: 80\n        env:\n          - name: ENV\n            value: \"production\"\n      traits:\n        - type: auto-scaler\n          properties:\n            min: \"2\"\n            max: \"5\"\n            target: \"80\"\n\n4. Apply the application: `kubectl apply -f applications/web-app.yaml`\n5. Verify the application is deployed: `vela ls`\n6. Test the application functionality and scaling behavior\n7. Document the application configuration options and trait parameters",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -795,7 +795,7 @@
               4
             ],
             "details": "1. Verify ArgoCD installation: `kubectl get pods -n argocd`\n2. Create an ArgoCD application manifest in `argocd/application.yaml`:\nyaml\napiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: oam-application\n  namespace: argocd\nspec:\n  project: default\n  source:\n    repoURL: https://github.com/yourusername/oam-project.git\n    targetRevision: HEAD\n    path: applications\n  destination:\n    server: https://kubernetes.default.svc\n    namespace: default\n  syncPolicy:\n    automated:\n      prune: true\n      selfHeal: true\n    syncOptions:\n      - CreateNamespace=true\n\n3. Apply the ArgoCD application: `kubectl apply -f argocd/application.yaml`\n4. Push your OAM project to GitHub:\n\ngit remote add origin https://github.com/yourusername/oam-project.git\ngit push -u origin main\n\n5. Verify ArgoCD syncs the application: `argocd app get oam-application`\n6. Set up a test workflow to validate the GitOps process:\n   - Make a change to the application configuration\n   - Commit and push the change\n   - Verify ArgoCD detects and applies the change\n7. Document the ArgoCD integration process and monitoring procedures\n8. Create a CI pipeline configuration file (.github/workflows/ci.yaml or .gitlab-ci.yml) to validate OAM configurations before they're applied",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -806,33 +806,348 @@
         "description": "Create the project structure for an ArgoCD app of apps pattern that integrates with KubeVela applications, including repository setup for components and container image storage.",
         "details": "1. Create the base directory structure for the ArgoCD app of apps pattern:\n\nmkdir -p argocd-vela-project/apps\nmkdir -p argocd-vela-project/components\n\n\n2. Set up the root application in ArgoCD (root-app.yaml):\nyaml\napiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: root-application\n  namespace: argocd\nspec:\n  project: default\n  source:\n    repoURL: https://github.com/your-org/argocd-vela-project.git\n    targetRevision: HEAD\n    path: apps\n  destination:\n    server: https://kubernetes.default.svc\n    namespace: argocd\n  syncPolicy:\n    automated:\n      prune: true\n      selfHeal: true\n\n\n3. Create GitHub repositories for each component:\n\n# Example using GitHub CLI\ngh repo create your-org/component-one --public\ngh repo create your-org/component-two --public\ngh repo create your-org/component-three --public\n\n\n4. Set up Google Container Registry (GCR) for image storage:\n\n# Authenticate with GCR\ngcloud auth configure-docker gcr.io\n\n# Create project structure for each component with Dockerfile\nfor component in component-one component-two component-three; do\n  mkdir -p $component/src\n  cat > $component/Dockerfile << EOF\nFROM node:16-alpine\nWORKDIR /app\nCOPY src/ .\nRUN npm install\nCMD [\"npm\", \"start\"]\nEOF\ndone\n\n\n5. Create KubeVela application definition for each component (component-one.yaml):\nyaml\napiVersion: core.oam.dev/v1beta1\nkind: Application\nmetadata:\n  name: component-one\n  namespace: applications\nspec:\n  components:\n    - name: component-one\n      type: webservice\n      properties:\n        image: gcr.io/your-project/component-one:latest\n        ports:\n          - port: 8080\n            expose: true\n      traits:\n        - type: scaler\n          properties:\n            replicas: 2\n\n\n6. Create ArgoCD application definitions for each KubeVela application (apps/component-one.yaml):\nyaml\napiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: component-one\n  namespace: argocd\nspec:\n  project: default\n  source:\n    repoURL: https://github.com/your-org/component-one.git\n    targetRevision: HEAD\n    path: deploy\n  destination:\n    server: https://kubernetes.default.svc\n    namespace: applications\n  syncPolicy:\n    automated:\n      prune: true\n      selfHeal: true\n\n\n7. Set up CI/CD workflows for each component repository to build and push images to GCR:\nyaml\n# .github/workflows/build.yaml\nname: Build and Push\n\non:\n  push:\n    branches: [ main ]\n\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v3\n      \n      - name: Set up Google Cloud SDK\n        uses: google-github-actions/setup-gcloud@v1\n        with:\n          project_id: your-project\n          service_account_key: ${{ secrets.GCR_KEY }}\n          \n      - name: Build and push\n        run: |\n          gcloud auth configure-docker gcr.io\n          docker build -t gcr.io/your-project/component-one:${{ github.sha }} .\n          docker push gcr.io/your-project/component-one:${{ github.sha }}\n          docker tag gcr.io/your-project/component-one:${{ github.sha }} gcr.io/your-project/component-one:latest\n          docker push gcr.io/your-project/component-one:latest\n\n\n8. Configure ArgoCD to monitor the repositories:\n\nargocd repo add https://github.com/your-org/argocd-vela-project.git --name root-repo\nargocd repo add https://github.com/your-org/component-one.git --name component-one\nargocd repo add https://github.com/your-org/component-two.git --name component-two\nargocd repo add https://github.com/your-org/component-three.git --name component-three\n\n\n9. Apply the root application to bootstrap the entire system:\n\nkubectl apply -f root-app.yaml\n",
         "testStrategy": "1. Verify the GitHub repositories are correctly created and accessible:\n\ngh repo list your-org --limit 10\n\n\n2. Validate GCR access and permissions:\n\ngcloud container images list --repository=gcr.io/your-project\n\n\n3. Test the ArgoCD root application deployment:\n\nkubectl apply -f root-app.yaml\nkubectl get applications -n argocd\nargocd app get root-application\n\nVerify the root application is synced and healthy.\n\n4. Validate that child applications are automatically created:\n\nkubectl get applications -n argocd\n\nConfirm that component-one, component-two, etc. applications appear.\n\n5. Test the end-to-end workflow by making a change to a component repository:\n\ncd component-one\n# Make a change to the code\ngit add .\ngit commit -m \"Test change\"\ngit push\n\nVerify in ArgoCD UI or CLI that the change is detected and deployed.\n\n6. Validate KubeVela application deployment:\n\nkubectl get application.core.oam.dev -n applications\nkubectl get deployment -n applications\n\nConfirm that the deployments are created as expected.\n\n7. Test container image build and push workflow:\n\n# Trigger GitHub Actions workflow manually or via commit\ngh workflow run build.yaml -R your-org/component-one\n\nVerify the image is built and pushed to GCR.\n\n8. Perform an integration test by accessing the deployed services:\n\nkubectl get svc -n applications\n# Use port-forward or ingress to access the service\nkubectl port-forward svc/component-one 8080:8080 -n applications\ncurl http://localhost:8080\n",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           11,
           12
         ],
         "priority": "medium",
-        "subtasks": []
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Repository Structure Organization",
+            "description": "Set up the Git repository structure to support the ArgoCD App of Apps pattern",
+            "dependencies": [],
+            "details": "1. Create a main Git repository for the root application\n2. Define folder structure (apps/, templates/, environments/)\n3. Create README.md with repository purpose and structure documentation\n4. Set up branch protection rules for main/master branch\n5. Configure access controls and permissions\n6. Initialize with .gitignore for ArgoCD and Kubernetes artifacts\n7. Validation: Repository structure should follow GitOps best practices and be accessible to ArgoCD",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Root Application Configuration",
+            "description": "Configure the ArgoCD root application that will manage all child applications",
+            "dependencies": [
+              1
+            ],
+            "details": "1. Create root Application manifest in the main repository\n2. Configure sync policies (automated, self-heal, prune)\n3. Set up appropriate RBAC for the root application\n4. Define resource exclusions/inclusions\n5. Configure health checks for the root application\n6. Set up appropriate retry and timeout settings\n7. Validation: Root application should successfully sync and display in ArgoCD UI",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Component Repository Setup",
+            "description": "Set up individual repositories for each application component with proper ArgoCD configuration",
+            "dependencies": [
+              1
+            ],
+            "details": "1. Create separate repositories for each application component\n2. Set up standard structure for each component repo (manifests/, helm/, kustomize/)\n3. Create Application manifests for each component\n4. Configure component-specific sync policies\n5. Set up appropriate health checks for each component\n6. Document dependencies between components\n7. Validation: Each component repository should be properly structured and contain valid Kubernetes manifests",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "CI/CD Workflow Implementation",
+            "description": "Implement CI/CD workflows for automated updates to the App of Apps structure",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "1. Set up CI/CD pipeline for the root application repository\n2. Configure workflows for component repositories\n3. Implement validation steps (manifest validation, policy checks)\n4. Set up automated testing of deployed applications\n5. Configure notifications for sync failures\n6. Implement promotion workflow between environments\n7. Validation: CI/CD pipelines should automatically update applications when changes are pushed",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Testing and Validation Procedures",
+            "description": "Develop comprehensive testing procedures for the App of Apps structure",
+            "dependencies": [
+              4
+            ],
+            "details": "1. Create test cases for application deployment\n2. Implement rollback testing procedures\n3. Set up monitoring for application health\n4. Document disaster recovery procedures\n5. Test multi-cluster deployment scenarios\n6. Implement chaos testing to verify resilience\n7. Validation: All applications should deploy correctly, and recovery procedures should work as expected",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
       },
       {
         "id": 14,
-        "title": "Configure Knative Python Function Backend with FastAPI and Pydantic",
-        "description": "Set up a serverless Python backend using Knative Functions with FastAPI, Pydantic for data validation, and Poetry for dependency management.",
-        "details": "1. Set up a Knative Python function project structure:\n\nmkdir -p knative-python-backend/src\ncd knative-python-backend\n\n\n2. Initialize Poetry project for dependency management:\n\npoetry init --name knative-python-backend --description \"Serverless Python backend with Knative Functions\"\npoetry add fastapi pydantic uvicorn httpx\npoetry add --dev pytest pytest-asyncio black isort mypy\n\n\n3. Create a fallback requirements.txt for Knative compatibility:\n\npoetry export -f requirements.txt --output requirements.txt\n\n\n4. Create the main function file (src/func.py):\npython\nimport os\nfrom typing import Dict, Any, List, Optional\n\nfrom fastapi import FastAPI, HTTPException\nfrom pydantic import BaseModel, Field\nfrom contextlib import asynccontextmanager\n\n# Define data models with Pydantic\nclass RequestModel(BaseModel):\n    query: str = Field(..., description=\"The query to process\")\n    parameters: Optional[Dict[str, Any]] = Field(default=None, description=\"Optional parameters\")\n\nclass ResponseModel(BaseModel):\n    result: Any = Field(..., description=\"The result of the operation\")\n    metadata: Optional[Dict[str, Any]] = Field(default=None, description=\"Optional metadata\")\n\n# Create lifespan context for startup/shutdown tasks\n@asynccontextmanager\nasync def lifespan(app: FastAPI):\n    # Startup logic (load models, connect to services, etc.)\n    print(\"Starting up the function...\")\n    yield\n    # Shutdown logic\n    print(\"Shutting down the function...\")\n\n# Initialize FastAPI app\napp = FastAPI(lifespan=lifespan)\n\n@app.post(\"/\", response_model=ResponseModel)\nasync def handle_request(request: RequestModel) -> ResponseModel:\n    \"\"\"\n    Main function handler that processes incoming requests\n    \"\"\"\n    try:\n        # Process the request (implement your business logic here)\n        result = {\"message\": f\"Processed query: {request.query}\"}\n        \n        # Return formatted response\n        return ResponseModel(\n            result=result,\n            metadata={\"timestamp\": \"2023-01-01T00:00:00Z\"}  # Replace with actual timestamp\n        )\n    except Exception as e:\n        raise HTTPException(status_code=500, detail=str(e))\n\n\n5. Create a Knative function configuration (func.yaml):\nyaml\napiVersion: func.knative.dev/v1\nkind: Function\nmetadata:\n  name: python-backend\nspec:\n  runtime: python\n  entrypoint: src/func.py\n  builder: pack\n  buildEnvs:\n    - name: BP_PYTHON_VERSION\n      value: \"3.11\"\n  envs:\n    - name: PYTHONPATH\n      value: /src\n\n\n6. Create a Dockerfile for custom builds if needed:\ndockerfile\nFROM python:3.11-slim\n\nWORKDIR /app\n\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\n\nCOPY . .\n\nENV PYTHONPATH=/app\n\nCMD [\"uvicorn\", \"src.func:app\", \"--host\", \"0.0.0.0\", \"--port\", \"${PORT:-8080}\"]\n\n\n7. Set up integration with the Streamlit frontend:\n   - Implement WebSocket support for real-time communication\n   - Add CORS configuration for frontend access\n   - Create API endpoints that align with frontend requirements\n\n8. Implement connection to other backend services:\n   - Add authentication and authorization\n   - Set up logging and monitoring\n   - Configure error handling and retry mechanisms\n\n9. Deploy the function to Knative:\n\nfunc deploy --registry gcr.io/your-project\n\n\n10. Configure autoscaling settings in Knative:\nyaml\napiVersion: serving.knative.dev/v1\nkind: Service\nmetadata:\n  name: python-backend\n  annotations:\n    autoscaling.knative.dev/minScale: \"1\"\n    autoscaling.knative.dev/maxScale: \"10\"\n    autoscaling.knative.dev/target: \"50\"\nspec:\n  template:\n    spec:\n      containers:\n        - image: gcr.io/your-project/python-backend:latest\n",
-        "testStrategy": "1. Set up local testing environment:\n\npoetry install\npoetry run pytest\n\n\n2. Create unit tests for the FastAPI endpoints (tests/test_func.py):\npython\nimport pytest\nfrom fastapi.testclient import TestClient\nfrom src.func import app\n\nclient = TestClient(app)\n\ndef test_handle_request():\n    response = client.post(\"/\", json={\"query\": \"test query\", \"parameters\": {\"param1\": \"value1\"}})\n    assert response.status_code == 200\n    data = response.json()\n    assert \"result\" in data\n    assert \"metadata\" in data\n    assert \"message\" in data[\"result\"]\n\n\n3. Test Pydantic model validation:\npython\nfrom src.func import RequestModel\nimport pytest\nfrom pydantic import ValidationError\n\ndef test_request_model_validation():\n    # Valid data\n    valid_data = {\"query\": \"test query\", \"parameters\": {\"param1\": \"value1\"}}\n    model = RequestModel(**valid_data)\n    assert model.query == \"test query\"\n    \n    # Invalid data (missing required field)\n    invalid_data = {\"parameters\": {\"param1\": \"value1\"}}\n    with pytest.raises(ValidationError):\n        RequestModel(**invalid_data)\n\n\n4. Test local Knative function deployment:\n\nfunc run\n\n\n5. Verify the function responds correctly:\n\ncurl -X POST http://localhost:8080 \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"query\": \"test query\", \"parameters\": {\"param1\": \"value1\"}}'\n\n\n6. Test integration with Streamlit frontend:\n   - Create a mock Streamlit app that connects to the local function\n   - Verify data flow between frontend and backend\n   - Test WebSocket connections if implemented\n\n7. Perform load testing:\n\npip install locust\nlocust -f load_tests.py\n\n\n8. Verify Knative deployment and scaling:\n\nkubectl get ksvc python-backend\nkubectl get pods -n knative-serving\n\n\n9. Test cold start performance:\n   - Measure response time after idle period\n   - Verify function scales to zero when unused\n   - Test scaling behavior under increasing load\n\n10. Integration testing with ArgoCD deployment:\n    - Verify the function deploys correctly through ArgoCD\n    - Test rollback capabilities\n    - Verify configuration changes are applied correctly",
-        "status": "pending",
+        "title": "Configure Microservice Architecture for Python Backend with FastAPI and Pydantic",
+        "description": "Transform the existing monolithic Python codebase into 17 microservices using FastAPI, Pydantic for data validation, and Poetry for dependency management to match OAM application definition requirements.",
+        "status": "done",
         "dependencies": [
           12,
           13,
           3
         ],
-        "priority": "medium",
-        "subtasks": []
+        "priority": "high",
+        "details": "1. Set up a microservice project structure for 17 services:\n\nmkdir -p microservices/{orchestration-service,streamlit-frontend,redis-service,business-analyst-deterministic,business-analyst-anthropic,business-architect-deterministic,business-architect-anthropic,application-architect-deterministic,application-architect-anthropic,infrastructure-architect-deterministic,infrastructure-architect-anthropic,solution-architect-deterministic,solution-architect-anthropic,project-manager-deterministic,project-manager-anthropic,accountant-deterministic,accountant-anthropic,developer-deterministic,developer-anthropic}\n\n\n2. Initialize Poetry project for each microservice:\n\nfor service in orchestration-service streamlit-frontend redis-service business-analyst-deterministic business-analyst-anthropic business-architect-deterministic business-architect-anthropic application-architect-deterministic application-architect-anthropic infrastructure-architect-deterministic infrastructure-architect-anthropic solution-architect-deterministic solution-architect-anthropic project-manager-deterministic project-manager-anthropic accountant-deterministic accountant-anthropic developer-deterministic developer-anthropic; do\n  cd microservices/$service\n  poetry init --name $service --description \"$service microservice\"\n  poetry add fastapi pydantic uvicorn httpx\n  poetry add --dev pytest pytest-asyncio black isort mypy\n  cd ../..\ndone\n\n\n3. Create a fallback requirements.txt for each service for container compatibility:\n\nfor service in orchestration-service streamlit-frontend redis-service business-analyst-deterministic business-analyst-anthropic business-architect-deterministic business-architect-anthropic application-architect-deterministic application-architect-anthropic infrastructure-architect-deterministic infrastructure-architect-anthropic solution-architect-deterministic solution-architect-anthropic project-manager-deterministic project-manager-anthropic accountant-deterministic accountant-anthropic developer-deterministic developer-anthropic; do\n  cd microservices/$service\n  poetry export -f requirements.txt --output requirements.txt\n  cd ../..\ndone\n\n\n4. Create a base agent service template (src/base_agent.py):\npython\nimport os\nfrom typing import Dict, Any, List, Optional\n\nfrom fastapi import FastAPI, HTTPException\nfrom pydantic import BaseModel, Field\nfrom contextlib import asynccontextmanager\n\n# Define data models with Pydantic\nclass AgentRequestModel(BaseModel):\n    query: str = Field(..., description=\"The query to process\")\n    parameters: Optional[Dict[str, Any]] = Field(default=None, description=\"Optional parameters\")\n\nclass AgentResponseModel(BaseModel):\n    result: Any = Field(..., description=\"The result of the operation\")\n    metadata: Optional[Dict[str, Any]] = Field(default=None, description=\"Optional metadata\")\n\n# Create lifespan context for startup/shutdown tasks\n@asynccontextmanager\nasync def lifespan(app: FastAPI):\n    # Startup logic (load models, connect to services, etc.)\n    print(\"Starting up the agent service...\")\n    yield\n    # Shutdown logic\n    print(\"Shutting down the agent service...\")\n\n# Initialize FastAPI app\napp = FastAPI(lifespan=lifespan)\n\n@app.post(\"/\", response_model=AgentResponseModel)\nasync def handle_request(request: AgentRequestModel) -> AgentResponseModel:\n    \"\"\"\n    Main function handler that processes incoming requests\n    \"\"\"\n    try:\n        # Process the request (implement your business logic here)\n        result = {\"message\": f\"Processed query: {request.query}\"}\n        \n        # Return formatted response\n        return AgentResponseModel(\n            result=result,\n            metadata={\"timestamp\": \"2023-01-01T00:00:00Z\"}  # Replace with actual timestamp\n        )\n    except Exception as e:\n        raise HTTPException(status_code=500, detail=str(e))\n\n\n5. Create a Dockerfile template for each microservice:\ndockerfile\nFROM python:3.11-slim\n\nWORKDIR /app\n\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\n\nCOPY . .\n\nENV PYTHONPATH=/app\n\nCMD [\"uvicorn\", \"src.main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"${PORT:-8080}\"]\n\n\n6. Create a docker-compose.yml file to orchestrate all services:\nyaml\nversion: '3'\n\nservices:\n  orchestration-service:\n    build: ./microservices/orchestration-service\n    ports:\n      - \"8000:8080\"\n    environment:\n      - REDIS_HOST=redis-service\n    depends_on:\n      - redis-service\n\n  streamlit-frontend:\n    build: ./microservices/streamlit-frontend\n    ports:\n      - \"8501:8501\"\n    environment:\n      - ORCHESTRATION_SERVICE_URL=http://orchestration-service:8080\n    depends_on:\n      - orchestration-service\n\n  redis-service:\n    image: redis:7-alpine\n    ports:\n      - \"6379:6379\"\n    volumes:\n      - redis-data:/data\n    command: redis-server --appendonly yes\n\n  # Agent services\n  business-analyst-deterministic:\n    build: ./microservices/business-analyst-deterministic\n    environment:\n      - REDIS_HOST=redis-service\n      - AGENT_TYPE=business-analyst\n      - IMPLEMENTATION_TYPE=deterministic\n\n  business-analyst-anthropic:\n    build: ./microservices/business-analyst-anthropic\n    environment:\n      - REDIS_HOST=redis-service\n      - AGENT_TYPE=business-analyst\n      - IMPLEMENTATION_TYPE=anthropic\n      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}\n\n  # Add similar configurations for all other agent services\n  business-architect-deterministic:\n    build: ./microservices/business-architect-deterministic\n    environment:\n      - REDIS_HOST=redis-service\n      - AGENT_TYPE=business-architect\n      - IMPLEMENTATION_TYPE=deterministic\n\n  business-architect-anthropic:\n    build: ./microservices/business-architect-anthropic\n    environment:\n      - REDIS_HOST=redis-service\n      - AGENT_TYPE=business-architect\n      - IMPLEMENTATION_TYPE=anthropic\n      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}\n\n  application-architect-deterministic:\n    build: ./microservices/application-architect-deterministic\n    environment:\n      - REDIS_HOST=redis-service\n      - AGENT_TYPE=application-architect\n      - IMPLEMENTATION_TYPE=deterministic\n\n  application-architect-anthropic:\n    build: ./microservices/application-architect-anthropic\n    environment:\n      - REDIS_HOST=redis-service\n      - AGENT_TYPE=application-architect\n      - IMPLEMENTATION_TYPE=anthropic\n      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}\n\n  infrastructure-architect-deterministic:\n    build: ./microservices/infrastructure-architect-deterministic\n    environment:\n      - REDIS_HOST=redis-service\n      - AGENT_TYPE=infrastructure-architect\n      - IMPLEMENTATION_TYPE=deterministic\n\n  infrastructure-architect-anthropic:\n    build: ./microservices/infrastructure-architect-anthropic\n    environment:\n      - REDIS_HOST=redis-service\n      - AGENT_TYPE=infrastructure-architect\n      - IMPLEMENTATION_TYPE=anthropic\n      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}\n\n  solution-architect-deterministic:\n    build: ./microservices/solution-architect-deterministic\n    environment:\n      - REDIS_HOST=redis-service\n      - AGENT_TYPE=solution-architect\n      - IMPLEMENTATION_TYPE=deterministic\n\n  solution-architect-anthropic:\n    build: ./microservices/solution-architect-anthropic\n    environment:\n      - REDIS_HOST=redis-service\n      - AGENT_TYPE=solution-architect\n      - IMPLEMENTATION_TYPE=anthropic\n      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}\n\n  project-manager-deterministic:\n    build: ./microservices/project-manager-deterministic\n    environment:\n      - REDIS_HOST=redis-service\n      - AGENT_TYPE=project-manager\n      - IMPLEMENTATION_TYPE=deterministic\n\n  project-manager-anthropic:\n    build: ./microservices/project-manager-anthropic\n    environment:\n      - REDIS_HOST=redis-service\n      - AGENT_TYPE=project-manager\n      - IMPLEMENTATION_TYPE=anthropic\n      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}\n\n  accountant-deterministic:\n    build: ./microservices/accountant-deterministic\n    environment:\n      - REDIS_HOST=redis-service\n      - AGENT_TYPE=accountant\n      - IMPLEMENTATION_TYPE=deterministic\n\n  accountant-anthropic:\n    build: ./microservices/accountant-anthropic\n    environment:\n      - REDIS_HOST=redis-service\n      - AGENT_TYPE=accountant\n      - IMPLEMENTATION_TYPE=anthropic\n      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}\n\n  developer-deterministic:\n    build: ./microservices/developer-deterministic\n    environment:\n      - REDIS_HOST=redis-service\n      - AGENT_TYPE=developer\n      - IMPLEMENTATION_TYPE=deterministic\n\n  developer-anthropic:\n    build: ./microservices/developer-anthropic\n    environment:\n      - REDIS_HOST=redis-service\n      - AGENT_TYPE=developer\n      - IMPLEMENTATION_TYPE=anthropic\n      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}\n\nvolumes:\n  redis-data:\n\n\n7. Implement the orchestration service to coordinate between agents:\n   - Extract orchestration logic from the monolith in /orchestration/ directory\n   - Implement service discovery using Kubernetes DNS\n   - Add Redis for message passing and state management\n   - Create API endpoints for frontend communication\n   - Implement circuit breakers for resilience\n   - Add health check endpoints\n\n8. Extract agent-specific code from the monolith:\n   - Identify shared code in agents/ directory vs. agent-specific logic\n   - Create base classes for deterministic and LLM-based agents\n   - Implement agent-specific endpoints and business logic\n   - Ensure proper error handling and retry mechanisms\n   - Add health check endpoints\n   - Configure environment variables for AGENT_TYPE and IMPLEMENTATION_TYPE\n\n9. Adapt the Streamlit frontend to work with microservices:\n   - Update API calls to target the orchestration service\n   - Implement proper error handling for service unavailability\n   - Add service health monitoring\n   - Containerize as standalone service\n\n10. Create Kubernetes deployment manifests for each service:\nyaml\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: orchestration-service\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app: orchestration-service\n  template:\n    metadata:\n      labels:\n        app: orchestration-service\n    spec:\n      containers:\n        - name: orchestration-service\n          image: ghcr.io/health-service-idp/orchestration-service:latest\n          ports:\n            - containerPort: 8080\n          env:\n            - name: REDIS_HOST\n              value: redis-service\n            - name: LOG_LEVEL\n              value: \"INFO\"\n          resources:\n            limits:\n              cpu: \"500m\"\n              memory: \"512Mi\"\n            requests:\n              cpu: \"200m\"\n              memory: \"256Mi\"\n          readinessProbe:\n            httpGet:\n              path: /health\n              port: 8080\n            initialDelaySeconds: 5\n            periodSeconds: 10\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: orchestration-service\nspec:\n  selector:\n    app: orchestration-service\n  ports:\n    - port: 80\n      targetPort: 8080\n  type: ClusterIP\n\n11. Configure Knative service definitions for each microservice:\nyaml\napiVersion: serving.knative.dev/v1\nkind: Service\nmetadata:\n  name: orchestration-service\nspec:\n  template:\n    metadata:\n      annotations:\n        autoscaling.knative.dev/minScale: \"1\"\n        autoscaling.knative.dev/maxScale: \"5\"\n    spec:\n      containers:\n        - image: ghcr.io/health-service-idp/orchestration-service:latest\n          env:\n            - name: REDIS_HOST\n              value: redis-service\n            - name: LOG_LEVEL\n              value: \"INFO\"\n          ports:\n            - containerPort: 8080\n\n12. Create CI/CD pipeline for container builds and deployment:\n   - Set up GitHub Actions workflow for building and pushing container images\n   - Configure image tagging for ghcr.io/health-service-idp/ registry\n   - Implement automated testing before deployment\n   - Set up deployment to Knative environment",
+        "testStrategy": "1. Set up testing framework for microservices:\n\nfor service in orchestration-service streamlit-frontend business-analyst-deterministic business-analyst-anthropic business-architect-deterministic business-architect-anthropic application-architect-deterministic application-architect-anthropic infrastructure-architect-deterministic infrastructure-architect-anthropic solution-architect-deterministic solution-architect-anthropic project-manager-deterministic project-manager-anthropic accountant-deterministic accountant-anthropic developer-deterministic developer-anthropic; do\n  cd microservices/$service\n  mkdir -p tests\n  touch tests/__init__.py\n  touch tests/test_main.py\n  touch tests/test_health.py\n  cd ../..\ndone\n\n\n2. Create unit tests for each agent service (tests/test_main.py):\npython\nimport pytest\nfrom fastapi.testclient import TestClient\nfrom src.main import app\n\nclient = TestClient(app)\n\ndef test_handle_request():\n    response = client.post(\"/\", json={\"query\": \"test query\", \"parameters\": {\"param1\": \"value1\"}})\n    assert response.status_code == 200\n    data = response.json()\n    assert \"result\" in data\n    assert \"metadata\" in data\n\ndef test_health_endpoint():\n    response = client.get(\"/health\")\n    assert response.status_code == 200\n    data = response.json()\n    assert data[\"status\"] == \"healthy\"\n\n\n3. Test Pydantic model validation for each service:\npython\nfrom src.main import AgentRequestModel\nimport pytest\nfrom pydantic import ValidationError\n\ndef test_request_model_validation():\n    # Valid data\n    valid_data = {\"query\": \"test query\", \"parameters\": {\"param1\": \"value1\"}}\n    model = AgentRequestModel(**valid_data)\n    assert model.query == \"test query\"\n    \n    # Invalid data (missing required field)\n    invalid_data = {\"parameters\": {\"param1\": \"value1\"}}\n    with pytest.raises(ValidationError):\n        AgentRequestModel(**invalid_data)\n\n\n4. Create integration tests for service communication:\npython\nimport pytest\nimport httpx\nimport asyncio\n\n@pytest.mark.asyncio\nasync def test_orchestration_with_agents():\n    async with httpx.AsyncClient(base_url=\"http://localhost:8000\") as client:\n        response = await client.post(\"/orchestrate\", json={\n            \"query\": \"Create a simple web application\",\n            \"agents\": [\"business-analyst\", \"developer\"]\n        })\n        assert response.status_code == 200\n        data = response.json()\n        assert \"results\" in data\n        assert len(data[\"results\"]) == 2\n\n\n5. Test local deployment with docker-compose:\n\ndocker-compose up -d\nsleep 10  # Wait for services to start\n\n# Test health endpoints for all services\nfor service in orchestration-service business-analyst-deterministic business-analyst-anthropic business-architect-deterministic business-architect-anthropic application-architect-deterministic application-architect-anthropic infrastructure-architect-deterministic infrastructure-architect-anthropic solution-architect-deterministic solution-architect-anthropic project-manager-deterministic project-manager-anthropic accountant-deterministic accountant-anthropic developer-deterministic developer-anthropic; do\n  echo \"Testing health endpoint for $service\"\n  curl -f http://localhost:$(docker-compose port $service 8080 | cut -d: -f2)/health || echo \"$service health check failed\"\ndone\n\n# Test orchestration service\ncurl -X POST http://localhost:8000/orchestrate \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"query\": \"Create a simple web application\", \"agents\": [\"business-analyst\", \"developer\"]}'\n\n# Shutdown services\ndocker-compose down\n\n\n6. Test individual agent services:\n\nfor service in business-analyst-deterministic business-analyst-anthropic business-architect-deterministic business-architect-anthropic application-architect-deterministic application-architect-anthropic infrastructure-architect-deterministic infrastructure-architect-anthropic solution-architect-deterministic solution-architect-anthropic project-manager-deterministic project-manager-anthropic accountant-deterministic accountant-anthropic developer-deterministic developer-anthropic; do\n  docker-compose up -d $service redis-service\n  sleep 5\n  \n  # Test the service\n  curl -X POST http://localhost:$(docker-compose port $service 8080 | cut -d: -f2) \\\n    -H \"Content-Type: application/json\" \\\n    -d '{\"query\": \"Test query\", \"parameters\": {\"param1\": \"value1\"}}'\n  \n  docker-compose down\ndone\n\n\n7. Test Redis integration:\npython\nimport pytest\nimport redis\nimport json\n\ndef test_redis_connection():\n    r = redis.Redis(host=\"localhost\", port=6379, db=0)\n    r.set(\"test_key\", \"test_value\")\n    assert r.get(\"test_key\").decode(\"utf-8\") == \"test_value\"\n    r.delete(\"test_key\")\n\ndef test_message_passing():\n    r = redis.Redis(host=\"localhost\", port=6379, db=0)\n    message = {\"query\": \"test\", \"agent\": \"business-analyst\"}\n    r.lpush(\"agent_queue\", json.dumps(message))\n    result = r.rpop(\"agent_queue\")\n    assert json.loads(result.decode(\"utf-8\")) == message\n\ndef test_redis_persistence():\n    r = redis.Redis(host=\"localhost\", port=6379, db=0)\n    r.set(\"persistence_test\", \"test_value\")\n    \n    # Restart Redis container\n    import subprocess\n    subprocess.run([\"docker-compose\", \"restart\", \"redis-service\"])\n    import time\n    time.sleep(5)  # Wait for Redis to restart\n    \n    # Check if the value persisted\n    assert r.get(\"persistence_test\").decode(\"utf-8\") == \"test_value\"\n    r.delete(\"persistence_test\")\n\n\n8. Test Kubernetes deployment (if applicable):\n\n# Deploy to Kubernetes\nkubectl apply -f kubernetes/\n\n# Wait for deployments to be ready\nkubectl wait --for=condition=available --timeout=300s deployment/orchestration-service\nkubectl wait --for=condition=available --timeout=300s deployment/streamlit-frontend\n\n# Test the orchestration service\nORCHESTRATION_URL=$(kubectl get svc orchestration-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}')\ncurl -X POST http://$ORCHESTRATION_URL/orchestrate \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"query\": \"Create a simple web application\", \"agents\": [\"business-analyst\", \"developer\"]}'\n\n# Clean up\nkubectl delete -f kubernetes/\n\n\n9. Performance testing for each microservice:\n\npip install locust\n\n# Create a locustfile.py for load testing\ncat > locustfile.py << 'EOF'\nfrom locust import HttpUser, task, between\n\nclass AgentUser(HttpUser):\n    wait_time = between(1, 3)\n    \n    @task\n    def test_agent(self):\n        self.client.post(\"/\", json={\n            \"query\": \"Test query\",\n            \"parameters\": {\"param1\": \"value1\"}\n        })\n    \n    @task\n    def test_health(self):\n        self.client.get(\"/health\")\n\nclass OrchestratorUser(HttpUser):\n    wait_time = between(1, 5)\n    \n    @task\n    def test_orchestration(self):\n        self.client.post(\"/orchestrate\", json={\n            \"query\": \"Create a simple web application\",\n            \"agents\": [\"business-analyst\", \"developer\"]\n        })\n    \n    @task\n    def test_health(self):\n        self.client.get(\"/health\")\nEOF\n\n# Run load test against orchestration service\nlocust -f locustfile.py --host=http://localhost:8000 --headless -u 10 -r 2 --run-time 1m\n\n\n10. Test service resilience and circuit breakers:\n\n# Start all services\ndocker-compose up -d\n\n# Test service resilience by stopping an agent service\ndocker-compose stop business-analyst-deterministic\n\n# Verify orchestration service can handle the failure\ncurl -X POST http://localhost:8000/orchestrate \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"query\": \"Create a simple web application\", \"agents\": [\"business-analyst\", \"developer\"]}'\n\n# Restart the service\ndocker-compose start business-analyst-deterministic\n\n# Shutdown all services\ndocker-compose down\n\n11. Test Knative autoscaling behavior:\n\n# Deploy to Knative\nkubectl apply -f knative/\n\n# Wait for services to be ready\nkubectl wait --for=condition=Ready ksvc/orchestration-service --timeout=300s\n\n# Get the service URL\nSERVICE_URL=$(kubectl get ksvc orchestration-service -o jsonpath='{.status.url}')\n\n# Send requests to trigger scaling\nfor i in {1..100}; do\n  curl -X POST $SERVICE_URL/orchestrate \\\n    -H \"Content-Type: application/json\" \\\n    -d '{\"query\": \"Test query '$i'\", \"agents\": [\"business-analyst\"]}' &\ndone\n\n# Check scaling behavior\nkubectl get pods -w\n\n# Clean up\nkubectl delete -f knative/\n\n12. Test container image builds and registry push:\n\n# Build and push images to ghcr.io\nfor service in orchestration-service streamlit-frontend business-analyst-deterministic business-analyst-anthropic business-architect-deterministic business-architect-anthropic application-architect-deterministic application-architect-anthropic infrastructure-architect-deterministic infrastructure-architect-anthropic solution-architect-deterministic solution-architect-anthropic project-manager-deterministic project-manager-anthropic accountant-deterministic accountant-anthropic developer-deterministic developer-anthropic; do\n  docker build -t ghcr.io/health-service-idp/$service:latest ./microservices/$service\n  docker push ghcr.io/health-service-idp/$service:latest\ndone",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Project Structure and Dependency Management Setup",
+            "description": "Set up the project directory structure and configure Poetry for dependency management",
+            "dependencies": [],
+            "details": "1. Create the project directory structure:\n```bash\nmkdir -p knative-python-function/src/api\nmkdir -p knative-python-function/tests\ncd knative-python-function\n```\n\n2. Initialize Poetry and configure dependencies:\n```bash\npoetry init --name knative-python-function --description \"Serverless Python Function Backend using Knative\"\npoetry add fastapi uvicorn pydantic\npoetry add pytest pytest-asyncio httpx --group dev\n```\n\n3. Create a `pyproject.toml` file with the following content:\n```toml\n[tool.poetry]\nname = \"knative-python-function\"\nversion = \"0.1.0\"\ndescription = \"Serverless Python Function Backend using Knative\"\nauthors = [\"Your Name <your.email@example.com>\"]\n\n[tool.poetry.dependencies]\npython = \"^3.9\"\nfastapi = \"^0.95.0\"\nuvicorn = \"^0.21.1\"\npydantic = \"^1.10.7\"\n\n[tool.poetry.group.dev.dependencies]\npytest = \"^7.3.1\"\npytest-asyncio = \"^0.21.0\"\nhttpx = \"^0.24.0\"\n\n[build-system]\nrequires = [\"poetry-core>=1.0.0\"]\nbuild-backend = \"poetry.core.masonry.api\"\n```\n\n4. Create a `.gitignore` file:\n```\n__pycache__/\n*.py[cod]\n*$py.class\n.pytest_cache/\n.coverage\nhtmlcov/\n.env\n.venv\nvenv/\nENV/\n```",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "FastAPI Implementation with Pydantic Models",
+            "description": "Implement the FastAPI application with Pydantic models for request/response validation",
+            "dependencies": [
+              1
+            ],
+            "details": "1. Create the main API module in `src/api/main.py`:\n```python\nfrom fastapi import FastAPI, HTTPException\nfrom pydantic import BaseModel\nfrom typing import List, Optional\nimport logging\n\n# Configure logging\nlogging.basicConfig(level=logging.INFO)\nlogger = logging.getLogger(__name__)\n\napp = FastAPI(title=\"Knative Python Function\")\n\n# Define Pydantic models\nclass Item(BaseModel):\n    id: Optional[str] = None\n    name: str\n    description: Optional[str] = None\n    value: float\n\nclass ProcessRequest(BaseModel):\n    items: List[Item]\n    operation: str\n\nclass ProcessResponse(BaseModel):\n    result: float\n    processed_items: int\n    operation: str\n\n@app.get(\"/\")\nasync def root():\n    return {\"status\": \"healthy\", \"service\": \"knative-python-function\"}\n\n@app.post(\"/process\", response_model=ProcessResponse)\nasync def process_items(request: ProcessRequest):\n    logger.info(f\"Processing request with operation: {request.operation}\")\n    \n    if not request.items:\n        raise HTTPException(status_code=400, detail=\"No items provided\")\n    \n    result = 0.0\n    if request.operation == \"sum\":\n        result = sum(item.value for item in request.items)\n    elif request.operation == \"average\":\n        result = sum(item.value for item in request.items) / len(request.items)\n    elif request.operation == \"max\":\n        result = max(item.value for item in request.items)\n    elif request.operation == \"min\":\n        result = min(item.value for item in request.items)\n    else:\n        raise HTTPException(status_code=400, detail=f\"Unsupported operation: {request.operation}\")\n    \n    logger.info(f\"Processed {len(request.items)} items with result: {result}\")\n    return ProcessResponse(\n        result=result,\n        processed_items=len(request.items),\n        operation=request.operation\n    )\n```\n\n2. Create an entry point file `src/main.py`:\n```python\nimport uvicorn\nfrom api.main import app\n\nif __name__ == \"__main__\":\n    uvicorn.run(\"api.main:app\", host=\"0.0.0.0\", port=8080, reload=True)\n```\n\n3. Create a test file `tests/test_api.py`:\n```python\nimport pytest\nfrom fastapi.testclient import TestClient\nfrom src.api.main import app\n\nclient = TestClient(app)\n\ndef test_root_endpoint():\n    response = client.get(\"/\")\n    assert response.status_code == 200\n    assert response.json()[\"status\"] == \"healthy\"\n\ndef test_process_sum():\n    payload = {\n        \"items\": [\n            {\"name\": \"item1\", \"value\": 10.5},\n            {\"name\": \"item2\", \"value\": 20.5}\n        ],\n        \"operation\": \"sum\"\n    }\n    response = client.post(\"/process\", json=payload)\n    assert response.status_code == 200\n    data = response.json()\n    assert data[\"result\"] == 31.0\n    assert data[\"processed_items\"] == 2\n    assert data[\"operation\"] == \"sum\"\n\ndef test_process_invalid_operation():\n    payload = {\n        \"items\": [\n            {\"name\": \"item1\", \"value\": 10.5}\n        ],\n        \"operation\": \"invalid\"\n    }\n    response = client.post(\"/process\", json=payload)\n    assert response.status_code == 400\n```",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Containerization with Docker",
+            "description": "Create Docker configuration for containerizing the Python application",
+            "dependencies": [
+              2
+            ],
+            "details": "1. Create a `Dockerfile` in the project root:\n```dockerfile\nFROM python:3.9-slim\n\nWORKDIR /app\n\n# Install Poetry\nRUN pip install poetry==1.4.2\n\n# Copy poetry configuration files\nCOPY pyproject.toml poetry.lock* /app/\n\n# Configure poetry to not create a virtual environment\nRUN poetry config virtualenvs.create false\n\n# Install dependencies\nRUN poetry install --no-dev --no-interaction --no-ansi\n\n# Copy application code\nCOPY src/ /app/src/\n\n# Set environment variables\nENV PORT=8080\nENV HOST=0.0.0.0\n\n# Expose the application port\nEXPOSE 8080\n\n# Run the application\nCMD [\"uvicorn\", \"src.api.main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8080\"]\n```\n\n2. Create a `.dockerignore` file:\n```\n__pycache__\n*.py[cod]\n*$py.class\n.pytest_cache\n.coverage\nhtmlcov\n.env\n.venv\nvenv\nENV\ntests/\n.git\n.github\n```\n\n3. Create a `docker-compose.yml` file for local testing:\n```yaml\nversion: '3'\n\nservices:\n  api:\n    build: .\n    ports:\n      - \"8080:8080\"\n    environment:\n      - LOG_LEVEL=INFO\n    volumes:\n      - ./src:/app/src\n```\n\n4. Add build and run scripts in the project root:\n\nCreate `build.sh`:\n```bash\n#!/bin/bash\ndocker build -t knative-python-function:latest .\n```\n\nCreate `run.sh`:\n```bash\n#!/bin/bash\ndocker run -p 8080:8080 knative-python-function:latest\n```\n\nMake the scripts executable:\n```bash\nchmod +x build.sh run.sh\n```",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Knative Service Configuration and Deployment",
+            "description": "Create Knative service configuration and deployment scripts",
+            "dependencies": [
+              3
+            ],
+            "details": "1. Create a Knative service configuration file `knative-service.yaml`:\n```yaml\napiVersion: serving.knative.dev/v1\nkind: Service\nmetadata:\n  name: knative-python-function\n  namespace: default\nspec:\n  template:\n    metadata:\n      annotations:\n        autoscaling.knative.dev/minScale: \"1\"\n        autoscaling.knative.dev/maxScale: \"5\"\n        autoscaling.knative.dev/target: \"50\"\n    spec:\n      containers:\n        - image: ${DOCKER_REGISTRY}/knative-python-function:latest\n          ports:\n            - containerPort: 8080\n          env:\n            - name: LOG_LEVEL\n              value: \"INFO\"\n          resources:\n            limits:\n              cpu: \"1\"\n              memory: \"512Mi\"\n            requests:\n              cpu: \"500m\"\n              memory: \"256Mi\"\n```\n\n2. Create a deployment script `deploy.sh`:\n```bash\n#!/bin/bash\n\n# Set variables\nDOCKER_REGISTRY=${DOCKER_REGISTRY:-\"docker.io/yourusername\"}\nIMAGE_NAME=\"knative-python-function\"\nIMAGE_TAG=${IMAGE_TAG:-\"latest\"}\n\n# Build the Docker image\ndocker build -t ${IMAGE_NAME}:${IMAGE_TAG} .\n\n# Tag the image for the registry\ndocker tag ${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}\n\n# Push the image to the registry\ndocker push ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}\n\n# Replace the image placeholder in the Knative service file\nsed -e \"s|\\${DOCKER_REGISTRY}|${DOCKER_REGISTRY}|g\" knative-service.yaml > knative-service-deploy.yaml\n\n# Apply the Knative service\nkubectl apply -f knative-service-deploy.yaml\n\n# Wait for the service to be ready\necho \"Waiting for Knative service to be ready...\"\nkubectl wait --for=condition=Ready ksvc/knative-python-function --timeout=120s\n\n# Get the service URL\nSERVICE_URL=$(kubectl get ksvc knative-python-function -o jsonpath='{.status.url}')\necho \"Service deployed successfully!\"\necho \"Service URL: ${SERVICE_URL}\"\n```\n\n3. Create a test script `test-deployment.sh`:\n```bash\n#!/bin/bash\n\n# Get the service URL\nSERVICE_URL=$(kubectl get ksvc knative-python-function -o jsonpath='{.status.url}')\n\n# Test the health endpoint\necho \"Testing health endpoint...\"\ncurl -s ${SERVICE_URL}\n\n# Test the process endpoint\necho \"\\n\\nTesting process endpoint...\"\ncurl -s -X POST ${SERVICE_URL}/process \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"items\": [{\"name\": \"item1\", \"value\": 10.5}, {\"name\": \"item2\", \"value\": 20.5}], \"operation\": \"sum\"}'\n\necho \"\\n\"\n```\n\n4. Make the scripts executable:\n```bash\nchmod +x deploy.sh test-deployment.sh\n```\n\n5. Create a README.md file with deployment instructions:\n```markdown\n# Knative Python Function Backend\n\nA serverless Python backend function using Knative, FastAPI, and Pydantic.\n\n## Prerequisites\n\n- Docker\n- Kubernetes cluster with Knative installed\n- kubectl configured to access your cluster\n\n## Local Development\n\n1. Install dependencies:\n   ```bash\n   poetry install\n   ```\n\n2. Run the application locally:\n   ```bash\n   poetry run python src/main.py\n   ```\n\n3. Run tests:\n   ```bash\n   poetry run pytest\n   ```\n\n## Docker Build and Run\n\n1. Build the Docker image:\n   ```bash\n   ./build.sh\n   ```\n\n2. Run the container locally:\n   ```bash\n   ./run.sh\n   ```\n\n## Deployment to Knative\n\n1. Set your Docker registry:\n   ```bash\n   export DOCKER_REGISTRY=\"docker.io/yourusername\"\n   ```\n\n2. Deploy to Knative:\n   ```bash\n   ./deploy.sh\n   ```\n\n3. Test the deployment:\n   ```bash\n   ./test-deployment.sh\n   ```\n\n## API Endpoints\n\n- `GET /`: Health check endpoint\n- `POST /process`: Process items with operations (sum, average, max, min)\n\n### Example Request\n\n```json\n{\n  \"items\": [\n    {\"name\": \"item1\", \"value\": 10.5},\n    {\"name\": \"item2\", \"value\": 20.5}\n  ],\n  \"operation\": \"sum\"\n}\n```\n\n### Example Response\n\n```json\n{\n  \"result\": 31.0,\n  \"processed_items\": 2,\n  \"operation\": \"sum\"\n}\n```\n```",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Extract Shared Agent Base Classes",
+            "description": "Extract and refactor shared agent base classes from the monolithic codebase to be used by all agent microservices",
+            "dependencies": [
+              1
+            ],
+            "details": "1. Analyze the existing monolithic codebase in agents/ directory to identify shared agent functionality\n2. Create a common library structure for agent base classes\n3. Extract the base agent class with common functionality\n4. Create specialized base classes for deterministic and LLM-based agents\n5. Implement proper dependency injection for configuration and external services\n6. Ensure backward compatibility with existing agent implementations\n7. Add environment variable handling for AGENT_TYPE and IMPLEMENTATION_TYPE",
+            "status": "done",
+            "testStrategy": "1. Create unit tests for base agent classes\n2. Verify that all required functionality is preserved\n3. Test with mock implementations of concrete agents\n4. Ensure proper inheritance and method overriding\n5. Test environment variable configuration"
+          },
+          {
+            "id": 6,
+            "title": "Implement Orchestration Service Microservice",
+            "description": "Extract and implement the orchestration service as a standalone microservice that coordinates the agent microservices",
+            "dependencies": [
+              5
+            ],
+            "details": "1. Extract orchestration logic from the monolith in /orchestration/ directory\n2. Implement service discovery using Kubernetes DNS\n3. Create API endpoints for frontend communication\n4. Implement message passing using Redis\n5. Add proper error handling and retry mechanisms\n6. Implement logging and monitoring\n7. Add health check endpoints\n8. Implement circuit breakers for resilience\n9. Configure environment variables for service configuration",
+            "status": "done",
+            "testStrategy": "1. Test service discovery with mock agent services\n2. Verify message passing through Redis\n3. Test error handling with simulated failures\n4. Benchmark performance against the monolithic implementation\n5. Test health check endpoints\n6. Verify circuit breaker functionality"
+          },
+          {
+            "id": 7,
+            "title": "Implement Agent Microservices",
+            "description": "Extract and implement each of the 14 agent microservices from the monolithic codebase",
+            "dependencies": [
+              5,
+              6
+            ],
+            "details": "1. For each agent type (business-analyst, business-architect, etc.):\n   - Extract agent-specific code from the monolith in agents/ directory\n   - Create deterministic and anthropic variants\n   - Implement agent-specific API endpoints\n   - Add proper error handling and logging\n   - Add health check endpoints\n2. Ensure all agents follow the same interface pattern\n3. Implement proper configuration management using environment variables\n4. Configure AGENT_TYPE and IMPLEMENTATION_TYPE environment variables\n5. Handle Knative scale-to-zero scenarios with proper initialization\n6. Implement proper error handling for external service dependencies",
+            "status": "done",
+            "testStrategy": "1. Create unit tests for each agent microservice\n2. Test agent-specific functionality\n3. Verify integration with the orchestration service\n4. Test with sample inputs and compare outputs with the monolithic implementation\n5. Test health check endpoints\n6. Verify proper environment variable handling"
+          },
+          {
+            "id": 8,
+            "title": "Adapt Streamlit Frontend for Microservices",
+            "description": "Modify the Streamlit frontend to work with the new microservice architecture",
+            "dependencies": [
+              6
+            ],
+            "details": "1. Update API calls to target the orchestration service\n2. Implement proper error handling for service unavailability\n3. Add service health monitoring\n4. Update UI to reflect the microservice architecture\n5. Implement caching for improved performance\n6. Containerize the Streamlit frontend as a standalone service\n7. Configure environment variables for service discovery",
+            "status": "done",
+            "testStrategy": "1. Test UI functionality with the new microservice backend\n2. Verify error handling with simulated service failures\n3. Test performance with various load scenarios\n4. Ensure all existing frontend features work correctly\n5. Test container deployment and configuration"
+          },
+          {
+            "id": 9,
+            "title": "Implement Redis Service Integration",
+            "description": "Set up and configure Redis for inter-service communication and state management",
+            "dependencies": [
+              6
+            ],
+            "details": "1. Configure Redis service for development and production\n2. Implement message queue patterns for agent communication\n3. Set up caching for improved performance\n4. Implement proper error handling for Redis connection issues\n5. Add monitoring and logging for Redis operations\n6. Configure Redis persistence for data durability\n7. Set up proper Redis security configuration",
+            "status": "done",
+            "testStrategy": "1. Test Redis connection and operations\n2. Verify message passing between services\n3. Test cache hit/miss scenarios\n4. Benchmark performance with various load patterns\n5. Test Redis persistence across restarts\n6. Verify data durability with simulated failures"
+          },
+          {
+            "id": 10,
+            "title": "Create Kubernetes Deployment Manifests",
+            "description": "Create Kubernetes deployment manifests for all 17 microservices",
+            "dependencies": [
+              7,
+              8,
+              9
+            ],
+            "details": "1. Create deployment manifests for each microservice\n2. Configure service resources and scaling parameters\n3. Set up service discovery and networking\n4. Configure environment variables and secrets\n5. Implement health checks and readiness probes\n6. Create a Helm chart for easy deployment\n7. Configure proper resource limits and requests\n8. Add appropriate labels and annotations for Kubernetes management",
+            "status": "done",
+            "testStrategy": "1. Test deployment in a Kubernetes environment\n2. Verify service discovery and communication\n3. Test scaling under load\n4. Verify proper secret management\n5. Test health check and readiness probe functionality\n6. Verify resource allocation and limits"
+          },
+          {
+            "id": 11,
+            "title": "Create Knative Service Definitions",
+            "description": "Create Knative service definitions for all microservices to enable serverless deployment",
+            "dependencies": [
+              10
+            ],
+            "details": "1. Create Knative service definitions for each microservice\n2. Configure autoscaling parameters (minScale, maxScale)\n3. Set up proper resource allocation\n4. Configure environment variables and secrets\n5. Implement proper container configuration\n6. Set up service networking and discovery\n7. Configure proper health checks and probes",
+            "status": "done",
+            "testStrategy": "1. Test deployment to a Knative environment\n2. Verify autoscaling behavior under load\n3. Test scale-to-zero functionality\n4. Verify service discovery and communication\n5. Test cold start performance\n6. Benchmark resource usage and performance"
+          },
+          {
+            "id": 12,
+            "title": "Implement CI/CD Pipeline for Container Builds",
+            "description": "Create CI/CD pipeline for building and deploying container images to the ghcr.io registry",
+            "dependencies": [
+              11
+            ],
+            "details": "1. Set up GitHub Actions workflow for container builds\n2. Configure image tagging for ghcr.io/health-service-idp/ registry\n3. Implement automated testing before deployment\n4. Set up deployment to Knative environment\n5. Configure proper versioning and tagging strategy\n6. Implement security scanning for container images\n7. Set up proper access controls and secrets management",
+            "status": "done",
+            "testStrategy": "1. Test the CI/CD pipeline with sample code changes\n2. Verify container builds and registry pushes\n3. Test automated deployment to Knative\n4. Verify proper versioning and tagging\n5. Test security scanning functionality\n6. Verify access controls and permissions"
+          }
+        ]
+      },
+      {
+        "id": 15,
+        "title": "Implement Authentication and Authorization for Microservice Architecture",
+        "description": "Implement a secure authentication and authorization system for the microservice architecture using JWT tokens, role-based access control, and integration with the existing FastAPI and Pydantic setup.",
+        "status": "pending",
+        "dependencies": [
+          14
+        ],
+        "priority": "high",
+        "details": "1. Add authentication dependencies to each microservice:\n```\nfor service in orchestration-service business-analyst-deterministic business-analyst-anthropic business-architect-deterministic business-architect-anthropic application-architect-deterministic application-architect-anthropic infrastructure-architect-deterministic infrastructure-architect-anthropic solution-architect-deterministic solution-architect-anthropic project-manager-deterministic project-manager-anthropic accountant-deterministic accountant-anthropic developer-deterministic developer-anthropic; do\n  cd microservices/$service\n  poetry add python-jose[cryptography] passlib[bcrypt] python-multipart\n  cd ../..\ndone\n```\n\n2. Create a shared authentication library in `microservices/shared/auth/`:\n```\nmkdir -p microservices/shared/auth\ntouch microservices/shared/auth/__init__.py\n```\n\n3. Implement JWT token handling in `microservices/shared/auth/jwt.py`:\n```python\nfrom datetime import datetime, timedelta\nfrom typing import Annotated, Any, List, Optional\n\nfrom fastapi import Depends, HTTPException, Security, status\nfrom fastapi.security import OAuth2PasswordBearer, SecurityScopes\nfrom jose import JWTError, jwt\nfrom passlib.context import CryptContext\nfrom pydantic import BaseModel, EmailStr, Field, ValidationError\n\n# Pydantic models for authentication\nclass UserBase(BaseModel):\n    email: EmailStr\n    username: str = Field(..., min_length=3, max_length=50)\n    \nclass UserCreate(UserBase):\n    password: str = Field(..., min_length=8)\n    \nclass UserInDB(UserBase):\n    hashed_password: str\n    disabled: bool = False\n    roles: List[str] = [\"user\"]\n    \nclass Token(BaseModel):\n    access_token: str\n    token_type: str\n    \nclass TokenData(BaseModel):\n    username: Optional[str] = None\n    scopes: List[str] = []\n\n# Configuration\nSECRET_KEY = \"your-secret-key\"  # Store in environment variables in production\nALGORITHM = \"HS256\"\nACCESS_TOKEN_EXPIRE_MINUTES = 30\n\npwd_context = CryptContext(schemes=[\"bcrypt\"], deprecated=\"auto\")\noauth2_scheme = OAuth2PasswordBearer(\n    tokenUrl=\"token\",\n    scopes={\"admin\": \"Full access\", \"user\": \"Regular user access\"}\n)\n\ndef verify_password(plain_password, hashed_password):\n    return pwd_context.verify(plain_password, hashed_password)\n\ndef get_password_hash(password):\n    return pwd_context.hash(password)\n\ndef create_access_token(data: dict, expires_delta: Optional[timedelta] = None):\n    to_encode = data.copy()\n    if expires_delta:\n        expire = datetime.utcnow() + expires_delta\n    else:\n        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)\n    to_encode.update({\"exp\": expire})\n    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)\n    return encoded_jwt\n\nasync def get_current_user(\n    security_scopes: SecurityScopes,\n    token: Annotated[str, Depends(oauth2_scheme)],\n    user_service_url: str = \"http://user-service:8080\"\n):\n    if security_scopes.scopes:\n        authenticate_value = f'Bearer scope=\"{security_scopes.scope_str}\"'\n    else:\n        authenticate_value = \"Bearer\"\n        \n    credentials_exception = HTTPException(\n        status_code=status.HTTP_401_UNAUTHORIZED,\n        detail=\"Could not validate credentials\",\n        headers={\"WWW-Authenticate\": authenticate_value},\n    )\n    \n    try:\n        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])\n        username: str = payload.get(\"sub\")\n        if username is None:\n            raise credentials_exception\n        token_scopes = payload.get(\"scopes\", [])\n        token_data = TokenData(username=username, scopes=token_scopes)\n    except (JWTError, ValidationError):\n        raise credentials_exception\n        \n    # In a microservice architecture, we would typically call a user service\n    # This is a simplified example - in production, implement proper service discovery\n    import httpx\n    async with httpx.AsyncClient() as client:\n        try:\n            response = await client.get(f\"{user_service_url}/users/{username}\")\n            if response.status_code != 200:\n                raise credentials_exception\n            user_data = response.json()\n            user = UserInDB(**user_data)\n        except httpx.RequestError:\n            # Handle service unavailability\n            raise HTTPException(\n                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,\n                detail=\"User service unavailable\"\n            )\n        \n    for scope in security_scopes.scopes:\n        if scope not in token_data.scopes:\n            raise HTTPException(\n                status_code=status.HTTP_403_FORBIDDEN,\n                detail=f\"Not enough permissions. Required: {scope}\",\n                headers={\"WWW-Authenticate\": authenticate_value},\n            )\n    \n    return user\n\ndef get_current_active_user(\n    current_user: Annotated[UserInDB, Depends(get_current_user)]\n):\n    if current_user.disabled:\n        raise HTTPException(status_code=400, detail=\"Inactive user\")\n    return current_user\n```\n\n4. Create a user service for centralized user management in `microservices/user-service/src/main.py`:\n```python\nfrom fastapi import FastAPI, HTTPException, Depends, status\nfrom fastapi.security import OAuth2PasswordRequestForm\nfrom typing import List, Dict, Any, Annotated\nfrom datetime import timedelta\nimport os\nimport redis\n\nfrom shared.auth.jwt import (\n    UserInDB, UserCreate, Token, get_password_hash, verify_password,\n    create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES\n)\n\napp = FastAPI()\n\n# In production, use a real database\n# This is a simplified example using Redis\nredis_host = os.getenv(\"REDIS_HOST\", \"redis-service\")\nredis_port = int(os.getenv(\"REDIS_PORT\", \"6379\"))\nr = redis.Redis(host=redis_host, port=redis_port, db=0, decode_responses=True)\n\n@app.post(\"/users\", response_model=UserInDB, status_code=status.HTTP_201_CREATED)\nasync def create_user(user: UserCreate):\n    # Check if user already exists\n    if r.exists(f\"user:{user.username}\"):\n        raise HTTPException(\n            status_code=status.HTTP_400_BAD_REQUEST,\n            detail=\"Username already registered\"\n        )\n    \n    # Create new user\n    hashed_password = get_password_hash(user.password)\n    user_data = {\n        \"username\": user.username,\n        \"email\": user.email,\n        \"hashed_password\": hashed_password,\n        \"disabled\": False,\n        \"roles\": [\"user\"]\n    }\n    \n    # Store in Redis\n    r.hset(f\"user:{user.username}\", mapping=user_data)\n    \n    return UserInDB(**user_data)\n\n@app.get(\"/users/{username}\", response_model=UserInDB)\nasync def get_user(username: str):\n    # Get user from Redis\n    user_data = r.hgetall(f\"user:{username}\")\n    if not user_data:\n        raise HTTPException(\n            status_code=status.HTTP_404_NOT_FOUND,\n            detail=\"User not found\"\n        )\n    \n    # Convert roles from string to list if needed\n    if \"roles\" in user_data and isinstance(user_data[\"roles\"], str):\n        user_data[\"roles\"] = user_data[\"roles\"].split(\",\")\n    \n    return UserInDB(**user_data)\n\n@app.post(\"/token\", response_model=Token)\nasync def login_for_access_token(\n    form_data: Annotated[OAuth2PasswordRequestForm, Depends()]\n):\n    # Get user from Redis\n    user_data = r.hgetall(f\"user:{form_data.username}\")\n    if not user_data:\n        raise HTTPException(\n            status_code=status.HTTP_401_UNAUTHORIZED,\n            detail=\"Incorrect username or password\",\n            headers={\"WWW-Authenticate\": \"Bearer\"},\n        )\n    \n    # Convert roles from string to list if needed\n    if \"roles\" in user_data and isinstance(user_data[\"roles\"], str):\n        user_data[\"roles\"] = user_data[\"roles\"].split(\",\")\n    \n    user = UserInDB(**user_data)\n    \n    if not verify_password(form_data.password, user.hashed_password):\n        raise HTTPException(\n            status_code=status.HTTP_401_UNAUTHORIZED,\n            detail=\"Incorrect username or password\",\n            headers={\"WWW-Authenticate\": \"Bearer\"},\n        )\n    \n    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)\n    access_token = create_access_token(\n        data={\"sub\": user.username, \"scopes\": user.roles},\n        expires_delta=access_token_expires\n    )\n    \n    return {\"access_token\": access_token, \"token_type\": \"bearer\"}\n```\n\n5. Implement authentication middleware for the orchestration service in `microservices/orchestration-service/src/middleware/auth.py`:\n```python\nfrom fastapi import Request, HTTPException, status\nfrom fastapi.responses import JSONResponse\nfrom jose import jwt, JWTError\nimport httpx\nimport os\n\nfrom shared.auth.jwt import SECRET_KEY, ALGORITHM\n\nasync def auth_middleware(request: Request, call_next):\n    # Skip authentication for certain paths\n    if request.url.path in [\"/docs\", \"/redoc\", \"/openapi.json\", \"/token\", \"/health\"]:\n        return await call_next(request)\n    \n    # Get the Authorization header\n    auth_header = request.headers.get(\"Authorization\")\n    if not auth_header or not auth_header.startswith(\"Bearer \"):\n        return JSONResponse(\n            status_code=status.HTTP_401_UNAUTHORIZED,\n            content={\"detail\": \"Not authenticated\"},\n            headers={\"WWW-Authenticate\": \"Bearer\"}\n        )\n    \n    token = auth_header.split(\" \")[1]\n    \n    try:\n        # Decode the token\n        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])\n        username = payload.get(\"sub\")\n        if username is None:\n            raise JWTError(\"Invalid token payload\")\n        \n        # Verify the user exists\n        user_service_url = os.getenv(\"USER_SERVICE_URL\", \"http://user-service:8080\")\n        async with httpx.AsyncClient() as client:\n            response = await client.get(f\"{user_service_url}/users/{username}\")\n            if response.status_code != 200:\n                return JSONResponse(\n                    status_code=status.HTTP_401_UNAUTHORIZED,\n                    content={\"detail\": \"Invalid user\"},\n                    headers={\"WWW-Authenticate\": \"Bearer\"}\n                )\n        \n        # Add the user to the request state\n        request.state.user = response.json()\n        request.state.token_scopes = payload.get(\"scopes\", [])\n        \n    except JWTError:\n        return JSONResponse(\n            status_code=status.HTTP_401_UNAUTHORIZED,\n            content={\"detail\": \"Invalid token\"},\n            headers={\"WWW-Authenticate\": \"Bearer\"}\n        )\n    except httpx.RequestError:\n        return JSONResponse(\n            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,\n            content={\"detail\": \"User service unavailable\"}\n        )\n    \n    # Continue processing the request\n    return await call_next(request)\n```\n\n6. Add the middleware to the orchestration service in `microservices/orchestration-service/src/main.py`:\n```python\nfrom fastapi import FastAPI, Depends, HTTPException, status\nfrom fastapi.middleware.cors import CORSMiddleware\nfrom typing import List, Dict, Any\n\nfrom .middleware.auth import auth_middleware\nfrom shared.auth.jwt import get_current_active_user, UserInDB\n\napp = FastAPI()\n\n# Add CORS middleware\napp.add_middleware(\n    CORSMiddleware,\n    allow_origins=[\"*\"],  # In production, restrict to your frontend domain\n    allow_credentials=True,\n    allow_methods=[\"*\"],\n    allow_headers=[\"*\"],\n)\n\n# Add authentication middleware\napp.middleware(\"http\")(auth_middleware)\n\n@app.get(\"/health\")\nasync def health():\n    return {\"status\": \"healthy\"}\n\n@app.get(\"/\")\nasync def root():\n    return {\"message\": \"Orchestration Service API\"}\n\n@app.post(\"/orchestrate\")\nasync def orchestrate(\n    query: str,\n    agents: List[str],\n    current_user: UserInDB = Depends(get_current_active_user)\n):\n    # Implement orchestration logic here\n    return {\n        \"message\": f\"Orchestrating query '{query}' with agents {agents}\",\n        \"user\": current_user.username\n    }\n```\n\n7. Create a service-to-service authentication mechanism in `microservices/shared/auth/service.py`:\n```python\nfrom datetime import datetime, timedelta\nfrom typing import Dict, Optional\nimport os\nfrom jose import jwt\n\n# Configuration\nSERVICE_SECRET_KEY = os.getenv(\"SERVICE_SECRET_KEY\", \"your-service-secret-key\")\nSERVICE_ALGORITHM = \"HS256\"\nSERVICE_TOKEN_EXPIRE_MINUTES = 5  # Short-lived tokens for service-to-service communication\n\ndef create_service_token(service_name: str, target_service: str, expires_delta: Optional[timedelta] = None) -> str:\n    \"\"\"Create a service-to-service authentication token\"\"\"\n    data = {\n        \"sub\": service_name,\n        \"target\": target_service,\n        \"iat\": datetime.utcnow()\n    }\n    \n    if expires_delta:\n        expire = datetime.utcnow() + expires_delta\n    else:\n        expire = datetime.utcnow() + timedelta(minutes=SERVICE_TOKEN_EXPIRE_MINUTES)\n    \n    data.update({\"exp\": expire})\n    encoded_jwt = jwt.encode(data, SERVICE_SECRET_KEY, algorithm=SERVICE_ALGORITHM)\n    return encoded_jwt\n\ndef verify_service_token(token: str, expected_target: str) -> Dict:\n    \"\"\"Verify a service-to-service token\"\"\"\n    payload = jwt.decode(token, SERVICE_SECRET_KEY, algorithms=[SERVICE_ALGORITHM])\n    \n    # Verify the token is intended for this service\n    if payload.get(\"target\") != expected_target:\n        raise ValueError(\"Token not intended for this service\")\n    \n    return payload\n```\n\n8. Implement service-to-service authentication in agent services:\n```python\n# Example for business-analyst-deterministic service\nfrom fastapi import FastAPI, Depends, HTTPException, Header, status\nfrom typing import Optional\n\nfrom shared.auth.service import verify_service_token\n\napp = FastAPI()\n\n@app.get(\"/health\")\nasync def health():\n    return {\"status\": \"healthy\"}\n\nasync def verify_service_auth(x_service_token: Optional[str] = Header(None)):\n    if not x_service_token:\n        raise HTTPException(\n            status_code=status.HTTP_401_UNAUTHORIZED,\n            detail=\"Service authentication required\"\n        )\n    \n    try:\n        payload = verify_service_token(x_service_token, \"business-analyst-deterministic\")\n        return payload\n    except Exception as e:\n        raise HTTPException(\n            status_code=status.HTTP_401_UNAUTHORIZED,\n            detail=f\"Invalid service token: {str(e)}\"\n        )\n\n@app.post(\"/process\")\nasync def process_query(query: str, service_auth: dict = Depends(verify_service_auth)):\n    # Process the query\n    calling_service = service_auth.get(\"sub\")\n    return {\n        \"result\": f\"Processed query: {query}\",\n        \"calling_service\": calling_service\n    }\n```\n\n9. Update the orchestration service to use service-to-service authentication:\n```python\n# In orchestration-service/src/services/agent_client.py\nimport httpx\nfrom shared.auth.service import create_service_token\n\nasync def call_agent_service(agent_name: str, query: str, parameters: dict = None):\n    # Create service token\n    service_token = create_service_token(\"orchestration-service\", agent_name)\n    \n    # Call the agent service\n    async with httpx.AsyncClient() as client:\n        response = await client.post(\n            f\"http://{agent_name}:8080/process\",\n            json={\"query\": query, \"parameters\": parameters},\n            headers={\"X-Service-Token\": service_token}\n        )\n        \n        if response.status_code != 200:\n            raise Exception(f\"Error calling {agent_name}: {response.text}\")\n        \n        return response.json()\n```\n\n10. Configure environment variables and secrets for authentication:\n```yaml\n# In docker-compose.yml\nservices:\n  orchestration-service:\n    environment:\n      - SECRET_KEY=${SECRET_KEY}\n      - SERVICE_SECRET_KEY=${SERVICE_SECRET_KEY}\n      - USER_SERVICE_URL=http://user-service:8080\n  \n  user-service:\n    environment:\n      - SECRET_KEY=${SECRET_KEY}\n      - REDIS_HOST=redis-service\n\n  # Add similar environment variables for all agent services\n```",
+        "testStrategy": "1. Create unit tests for JWT token handling in `microservices/shared/auth/tests/test_jwt.py`:\n```python\nimport pytest\nfrom jose import jwt\nfrom datetime import datetime, timedelta\n\nfrom shared.auth.jwt import (\n    create_access_token, get_password_hash, verify_password,\n    SECRET_KEY, ALGORITHM\n)\n\ndef test_password_hashing():\n    password = \"testpassword\"\n    hashed = get_password_hash(password)\n    assert verify_password(password, hashed)\n    assert not verify_password(\"wrongpassword\", hashed)\n\ndef test_create_access_token():\n    data = {\"sub\": \"testuser\", \"scopes\": [\"user\"]}\n    token = create_access_token(data)\n    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])\n    assert payload[\"sub\"] == \"testuser\"\n    assert payload[\"scopes\"] == [\"user\"]\n    assert \"exp\" in payload\n\ndef test_token_expiration():\n    data = {\"sub\": \"testuser\"}\n    # Create a token that expires in 1 second\n    token = create_access_token(data, expires_delta=timedelta(seconds=1))\n    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])\n    assert payload[\"sub\"] == \"testuser\"\n    \n    # Wait for token to expire\n    import time\n    time.sleep(2)\n    \n    # Token should be expired now\n    with pytest.raises(jwt.ExpiredSignatureError):\n        jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])\n```\n\n2. Create integration tests for the user service in `microservices/user-service/tests/test_integration.py`:\n```python\nimport pytest\nfrom fastapi.testclient import TestClient\nimport redis\nimport os\n\n# Mock Redis for testing\nclass MockRedis:\n    def __init__(self):\n        self.data = {}\n    \n    def hset(self, key, mapping):\n        self.data[key] = mapping\n        return len(mapping)\n    \n    def hgetall(self, key):\n        return self.data.get(key, {})\n    \n    def exists(self, key):\n        return key in self.data\n\n# Patch the redis client\nos.environ[\"REDIS_HOST\"] = \"localhost\"\nos.environ[\"REDIS_PORT\"] = \"6379\"\n\n# Import the app after setting environment variables\nfrom src.main import app\nimport src.main\n\n# Replace Redis with mock\nsrc.main.r = MockRedis()\n\nclient = TestClient(app)\n\ndef test_create_user():\n    response = client.post(\n        \"/users\",\n        json={\n            \"username\": \"testuser\",\n            \"email\": \"test@example.com\",\n            \"password\": \"testpassword\"\n        }\n    )\n    assert response.status_code == 201\n    data = response.json()\n    assert data[\"username\"] == \"testuser\"\n    assert data[\"email\"] == \"test@example.com\"\n    assert \"hashed_password\" in data\n    assert data[\"roles\"] == [\"user\"]\n\ndef test_get_user():\n    # First create a user\n    client.post(\n        \"/users\",\n        json={\n            \"username\": \"getuser\",\n            \"email\": \"get@example.com\",\n            \"password\": \"testpassword\"\n        }\n    )\n    \n    # Then get the user\n    response = client.get(\"/users/getuser\")\n    assert response.status_code == 200\n    data = response.json()\n    assert data[\"username\"] == \"getuser\"\n    assert data[\"email\"] == \"get@example.com\"\n\ndef test_login():\n    # First create a user\n    client.post(\n        \"/users\",\n        json={\n            \"username\": \"loginuser\",\n            \"email\": \"login@example.com\",\n            \"password\": \"testpassword\"\n        }\n    )\n    \n    # Then login\n    response = client.post(\n        \"/token\",\n        data={\"username\": \"loginuser\", \"password\": \"testpassword\"}\n    )\n    assert response.status_code == 200\n    data = response.json()\n    assert \"access_token\" in data\n    assert data[\"token_type\"] == \"bearer\"\n    \n    # Verify token\n    from shared.auth.jwt import SECRET_KEY, ALGORITHM\n    payload = jwt.decode(data[\"access_token\"], SECRET_KEY, algorithms=[ALGORITHM])\n    assert payload[\"sub\"] == \"loginuser\"\n    assert payload[\"scopes\"] == [\"user\"]\n```\n\n3. Create tests for service-to-service authentication in `microservices/shared/auth/tests/test_service_auth.py`:\n```python\nimport pytest\nfrom datetime import timedelta\nfrom jose import jwt, JWTError\n\nfrom shared.auth.service import create_service_token, verify_service_token, SERVICE_SECRET_KEY, SERVICE_ALGORITHM\n\ndef test_create_service_token():\n    token = create_service_token(\"service-a\", \"service-b\")\n    payload = jwt.decode(token, SERVICE_SECRET_KEY, algorithms=[SERVICE_ALGORITHM])\n    assert payload[\"sub\"] == \"service-a\"\n    assert payload[\"target\"] == \"service-b\"\n    assert \"exp\" in payload\n    assert \"iat\" in payload\n\ndef test_verify_service_token():\n    token = create_service_token(\"service-a\", \"service-b\")\n    payload = verify_service_token(token, \"service-b\")\n    assert payload[\"sub\"] == \"service-a\"\n    assert payload[\"target\"] == \"service-b\"\n\ndef test_verify_service_token_wrong_target():\n    token = create_service_token(\"service-a\", \"service-b\")\n    with pytest.raises(ValueError, match=\"Token not intended for this service\"):\n        verify_service_token(token, \"service-c\")\n\ndef test_service_token_expiration():\n    # Create a token that expires in 1 second\n    token = create_service_token(\"service-a\", \"service-b\", expires_delta=timedelta(seconds=1))\n    payload = verify_service_token(token, \"service-b\")\n    assert payload[\"sub\"] == \"service-a\"\n    \n    # Wait for token to expire\n    import time\n    time.sleep(2)\n    \n    # Token should be expired now\n    with pytest.raises(JWTError):\n        verify_service_token(token, \"service-b\")\n```\n\n4. Create integration tests for the orchestration service with authentication in `microservices/orchestration-service/tests/test_integration.py`:\n```python\nimport pytest\nfrom fastapi.testclient import TestClient\nimport httpx\nfrom unittest.mock import patch, MagicMock\n\n# Mock the auth middleware\nfrom src.middleware.auth import auth_middleware\n\nasync def mock_auth_middleware(request, call_next):\n    # Skip authentication for tests\n    request.state.user = {\"username\": \"testuser\", \"roles\": [\"user\"]}\n    request.state.token_scopes = [\"user\"]\n    return await call_next(request)\n\n# Import the app and patch the middleware\nfrom src.main import app\napp.middleware_stack = None  # Clear middleware stack\napp.middleware(\"http\")(mock_auth_middleware)  # Add mock middleware\n\nclient = TestClient(app)\n\ndef test_root_endpoint():\n    response = client.get(\"/\")\n    assert response.status_code == 200\n    assert response.json()[\"message\"] == \"Orchestration Service API\"\n\ndef test_health_endpoint():\n    response = client.get(\"/health\")\n    assert response.status_code == 200\n    assert response.json()[\"status\"] == \"healthy\"\n\n# Mock the agent service calls\nwith patch(\"src.services.agent_client.call_agent_service\") as mock_call_agent:\n    mock_call_agent.return_value = {\"result\": \"Mocked agent response\"}\n    \n    def test_orchestrate():\n        response = client.post(\n            \"/orchestrate\",\n            json={\n                \"query\": \"Test query\",\n                \"agents\": [\"business-analyst-deterministic\", \"developer-deterministic\"]\n            }\n        )\n        assert response.status_code == 200\n        data = response.json()\n        assert \"message\" in data\n        assert data[\"user\"] == \"testuser\"\n```\n\n5. Test the authentication flow with curl commands:\n```bash\n# Start the services\ndocker-compose up -d\n\n# Create a user\ncurl -X POST http://localhost:8080/users \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"username\":\"testuser\",\"email\":\"test@example.com\",\"password\":\"testpassword\"}'\n\n# Get a token\nTOKEN=$(curl -s -X POST http://localhost:8080/token \\\n  -d \"username=testuser&password=testpassword\" | jq -r .access_token)\n\n# Use the token to access the orchestration service\ncurl -H \"Authorization: Bearer $TOKEN\" \\\n  -X POST http://localhost:8000/orchestrate \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"query\":\"Test query\",\"agents\":[\"business-analyst-deterministic\"]}'\n\n# Try without a token (should fail)\ncurl -X POST http://localhost:8000/orchestrate \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"query\":\"Test query\",\"agents\":[\"business-analyst-deterministic\"]}'\n\n# Test health endpoint (should work without authentication)\ncurl http://localhost:8000/health\n```\n\n6. Test service-to-service authentication:\n```bash\n# Generate a service token\nTOKEN=$(python -c \"from shared.auth.service import create_service_token; print(create_service_token('test-service', 'business-analyst-deterministic'))\")\n\n# Use the token to call the agent service directly\ncurl -H \"X-Service-Token: $TOKEN\" \\\n  -X POST http://localhost:8001/process \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"query\":\"Test query\"}'\n\n# Try without a token (should fail)\ncurl -X POST http://localhost:8001/process \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"query\":\"Test query\"}'\n\n# Test health endpoint (should work without authentication)\ncurl http://localhost:8001/health\n```",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set up authentication models and password utilities",
+            "description": "Implement the Pydantic models for authentication and set up password hashing utilities. This includes creating the user models, token models, and password verification functions.",
+            "dependencies": [],
+            "details": "1. Create the `src/models/auth.py` file with the Pydantic models for UserBase, UserCreate, UserInDB, Token, and TokenData.\n2. Set up the password context in `src/auth/jwt.py` with the CryptContext configuration.\n3. Implement the password verification and hashing functions.\n4. Ensure proper validation rules are applied to the models (e.g., minimum password length).",
+            "status": "pending",
+            "testStrategy": "Write unit tests for password hashing and verification functions. Test model validation with valid and invalid inputs."
+          },
+          {
+            "id": 2,
+            "title": "Implement JWT token generation and validation",
+            "description": "Create the JWT token generation and validation logic, including token creation, decoding, and verification with proper expiration handling.",
+            "dependencies": [
+              1
+            ],
+            "details": "1. Implement the `create_access_token` function with proper expiration time.\n2. Set up the OAuth2PasswordBearer for token extraction from requests.\n3. Create the token validation logic in the `get_current_user` function.\n4. Implement scope validation for role-based access control.\n5. Ensure proper error handling for invalid or expired tokens.",
+            "status": "pending",
+            "testStrategy": "Test token generation with different payloads and expiration times. Verify token validation with valid and invalid tokens, including expired tokens and tokens with incorrect signatures."
+          },
+          {
+            "id": 3,
+            "title": "Create user database interface",
+            "description": "Implement a user database interface with mock data for development that can be replaced with a real database in production.",
+            "dependencies": [
+              1
+            ],
+            "details": "1. Create the `src/db/users.py` file with a mock user database.\n2. Implement the `get_user` function to retrieve users by username.\n3. Add sample users with different roles (regular user and admin).\n4. Ensure the mock database uses proper password hashing.\n5. Design the interface to be easily replaceable with a real database implementation.",
+            "status": "pending",
+            "testStrategy": "Test user retrieval with existing and non-existing usernames. Verify that returned user objects match the expected structure and contain the correct roles."
+          },
+          {
+            "id": 4,
+            "title": "Implement authentication endpoints",
+            "description": "Create the API endpoints for user authentication, including token generation and user information retrieval.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "1. Create the `src/routes/auth.py` file with an APIRouter.\n2. Implement the `/token` endpoint for user login and access token generation.\n3. Create the `/users/me` endpoint to retrieve the current user's information.\n4. Ensure proper error handling for authentication failures.\n5. Implement the form data validation for the login endpoint.",
+            "status": "pending",
+            "testStrategy": "Test the login endpoint with valid and invalid credentials. Verify token generation and user information retrieval. Test error responses for invalid login attempts."
+          },
+          {
+            "id": 5,
+            "title": "Integrate authentication with main application and secure routes",
+            "description": "Update the main application to include the authentication routes and implement protected routes with role-based access control.",
+            "dependencies": [
+              4
+            ],
+            "details": "1. Update `src/func.py` to include the authentication router.\n2. Implement protected routes that require authentication.\n3. Add role-based access control for admin-only routes.\n4. Update the Knative function configuration to include environment variables for secrets.\n5. Implement security best practices such as moving secrets to environment variables and setting appropriate CORS policies.\n6. Add documentation for the authentication system.",
+            "status": "pending",
+            "testStrategy": "Test the protected routes with authenticated and unauthenticated requests. Verify that admin routes are only accessible to users with admin roles. Test the entire authentication flow from login to accessing protected resources."
+          },
+          {
+            "id": 6,
+            "title": "Create shared authentication library for microservices",
+            "description": "Create a shared authentication library that can be used by all microservices for consistent authentication and authorization.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "1. Create a shared directory structure for authentication code\n2. Move common authentication models and utilities to the shared library\n3. Implement service-to-service authentication mechanisms\n4. Create helper functions for token validation across services\n5. Document the shared authentication library usage",
+            "status": "pending",
+            "testStrategy": "Test the shared library functions with various inputs. Verify compatibility across different microservices. Test token generation and validation in isolation."
+          },
+          {
+            "id": 7,
+            "title": "Implement user management service",
+            "description": "Create a dedicated user management microservice for centralized user authentication and management.",
+            "dependencies": [
+              6
+            ],
+            "details": "1. Create the user service project structure\n2. Implement user registration, retrieval, and update endpoints\n3. Implement the token generation endpoint\n4. Add Redis integration for user storage\n5. Implement proper error handling and validation\n6. Add documentation for the user service API\n7. Add health check endpoint",
+            "status": "pending",
+            "testStrategy": "Test user creation, retrieval, and authentication. Verify token generation and validation. Test error handling with invalid inputs. Test Redis integration. Verify health check endpoint."
+          },
+          {
+            "id": 8,
+            "title": "Implement authentication middleware for orchestration service",
+            "description": "Create middleware for the orchestration service to authenticate and authorize incoming requests.",
+            "dependencies": [
+              6,
+              7
+            ],
+            "details": "1. Create the authentication middleware\n2. Implement token extraction and validation\n3. Add user information to request state\n4. Implement role-based access control\n5. Add proper error handling for authentication failures\n6. Configure the middleware in the main application\n7. Ensure health endpoints remain accessible without authentication",
+            "status": "pending",
+            "testStrategy": "Test the middleware with valid and invalid tokens. Verify proper error responses for authentication failures. Test role-based access control with different user roles. Verify health endpoints are accessible without authentication."
+          },
+          {
+            "id": 9,
+            "title": "Implement service-to-service authentication",
+            "description": "Create a secure mechanism for service-to-service authentication between microservices.",
+            "dependencies": [
+              6
+            ],
+            "details": "1. Implement service token generation\n2. Create service token validation\n3. Add service identity verification\n4. Implement short-lived tokens for service communication\n5. Add proper error handling for service authentication failures\n6. Document the service-to-service authentication flow\n7. Ensure health endpoints remain accessible without authentication",
+            "status": "pending",
+            "testStrategy": "Test service token generation and validation. Verify token expiration handling. Test with valid and invalid service identities. Test error handling for authentication failures. Verify health endpoints are accessible without authentication."
+          },
+          {
+            "id": 10,
+            "title": "Configure environment variables and secrets for authentication",
+            "description": "Set up proper environment variables and secrets management for authentication across all microservices.",
+            "dependencies": [
+              8,
+              9
+            ],
+            "details": "1. Identify all required secrets and configuration values\n2. Update docker-compose.yml with environment variables\n3. Create Kubernetes secrets for production deployment\n4. Implement configuration loading in all services\n5. Document the required environment variables\n6. Implement secret rotation mechanisms\n7. Configure Knative services with proper secret management",
+            "status": "pending",
+            "testStrategy": "Test configuration loading with different environment variables. Verify secret access across services. Test with missing or invalid configuration values. Verify Knative service configuration with secrets."
+          }
+        ]
       }
     ],
     "metadata": {
       "created": "2025-06-22T11:48:55.604Z",
-      "updated": "2025-06-22T12:41:21.654Z",
+      "updated": "2025-06-29T11:52:58.239Z",
       "description": "Tasks for master context"
     }
   }

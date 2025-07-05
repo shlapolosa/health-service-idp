@@ -1,0 +1,859 @@
+# Task ID: 15
+# Title: Implement Authentication and Authorization for Microservice Architecture
+# Status: pending
+# Dependencies: 14
+# Priority: high
+# Description: Implement a secure authentication and authorization system for the microservice architecture using JWT tokens, role-based access control, and integration with the existing FastAPI and Pydantic setup.
+# Details:
+1. Add authentication dependencies to each microservice:
+```
+for service in orchestration-service business-analyst-deterministic business-analyst-anthropic business-architect-deterministic business-architect-anthropic application-architect-deterministic application-architect-anthropic infrastructure-architect-deterministic infrastructure-architect-anthropic solution-architect-deterministic solution-architect-anthropic project-manager-deterministic project-manager-anthropic accountant-deterministic accountant-anthropic developer-deterministic developer-anthropic; do
+  cd microservices/$service
+  poetry add python-jose[cryptography] passlib[bcrypt] python-multipart
+  cd ../..
+done
+```
+
+2. Create a shared authentication library in `microservices/shared/auth/`:
+```
+mkdir -p microservices/shared/auth
+touch microservices/shared/auth/__init__.py
+```
+
+3. Implement JWT token handling in `microservices/shared/auth/jwt.py`:
+```python
+from datetime import datetime, timedelta
+from typing import Annotated, Any, List, Optional
+
+from fastapi import Depends, HTTPException, Security, status
+from fastapi.security import OAuth2PasswordBearer, SecurityScopes
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from pydantic import BaseModel, EmailStr, Field, ValidationError
+
+# Pydantic models for authentication
+class UserBase(BaseModel):
+    email: EmailStr
+    username: str = Field(..., min_length=3, max_length=50)
+    
+class UserCreate(UserBase):
+    password: str = Field(..., min_length=8)
+    
+class UserInDB(UserBase):
+    hashed_password: str
+    disabled: bool = False
+    roles: List[str] = ["user"]
+    
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    
+class TokenData(BaseModel):
+    username: Optional[str] = None
+    scopes: List[str] = []
+
+# Configuration
+SECRET_KEY = "your-secret-key"  # Store in environment variables in production
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="token",
+    scopes={"admin": "Full access", "user": "Regular user access"}
+)
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+async def get_current_user(
+    security_scopes: SecurityScopes,
+    token: Annotated[str, Depends(oauth2_scheme)],
+    user_service_url: str = "http://user-service:8080"
+):
+    if security_scopes.scopes:
+        authenticate_value = f'Bearer scope="{security_scopes.scope_str}"'
+    else:
+        authenticate_value = "Bearer"
+        
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": authenticate_value},
+    )
+    
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_scopes = payload.get("scopes", [])
+        token_data = TokenData(username=username, scopes=token_scopes)
+    except (JWTError, ValidationError):
+        raise credentials_exception
+        
+    # In a microservice architecture, we would typically call a user service
+    # This is a simplified example - in production, implement proper service discovery
+    import httpx
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(f"{user_service_url}/users/{username}")
+            if response.status_code != 200:
+                raise credentials_exception
+            user_data = response.json()
+            user = UserInDB(**user_data)
+        except httpx.RequestError:
+            # Handle service unavailability
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="User service unavailable"
+            )
+        
+    for scope in security_scopes.scopes:
+        if scope not in token_data.scopes:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Not enough permissions. Required: {scope}",
+                headers={"WWW-Authenticate": authenticate_value},
+            )
+    
+    return user
+
+def get_current_active_user(
+    current_user: Annotated[UserInDB, Depends(get_current_user)]
+):
+    if current_user.disabled:
+        raise HTTPException(status_code=400, detail="Inactive user")
+    return current_user
+```
+
+4. Create a user service for centralized user management in `microservices/user-service/src/main.py`:
+```python
+from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.security import OAuth2PasswordRequestForm
+from typing import List, Dict, Any, Annotated
+from datetime import timedelta
+import os
+import redis
+
+from shared.auth.jwt import (
+    UserInDB, UserCreate, Token, get_password_hash, verify_password,
+    create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
+)
+
+app = FastAPI()
+
+# In production, use a real database
+# This is a simplified example using Redis
+redis_host = os.getenv("REDIS_HOST", "redis-service")
+redis_port = int(os.getenv("REDIS_PORT", "6379"))
+r = redis.Redis(host=redis_host, port=redis_port, db=0, decode_responses=True)
+
+@app.post("/users", response_model=UserInDB, status_code=status.HTTP_201_CREATED)
+async def create_user(user: UserCreate):
+    # Check if user already exists
+    if r.exists(f"user:{user.username}"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already registered"
+        )
+    
+    # Create new user
+    hashed_password = get_password_hash(user.password)
+    user_data = {
+        "username": user.username,
+        "email": user.email,
+        "hashed_password": hashed_password,
+        "disabled": False,
+        "roles": ["user"]
+    }
+    
+    # Store in Redis
+    r.hset(f"user:{user.username}", mapping=user_data)
+    
+    return UserInDB(**user_data)
+
+@app.get("/users/{username}", response_model=UserInDB)
+async def get_user(username: str):
+    # Get user from Redis
+    user_data = r.hgetall(f"user:{username}")
+    if not user_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Convert roles from string to list if needed
+    if "roles" in user_data and isinstance(user_data["roles"], str):
+        user_data["roles"] = user_data["roles"].split(",")
+    
+    return UserInDB(**user_data)
+
+@app.post("/token", response_model=Token)
+async def login_for_access_token(
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
+):
+    # Get user from Redis
+    user_data = r.hgetall(f"user:{form_data.username}")
+    if not user_data:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Convert roles from string to list if needed
+    if "roles" in user_data and isinstance(user_data["roles"], str):
+        user_data["roles"] = user_data["roles"].split(",")
+    
+    user = UserInDB(**user_data)
+    
+    if not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username, "scopes": user.roles},
+        expires_delta=access_token_expires
+    )
+    
+    return {"access_token": access_token, "token_type": "bearer"}
+```
+
+5. Implement authentication middleware for the orchestration service in `microservices/orchestration-service/src/middleware/auth.py`:
+```python
+from fastapi import Request, HTTPException, status
+from fastapi.responses import JSONResponse
+from jose import jwt, JWTError
+import httpx
+import os
+
+from shared.auth.jwt import SECRET_KEY, ALGORITHM
+
+async def auth_middleware(request: Request, call_next):
+    # Skip authentication for certain paths
+    if request.url.path in ["/docs", "/redoc", "/openapi.json", "/token", "/health"]:
+        return await call_next(request)
+    
+    # Get the Authorization header
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={"detail": "Not authenticated"},
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    
+    token = auth_header.split(" ")[1]
+    
+    try:
+        # Decode the token
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        if username is None:
+            raise JWTError("Invalid token payload")
+        
+        # Verify the user exists
+        user_service_url = os.getenv("USER_SERVICE_URL", "http://user-service:8080")
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{user_service_url}/users/{username}")
+            if response.status_code != 200:
+                return JSONResponse(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    content={"detail": "Invalid user"},
+                    headers={"WWW-Authenticate": "Bearer"}
+                )
+        
+        # Add the user to the request state
+        request.state.user = response.json()
+        request.state.token_scopes = payload.get("scopes", [])
+        
+    except JWTError:
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={"detail": "Invalid token"},
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    except httpx.RequestError:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"detail": "User service unavailable"}
+        )
+    
+    # Continue processing the request
+    return await call_next(request)
+```
+
+6. Add the middleware to the orchestration service in `microservices/orchestration-service/src/main.py`:
+```python
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
+from typing import List, Dict, Any
+
+from .middleware.auth import auth_middleware
+from shared.auth.jwt import get_current_active_user, UserInDB
+
+app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, restrict to your frontend domain
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Add authentication middleware
+app.middleware("http")(auth_middleware)
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
+
+@app.get("/")
+async def root():
+    return {"message": "Orchestration Service API"}
+
+@app.post("/orchestrate")
+async def orchestrate(
+    query: str,
+    agents: List[str],
+    current_user: UserInDB = Depends(get_current_active_user)
+):
+    # Implement orchestration logic here
+    return {
+        "message": f"Orchestrating query '{query}' with agents {agents}",
+        "user": current_user.username
+    }
+```
+
+7. Create a service-to-service authentication mechanism in `microservices/shared/auth/service.py`:
+```python
+from datetime import datetime, timedelta
+from typing import Dict, Optional
+import os
+from jose import jwt
+
+# Configuration
+SERVICE_SECRET_KEY = os.getenv("SERVICE_SECRET_KEY", "your-service-secret-key")
+SERVICE_ALGORITHM = "HS256"
+SERVICE_TOKEN_EXPIRE_MINUTES = 5  # Short-lived tokens for service-to-service communication
+
+def create_service_token(service_name: str, target_service: str, expires_delta: Optional[timedelta] = None) -> str:
+    """Create a service-to-service authentication token"""
+    data = {
+        "sub": service_name,
+        "target": target_service,
+        "iat": datetime.utcnow()
+    }
+    
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=SERVICE_TOKEN_EXPIRE_MINUTES)
+    
+    data.update({"exp": expire})
+    encoded_jwt = jwt.encode(data, SERVICE_SECRET_KEY, algorithm=SERVICE_ALGORITHM)
+    return encoded_jwt
+
+def verify_service_token(token: str, expected_target: str) -> Dict:
+    """Verify a service-to-service token"""
+    payload = jwt.decode(token, SERVICE_SECRET_KEY, algorithms=[SERVICE_ALGORITHM])
+    
+    # Verify the token is intended for this service
+    if payload.get("target") != expected_target:
+        raise ValueError("Token not intended for this service")
+    
+    return payload
+```
+
+8. Implement service-to-service authentication in agent services:
+```python
+# Example for business-analyst-deterministic service
+from fastapi import FastAPI, Depends, HTTPException, Header, status
+from typing import Optional
+
+from shared.auth.service import verify_service_token
+
+app = FastAPI()
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
+
+async def verify_service_auth(x_service_token: Optional[str] = Header(None)):
+    if not x_service_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Service authentication required"
+        )
+    
+    try:
+        payload = verify_service_token(x_service_token, "business-analyst-deterministic")
+        return payload
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid service token: {str(e)}"
+        )
+
+@app.post("/process")
+async def process_query(query: str, service_auth: dict = Depends(verify_service_auth)):
+    # Process the query
+    calling_service = service_auth.get("sub")
+    return {
+        "result": f"Processed query: {query}",
+        "calling_service": calling_service
+    }
+```
+
+9. Update the orchestration service to use service-to-service authentication:
+```python
+# In orchestration-service/src/services/agent_client.py
+import httpx
+from shared.auth.service import create_service_token
+
+async def call_agent_service(agent_name: str, query: str, parameters: dict = None):
+    # Create service token
+    service_token = create_service_token("orchestration-service", agent_name)
+    
+    # Call the agent service
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            f"http://{agent_name}:8080/process",
+            json={"query": query, "parameters": parameters},
+            headers={"X-Service-Token": service_token}
+        )
+        
+        if response.status_code != 200:
+            raise Exception(f"Error calling {agent_name}: {response.text}")
+        
+        return response.json()
+```
+
+10. Configure environment variables and secrets for authentication:
+```yaml
+# In docker-compose.yml
+services:
+  orchestration-service:
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - SERVICE_SECRET_KEY=${SERVICE_SECRET_KEY}
+      - USER_SERVICE_URL=http://user-service:8080
+  
+  user-service:
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - REDIS_HOST=redis-service
+
+  # Add similar environment variables for all agent services
+```
+
+# Test Strategy:
+1. Create unit tests for JWT token handling in `microservices/shared/auth/tests/test_jwt.py`:
+```python
+import pytest
+from jose import jwt
+from datetime import datetime, timedelta
+
+from shared.auth.jwt import (
+    create_access_token, get_password_hash, verify_password,
+    SECRET_KEY, ALGORITHM
+)
+
+def test_password_hashing():
+    password = "testpassword"
+    hashed = get_password_hash(password)
+    assert verify_password(password, hashed)
+    assert not verify_password("wrongpassword", hashed)
+
+def test_create_access_token():
+    data = {"sub": "testuser", "scopes": ["user"]}
+    token = create_access_token(data)
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    assert payload["sub"] == "testuser"
+    assert payload["scopes"] == ["user"]
+    assert "exp" in payload
+
+def test_token_expiration():
+    data = {"sub": "testuser"}
+    # Create a token that expires in 1 second
+    token = create_access_token(data, expires_delta=timedelta(seconds=1))
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    assert payload["sub"] == "testuser"
+    
+    # Wait for token to expire
+    import time
+    time.sleep(2)
+    
+    # Token should be expired now
+    with pytest.raises(jwt.ExpiredSignatureError):
+        jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+```
+
+2. Create integration tests for the user service in `microservices/user-service/tests/test_integration.py`:
+```python
+import pytest
+from fastapi.testclient import TestClient
+import redis
+import os
+
+# Mock Redis for testing
+class MockRedis:
+    def __init__(self):
+        self.data = {}
+    
+    def hset(self, key, mapping):
+        self.data[key] = mapping
+        return len(mapping)
+    
+    def hgetall(self, key):
+        return self.data.get(key, {})
+    
+    def exists(self, key):
+        return key in self.data
+
+# Patch the redis client
+os.environ["REDIS_HOST"] = "localhost"
+os.environ["REDIS_PORT"] = "6379"
+
+# Import the app after setting environment variables
+from src.main import app
+import src.main
+
+# Replace Redis with mock
+src.main.r = MockRedis()
+
+client = TestClient(app)
+
+def test_create_user():
+    response = client.post(
+        "/users",
+        json={
+            "username": "testuser",
+            "email": "test@example.com",
+            "password": "testpassword"
+        }
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert data["username"] == "testuser"
+    assert data["email"] == "test@example.com"
+    assert "hashed_password" in data
+    assert data["roles"] == ["user"]
+
+def test_get_user():
+    # First create a user
+    client.post(
+        "/users",
+        json={
+            "username": "getuser",
+            "email": "get@example.com",
+            "password": "testpassword"
+        }
+    )
+    
+    # Then get the user
+    response = client.get("/users/getuser")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["username"] == "getuser"
+    assert data["email"] == "get@example.com"
+
+def test_login():
+    # First create a user
+    client.post(
+        "/users",
+        json={
+            "username": "loginuser",
+            "email": "login@example.com",
+            "password": "testpassword"
+        }
+    )
+    
+    # Then login
+    response = client.post(
+        "/token",
+        data={"username": "loginuser", "password": "testpassword"}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "access_token" in data
+    assert data["token_type"] == "bearer"
+    
+    # Verify token
+    from shared.auth.jwt import SECRET_KEY, ALGORITHM
+    payload = jwt.decode(data["access_token"], SECRET_KEY, algorithms=[ALGORITHM])
+    assert payload["sub"] == "loginuser"
+    assert payload["scopes"] == ["user"]
+```
+
+3. Create tests for service-to-service authentication in `microservices/shared/auth/tests/test_service_auth.py`:
+```python
+import pytest
+from datetime import timedelta
+from jose import jwt, JWTError
+
+from shared.auth.service import create_service_token, verify_service_token, SERVICE_SECRET_KEY, SERVICE_ALGORITHM
+
+def test_create_service_token():
+    token = create_service_token("service-a", "service-b")
+    payload = jwt.decode(token, SERVICE_SECRET_KEY, algorithms=[SERVICE_ALGORITHM])
+    assert payload["sub"] == "service-a"
+    assert payload["target"] == "service-b"
+    assert "exp" in payload
+    assert "iat" in payload
+
+def test_verify_service_token():
+    token = create_service_token("service-a", "service-b")
+    payload = verify_service_token(token, "service-b")
+    assert payload["sub"] == "service-a"
+    assert payload["target"] == "service-b"
+
+def test_verify_service_token_wrong_target():
+    token = create_service_token("service-a", "service-b")
+    with pytest.raises(ValueError, match="Token not intended for this service"):
+        verify_service_token(token, "service-c")
+
+def test_service_token_expiration():
+    # Create a token that expires in 1 second
+    token = create_service_token("service-a", "service-b", expires_delta=timedelta(seconds=1))
+    payload = verify_service_token(token, "service-b")
+    assert payload["sub"] == "service-a"
+    
+    # Wait for token to expire
+    import time
+    time.sleep(2)
+    
+    # Token should be expired now
+    with pytest.raises(JWTError):
+        verify_service_token(token, "service-b")
+```
+
+4. Create integration tests for the orchestration service with authentication in `microservices/orchestration-service/tests/test_integration.py`:
+```python
+import pytest
+from fastapi.testclient import TestClient
+import httpx
+from unittest.mock import patch, MagicMock
+
+# Mock the auth middleware
+from src.middleware.auth import auth_middleware
+
+async def mock_auth_middleware(request, call_next):
+    # Skip authentication for tests
+    request.state.user = {"username": "testuser", "roles": ["user"]}
+    request.state.token_scopes = ["user"]
+    return await call_next(request)
+
+# Import the app and patch the middleware
+from src.main import app
+app.middleware_stack = None  # Clear middleware stack
+app.middleware("http")(mock_auth_middleware)  # Add mock middleware
+
+client = TestClient(app)
+
+def test_root_endpoint():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.json()["message"] == "Orchestration Service API"
+
+def test_health_endpoint():
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json()["status"] == "healthy"
+
+# Mock the agent service calls
+with patch("src.services.agent_client.call_agent_service") as mock_call_agent:
+    mock_call_agent.return_value = {"result": "Mocked agent response"}
+    
+    def test_orchestrate():
+        response = client.post(
+            "/orchestrate",
+            json={
+                "query": "Test query",
+                "agents": ["business-analyst-deterministic", "developer-deterministic"]
+            }
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "message" in data
+        assert data["user"] == "testuser"
+```
+
+5. Test the authentication flow with curl commands:
+```bash
+# Start the services
+docker-compose up -d
+
+# Create a user
+curl -X POST http://localhost:8080/users \
+  -H "Content-Type: application/json" \
+  -d '{"username":"testuser","email":"test@example.com","password":"testpassword"}'
+
+# Get a token
+TOKEN=$(curl -s -X POST http://localhost:8080/token \
+  -d "username=testuser&password=testpassword" | jq -r .access_token)
+
+# Use the token to access the orchestration service
+curl -H "Authorization: Bearer $TOKEN" \
+  -X POST http://localhost:8000/orchestrate \
+  -H "Content-Type: application/json" \
+  -d '{"query":"Test query","agents":["business-analyst-deterministic"]}'
+
+# Try without a token (should fail)
+curl -X POST http://localhost:8000/orchestrate \
+  -H "Content-Type: application/json" \
+  -d '{"query":"Test query","agents":["business-analyst-deterministic"]}'
+
+# Test health endpoint (should work without authentication)
+curl http://localhost:8000/health
+```
+
+6. Test service-to-service authentication:
+```bash
+# Generate a service token
+TOKEN=$(python -c "from shared.auth.service import create_service_token; print(create_service_token('test-service', 'business-analyst-deterministic'))")
+
+# Use the token to call the agent service directly
+curl -H "X-Service-Token: $TOKEN" \
+  -X POST http://localhost:8001/process \
+  -H "Content-Type: application/json" \
+  -d '{"query":"Test query"}'
+
+# Try without a token (should fail)
+curl -X POST http://localhost:8001/process \
+  -H "Content-Type: application/json" \
+  -d '{"query":"Test query"}'
+
+# Test health endpoint (should work without authentication)
+curl http://localhost:8001/health
+```
+
+# Subtasks:
+## 1. Set up authentication models and password utilities [pending]
+### Dependencies: None
+### Description: Implement the Pydantic models for authentication and set up password hashing utilities. This includes creating the user models, token models, and password verification functions.
+### Details:
+1. Create the `src/models/auth.py` file with the Pydantic models for UserBase, UserCreate, UserInDB, Token, and TokenData.
+2. Set up the password context in `src/auth/jwt.py` with the CryptContext configuration.
+3. Implement the password verification and hashing functions.
+4. Ensure proper validation rules are applied to the models (e.g., minimum password length).
+
+## 2. Implement JWT token generation and validation [pending]
+### Dependencies: 15.1
+### Description: Create the JWT token generation and validation logic, including token creation, decoding, and verification with proper expiration handling.
+### Details:
+1. Implement the `create_access_token` function with proper expiration time.
+2. Set up the OAuth2PasswordBearer for token extraction from requests.
+3. Create the token validation logic in the `get_current_user` function.
+4. Implement scope validation for role-based access control.
+5. Ensure proper error handling for invalid or expired tokens.
+
+## 3. Create user database interface [pending]
+### Dependencies: 15.1
+### Description: Implement a user database interface with mock data for development that can be replaced with a real database in production.
+### Details:
+1. Create the `src/db/users.py` file with a mock user database.
+2. Implement the `get_user` function to retrieve users by username.
+3. Add sample users with different roles (regular user and admin).
+4. Ensure the mock database uses proper password hashing.
+5. Design the interface to be easily replaceable with a real database implementation.
+
+## 4. Implement authentication endpoints [pending]
+### Dependencies: 15.2, 15.3
+### Description: Create the API endpoints for user authentication, including token generation and user information retrieval.
+### Details:
+1. Create the `src/routes/auth.py` file with an APIRouter.
+2. Implement the `/token` endpoint for user login and access token generation.
+3. Create the `/users/me` endpoint to retrieve the current user's information.
+4. Ensure proper error handling for authentication failures.
+5. Implement the form data validation for the login endpoint.
+
+## 5. Integrate authentication with main application and secure routes [pending]
+### Dependencies: 15.4
+### Description: Update the main application to include the authentication routes and implement protected routes with role-based access control.
+### Details:
+1. Update `src/func.py` to include the authentication router.
+2. Implement protected routes that require authentication.
+3. Add role-based access control for admin-only routes.
+4. Update the Knative function configuration to include environment variables for secrets.
+5. Implement security best practices such as moving secrets to environment variables and setting appropriate CORS policies.
+6. Add documentation for the authentication system.
+
+## 6. Create shared authentication library for microservices [pending]
+### Dependencies: 15.1, 15.2
+### Description: Create a shared authentication library that can be used by all microservices for consistent authentication and authorization.
+### Details:
+1. Create a shared directory structure for authentication code
+2. Move common authentication models and utilities to the shared library
+3. Implement service-to-service authentication mechanisms
+4. Create helper functions for token validation across services
+5. Document the shared authentication library usage
+
+## 7. Implement user management service [pending]
+### Dependencies: 15.6
+### Description: Create a dedicated user management microservice for centralized user authentication and management.
+### Details:
+1. Create the user service project structure
+2. Implement user registration, retrieval, and update endpoints
+3. Implement the token generation endpoint
+4. Add Redis integration for user storage
+5. Implement proper error handling and validation
+6. Add documentation for the user service API
+7. Add health check endpoint
+
+## 8. Implement authentication middleware for orchestration service [pending]
+### Dependencies: 15.6, 15.7
+### Description: Create middleware for the orchestration service to authenticate and authorize incoming requests.
+### Details:
+1. Create the authentication middleware
+2. Implement token extraction and validation
+3. Add user information to request state
+4. Implement role-based access control
+5. Add proper error handling for authentication failures
+6. Configure the middleware in the main application
+7. Ensure health endpoints remain accessible without authentication
+
+## 9. Implement service-to-service authentication [pending]
+### Dependencies: 15.6
+### Description: Create a secure mechanism for service-to-service authentication between microservices.
+### Details:
+1. Implement service token generation
+2. Create service token validation
+3. Add service identity verification
+4. Implement short-lived tokens for service communication
+5. Add proper error handling for service authentication failures
+6. Document the service-to-service authentication flow
+7. Ensure health endpoints remain accessible without authentication
+
+## 10. Configure environment variables and secrets for authentication [pending]
+### Dependencies: 15.8, 15.9
+### Description: Set up proper environment variables and secrets management for authentication across all microservices.
+### Details:
+1. Identify all required secrets and configuration values
+2. Update docker-compose.yml with environment variables
+3. Create Kubernetes secrets for production deployment
+4. Implement configuration loading in all services
+5. Document the required environment variables
+6. Implement secret rotation mechanisms
+7. Configure Knative services with proper secret management
+

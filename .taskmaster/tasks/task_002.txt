@@ -1,6 +1,6 @@
 # Task ID: 2
 # Title: Implement Core Data Layer
-# Status: pending
+# Status: done
 # Dependencies: None
 # Priority: high
 # Description: Set up the data persistence layer including PostgreSQL database, Redis cluster, and implement basic CRUD API for architecture entities.
@@ -30,7 +30,7 @@ API Endpoints:
 7. Validate data persistence across system restarts
 
 # Subtasks:
-## 1. Deploy Database Infrastructure [pending]
+## 1. Deploy Database Infrastructure [done]
 ### Dependencies: None
 ### Description: Set up PostgreSQL 14.7 on AWS RDS and Redis 7.0 cluster for caching and message passing
 ### Details:
@@ -40,7 +40,7 @@ API Endpoints:
 4. Configure Redis persistence, memory limits, and network access
 5. Document connection strings and access credentials in secure location
 
-## 2. Design and Implement Database Schemas [pending]
+## 2. Design and Implement Database Schemas [done]
 ### Dependencies: None
 ### Description: Create database schemas for architecture and change entities and set up migration framework
 ### Details:
@@ -50,7 +50,7 @@ API Endpoints:
 4. Create initial migration script for schema creation
 5. Document entity relationships and schema design
 
-## 3. Develop Data Access Layer [pending]
+## 3. Develop Data Access Layer [done]
 ### Dependencies: None
 ### Description: Implement SQLAlchemy-based data access layer with CRUD operations for architecture entities
 ### Details:
@@ -61,7 +61,7 @@ API Endpoints:
 5. Add transaction management and error handling
 6. Create unit tests for repository classes
 
-## 4. Implement Authentication Service [pending]
+## 4. Implement Authentication Service [done]
 ### Dependencies: 2.3
 ### Description: Create authentication service with JWT token management for API security
 ### Details:
@@ -72,7 +72,7 @@ API Endpoints:
 5. Configure token expiration and refresh policies
 6. Implement login/logout endpoints
 
-## 5. Create FastAPI CRUD Endpoints [pending]
+## 5. Create FastAPI CRUD Endpoints [done]
 ### Dependencies: None
 ### Description: Implement RESTful API endpoints for architecture entities using FastAPI
 ### Details:

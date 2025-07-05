@@ -5,16 +5,16 @@ on:
     branches: [ main, develop, 'feature/*', 'hotfix/*', 'release/*' ]
     paths:
       - 'microservices/**'
-      - 'oam-applications/**'
   pull_request:
     branches: [ main ]
     paths:
       - 'microservices/**'
-      - 'oam-applications/**'
 
 env:
   REGISTRY: docker.io
   REGISTRY_USERNAME: socrates12345
+  GITOPS_REPO: health-service-idp-gitops
+  GITOPS_BRANCH: main
 
 jobs:
   semantic-version-build:
@@ -184,53 +184,71 @@ jobs:
     if: needs.semantic-version-build.outputs.changed-services != '' && needs.semantic-version-build.outputs.should-deploy == 'true'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout source code
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
+          path: source
 
-      - name: Update OAM applications with semantic versions
+      - name: Checkout GitOps repository
+        uses: actions/checkout@v4
+        with:
+          repository: shlapolosa/${{ env.GITOPS_REPO }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ env.GITOPS_BRANCH }}
+          path: gitops
+
+      - name: Update GitOps manifests with semantic versions
         run: |
-          chmod +x .github/scripts/version-manager.sh
+          # Make version manager executable
+          chmod +x source/.github/scripts/version-manager.sh
           
           IFS=',' read -ra SERVICES <<< "${{ needs.semantic-version-build.outputs.changed-services }}"
           
+          cd gitops
           git config --local user.email "semantic-versioning@github.com"
           git config --local user.name "Semantic Versioning Bot"
           
           for service in "${SERVICES[@]}"; do
-            echo "Updating OAM applications for $service..."
+            echo "Updating GitOps manifests for $service..."
             
             # Generate new image with semantic version
             COMMIT_SHA="${GITHUB_SHA:0:7}"
             NEW_IMAGE="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/$service:$COMMIT_SHA"
-            SEMVER=$(.github/scripts/version-manager.sh version "$service")
+            SEMVER=$(../source/.github/scripts/version-manager.sh version "$service")
             
             echo "Service: $service"
             echo "New Image: $NEW_IMAGE"
             echo "Semantic Version: $SEMVER"
             
             # Update OAM applications
-            .github/scripts/version-manager.sh update-oam "$service" "$NEW_IMAGE"
-            
-            # Update additional manifest files
             case "$service" in
               "streamlit-frontend")
-                if [ -f "frontend-simple.yaml" ]; then
-                  sed -i "s|image: socrates12345/streamlit-frontend:.*|image: $NEW_IMAGE|g" frontend-simple.yaml
-                  # Add version annotation
-                  if ! grep -q "version:" frontend-simple.yaml; then
-                    sed -i "/labels:/a\\    version: \"$SEMVER\"" frontend-simple.yaml
-                  fi
+                if [ -f "oam/frontend/streamlit-frontend-app.yaml" ]; then
+                  sed -i "s|image: socrates12345/streamlit-frontend:.*|image: $NEW_IMAGE|g" oam/frontend/streamlit-frontend-app.yaml
+                  sed -i "s|version: \".*\"|version: \"$SEMVER\"|g" oam/frontend/streamlit-frontend-app.yaml
+                fi
+                if [ -f "environments/dev/frontend-simple.yaml" ]; then
+                  sed -i "s|image: socrates12345/streamlit-frontend:.*|image: $NEW_IMAGE|g" environments/dev/frontend-simple.yaml
+                  sed -i "s|version: \".*\"|version: \"$SEMVER\"|g" environments/dev/frontend-simple.yaml
                 fi
                 ;;
               "orchestration-service")
-                if [ -f "orchestration-service-simple.yaml" ]; then
-                  sed -i "s|image: socrates12345/orchestration-service:.*|image: $NEW_IMAGE|g" orchestration-service-simple.yaml
-                  if ! grep -q "version:" orchestration-service-simple.yaml; then
-                    sed -i "/labels:/a\\    version: \"$SEMVER\"" orchestration-service-simple.yaml
-                  fi
+                if [ -f "oam/orchestration/orchestration-service-app.yaml" ]; then
+                  sed -i "s|image: socrates12345/orchestration-service:.*|image: $NEW_IMAGE|g" oam/orchestration/orchestration-service-app.yaml
+                  sed -i "s|version: \".*\"|version: \"$SEMVER\"|g" oam/orchestration/orchestration-service-app.yaml
+                fi
+                if [ -f "environments/dev/orchestration-service-simple.yaml" ]; then
+                  sed -i "s|image: socrates12345/orchestration-service:.*|image: $NEW_IMAGE|g" environments/dev/orchestration-service-simple.yaml
+                  sed -i "s|version: \".*\"|version: \"$SEMVER\"|g" environments/dev/orchestration-service-simple.yaml
+                fi
+                ;;
+              *)
+                # Handle other agent services
+                if [ -f "oam/agents/$service-app.yaml" ]; then
+                  sed -i "s|image: socrates12345/$service:.*|image: $NEW_IMAGE|g" oam/agents/$service-app.yaml
+                  sed -i "s|version: \".*\"|version: \"$SEMVER\"|g" oam/agents/$service-app.yaml
                 fi
                 ;;
             esac
@@ -238,17 +256,18 @@ jobs:
           
           # Check if there are changes to commit
           if ! git diff --quiet; then
-            echo "📝 Committing semantic versioning updates..."
+            echo "📝 Committing GitOps updates..."
             git add -A
-            git commit -m "chore: update service versions with semantic versioning
+            git commit -m "chore: update deployment manifests with semantic versioning
 
             Services: ${{ needs.semantic-version-build.outputs.changed-services }}
             Versions: ${{ needs.semantic-version-build.outputs.version-info }}
+            Source commit: ${{ github.sha }}
             
-            🏷️ Semantic versioning automated update
+            🏷️ GitOps automated update from source repository
             
             Co-Authored-By: Semantic Versioning Bot <semantic-versioning@github.com>"
-            git push
+            git push origin ${{ env.GITOPS_BRANCH }}
           else
             echo "No changes to commit"
           fi

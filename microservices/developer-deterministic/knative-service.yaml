@@ -1,0 +1,69 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: developer-deterministic
+  namespace: default
+  labels:
+    app: developer-deterministic
+    agent-type: developer
+    implementation: deterministic
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "10"
+        autoscaling.knative.dev/target: "50"
+        autoscaling.knative.dev/scaleDownDelay: "30s"
+        autoscaling.knative.dev/scaleToZeroGracePeriod: "60s"
+      labels:
+        app: developer-deterministic
+        agent-type: developer
+        implementation: deterministic
+    spec:
+      containers:
+      - name: developer-deterministic
+        image: ${DOCKER_REGISTRY}/developer-deterministic:latest
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        env:
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: AGENT_TYPE
+          value: "developer"
+        - name: IMPLEMENTATION_TYPE
+          value: "deterministic"
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: deterministic-api-key
+              key: api-key
+              optional: true
+        resources:
+          limits:
+            cpu: "2"
+            memory: "1Gi"
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL

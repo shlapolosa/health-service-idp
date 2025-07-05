@@ -1,6 +1,6 @@
 # Task ID: 12
 # Title: Configure OAM Project with Knative and ArgoCD Deployment
-# Status: pending
+# Status: done
 # Dependencies: 11, 4
 # Priority: medium
 # Description: Set up an Open Application Model (OAM) project that leverages Knative for serverless capabilities and configure ArgoCD for GitOps-based deployment of the application components.
@@ -238,7 +238,7 @@
     Verify the application rolls back to the previous version.
 
 # Subtasks:
-## 1. Verify Knative Installation and Configuration [pending]
+## 1. Verify Knative Installation and Configuration [done]
 ### Dependencies: None
 ### Description: Ensure Knative Serving is properly installed and configured in the Kubernetes cluster before proceeding with OAM setup.
 ### Details:
@@ -264,7 +264,7 @@ spec:
 5. Verify the service is running: `kubectl get ksvc hello`
 6. Document any configuration issues and resolve them before proceeding.
 
-## 2. Set Up OAM Project Structure [pending]
+## 2. Set Up OAM Project Structure [done]
 ### Dependencies: 12.1
 ### Description: Create the necessary directory structure and configuration files for the OAM project.
 ### Details:
@@ -291,7 +291,7 @@ maintainers:
 6. Document the project structure in README.md with explanations for each directory's purpose
 7. Commit the initial structure: `git add . && git commit -m "Initial OAM project structure"`
 
-## 3. Define KubeVela Application Components [pending]
+## 3. Define KubeVela Application Components [done]
 ### Dependencies: 12.2
 ### Description: Create the component definitions for the application using KubeVela's OAM implementation.
 ### Details:
@@ -344,7 +344,7 @@ spec:
 6. Test the component by creating a simple application that uses it
 7. Document the component parameters and usage examples
 
-## 4. Create OAM Application Configuration [pending]
+## 4. Create OAM Application Configuration [done]
 ### Dependencies: 12.3
 ### Description: Define the complete application using OAM application configuration, including components and traits.
 ### Details:
@@ -410,7 +410,7 @@ spec:
 6. Test the application functionality and scaling behavior
 7. Document the application configuration options and trait parameters
 
-## 5. Integrate with ArgoCD for GitOps Deployment [pending]
+## 5. Integrate with ArgoCD for GitOps Deployment [done]
 ### Dependencies: 12.4
 ### Description: Set up ArgoCD to manage the OAM application deployment using GitOps principles.
 ### Details:
