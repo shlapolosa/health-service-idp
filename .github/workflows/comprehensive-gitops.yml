@@ -66,7 +66,15 @@ jobs:
       - name: Find all services with Dockerfiles
         id: services
         run: |
-          SERVICES=$(find microservices -name "Dockerfile" -type f | sed 's|microservices/||g' | sed 's|/Dockerfile||g' | jq -R -s 'split("\n") | map(select(length > 0))')
+          # Find services and create JSON array
+          SERVICES_LIST=$(find microservices -name "Dockerfile" -type f | sed 's|microservices/||g' | sed 's|/Dockerfile||g' | sort)
+          
+          if [ -z "$SERVICES_LIST" ]; then
+            SERVICES="[]"
+          else
+            SERVICES=$(echo "$SERVICES_LIST" | jq -R -n '[inputs | select(length>0)]')
+          fi
+          
           echo "services=$SERVICES" >> $GITHUB_OUTPUT
           echo "All services: $SERVICES"
 
