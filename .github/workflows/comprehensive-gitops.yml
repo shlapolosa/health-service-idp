@@ -322,39 +322,52 @@ jobs:
           
           echo "Deployments payload: {$DEPLOYMENTS}"
           
-          # Trigger repository dispatch event
-          RESPONSE=$(curl -s -w "\n%{http_code}" -L \
-            -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.PERSONAL_ACCESS_TOKEN }}" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            https://api.github.com/repos/shlapolosa/${{ env.GITOPS_REPO }}/dispatches \
-            -d "{
-              \"event_type\": \"update-deployments\",
-              \"client_payload\": {
-                \"services\": \"$SERVICES\",
-                \"version_info\": \"$VERSION_INFO\",
-                \"source_commit\": \"$SOURCE_COMMIT\",
-                \"deployments\": {$DEPLOYMENTS},
-                \"registry\": \"${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}\",
-                \"branch\": \"${{ github.ref_name }}\",
-                \"workflow_run\": \"${{ github.run_id }}\"
-              }
-            }")
+          # Set up GitHub CLI authentication
+          export GH_TOKEN="${{ secrets.PERSONAL_ACCESS_TOKEN }}"
           
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-          RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
+          # Create dispatch payload
+          PAYLOAD=$(cat <<EOF
+          {
+            "services": "$SERVICES",
+            "version_info": "$VERSION_INFO",
+            "source_commit": "$SOURCE_COMMIT",
+            "deployments": {$DEPLOYMENTS},
+            "registry": "${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}",
+            "branch": "${{ github.ref_name }}",
+            "workflow_run": "${{ github.run_id }}"
+          }
+          EOF
+          )
           
-          echo "HTTP Code: $HTTP_CODE"
-          echo "Response: $RESPONSE_BODY"
+          echo "Dispatch payload:"
+          echo "$PAYLOAD" | jq .
           
-          if [ "$HTTP_CODE" = "204" ]; then
+          # Trigger repository dispatch using GitHub CLI
+          echo "📤 Sending dispatch event using GitHub CLI..."
+          
+          if gh api repos/shlapolosa/${{ env.GITOPS_REPO }}/dispatches \
+            --method POST \
+            --field event_type=update-deployments \
+            --raw-field client_payload="$PAYLOAD"; then
             echo "✅ GitOps repository dispatch event sent successfully!"
             echo "🔗 GitOps repository will handle the manifest updates"
           else
-            echo "❌ Failed to send dispatch event (HTTP $HTTP_CODE)"
-            echo "Response: $RESPONSE_BODY"
-            exit 1
+            echo "❌ Failed to send dispatch event via GitHub CLI"
+            echo "Trying alternative approach with workflow dispatch..."
+            
+            # Fallback: Try workflow dispatch instead
+            if gh workflow run deployment-update.yml \
+              --repo shlapolosa/${{ env.GITOPS_REPO }} \
+              --field services="$SERVICES" \
+              --field version_info="$VERSION_INFO" \
+              --field source_commit="$SOURCE_COMMIT" \
+              --field registry="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}" \
+              --field workflow_run="${{ github.run_id }}"; then
+              echo "✅ Fallback workflow dispatch sent successfully!"
+            else
+              echo "❌ Both dispatch methods failed"
+              exit 1
+            fi
           fi
 
   # Phase 4: Generate Summary

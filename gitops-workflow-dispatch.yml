@@ -1,0 +1,131 @@
+name: GitOps Deployment Update (Workflow Dispatch)
+
+on:
+  workflow_dispatch:
+    inputs:
+      services:
+        description: 'Comma-separated list of services to update'
+        required: true
+        type: string
+      version_info:
+        description: 'Version information for services'
+        required: true
+        type: string
+      source_commit:
+        description: 'Source commit SHA'
+        required: true
+        type: string
+      registry:
+        description: 'Container registry prefix'
+        required: true
+        type: string
+      workflow_run:
+        description: 'Source workflow run ID'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  update-manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout GitOps repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update deployment manifests
+        run: |
+          echo "🚀 Processing GitOps deployment update via workflow dispatch..."
+          
+          # Extract workflow inputs
+          SERVICES="${{ github.event.inputs.services }}"
+          VERSION_INFO="${{ github.event.inputs.version_info }}"
+          SOURCE_COMMIT="${{ github.event.inputs.source_commit }}"
+          REGISTRY="${{ github.event.inputs.registry }}"
+          WORKFLOW_RUN="${{ github.event.inputs.workflow_run }}"
+          
+          echo "Services to update: $SERVICES"
+          echo "Version info: $VERSION_INFO" 
+          echo "Source commit: $SOURCE_COMMIT"
+          echo "Registry: $REGISTRY"
+          
+          # Update each service's manifest
+          IFS=',' read -ra SERVICE_ARRAY <<< "$SERVICES"
+          
+          for service in "${SERVICE_ARRAY[@]}"; do
+            echo "🔄 Updating $service manifest..."
+            
+            # Extract commit SHA for image tag
+            COMMIT_SHA="${SOURCE_COMMIT:0:7}"
+            NEW_IMAGE="$REGISTRY/$service:$COMMIT_SHA"
+            
+            echo "📝 Updating $service to image: $NEW_IMAGE"
+            
+            # Find OAM application file for the service
+            OAM_FILE="oam/frontend/${service}-app.yaml"
+            if [ ! -f "$OAM_FILE" ]; then
+              # Try other possible locations
+              OAM_FILE=$(find oam -name "*${service}*.yaml" | head -1)
+            fi
+            
+            if [ -f "$OAM_FILE" ]; then
+              echo "📄 Updating manifest: $OAM_FILE"
+              
+              # Update the image in the OAM file
+              sed -i "s|image: .*/$service:.*|image: $NEW_IMAGE|g" "$OAM_FILE"
+              
+              # Update version labels if they exist
+              sed -i "s|version: .*|version: $COMMIT_SHA|g" "$OAM_FILE"
+              
+              echo "✅ Updated $service manifest successfully"
+            else
+              echo "⚠️ Warning: Could not find OAM file for $service"
+              echo "Available OAM files:"
+              find oam -name "*.yaml" -type f
+            fi
+          done
+
+      - name: Commit and push changes
+        run: |
+          # Configure git
+          git config user.name "GitOps Bot"
+          git config user.email "gitops-bot@github.com"
+          
+          # Check if there are changes
+          if git diff --quiet; then
+            echo "ℹ️ No changes detected in GitOps manifests"
+          else
+            echo "📋 Changes detected:"
+            git diff --name-only
+            
+            # Show what changed
+            echo "📝 Detailed changes:"
+            git diff
+            
+            # Commit changes
+            git add .
+            git commit -m "chore: update service deployments from source commit ${{ github.event.inputs.source_commit }}
+
+            Services updated: ${{ github.event.inputs.services }}
+            Source workflow: ${{ github.event.inputs.workflow_run }}
+            Triggered by: workflow_dispatch
+            Registry: ${{ github.event.inputs.registry }}"
+            
+            git push
+            
+            echo "✅ GitOps manifests updated and pushed successfully!"
+            echo "🔄 ArgoCD will now detect and deploy the changes"
+          fi
+
+      - name: Summary
+        run: |
+          echo "## 🎯 GitOps Deployment Update Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Services Updated:** ${{ github.event.inputs.services }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Source Commit:** \`${{ github.event.inputs.source_commit }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Registry:** ${{ github.event.inputs.registry }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🚀 **Next Steps:** ArgoCD will detect manifest changes and deploy to cluster" >> $GITHUB_STEP_SUMMARY
