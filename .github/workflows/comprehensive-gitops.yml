@@ -51,9 +51,24 @@ jobs:
           CHANGED_SERVICES_JSON="[]"
           
           if [ ! -z "$CHANGED_FILES" ]; then
-            CHANGED_SERVICES=$(echo "$CHANGED_FILES" | cut -d'/' -f1-2 | sort -u | grep '^microservices/' | cut -d'/' -f2 | tr '\n' ',' | sed 's/,$//')
-            # Create JSON array for matrix
-            CHANGED_SERVICES_JSON=$(echo "$CHANGED_SERVICES" | tr ',' '\n' | jq -R -n '[inputs | select(length>0)]')
+            # Get service names
+            SERVICE_NAMES=$(echo "$CHANGED_FILES" | cut -d'/' -f1-2 | sort -u | grep '^microservices/' | cut -d'/' -f2)
+            CHANGED_SERVICES=$(echo "$SERVICE_NAMES" | tr '\n' ',' | sed 's/,$//')
+            
+            # Create JSON array for matrix (simpler approach)
+            if [ ! -z "$SERVICE_NAMES" ]; then
+              CHANGED_SERVICES_JSON="["
+              FIRST=true
+              for service in $SERVICE_NAMES; do
+                if [ "$FIRST" = true ]; then
+                  CHANGED_SERVICES_JSON="$CHANGED_SERVICES_JSON\"$service\""
+                  FIRST=false
+                else
+                  CHANGED_SERVICES_JSON="$CHANGED_SERVICES_JSON,\"$service\""
+                fi
+              done
+              CHANGED_SERVICES_JSON="$CHANGED_SERVICES_JSON]"
+            fi
           fi
           
           # Determine if we should deploy (only on main branch pushes)
