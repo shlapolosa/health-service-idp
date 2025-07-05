@@ -360,10 +360,9 @@ jobs:
             git add .
             git commit -m "chore: update service images for commit $COMMIT_SHA
 
-Services updated: $SERVICES
-Source commit: $SOURCE_COMMIT
-Workflow: ${{ github.workflow }} #${{ github.run_number }}
-"
+            Services updated: $SERVICES
+            Source commit: $SOURCE_COMMIT
+            Workflow: ${{ github.workflow }} #${{ github.run_number }}"
             
             git push
             
