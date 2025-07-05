@@ -43,10 +43,13 @@ jobs:
           
           # Create matrix for parallel builds
           if [ ! -z "$CHANGED_SERVICES" ]; then
-            MATRIX=$(echo "$CHANGED_SERVICES" | jq -R -s 'split("\n") | map(select(length > 0))')
-            echo "changed-services=$CHANGED_SERVICES" >> $GITHUB_OUTPUT
+            # Convert newline-separated services to comma-separated
+            SERVICES_CSV=$(echo "$CHANGED_SERVICES" | tr '\n' ',' | sed 's/,$//')
+            # Create JSON array for matrix
+            MATRIX=$(echo "$CHANGED_SERVICES" | jq -R -n '[inputs | select(length>0)]')
+            echo "changed-services=$SERVICES_CSV" >> $GITHUB_OUTPUT
             echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
-            echo "Found changed services: $CHANGED_SERVICES"
+            echo "Found changed services: $SERVICES_CSV"
           else
             echo "changed-services=" >> $GITHUB_OUTPUT
             echo "matrix=[]" >> $GITHUB_OUTPUT
