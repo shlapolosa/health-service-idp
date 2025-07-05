@@ -1,0 +1,369 @@
+name: Comprehensive GitOps Pipeline
+
+on:
+  push:
+    branches: [ main, develop, 'feature/*', 'hotfix/*', 'release/*' ]
+    paths:
+      - 'microservices/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'microservices/**'
+  schedule:
+    # Run security scans daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  REGISTRY: docker.io
+  REGISTRY_USERNAME: socrates12345
+  GITOPS_REPO: health-service-idp-gitops
+  GITOPS_BRANCH: main
+
+jobs:
+  # Phase 1: Security Scanning
+  detect-services:
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.services.outputs.matrix }}
+      changed-services: ${{ steps.changes.outputs.changed-services }}
+      should-deploy: ${{ steps.changes.outputs.should-deploy }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed services
+        id: changes
+        run: |
+          # Get list of changed files
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | grep -E '^microservices/' || true)
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
+            # For scheduled runs, scan all services
+            CHANGED_FILES=$(find microservices -name "*.py" -o -name "Dockerfile" | head -5)
+          else
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -E '^microservices/' || true)
+          fi
+          
+          # Extract unique service directories
+          CHANGED_SERVICES=""
+          if [ ! -z "$CHANGED_FILES" ]; then
+            CHANGED_SERVICES=$(echo "$CHANGED_FILES" | cut -d'/' -f1-2 | sort -u | grep '^microservices/' | cut -d'/' -f2 | tr '\n' ',' | sed 's/,$//')
+          fi
+          
+          # Determine if we should deploy (only on main branch pushes)
+          SHOULD_DEPLOY="false"
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            SHOULD_DEPLOY="true"
+          fi
+          
+          echo "changed-services=$CHANGED_SERVICES" >> $GITHUB_OUTPUT
+          echo "should-deploy=$SHOULD_DEPLOY" >> $GITHUB_OUTPUT
+          echo "Changed services: $CHANGED_SERVICES"
+          echo "Should deploy: $SHOULD_DEPLOY"
+
+      - name: Find all services with Dockerfiles
+        id: services
+        run: |
+          SERVICES=$(find microservices -name "Dockerfile" -type f | sed 's|microservices/||g' | sed 's|/Dockerfile||g' | jq -R -s 'split("\n") | map(select(length > 0))')
+          echo "services=$SERVICES" >> $GITHUB_OUTPUT
+          echo "All services: $SERVICES"
+
+  vulnerability-scan:
+    needs: detect-services
+    if: fromJson(needs.detect-services.outputs.services)[0] != null
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.detect-services.outputs.services) }}
+      fail-fast: false  # Continue scanning other services if one fails
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build image for scanning
+        run: |
+          echo "🔍 Building ${{ matrix.service }} for security scanning..."
+          docker build -t local-scan/${{ matrix.service }}:latest ./microservices/${{ matrix.service }}
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'local-scan/${{ matrix.service }}:latest'
+          format: 'sarif'
+          output: 'trivy-results-${{ matrix.service }}.sarif'
+        continue-on-error: true
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results-${{ matrix.service }}.sarif'
+          category: 'trivy-${{ matrix.service }}'
+        continue-on-error: true
+
+      - name: Run Trivy for summary
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'local-scan/${{ matrix.service }}:latest'
+          format: 'table'
+        continue-on-error: true
+
+  dependency-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install safety
+        run: pip install safety
+
+      - name: Check Python dependencies
+        run: |
+          echo "🔍 Scanning Python dependencies for security vulnerabilities..."
+          # Scan each service's requirements
+          for req_file in $(find microservices -name "requirements.txt" -o -name "pyproject.toml"); do
+            echo "Scanning: $req_file"
+            if [[ $req_file == *"requirements.txt" ]]; then
+              safety check -r "$req_file" || true
+            fi
+          done
+        continue-on-error: true
+
+  # Phase 2: Semantic Versioning and Build
+  semantic-versioning:
+    needs: [detect-services, vulnerability-scan, dependency-check]
+    if: needs.detect-services.outputs.changed-services != '' && needs.detect-services.outputs.should-deploy == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      version-info: ${{ steps.versions.outputs.version-info }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for semantic versioning
+
+      - name: Generate semantic versions
+        id: versions
+        run: |
+          # Make version manager executable
+          chmod +x .github/scripts/version-manager.sh
+          
+          IFS=',' read -ra SERVICES <<< "${{ needs.detect-services.outputs.changed-services }}"
+          VERSION_INFO=""
+          
+          for service in "${SERVICES[@]}"; do
+            if [ -f "microservices/$service/Dockerfile" ]; then
+              echo "🏷️ Generating semantic version for: $service"
+              
+              # Generate semantic version and tags
+              SEMVER=$(.github/scripts/version-manager.sh version "$service")
+              CONTAINER_TAGS=$(.github/scripts/version-manager.sh tags "$service" "${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}")
+              
+              echo "Service: $service, Version: $SEMVER"
+              echo "Container tags: $CONTAINER_TAGS"
+              
+              # Store version info
+              VERSION_INFO="$VERSION_INFO$service:$SEMVER,"
+            fi
+          done
+          
+          echo "version-info=${VERSION_INFO%,}" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push with semantic versioning
+        run: |
+          chmod +x .github/scripts/version-manager.sh
+          
+          IFS=',' read -ra SERVICES <<< "${{ needs.detect-services.outputs.changed-services }}"
+          
+          for service in "${SERVICES[@]}"; do
+            if [ -f "microservices/$service/Dockerfile" ]; then
+              echo "🏗️ Building $service with semantic versioning..."
+              
+              # Generate semantic version and all tags
+              SEMVER=$(.github/scripts/version-manager.sh version "$service")
+              CONTAINER_TAGS=$(.github/scripts/version-manager.sh tags "$service" "${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}")
+              COMMIT_SHA="${GITHUB_SHA:0:7}"
+              
+              echo "🏷️ Service: $service"
+              echo "📦 Semantic Version: $SEMVER"
+              echo "🔖 All Tags: $CONTAINER_TAGS"
+              
+              # Build primary image with rich metadata
+              PRIMARY_TAG="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/$service:$COMMIT_SHA"
+              
+              docker build -t "$PRIMARY_TAG" \
+                --label "org.opencontainers.image.version=$SEMVER" \
+                --label "org.opencontainers.image.revision=${{ github.sha }}" \
+                --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
+                --label "org.opencontainers.image.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+                --label "org.opencontainers.image.title=$service" \
+                --label "org.opencontainers.image.description=Visual Architecture Tool - $service" \
+                --label "version=$SEMVER" \
+                --label "commit=${{ github.sha }}" \
+                --label "commit-short=$COMMIT_SHA" \
+                --label "branch=${{ github.ref_name }}" \
+                --label "service=$service" \
+                --label "build-date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+                --label "build-number=${{ github.run_number }}" \
+                --label "workflow-run=${{ github.run_id }}" \
+                "./microservices/$service"
+              
+              # Create all semantic version tags
+              IFS=',' read -ra TAG_ARRAY <<< "$CONTAINER_TAGS"
+              for tag in "${TAG_ARRAY[@]}"; do
+                if [ "$tag" != "$PRIMARY_TAG" ]; then
+                  echo "Tagging: $tag"
+                  docker tag "$PRIMARY_TAG" "$tag"
+                fi
+              done
+              
+              # Push all tags
+              echo "📤 Pushing all tags for $service..."
+              for tag in "${TAG_ARRAY[@]}"; do
+                echo "  Pushing: $tag"
+                docker push "$tag"
+              done
+              
+              echo "✅ Successfully built and pushed $service with version $SEMVER"
+            fi
+          done
+
+  # Phase 3: GitOps Update
+  update-gitops:
+    needs: [detect-services, semantic-versioning]
+    if: needs.detect-services.outputs.changed-services != '' && needs.detect-services.outputs.should-deploy == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          path: source
+
+      - name: Checkout GitOps repository
+        uses: actions/checkout@v4
+        with:
+          repository: shlapolosa/${{ env.GITOPS_REPO }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ env.GITOPS_BRANCH }}
+          path: gitops
+
+      - name: Update GitOps manifests with semantic versions
+        run: |
+          # Make version manager executable
+          chmod +x source/.github/scripts/version-manager.sh
+          
+          IFS=',' read -ra SERVICES <<< "${{ needs.detect-services.outputs.changed-services }}"
+          
+          cd gitops
+          git config --local user.email "gitops-bot@github.com"
+          git config --local user.name "GitOps Bot"
+          
+          for service in "${SERVICES[@]}"; do
+            echo "🔄 Updating GitOps manifests for $service..."
+            
+            # Generate new image with semantic version
+            COMMIT_SHA="${GITHUB_SHA:0:7}"
+            NEW_IMAGE="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/$service:$COMMIT_SHA"
+            SEMVER=$(../source/.github/scripts/version-manager.sh version "$service")
+            
+            echo "Service: $service"
+            echo "New Image: $NEW_IMAGE"
+            echo "Semantic Version: $SEMVER"
+            
+            # Update OAM applications
+            case "$service" in
+              "streamlit-frontend")
+                if [ -f "oam/frontend/streamlit-frontend-app.yaml" ]; then
+                  sed -i "s|image: socrates12345/streamlit-frontend:.*|image: $NEW_IMAGE|g" oam/frontend/streamlit-frontend-app.yaml
+                  sed -i "s|version: \".*\"|version: \"$SEMVER\"|g" oam/frontend/streamlit-frontend-app.yaml
+                fi
+                if [ -f "environments/dev/frontend-simple.yaml" ]; then
+                  sed -i "s|image: socrates12345/streamlit-frontend:.*|image: $NEW_IMAGE|g" environments/dev/frontend-simple.yaml
+                  sed -i "s|version: \".*\"|version: \"$SEMVER\"|g" environments/dev/frontend-simple.yaml
+                fi
+                ;;
+              "orchestration-service")
+                if [ -f "oam/orchestration/orchestration-service-app.yaml" ]; then
+                  sed -i "s|image: socrates12345/orchestration-service:.*|image: $NEW_IMAGE|g" oam/orchestration/orchestration-service-app.yaml
+                  sed -i "s|version: \".*\"|version: \"$SEMVER\"|g" oam/orchestration/orchestration-service-app.yaml
+                fi
+                if [ -f "environments/dev/orchestration-service-simple.yaml" ]; then
+                  sed -i "s|image: socrates12345/orchestration-service:.*|image: $NEW_IMAGE|g" environments/dev/orchestration-service-simple.yaml
+                  sed -i "s|version: \".*\"|version: \"$SEMVER\"|g" environments/dev/orchestration-service-simple.yaml
+                fi
+                ;;
+              *)
+                # Handle other agent services
+                if [ -f "oam/agents/$service-app.yaml" ]; then
+                  sed -i "s|image: socrates12345/$service:.*|image: $NEW_IMAGE|g" oam/agents/$service-app.yaml
+                  sed -i "s|version: \".*\"|version: \"$SEMVER\"|g" oam/agents/$service-app.yaml
+                fi
+                ;;
+            esac
+          done
+          
+          # Check if there are changes to commit
+          if ! git diff --quiet; then
+            echo "📝 Committing GitOps updates..."
+            git add -A
+            git commit -m "chore: update deployment manifests with semantic versioning
+
+            Services: ${{ needs.detect-services.outputs.changed-services }}
+            Versions: ${{ needs.semantic-versioning.outputs.version-info }}
+            Source commit: ${{ github.sha }}
+            
+            🏷️ GitOps automated update from source repository
+            
+            Co-Authored-By: GitOps Bot <gitops-bot@github.com>"
+            git push origin ${{ env.GITOPS_BRANCH }}
+            echo "✅ GitOps repository updated successfully!"
+          else
+            echo "No changes to commit"
+          fi
+
+  # Phase 4: Generate Summary
+  deployment-summary:
+    needs: [detect-services, semantic-versioning, update-gitops]
+    if: always() && needs.detect-services.outputs.changed-services != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate deployment summary
+        run: |
+          echo "## 🚀 Comprehensive GitOps Pipeline Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔍 Security Scanning" >> $GITHUB_STEP_SUMMARY
+          echo "- **Vulnerability Scan**: ${{ needs.vulnerability-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dependency Check**: ${{ needs.dependency-check.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🏗️ Build & Deploy" >> $GITHUB_STEP_SUMMARY
+          echo "- **Changed Services**: ${{ needs.detect-services.outputs.changed-services }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Semantic Versioning**: ${{ needs.semantic-versioning.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **GitOps Update**: ${{ needs.update-gitops.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version Info**: ${{ needs.semantic-versioning.outputs.version-info }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Pipeline Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Source Commit**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Number**: \`${{ github.run_number }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **GitOps Repo**: [health-service-idp-gitops](https://github.com/shlapolosa/health-service-idp-gitops)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🎯 **Pipeline Status**: Security → Build → GitOps → Complete!"
