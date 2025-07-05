@@ -160,7 +160,7 @@ jobs:
   # Phase 2: Semantic Versioning and Build
   semantic-versioning:
     needs: [detect-changes, vulnerability-scan, dependency-check]
-    if: always() && needs.detect-changes.outputs.changed-services != '' && needs.detect-changes.outputs.should-deploy == 'true' && needs.dependency-check.result == 'success'
+    if: always() && needs.detect-changes.outputs.changed-services != '' && needs.detect-changes.outputs.should-deploy == 'true' && needs.dependency-check.result == 'success' && (needs.vulnerability-scan.result == 'success' || needs.vulnerability-scan.result == 'failure')
     runs-on: ubuntu-latest
     outputs:
       version-info: ${{ steps.versions.outputs.version-info }}
