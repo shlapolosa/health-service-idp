@@ -13,13 +13,13 @@ COPY shared-libs/agent-common/dist/*.whl ./
 RUN pip install *.whl
 
 # Copy requirements and install Python dependencies
-COPY pyproject.toml ./
+COPY orchestration-service/pyproject.toml ./
 RUN pip install poetry && \
     poetry config virtualenvs.create false && \
     poetry install --only main --no-root
 
 # Copy application code
-COPY src/ ./src/
+COPY orchestration-service/src/ ./src/
 
 # Set environment variables
 ENV PYTHONPATH=/app
