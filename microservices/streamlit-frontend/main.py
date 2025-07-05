@@ -16,7 +16,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Test GitOps pipeline trigger - Repository dispatch events
+# Test GitOps pipeline trigger - PERSONAL_ACCESS_TOKEN dispatch
 
 # Custom CSS for better styling
 st.markdown("""
