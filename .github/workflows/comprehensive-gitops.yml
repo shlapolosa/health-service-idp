@@ -338,28 +338,28 @@ jobs:
               "streamlit-frontend")
                 if [ -f "oam/frontend/streamlit-frontend-app.yaml" ]; then
                   sed -i "s|image: socrates12345/streamlit-frontend:.*|image: $NEW_IMAGE|g" oam/frontend/streamlit-frontend-app.yaml
-                  sed -i "s|version: \".*\"|version: \"$SEMVER\"|g" oam/frontend/streamlit-frontend-app.yaml
+                  sed -i "s|version: .*|version: $SEMVER|g" oam/frontend/streamlit-frontend-app.yaml
                 fi
                 if [ -f "environments/dev/frontend-simple.yaml" ]; then
                   sed -i "s|image: socrates12345/streamlit-frontend:.*|image: $NEW_IMAGE|g" environments/dev/frontend-simple.yaml
-                  sed -i "s|version: \".*\"|version: \"$SEMVER\"|g" environments/dev/frontend-simple.yaml
+                  sed -i "s|version: .*|version: $SEMVER|g" environments/dev/frontend-simple.yaml
                 fi
                 ;;
               "orchestration-service")
                 if [ -f "oam/orchestration/orchestration-service-app.yaml" ]; then
                   sed -i "s|image: socrates12345/orchestration-service:.*|image: $NEW_IMAGE|g" oam/orchestration/orchestration-service-app.yaml
-                  sed -i "s|version: \".*\"|version: \"$SEMVER\"|g" oam/orchestration/orchestration-service-app.yaml
+                  sed -i "s|version: .*|version: $SEMVER|g" oam/orchestration/orchestration-service-app.yaml
                 fi
                 if [ -f "environments/dev/orchestration-service-simple.yaml" ]; then
                   sed -i "s|image: socrates12345/orchestration-service:.*|image: $NEW_IMAGE|g" environments/dev/orchestration-service-simple.yaml
-                  sed -i "s|version: \".*\"|version: \"$SEMVER\"|g" environments/dev/orchestration-service-simple.yaml
+                  sed -i "s|version: .*|version: $SEMVER|g" environments/dev/orchestration-service-simple.yaml
                 fi
                 ;;
               *)
                 # Handle other agent services
                 if [ -f "oam/agents/$service-app.yaml" ]; then
                   sed -i "s|image: socrates12345/$service:.*|image: $NEW_IMAGE|g" oam/agents/$service-app.yaml
-                  sed -i "s|version: \".*\"|version: \"$SEMVER\"|g" oam/agents/$service-app.yaml
+                  sed -i "s|version: .*|version: $SEMVER|g" oam/agents/$service-app.yaml
                 fi
                 ;;
             esac
