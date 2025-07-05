@@ -318,8 +318,11 @@ jobs:
           git config --local user.email "gitops-bot@github.com"
           git config --local user.name "GitOps Bot"
           
+          # Remove default GitHub token auth header that conflicts with PAT
+          git config --unset-all http.https://github.com/.extraheader || true
+          
           # Configure git to use PERSONAL_ACCESS_TOKEN for authentication
-          git remote set-url origin https://x-access-token:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/shlapolosa/${{ env.GITOPS_REPO }}.git
+          git remote set-url origin https://${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/shlapolosa/${{ env.GITOPS_REPO }}.git
           
           for service in "${SERVICES[@]}"; do
             echo "🔄 Updating GitOps manifests for $service..."
