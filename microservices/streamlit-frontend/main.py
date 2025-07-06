@@ -39,8 +39,20 @@ st.markdown("""
         border: 2px solid #e0e0e0;
         border-radius: 8px;
         padding: 1rem;
-        min-height: 500px;
+        min-height: 300px;
+        max-height: 400px;
         background-color: #ffffff;
+        overflow-y: auto;
+    }
+    .compact-chat {
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        padding: 0.75rem;
+        min-height: 200px;
+        max-height: 300px;
+        background-color: #ffffff;
+        overflow-y: auto;
+        margin-top: 1rem;
     }
     .full-width {
         width: 100%;
@@ -161,7 +173,17 @@ def initialize_api_integration():
 
 def render_chat_interface():
     """Render the enhanced chat interface"""
-    st.markdown('<div class="chat-area">', unsafe_allow_html=True)
+    st.markdown('<div class="compact-chat">', unsafe_allow_html=True)
+    
+    # Initialize and render chat interface
+    chat_interface = ChatInterface()
+    chat_interface.render_chat_interface()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def render_architecture_chat():
+    """Render architecture-specific chat with compact styling"""
+    st.markdown('<div class="compact-chat">', unsafe_allow_html=True)
     
     # Initialize and render chat interface
     chat_interface = ChatInterface()
@@ -196,19 +218,17 @@ def render_architecture_view_with_chat(view_renderer, selected_arch, nav_manager
     with col4:
         st.markdown(f"**Complexity:** {selected_arch.get('complexity', 'Moderate')}")
     
-    # Main content area: Visualization + Chat side by side
-    viz_col, chat_col = st.columns([2.5, 1])
+    # Full-width visualization area
+    st.markdown("### 📊 Architecture Visualization")
+    # Render the ArchiMate visualization directly
+    view_renderer.render_view_architecture(selected_arch)
     
-    with viz_col:
-        # Render the ArchiMate visualization directly
-        view_renderer.render_view_architecture(selected_arch)
+    # Chat component below visualization with compact height
+    st.markdown("### 💬 Architecture Chat")
+    st.markdown("Ask questions about this architecture or request changes:")
     
-    with chat_col:
-        st.markdown("### 💬 Architecture Chat")
-        st.markdown("Ask questions about this architecture or request changes:")
-        
-        # Enhanced chat interface with architecture context
-        render_architecture_chat_interface(selected_arch)
+    # Enhanced chat interface with architecture context
+    render_architecture_chat_interface(selected_arch)
     
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -256,9 +276,11 @@ def render_architecture_chat_interface(architecture):
             chat_interface.add_message("user", chat_message)
             handle_chat_message_with_agents(chat_message, architecture)
     
-    # Render the standard chat interface
+    # Render the standard chat interface with compact styling
     st.markdown("---")
+    st.markdown('<div class="compact-chat">', unsafe_allow_html=True)
     chat_interface.render_chat_interface()
+    st.markdown('</div>', unsafe_allow_html=True)
 
 def handle_chat_message_with_agents(message: str, architecture: Dict[str, Any]):
     """Handle chat message by routing to appropriate agents"""
@@ -587,33 +609,31 @@ def main():
         selected_arch = nav_manager.get_selected_architecture()
         render_architecture_view_with_chat(view_renderer, selected_arch, nav_manager)
     else:
-        # Standard two-column layout for other views
-        col1, col2 = st.columns([2, 1])
+        # Full-width main content area
+        st.markdown('<div class="visualization-area">', unsafe_allow_html=True)
         
-        with col1:
-            st.markdown('<div class="visualization-area">', unsafe_allow_html=True)
-            
-            # Render breadcrumb
-            nav_manager.render_breadcrumb()
-            
-            # Render appropriate view based on current state
-            if current_view == ViewType.HOME:
-                view_renderer.render_dashboard_view(architectures)
-            elif current_view == ViewType.CREATE:
-                view_renderer.render_create_view()
-            elif current_view == ViewType.LIST:
-                view_renderer.render_list_view(architectures)
-            elif current_view == ViewType.SETTINGS:
-                view_renderer.render_settings_view()
-                # Add session preferences to settings
-                session_manager.render_preferences_widget()
-            elif current_view == ViewType.AGENT_STATUS:
-                view_renderer.render_agent_status_view()
-            
-            st.markdown('</div>', unsafe_allow_html=True)
+        # Render breadcrumb
+        nav_manager.render_breadcrumb()
         
-        with col2:
-            render_chat_interface()
+        # Render appropriate view based on current state
+        if current_view == ViewType.HOME:
+            view_renderer.render_dashboard_view(architectures)
+        elif current_view == ViewType.CREATE:
+            view_renderer.render_create_view()
+        elif current_view == ViewType.LIST:
+            view_renderer.render_list_view(architectures)
+        elif current_view == ViewType.SETTINGS:
+            view_renderer.render_settings_view()
+            # Add session preferences to settings
+            session_manager.render_preferences_widget()
+        elif current_view == ViewType.AGENT_STATUS:
+            view_renderer.render_agent_status_view()
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Chat interface below main content with compact styling
+        st.markdown("### 💬 Chat Assistant")
+        render_chat_interface()
     
     # Cleanup completed async tasks periodically
     task_manager.cleanup_completed_tasks()
