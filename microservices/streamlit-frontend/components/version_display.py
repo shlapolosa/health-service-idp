@@ -39,123 +39,165 @@ class VersionDisplay:
             return self.commit
         return self.commit[:7]
     
-    def render_version_badge(self) -> None:
-        """Render the version badge in bottom-right corner"""
+    def render_version_footer(self) -> None:
+        """Render the version information in a footer at the bottom of the page"""
         version_info = self.get_version_info()
         short_version = self.get_short_version()
         short_commit = self.get_commit_short()
         
-        # Format build date for tooltip
+        # Format build date for display
         build_date_formatted = self.build_date
+        build_date_short = "unknown"
         if self.build_date != 'unknown':
             try:
                 # Parse ISO format and format for display
                 dt = datetime.fromisoformat(self.build_date.replace('Z', '+00:00'))
                 build_date_formatted = dt.strftime('%Y-%m-%d %H:%M UTC')
+                build_date_short = dt.strftime('%Y-%m-%d')
             except:
                 build_date_formatted = self.build_date
+                build_date_short = self.build_date
         
-        # Create tooltip content
-        tooltip_content = f"""
-**Version Information:**
-- **Version:** {version_info['version']}
-- **Commit:** {version_info['commit']}
-- **Built:** {build_date_formatted}
-- **Environment:** {version_info['environment']}
-"""
-        
-        # CSS styling for version badge
-        version_css = """
+        # CSS styling for footer
+        footer_css = """
         <style>
-        .version-badge {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(255, 255, 255, 0.9);
-            border: 1px solid #e1e5e9;
-            border-radius: 20px;
-            padding: 8px 16px;
-            font-family: 'Source Code Pro', monospace;
+        .version-footer {
+            position: relative;
+            width: 100%;
+            padding: 16px 20px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-top: 1px solid #dee2e6;
+            margin-top: 40px;
+            font-family: 'Source Code Pro', 'Courier New', monospace;
             font-size: 12px;
-            color: #555;
-            z-index: 999999;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            cursor: pointer;
-            transition: all 0.2s ease;
-            user-select: none;
+            color: #6c757d;
+            text-align: center;
         }
         
-        .version-badge:hover {
-            background: rgba(255, 255, 255, 1);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-            transform: translateY(-1px);
+        .version-content {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
         }
         
-        .version-text {
+        .version-item {
             display: flex;
             align-items: center;
             gap: 6px;
         }
         
-        .version-icon {
-            font-size: 10px;
-            opacity: 0.7;
+        .version-label {
+            font-weight: 600;
+            color: #495057;
         }
         
-        .version-number {
-            font-weight: 600;
+        .version-value {
+            font-weight: 500;
             color: #1f77b4;
         }
         
-        .commit-hash {
-            color: #888;
-            font-size: 10px;
+        .commit-link {
+            text-decoration: none;
+            color: #1f77b4;
+            transition: color 0.2s ease;
+        }
+        
+        .commit-link:hover {
+            color: #0d47a1;
+            text-decoration: underline;
+        }
+        
+        .version-divider {
+            height: 12px;
+            width: 1px;
+            background: #dee2e6;
         }
         
         /* Dark mode support */
         @media (prefers-color-scheme: dark) {
-            .version-badge {
-                background: rgba(30, 30, 30, 0.9);
-                border-color: #404040;
-                color: #ccc;
+            .version-footer {
+                background: linear-gradient(135deg, #2b2b2b 0%, #1a1a1a 100%);
+                border-top-color: #404040;
+                color: #adb5bd;
             }
             
-            .version-badge:hover {
-                background: rgba(30, 30, 30, 1);
+            .version-label {
+                color: #e9ecef;
             }
             
-            .version-number {
+            .version-value {
                 color: #6ab7ff;
+            }
+            
+            .commit-link {
+                color: #6ab7ff;
+            }
+            
+            .commit-link:hover {
+                color: #90caf9;
+            }
+            
+            .version-divider {
+                background: #404040;
             }
         }
         
         /* Mobile responsiveness */
         @media (max-width: 768px) {
-            .version-badge {
-                bottom: 10px;
-                right: 10px;
-                font-size: 10px;
-                padding: 6px 12px;
+            .version-footer {
+                padding: 12px 16px;
+                font-size: 11px;
+            }
+            
+            .version-content {
+                gap: 12px;
+            }
+            
+            .version-divider {
+                display: none;
             }
         }
         </style>
         """
         
-        # HTML for version badge
-        version_html = f"""
-        <div class="version-badge" title="{tooltip_content.strip()}">
-            <div class="version-text">
-                <span class="version-icon">🏷️</span>
-                <span class="version-number">v{short_version}</span>
-                {f'<span class="commit-hash">({short_commit})</span>' if short_commit != 'unknown' else ''}
+        # Create commit link if commit is available
+        commit_display = short_commit
+        if version_info['commit'] != 'unknown' and len(version_info['commit']) >= 7:
+            commit_url = f"https://github.com/shlapolosa/health-service-idp/commit/{version_info['commit']}"
+            commit_display = f'<a href="{commit_url}" target="_blank" class="commit-link">{short_commit}</a>'
+        
+        # HTML for version footer
+        footer_html = f"""
+        <div class="version-footer">
+            <div class="version-content">
+                <div class="version-item">
+                    <span class="version-label">Version:</span>
+                    <span class="version-value">v{short_version}</span>
+                </div>
+                <div class="version-divider"></div>
+                <div class="version-item">
+                    <span class="version-label">Commit:</span>
+                    <span class="version-value">{commit_display}</span>
+                </div>
+                <div class="version-divider"></div>
+                <div class="version-item">
+                    <span class="version-label">Built:</span>
+                    <span class="version-value">{build_date_short}</span>
+                </div>
+                <div class="version-divider"></div>
+                <div class="version-item">
+                    <span class="version-label">Environment:</span>
+                    <span class="version-value">{version_info['environment']}</span>
+                </div>
             </div>
         </div>
         """
         
-        # Render the version badge
-        st.markdown(version_css, unsafe_allow_html=True)
-        st.markdown(version_html, unsafe_allow_html=True)
+        # Render the version footer
+        st.markdown(footer_css, unsafe_allow_html=True)
+        st.markdown(footer_html, unsafe_allow_html=True)
     
     def render_detailed_info(self) -> None:
         """Render detailed version information in sidebar or expander"""
@@ -173,10 +215,10 @@ class VersionDisplay:
                 st.markdown(f"**View Commit:** [GitHub]({commit_url})")
 
 # Convenience function for easy import
-def render_version_display():
-    """Convenience function to render version display"""
+def render_version_footer():
+    """Convenience function to render version footer"""
     version_display = VersionDisplay()
-    version_display.render_version_badge()
+    version_display.render_version_footer()
 
 def render_detailed_version_info():
     """Convenience function to render detailed version info"""

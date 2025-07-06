@@ -2,7 +2,7 @@ import streamlit as st
 from components.navigation import NavigationManager, ViewType
 from components.views import ViewRenderer
 from components.chat import ChatInterface, ChatMessage
-from components.version_display import render_version_display, render_detailed_version_info
+from components.version_display import render_version_footer, render_detailed_version_info
 from utils.session_manager import SessionManager, StateValidator
 from utils.async_utils import async_runner, run_async_in_streamlit, with_loading_spinner, task_manager
 from api.client import api_client, api_integration
@@ -540,24 +540,18 @@ def handle_page_refresh():
 
 def main():
     """Main application function"""
-    # GitOps Pipeline Test Header - Version 1.1.9
+    # Application Header
     st.markdown("""
     <div style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); 
                 padding: 1rem; border-radius: 10px; margin-bottom: 2rem; text-align: center;">
         <h1 style="color: white; margin: 0; font-family: 'Segoe UI', sans-serif;">
-            🏗️ Visual Architecture Maintenance Tool
+            🏗️ Visual Architecture Tool
         </h1>
         <p style="color: #f0f0f0; margin: 0.5rem 0 0 0; font-size: 1.1rem;">
-            ✨ GitOps Pipeline Test - Semantic Versioning Active ✨
+            ✨ Enterprise Architecture Design & Management ✨
         </p>
-        <small style="color: #e0e0e0; font-family: monospace;">
-            Build: {build_version} | Commit: {commit_sha}
-        </small>
     </div>
-    """.format(
-        build_version="1.1.9+test",
-        commit_sha="testing"
-    ), unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
     
     # Handle page refresh and initialization
     handle_page_refresh()
@@ -624,8 +618,8 @@ def main():
     # Cleanup completed async tasks periodically
     task_manager.cleanup_completed_tasks()
     
-    # Render version display in bottom-right corner
-    render_version_display()
+    # Render version footer at bottom of page
+    render_version_footer()
 
 if __name__ == "__main__":
     main()  # GitOps test comment Sat  5 Jul 2025 16:23:55 SAST
