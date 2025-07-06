@@ -2,6 +2,7 @@ import streamlit as st
 from components.navigation import NavigationManager, ViewType
 from components.views import ViewRenderer
 from components.chat import ChatInterface, ChatMessage
+from components.version_display import render_version_display, render_detailed_version_info
 from utils.session_manager import SessionManager, StateValidator
 from utils.async_utils import async_runner, run_async_in_streamlit, with_loading_spinner, task_manager
 from api.client import api_client, api_integration
@@ -520,6 +521,9 @@ def render_session_sidebar():
             
             # Show detailed session info
             session_manager.render_session_info_widget()
+            
+            # Show detailed version information
+            render_detailed_version_info()
 
 def handle_page_refresh():
     """Handle page refresh and state restoration"""
@@ -619,6 +623,9 @@ def main():
     
     # Cleanup completed async tasks periodically
     task_manager.cleanup_completed_tasks()
+    
+    # Render version display in bottom-right corner
+    render_version_display()
 
 if __name__ == "__main__":
     main()  # GitOps test comment Sat  5 Jul 2025 16:23:55 SAST

@@ -250,6 +250,9 @@ jobs:
               
               docker build -t "$PRIMARY_TAG" \
                 $DOCKERFILE_PATH \
+                --build-arg BUILD_VERSION="$SEMVER" \
+                --build-arg BUILD_COMMIT="$COMMIT_SHA" \
+                --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
                 --label "org.opencontainers.image.version=$SEMVER" \
                 --label "org.opencontainers.image.revision=${{ github.sha }}" \
                 --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \

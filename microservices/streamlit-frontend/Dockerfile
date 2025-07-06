@@ -2,6 +2,11 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Accept build arguments for version information
+ARG BUILD_VERSION="development"
+ARG BUILD_COMMIT="unknown"
+ARG BUILD_DATE="unknown"
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
@@ -23,6 +28,11 @@ ENV STREAMLIT_SERVER_PORT=8501
 ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0
 ENV ORCHESTRATION_SERVICE_URL=http://orchestration-service:8080
 ENV ORCHESTRATION_WS_URL=ws://orchestration-service:8080
+
+# Set version environment variables from build arguments
+ENV APP_VERSION=${BUILD_VERSION}
+ENV APP_COMMIT=${BUILD_COMMIT}
+ENV APP_BUILD_DATE=${BUILD_DATE}
 
 # Expose port
 EXPOSE 8501
