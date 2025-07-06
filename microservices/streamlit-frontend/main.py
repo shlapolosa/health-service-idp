@@ -16,7 +16,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Test GitOps pipeline trigger - JSON parsing fix deployed
+# Test GitOps pipeline trigger - Fix websockets dependency
 
 # Custom CSS for better styling
 st.markdown("""
