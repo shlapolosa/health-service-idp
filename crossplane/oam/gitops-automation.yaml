@@ -1,0 +1,345 @@
+# GitOps Automation for OAM + Crossplane Integration
+# This provides the bridge between OAM Applications and existing Crossplane infrastructure
+
+---
+# 1. OAM Application Controller Configuration
+# This configures KubeVela to watch for OAM Applications and auto-create Crossplane Claims
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubevela-oam-crossplane-bridge
+  namespace: vela-system
+data:
+  application-controller.yaml: |
+    apiVersion: core.oam.dev/v1beta1
+    kind: Application
+    metadata:
+      name: oam-crossplane-bridge
+      namespace: vela-system
+    spec:
+      components:
+      - name: application-watcher
+        type: webservice
+        properties:
+          image: oamdev/vela-core:latest
+          cmd: ["/manager"]
+          env:
+          - name: WEBHOOK_CERT_DIR
+            value: "/etc/certs"
+          - name: ENABLE_WEBHOOKS
+            value: "true"
+          - name: ENABLE_CROSSPLANE_BRIDGE
+            value: "true"
+          - name: CROSSPLANE_NAMESPACE
+            value: "crossplane-system"
+        traits:
+        - type: service-account
+          properties:
+            name: kubevela-vela-core
+            create: false
+
+---
+# 2. ArgoCD Application for OAM Components
+# This ensures all OAM definitions are synchronized via GitOps
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: oam-crossplane-definitions
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/socrates12345/health-service-idp-gitops
+    targetRevision: main
+    path: oam-definitions
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: vela-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+
+---
+# 3. GitHub Actions Workflow for OAM Application Updates
+# This would be placed in .github/workflows/oam-sync.yml in the GitOps repo
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: github-actions-oam-workflow
+  namespace: argocd
+data:
+  oam-sync.yml: |
+    name: OAM Application Sync
+    
+    on:
+      push:
+        paths:
+        - 'applications/**/*.yaml'
+        - 'oam-definitions/**/*.yaml'
+      workflow_dispatch:
+        inputs:
+          application:
+            description: 'Specific OAM Application to sync'
+            required: false
+            type: string
+    
+    jobs:
+      validate-and-sync:
+        runs-on: ubuntu-latest
+        steps:
+        - name: Checkout GitOps Repository
+          uses: actions/checkout@v4
+          with:
+            fetch-depth: 0
+            
+        - name: Setup kubectl
+          uses: azure/setup-kubectl@v3
+          with:
+            version: 'v1.28.0'
+            
+        - name: Setup Helm
+          uses: azure/setup-helm@v3
+          with:
+            version: 'v3.12.0'
+            
+        - name: Configure AWS credentials
+          uses: aws-actions/configure-aws-credentials@v4
+          with:
+            aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+            aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            aws-region: us-west-2
+            
+        - name: Update kubeconfig for vCluster
+          run: |
+            aws eks update-kubeconfig --region us-west-2 --name health-service-idp-cluster
+            # Switch to vCluster context
+            kubectl config use-context architecture-visualization
+            
+        - name: Validate OAM Applications
+          run: |
+            echo "Validating OAM Application manifests..."
+            for file in applications/**/*.yaml; do
+              if [[ -f "$file" ]]; then
+                echo "Validating $file"
+                kubectl apply --dry-run=client -f "$file"
+              fi
+            done
+            
+        - name: Apply OAM ComponentDefinitions
+          run: |
+            echo "Applying OAM ComponentDefinitions..."
+            kubectl apply -f oam-definitions/
+            
+        - name: Apply OAM Applications
+          run: |
+            echo "Applying OAM Applications..."
+            if [[ -n "${{ github.event.inputs.application }}" ]]; then
+              kubectl apply -f "applications/${{ github.event.inputs.application }}.yaml"
+            else
+              kubectl apply -f applications/
+            fi
+            
+        - name: Wait for Crossplane Claims
+          run: |
+            echo "Waiting for Crossplane Claims to be created..."
+            sleep 30
+            kubectl get claims -A
+            
+        - name: Verify Application Status
+          run: |
+            echo "Checking OAM Application status..."
+            kubectl get applications -A
+            kubectl get compositions
+            kubectl get compositeresources
+            
+        - name: Update ArgoCD if needed
+          run: |
+            echo "Triggering ArgoCD sync..."
+            kubectl patch application oam-crossplane-definitions -n argocd --type merge -p '{"operation":{"sync":{"syncStrategy":{"hook":{"syncPolicy":{"syncOptions":["Force=true"]}}}}}}'
+
+---
+# 4. OAM to Crossplane Mapping ConfigMap
+# This defines how OAM components map to existing Crossplane Claims
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oam-crossplane-mapping
+  namespace: vela-system
+data:
+  mapping.yaml: |
+    # Infrastructure Component Mappings
+    vcluster:
+      target: VClusterEnvironmentClaim
+      apiVersion: platform.example.org/v1alpha1
+      namespace: default
+      
+    neon-postgres:
+      target: ExternalSecret
+      apiVersion: external-secrets.io/v1beta1
+      namespace: "{{ .Properties.namespace }}"
+      
+    auth0-idp:
+      target: ExternalSecret
+      apiVersion: external-secrets.io/v1beta1
+      namespace: "{{ .Properties.namespace }}"
+      
+    snowflake-datawarehouse:
+      target: Workspace
+      apiVersion: tf.crossplane.io/v1alpha1
+      namespace: crossplane-system
+      
+    # Application Component Mappings
+    webservice:
+      target: ApplicationClaim
+      apiVersion: platform.example.org/v1alpha1
+      namespace: default
+      
+    kafka:
+      target: Release
+      apiVersion: helm.crossplane.io/v1beta1
+      namespace: "{{ .Properties.namespace }}"
+      
+    tfjob:
+      target: TFJob
+      apiVersion: kubeflow.org/v1
+      namespace: "{{ .Properties.namespace }}"
+
+---
+# 5. OAM Application Validation Webhook
+# This ensures OAM Applications are valid before creating Crossplane Claims
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oam-validation-webhook-config
+  namespace: vela-system
+data:
+  webhook.yaml: |
+    apiVersion: admissionregistration.k8s.io/v1
+    kind: ValidatingAdmissionWebhook
+    metadata:
+      name: oam-application-validator
+    webhooks:
+    - name: validate.applications.core.oam.dev
+      clientConfig:
+        service:
+          name: kubevela-vela-core-webhook
+          namespace: vela-system
+          path: "/validate-core-oam-dev-v1beta1-application"
+      rules:
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: ["core.oam.dev"]
+        apiVersions: ["v1beta1"]
+        resources: ["applications"]
+      admissionReviewVersions: ["v1", "v1beta1"]
+      sideEffects: None
+      failurePolicy: Fail
+
+---
+# 6. Crossplane Claim Status Monitor
+# This monitors the status of Crossplane Claims created by OAM Applications
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: crossplane-claim-monitor
+  namespace: vela-system
+spec:
+  schedule: "*/5 * * * *"  # Every 5 minutes
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: claim-monitor
+            image: bitnami/kubectl:latest
+            command:
+            - /bin/bash
+            - -c
+            - |
+              echo "Monitoring Crossplane Claims..."
+              
+              # Check VCluster Environment Claims
+              kubectl get vclusterenvironmentclaims -A -o custom-columns=NAME:.metadata.name,NAMESPACE:.metadata.namespace,READY:.status.conditions[?@.type=='Ready'].status
+              
+              # Check Application Claims  
+              kubectl get applicationclaims -A -o custom-columns=NAME:.metadata.name,NAMESPACE:.metadata.namespace,READY:.status.conditions[?@.type=='Ready'].status
+              
+              # Check External Secrets
+              kubectl get externalsecrets -A -o custom-columns=NAME:.metadata.name,NAMESPACE:.metadata.namespace,READY:.status.conditions[?@.type=='Ready'].status
+              
+              # Update OAM Application status based on Crossplane Claim status
+              for app in $(kubectl get applications -A -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}'); do
+                namespace=$(echo $app | cut -d'/' -f1)
+                name=$(echo $app | cut -d'/' -f2)
+                
+                echo "Checking status for OAM Application: $namespace/$name"
+                
+                # This would include logic to aggregate status from underlying Crossplane Claims
+                # and update the OAM Application status accordingly
+              done
+          restartPolicy: OnFailure
+
+---
+# 7. OAM Application Template Generator
+# This helps generate OAM Applications from existing Crossplane Claims
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oam-template-generator
+  namespace: vela-system
+data:
+  generate-templates.sh: |
+    #!/bin/bash
+    
+    # Generate OAM Application template from existing Crossplane Claims
+    generate_oam_from_claims() {
+      local claim_type="$1"
+      local claim_name="$2"
+      local claim_namespace="$3"
+      
+      echo "Generating OAM Application template for $claim_type/$claim_name..."
+      
+      case "$claim_type" in
+        "VClusterEnvironmentClaim")
+          cat <<EOF
+    apiVersion: core.oam.dev/v1beta1
+    kind: Application
+    metadata:
+      name: ${claim_name}-oam
+      namespace: ${claim_namespace}
+    spec:
+      components:
+      - name: ${claim_name}
+        type: vcluster
+        properties:
+          name: ${claim_name}
+          # Add other properties based on existing claim spec
+    EOF
+          ;;
+        "ApplicationClaim")
+          cat <<EOF
+    apiVersion: core.oam.dev/v1beta1
+    kind: Application
+    metadata:
+      name: ${claim_name}-oam
+      namespace: ${claim_namespace}
+    spec:
+      components:
+      - name: ${claim_name}
+        type: webservice
+        properties:
+          name: ${claim_name}
+          # Add other properties based on existing claim spec
+    EOF
+          ;;
+        *)
+          echo "Unknown claim type: $claim_type"
+          ;;
+      esac
+    }
+    
+    # Example usage:
+    # generate_oam_from_claims "VClusterEnvironmentClaim" "my-vcluster" "default"

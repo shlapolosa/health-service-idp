@@ -1,1147 +1,130 @@
 # Task ID: 14
-# Title: Configure Microservice Architecture for Python Backend with FastAPI and Pydantic
-# Status: in-progress
-# Dependencies: 12, 13, 3
+# Title: Set Up External Secrets Operator for Auth0 and Neon Postgres
+# Status: pending
+# Dependencies: 11
 # Priority: high
-# Description: Transform the existing monolithic Python codebase into 17 microservices using FastAPI, Pydantic for data validation, and Poetry for dependency management to match OAM application definition requirements.
+# Description: Install and configure External Secrets Operator to sync Auth0 and Neon Postgres credentials (found in crossplane/application.properties) into vClusters for application use.
 # Details:
-1. Set up a microservice project structure for 17 services:
+1. Install External Secrets Operator v0.9.0+ in the management cluster
+2. Configure SecretStore with AWS Secrets Manager or other backend
+3. Create ExternalSecret templates for Auth0 and Neon Postgres
+4. Implement ClusterSecretStore for cross-namespace secret access
 
-mkdir -p microservices/{orchestration-service,streamlit-frontend,redis-service,business-analyst-deterministic,business-analyst-anthropic,business-architect-deterministic,business-architect-anthropic,application-architect-deterministic,application-architect-anthropic,infrastructure-architect-deterministic,infrastructure-architect-anthropic,solution-architect-deterministic,solution-architect-anthropic,project-manager-deterministic,project-manager-anthropic,accountant-deterministic,accountant-anthropic,developer-deterministic,developer-anthropic}
+```yaml
+# Install External Secrets Operator
+helm repo add external-secrets https://charts.external-secrets.io
+helm install external-secrets external-secrets/external-secrets \
+  --namespace external-secrets --create-namespace --version 0.9.0
 
-
-2. Initialize Poetry project for each microservice:
-
-for service in orchestration-service streamlit-frontend redis-service business-analyst-deterministic business-analyst-anthropic business-architect-deterministic business-architect-anthropic application-architect-deterministic application-architect-anthropic infrastructure-architect-deterministic infrastructure-architect-anthropic solution-architect-deterministic solution-architect-anthropic project-manager-deterministic project-manager-anthropic accountant-deterministic accountant-anthropic developer-deterministic developer-anthropic; do
-  cd microservices/$service
-  poetry init --name $service --description "$service microservice"
-  poetry add fastapi pydantic uvicorn httpx
-  poetry add --dev pytest pytest-asyncio black isort mypy
-  cd ../..
-done
-
-
-3. Create a fallback requirements.txt for each service for container compatibility:
-
-for service in orchestration-service streamlit-frontend redis-service business-analyst-deterministic business-analyst-anthropic business-architect-deterministic business-architect-anthropic application-architect-deterministic application-architect-anthropic infrastructure-architect-deterministic infrastructure-architect-anthropic solution-architect-deterministic solution-architect-anthropic project-manager-deterministic project-manager-anthropic accountant-deterministic accountant-anthropic developer-deterministic developer-anthropic; do
-  cd microservices/$service
-  poetry export -f requirements.txt --output requirements.txt
-  cd ../..
-done
-
-
-4. Create a base agent service template (src/base_agent.py):
-python
-import os
-from typing import Dict, Any, List, Optional
-
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
-from contextlib import asynccontextmanager
-
-# Define data models with Pydantic
-class AgentRequestModel(BaseModel):
-    query: str = Field(..., description="The query to process")
-    parameters: Optional[Dict[str, Any]] = Field(default=None, description="Optional parameters")
-
-class AgentResponseModel(BaseModel):
-    result: Any = Field(..., description="The result of the operation")
-    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Optional metadata")
-
-# Create lifespan context for startup/shutdown tasks
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup logic (load models, connect to services, etc.)
-    print("Starting up the agent service...")
-    yield
-    # Shutdown logic
-    print("Shutting down the agent service...")
-
-# Initialize FastAPI app
-app = FastAPI(lifespan=lifespan)
-
-@app.post("/", response_model=AgentResponseModel)
-async def handle_request(request: AgentRequestModel) -> AgentResponseModel:
-    """
-    Main function handler that processes incoming requests
-    """
-    try:
-        # Process the request (implement your business logic here)
-        result = {"message": f"Processed query: {request.query}"}
-        
-        # Return formatted response
-        return AgentResponseModel(
-            result=result,
-            metadata={"timestamp": "2023-01-01T00:00:00Z"}  # Replace with actual timestamp
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-5. Create a Dockerfile template for each microservice:
-dockerfile
-FROM python:3.11-slim
-
-WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-ENV PYTHONPATH=/app
-
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "${PORT:-8080}"]
-
-
-6. Create a docker-compose.yml file to orchestrate all services:
-yaml
-version: '3'
-
-services:
-  orchestration-service:
-    build: ./microservices/orchestration-service
-    ports:
-      - "8000:8080"
-    environment:
-      - REDIS_HOST=redis-service
-    depends_on:
-      - redis-service
-
-  streamlit-frontend:
-    build: ./microservices/streamlit-frontend
-    ports:
-      - "8501:8501"
-    environment:
-      - ORCHESTRATION_SERVICE_URL=http://orchestration-service:8080
-    depends_on:
-      - orchestration-service
-
-  redis-service:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-data:/data
-    command: redis-server --appendonly yes
-
-  # Agent services
-  business-analyst-deterministic:
-    build: ./microservices/business-analyst-deterministic
-    environment:
-      - REDIS_HOST=redis-service
-      - AGENT_TYPE=business-analyst
-      - IMPLEMENTATION_TYPE=deterministic
-
-  business-analyst-anthropic:
-    build: ./microservices/business-analyst-anthropic
-    environment:
-      - REDIS_HOST=redis-service
-      - AGENT_TYPE=business-analyst
-      - IMPLEMENTATION_TYPE=anthropic
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-
-  # Add similar configurations for all other agent services
-  business-architect-deterministic:
-    build: ./microservices/business-architect-deterministic
-    environment:
-      - REDIS_HOST=redis-service
-      - AGENT_TYPE=business-architect
-      - IMPLEMENTATION_TYPE=deterministic
-
-  business-architect-anthropic:
-    build: ./microservices/business-architect-anthropic
-    environment:
-      - REDIS_HOST=redis-service
-      - AGENT_TYPE=business-architect
-      - IMPLEMENTATION_TYPE=anthropic
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-
-  application-architect-deterministic:
-    build: ./microservices/application-architect-deterministic
-    environment:
-      - REDIS_HOST=redis-service
-      - AGENT_TYPE=application-architect
-      - IMPLEMENTATION_TYPE=deterministic
-
-  application-architect-anthropic:
-    build: ./microservices/application-architect-anthropic
-    environment:
-      - REDIS_HOST=redis-service
-      - AGENT_TYPE=application-architect
-      - IMPLEMENTATION_TYPE=anthropic
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-
-  infrastructure-architect-deterministic:
-    build: ./microservices/infrastructure-architect-deterministic
-    environment:
-      - REDIS_HOST=redis-service
-      - AGENT_TYPE=infrastructure-architect
-      - IMPLEMENTATION_TYPE=deterministic
-
-  infrastructure-architect-anthropic:
-    build: ./microservices/infrastructure-architect-anthropic
-    environment:
-      - REDIS_HOST=redis-service
-      - AGENT_TYPE=infrastructure-architect
-      - IMPLEMENTATION_TYPE=anthropic
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-
-  solution-architect-deterministic:
-    build: ./microservices/solution-architect-deterministic
-    environment:
-      - REDIS_HOST=redis-service
-      - AGENT_TYPE=solution-architect
-      - IMPLEMENTATION_TYPE=deterministic
-
-  solution-architect-anthropic:
-    build: ./microservices/solution-architect-anthropic
-    environment:
-      - REDIS_HOST=redis-service
-      - AGENT_TYPE=solution-architect
-      - IMPLEMENTATION_TYPE=anthropic
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-
-  project-manager-deterministic:
-    build: ./microservices/project-manager-deterministic
-    environment:
-      - REDIS_HOST=redis-service
-      - AGENT_TYPE=project-manager
-      - IMPLEMENTATION_TYPE=deterministic
-
-  project-manager-anthropic:
-    build: ./microservices/project-manager-anthropic
-    environment:
-      - REDIS_HOST=redis-service
-      - AGENT_TYPE=project-manager
-      - IMPLEMENTATION_TYPE=anthropic
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-
-  accountant-deterministic:
-    build: ./microservices/accountant-deterministic
-    environment:
-      - REDIS_HOST=redis-service
-      - AGENT_TYPE=accountant
-      - IMPLEMENTATION_TYPE=deterministic
-
-  accountant-anthropic:
-    build: ./microservices/accountant-anthropic
-    environment:
-      - REDIS_HOST=redis-service
-      - AGENT_TYPE=accountant
-      - IMPLEMENTATION_TYPE=anthropic
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-
-  developer-deterministic:
-    build: ./microservices/developer-deterministic
-    environment:
-      - REDIS_HOST=redis-service
-      - AGENT_TYPE=developer
-      - IMPLEMENTATION_TYPE=deterministic
-
-  developer-anthropic:
-    build: ./microservices/developer-anthropic
-    environment:
-      - REDIS_HOST=redis-service
-      - AGENT_TYPE=developer
-      - IMPLEMENTATION_TYPE=anthropic
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-
-volumes:
-  redis-data:
-
-
-7. Implement the orchestration service to coordinate between agents:
-   - Extract orchestration logic from the monolith in /orchestration/ directory
-   - Implement service discovery using Kubernetes DNS
-   - Add Redis for message passing and state management
-   - Create API endpoints for frontend communication
-   - Implement circuit breakers for resilience
-   - Add health check endpoints
-
-8. Extract agent-specific code from the monolith:
-   - Identify shared code in agents/ directory vs. agent-specific logic
-   - Create base classes for deterministic and LLM-based agents
-   - Implement agent-specific endpoints and business logic
-   - Ensure proper error handling and retry mechanisms
-   - Add health check endpoints
-   - Configure environment variables for AGENT_TYPE and IMPLEMENTATION_TYPE
-
-9. Adapt the Streamlit frontend to work with microservices:
-   - Update API calls to target the orchestration service
-   - Implement proper error handling for service unavailability
-   - Add service health monitoring
-   - Containerize as standalone service
-
-10. Create Kubernetes deployment manifests for each service:
-yaml
-apiVersion: apps/v1
-kind: Deployment
+# ClusterSecretStore configuration for AWS Secrets Manager
+apiVersion: external-secrets.io/v1beta1
+kind: ClusterSecretStore
 metadata:
-  name: orchestration-service
+  name: aws-secretsmanager
 spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: orchestration-service
-  template:
-    metadata:
-      labels:
-        app: orchestration-service
-    spec:
-      containers:
-        - name: orchestration-service
-          image: ghcr.io/health-service-idp/orchestration-service:latest
-          ports:
-            - containerPort: 8080
-          env:
-            - name: REDIS_HOST
-              value: redis-service
-            - name: LOG_LEVEL
-              value: "INFO"
-          resources:
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
-            requests:
-              cpu: "200m"
-              memory: "256Mi"
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: 8080
-            initialDelaySeconds: 5
-            periodSeconds: 10
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: orchestration-service
-spec:
-  selector:
-    app: orchestration-service
-  ports:
-    - port: 80
-      targetPort: 8080
-  type: ClusterIP
+  provider:
+    aws:
+      service: SecretsManager
+      region: us-west-2
+      auth:
+        jwt:
+          serviceAccountRef:
+            name: external-secrets-sa
+            namespace: external-secrets
 
-11. Configure Knative service definitions for each microservice:
-yaml
-apiVersion: serving.knative.dev/v1
-kind: Service
+# ExternalSecret template for Auth0
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
 metadata:
-  name: orchestration-service
+  name: auth0-credentials
+  namespace: {{.vcluster.namespace}}
 spec:
-  template:
-    metadata:
-      annotations:
-        autoscaling.knative.dev/minScale: "1"
-        autoscaling.knative.dev/maxScale: "5"
-    spec:
-      containers:
-        - image: ghcr.io/health-service-idp/orchestration-service:latest
-          env:
-            - name: REDIS_HOST
-              value: redis-service
-            - name: LOG_LEVEL
-              value: "INFO"
-          ports:
-            - containerPort: 8080
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: aws-secretsmanager
+  target:
+    name: auth0-credentials
+    creationPolicy: Owner
+  data:
+  - secretKey: clientId
+    remoteRef:
+      key: auth0/credentials
+      property: clientId
+  - secretKey: clientSecret
+    remoteRef:
+      key: auth0/credentials
+      property: clientSecret
+  - secretKey: domain
+    remoteRef:
+      key: auth0/credentials
+      property: domain
+```
 
-12. Create CI/CD pipeline for container builds and deployment:
-   - Set up GitHub Actions workflow for building and pushing container images
-   - Configure image tagging for ghcr.io/health-service-idp/ registry
-   - Implement automated testing before deployment
-   - Set up deployment to Knative environment
+Implement a controller or use ArgoCD ApplicationSet to automatically create ExternalSecret resources in each vCluster namespace. Configure proper RBAC to ensure secrets are only accessible to authorized services.
 
 # Test Strategy:
-1. Set up testing framework for microservices:
-
-for service in orchestration-service streamlit-frontend business-analyst-deterministic business-analyst-anthropic business-architect-deterministic business-architect-anthropic application-architect-deterministic application-architect-anthropic infrastructure-architect-deterministic infrastructure-architect-anthropic solution-architect-deterministic solution-architect-anthropic project-manager-deterministic project-manager-anthropic accountant-deterministic accountant-anthropic developer-deterministic developer-anthropic; do
-  cd microservices/$service
-  mkdir -p tests
-  touch tests/__init__.py
-  touch tests/test_main.py
-  touch tests/test_health.py
-  cd ../..
-done
-
-
-2. Create unit tests for each agent service (tests/test_main.py):
-python
-import pytest
-from fastapi.testclient import TestClient
-from src.main import app
-
-client = TestClient(app)
-
-def test_handle_request():
-    response = client.post("/", json={"query": "test query", "parameters": {"param1": "value1"}})
-    assert response.status_code == 200
-    data = response.json()
-    assert "result" in data
-    assert "metadata" in data
-
-def test_health_endpoint():
-    response = client.get("/health")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "healthy"
-
-
-3. Test Pydantic model validation for each service:
-python
-from src.main import AgentRequestModel
-import pytest
-from pydantic import ValidationError
-
-def test_request_model_validation():
-    # Valid data
-    valid_data = {"query": "test query", "parameters": {"param1": "value1"}}
-    model = AgentRequestModel(**valid_data)
-    assert model.query == "test query"
-    
-    # Invalid data (missing required field)
-    invalid_data = {"parameters": {"param1": "value1"}}
-    with pytest.raises(ValidationError):
-        AgentRequestModel(**invalid_data)
-
-
-4. Create integration tests for service communication:
-python
-import pytest
-import httpx
-import asyncio
-
-@pytest.mark.asyncio
-async def test_orchestration_with_agents():
-    async with httpx.AsyncClient(base_url="http://localhost:8000") as client:
-        response = await client.post("/orchestrate", json={
-            "query": "Create a simple web application",
-            "agents": ["business-analyst", "developer"]
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert "results" in data
-        assert len(data["results"]) == 2
-
-
-5. Test local deployment with docker-compose:
-
-docker-compose up -d
-sleep 10  # Wait for services to start
-
-# Test health endpoints for all services
-for service in orchestration-service business-analyst-deterministic business-analyst-anthropic business-architect-deterministic business-architect-anthropic application-architect-deterministic application-architect-anthropic infrastructure-architect-deterministic infrastructure-architect-anthropic solution-architect-deterministic solution-architect-anthropic project-manager-deterministic project-manager-anthropic accountant-deterministic accountant-anthropic developer-deterministic developer-anthropic; do
-  echo "Testing health endpoint for $service"
-  curl -f http://localhost:$(docker-compose port $service 8080 | cut -d: -f2)/health || echo "$service health check failed"
-done
-
-# Test orchestration service
-curl -X POST http://localhost:8000/orchestrate \
-  -H "Content-Type: application/json" \
-  -d '{"query": "Create a simple web application", "agents": ["business-analyst", "developer"]}'
-
-# Shutdown services
-docker-compose down
-
-
-6. Test individual agent services:
-
-for service in business-analyst-deterministic business-analyst-anthropic business-architect-deterministic business-architect-anthropic application-architect-deterministic application-architect-anthropic infrastructure-architect-deterministic infrastructure-architect-anthropic solution-architect-deterministic solution-architect-anthropic project-manager-deterministic project-manager-anthropic accountant-deterministic accountant-anthropic developer-deterministic developer-anthropic; do
-  docker-compose up -d $service redis-service
-  sleep 5
-  
-  # Test the service
-  curl -X POST http://localhost:$(docker-compose port $service 8080 | cut -d: -f2) \
-    -H "Content-Type: application/json" \
-    -d '{"query": "Test query", "parameters": {"param1": "value1"}}'
-  
-  docker-compose down
-done
-
-
-7. Test Redis integration:
-python
-import pytest
-import redis
-import json
-
-def test_redis_connection():
-    r = redis.Redis(host="localhost", port=6379, db=0)
-    r.set("test_key", "test_value")
-    assert r.get("test_key").decode("utf-8") == "test_value"
-    r.delete("test_key")
-
-def test_message_passing():
-    r = redis.Redis(host="localhost", port=6379, db=0)
-    message = {"query": "test", "agent": "business-analyst"}
-    r.lpush("agent_queue", json.dumps(message))
-    result = r.rpop("agent_queue")
-    assert json.loads(result.decode("utf-8")) == message
-
-def test_redis_persistence():
-    r = redis.Redis(host="localhost", port=6379, db=0)
-    r.set("persistence_test", "test_value")
-    
-    # Restart Redis container
-    import subprocess
-    subprocess.run(["docker-compose", "restart", "redis-service"])
-    import time
-    time.sleep(5)  # Wait for Redis to restart
-    
-    # Check if the value persisted
-    assert r.get("persistence_test").decode("utf-8") == "test_value"
-    r.delete("persistence_test")
-
-
-8. Test Kubernetes deployment (if applicable):
-
-# Deploy to Kubernetes
-kubectl apply -f kubernetes/
-
-# Wait for deployments to be ready
-kubectl wait --for=condition=available --timeout=300s deployment/orchestration-service
-kubectl wait --for=condition=available --timeout=300s deployment/streamlit-frontend
-
-# Test the orchestration service
-ORCHESTRATION_URL=$(kubectl get svc orchestration-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-curl -X POST http://$ORCHESTRATION_URL/orchestrate \
-  -H "Content-Type: application/json" \
-  -d '{"query": "Create a simple web application", "agents": ["business-analyst", "developer"]}'
-
-# Clean up
-kubectl delete -f kubernetes/
-
-
-9. Performance testing for each microservice:
-
-pip install locust
-
-# Create a locustfile.py for load testing
-cat > locustfile.py << 'EOF'
-from locust import HttpUser, task, between
-
-class AgentUser(HttpUser):
-    wait_time = between(1, 3)
-    
-    @task
-    def test_agent(self):
-        self.client.post("/", json={
-            "query": "Test query",
-            "parameters": {"param1": "value1"}
-        })
-    
-    @task
-    def test_health(self):
-        self.client.get("/health")
-
-class OrchestratorUser(HttpUser):
-    wait_time = between(1, 5)
-    
-    @task
-    def test_orchestration(self):
-        self.client.post("/orchestrate", json={
-            "query": "Create a simple web application",
-            "agents": ["business-analyst", "developer"]
-        })
-    
-    @task
-    def test_health(self):
-        self.client.get("/health")
-EOF
-
-# Run load test against orchestration service
-locust -f locustfile.py --host=http://localhost:8000 --headless -u 10 -r 2 --run-time 1m
-
-
-10. Test service resilience and circuit breakers:
-
-# Start all services
-docker-compose up -d
-
-# Test service resilience by stopping an agent service
-docker-compose stop business-analyst-deterministic
-
-# Verify orchestration service can handle the failure
-curl -X POST http://localhost:8000/orchestrate \
-  -H "Content-Type: application/json" \
-  -d '{"query": "Create a simple web application", "agents": ["business-analyst", "developer"]}'
-
-# Restart the service
-docker-compose start business-analyst-deterministic
-
-# Shutdown all services
-docker-compose down
-
-11. Test Knative autoscaling behavior:
-
-# Deploy to Knative
-kubectl apply -f knative/
-
-# Wait for services to be ready
-kubectl wait --for=condition=Ready ksvc/orchestration-service --timeout=300s
-
-# Get the service URL
-SERVICE_URL=$(kubectl get ksvc orchestration-service -o jsonpath='{.status.url}')
-
-# Send requests to trigger scaling
-for i in {1..100}; do
-  curl -X POST $SERVICE_URL/orchestrate \
-    -H "Content-Type: application/json" \
-    -d '{"query": "Test query '$i'", "agents": ["business-analyst"]}' &
-done
-
-# Check scaling behavior
-kubectl get pods -w
-
-# Clean up
-kubectl delete -f knative/
-
-12. Test container image builds and registry push:
-
-# Build and push images to ghcr.io
-for service in orchestration-service streamlit-frontend business-analyst-deterministic business-analyst-anthropic business-architect-deterministic business-architect-anthropic application-architect-deterministic application-architect-anthropic infrastructure-architect-deterministic infrastructure-architect-anthropic solution-architect-deterministic solution-architect-anthropic project-manager-deterministic project-manager-anthropic accountant-deterministic accountant-anthropic developer-deterministic developer-anthropic; do
-  docker build -t ghcr.io/health-service-idp/$service:latest ./microservices/$service
-  docker push ghcr.io/health-service-idp/$service:latest
-done
+1. Verify External Secrets Operator installation
+2. Test secret synchronization from backend to Kubernetes Secret
+3. Validate secret format matches the required schema in the PRD
+4. Test secret access from a pod in the vCluster namespace
+5. Verify secret rotation works when backend secret is updated
+6. Test error handling when backend is temporarily unavailable
 
 # Subtasks:
-## 1. Project Structure and Dependency Management Setup [in-progress]
+## 1. Install External Secrets Operator in Management Cluster [pending]
 ### Dependencies: None
-### Description: Set up the project directory structure and configure Poetry for dependency management
+### Description: Set up External Secrets Operator v0.9.0+ in the management Kubernetes cluster to enable secret synchronization from external sources.
 ### Details:
-1. Create the project directory structure:
-```bash
-mkdir -p knative-python-function/src/api
-mkdir -p knative-python-function/tests
-cd knative-python-function
-```
+Use Helm to install External Secrets Operator in a dedicated namespace:
+1. Add the external-secrets Helm repository
+2. Install the operator with version 0.9.0 or newer in the 'external-secrets' namespace
+3. Verify the installation by checking that all pods are running
+4. Create a service account with appropriate permissions for accessing AWS Secrets Manager
 
-2. Initialize Poetry and configure dependencies:
-```bash
-poetry init --name knative-python-function --description "Serverless Python Function Backend using Knative"
-poetry add fastapi uvicorn pydantic
-poetry add pytest pytest-asyncio httpx --group dev
-```
-
-3. Create a `pyproject.toml` file with the following content:
-```toml
-[tool.poetry]
-name = "knative-python-function"
-version = "0.1.0"
-description = "Serverless Python Function Backend using Knative"
-authors = ["Your Name <your.email@example.com>"]
-
-[tool.poetry.dependencies]
-python = "^3.9"
-fastapi = "^0.95.0"
-uvicorn = "^0.21.1"
-pydantic = "^1.10.7"
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.3.1"
-pytest-asyncio = "^0.21.0"
-httpx = "^0.24.0"
-
-[build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
-```
-
-4. Create a `.gitignore` file:
-```
-__pycache__/
-*.py[cod]
-*$py.class
-.pytest_cache/
-.coverage
-htmlcov/
-.env
-.venv
-venv/
-ENV/
-```
-
-## 2. FastAPI Implementation with Pydantic Models [pending]
+## 2. Configure AWS Secrets Manager Integration [pending]
 ### Dependencies: 14.1
-### Description: Implement the FastAPI application with Pydantic models for request/response validation
+### Description: Set up the ClusterSecretStore resource to connect External Secrets Operator with AWS Secrets Manager where Auth0 and Neon Postgres credentials are stored.
 ### Details:
-1. Create the main API module in `src/api/main.py`:
-```python
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import List, Optional
-import logging
+1. Create an IAM role with permissions to access the required AWS Secrets Manager secrets
+2. Configure IRSA (IAM Roles for Service Accounts) for the external-secrets service account
+3. Create a ClusterSecretStore resource that references the service account and specifies AWS region
+4. Test the connection to ensure the operator can retrieve secrets from AWS Secrets Manager
+5. Document the AWS secret path structure for Auth0 and Neon credentials
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-app = FastAPI(title="Knative Python Function")
-
-# Define Pydantic models
-class Item(BaseModel):
-    id: Optional[str] = None
-    name: str
-    description: Optional[str] = None
-    value: float
-
-class ProcessRequest(BaseModel):
-    items: List[Item]
-    operation: str
-
-class ProcessResponse(BaseModel):
-    result: float
-    processed_items: int
-    operation: str
-
-@app.get("/")
-async def root():
-    return {"status": "healthy", "service": "knative-python-function"}
-
-@app.post("/process", response_model=ProcessResponse)
-async def process_items(request: ProcessRequest):
-    logger.info(f"Processing request with operation: {request.operation}")
-    
-    if not request.items:
-        raise HTTPException(status_code=400, detail="No items provided")
-    
-    result = 0.0
-    if request.operation == "sum":
-        result = sum(item.value for item in request.items)
-    elif request.operation == "average":
-        result = sum(item.value for item in request.items) / len(request.items)
-    elif request.operation == "max":
-        result = max(item.value for item in request.items)
-    elif request.operation == "min":
-        result = min(item.value for item in request.items)
-    else:
-        raise HTTPException(status_code=400, detail=f"Unsupported operation: {request.operation}")
-    
-    logger.info(f"Processed {len(request.items)} items with result: {result}")
-    return ProcessResponse(
-        result=result,
-        processed_items=len(request.items),
-        operation=request.operation
-    )
-```
-
-2. Create an entry point file `src/main.py`:
-```python
-import uvicorn
-from api.main import app
-
-if __name__ == "__main__":
-    uvicorn.run("api.main:app", host="0.0.0.0", port=8080, reload=True)
-```
-
-3. Create a test file `tests/test_api.py`:
-```python
-import pytest
-from fastapi.testclient import TestClient
-from src.api.main import app
-
-client = TestClient(app)
-
-def test_root_endpoint():
-    response = client.get("/")
-    assert response.status_code == 200
-    assert response.json()["status"] == "healthy"
-
-def test_process_sum():
-    payload = {
-        "items": [
-            {"name": "item1", "value": 10.5},
-            {"name": "item2", "value": 20.5}
-        ],
-        "operation": "sum"
-    }
-    response = client.post("/process", json=payload)
-    assert response.status_code == 200
-    data = response.json()
-    assert data["result"] == 31.0
-    assert data["processed_items"] == 2
-    assert data["operation"] == "sum"
-
-def test_process_invalid_operation():
-    payload = {
-        "items": [
-            {"name": "item1", "value": 10.5}
-        ],
-        "operation": "invalid"
-    }
-    response = client.post("/process", json=payload)
-    assert response.status_code == 400
-```
-
-## 3. Containerization with Docker [pending]
+## 3. Create ExternalSecret Templates for Auth0 and Neon Postgres [pending]
 ### Dependencies: 14.2
-### Description: Create Docker configuration for containerizing the Python application
+### Description: Develop template manifests for ExternalSecret resources that will sync Auth0 and Neon Postgres credentials from AWS Secrets Manager to Kubernetes Secrets in vCluster namespaces.
 ### Details:
-1. Create a `Dockerfile` in the project root:
-```dockerfile
-FROM python:3.9-slim
+1. Analyze the structure of Auth0 and Neon Postgres credentials in AWS Secrets Manager
+2. Create an ExternalSecret template for Auth0 with appropriate secretKey and remoteRef mappings
+3. Create an ExternalSecret template for Neon Postgres with appropriate secretKey and remoteRef mappings
+4. Include namespace templating to allow deployment across multiple vClusters
+5. Set appropriate refresh intervals and creation policies
+6. Ensure secret naming conventions align with application expectations
 
-WORKDIR /app
-
-# Install Poetry
-RUN pip install poetry==1.4.2
-
-# Copy poetry configuration files
-COPY pyproject.toml poetry.lock* /app/
-
-# Configure poetry to not create a virtual environment
-RUN poetry config virtualenvs.create false
-
-# Install dependencies
-RUN poetry install --no-dev --no-interaction --no-ansi
-
-# Copy application code
-COPY src/ /app/src/
-
-# Set environment variables
-ENV PORT=8080
-ENV HOST=0.0.0.0
-
-# Expose the application port
-EXPOSE 8080
-
-# Run the application
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8080"]
-```
-
-2. Create a `.dockerignore` file:
-```
-__pycache__
-*.py[cod]
-*$py.class
-.pytest_cache
-.coverage
-htmlcov
-.env
-.venv
-venv
-ENV
-tests/
-.git
-.github
-```
-
-3. Create a `docker-compose.yml` file for local testing:
-```yaml
-version: '3'
-
-services:
-  api:
-    build: .
-    ports:
-      - "8080:8080"
-    environment:
-      - LOG_LEVEL=INFO
-    volumes:
-      - ./src:/app/src
-```
-
-4. Add build and run scripts in the project root:
-
-Create `build.sh`:
-```bash
-#!/bin/bash
-docker build -t knative-python-function:latest .
-```
-
-Create `run.sh`:
-```bash
-#!/bin/bash
-docker run -p 8080:8080 knative-python-function:latest
-```
-
-Make the scripts executable:
-```bash
-chmod +x build.sh run.sh
-```
-
-## 4. Knative Service Configuration and Deployment [pending]
+## 4. Implement Automated ExternalSecret Deployment [pending]
 ### Dependencies: 14.3
-### Description: Create Knative service configuration and deployment scripts
+### Description: Create a mechanism to automatically deploy ExternalSecret resources to each vCluster namespace using either a custom controller or ArgoCD ApplicationSet.
 ### Details:
-1. Create a Knative service configuration file `knative-service.yaml`:
-```yaml
-apiVersion: serving.knative.dev/v1
-kind: Service
-metadata:
-  name: knative-python-function
-  namespace: default
-spec:
-  template:
-    metadata:
-      annotations:
-        autoscaling.knative.dev/minScale: "1"
-        autoscaling.knative.dev/maxScale: "5"
-        autoscaling.knative.dev/target: "50"
-    spec:
-      containers:
-        - image: ${DOCKER_REGISTRY}/knative-python-function:latest
-          ports:
-            - containerPort: 8080
-          env:
-            - name: LOG_LEVEL
-              value: "INFO"
-          resources:
-            limits:
-              cpu: "1"
-              memory: "512Mi"
-            requests:
-              cpu: "500m"
-              memory: "256Mi"
-```
+1. Evaluate whether to use a custom controller or ArgoCD ApplicationSet based on existing infrastructure
+2. If using ArgoCD:
+   - Create an ApplicationSet template that generates Applications for each vCluster
+   - Configure the template to deploy ExternalSecret resources with appropriate namespace substitution
+3. If using a custom controller:
+   - Develop a controller that watches for vCluster creation
+   - Automatically deploy ExternalSecret resources when new vClusters are detected
+4. Implement error handling and logging for deployment failures
+5. Add annotations to track which controller created each ExternalSecret
 
-2. Create a deployment script `deploy.sh`:
-```bash
-#!/bin/bash
-
-# Set variables
-DOCKER_REGISTRY=${DOCKER_REGISTRY:-"docker.io/yourusername"}
-IMAGE_NAME="knative-python-function"
-IMAGE_TAG=${IMAGE_TAG:-"latest"}
-
-# Build the Docker image
-docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
-
-# Tag the image for the registry
-docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
-
-# Push the image to the registry
-docker push ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
-
-# Replace the image placeholder in the Knative service file
-sed -e "s|\${DOCKER_REGISTRY}|${DOCKER_REGISTRY}|g" knative-service.yaml > knative-service-deploy.yaml
-
-# Apply the Knative service
-kubectl apply -f knative-service-deploy.yaml
-
-# Wait for the service to be ready
-echo "Waiting for Knative service to be ready..."
-kubectl wait --for=condition=Ready ksvc/knative-python-function --timeout=120s
-
-# Get the service URL
-SERVICE_URL=$(kubectl get ksvc knative-python-function -o jsonpath='{.status.url}')
-echo "Service deployed successfully!"
-echo "Service URL: ${SERVICE_URL}"
-```
-
-3. Create a test script `test-deployment.sh`:
-```bash
-#!/bin/bash
-
-# Get the service URL
-SERVICE_URL=$(kubectl get ksvc knative-python-function -o jsonpath='{.status.url}')
-
-# Test the health endpoint
-echo "Testing health endpoint..."
-curl -s ${SERVICE_URL}
-
-# Test the process endpoint
-echo "\n\nTesting process endpoint..."
-curl -s -X POST ${SERVICE_URL}/process \
-  -H "Content-Type: application/json" \
-  -d '{"items": [{"name": "item1", "value": 10.5}, {"name": "item2", "value": 20.5}], "operation": "sum"}'
-
-echo "\n"
-```
-
-4. Make the scripts executable:
-```bash
-chmod +x deploy.sh test-deployment.sh
-```
-
-5. Create a README.md file with deployment instructions:
-```markdown
-# Knative Python Function Backend
-
-A serverless Python backend function using Knative, FastAPI, and Pydantic.
-
-## Prerequisites
-
-- Docker
-- Kubernetes cluster with Knative installed
-- kubectl configured to access your cluster
-
-## Local Development
-
-1. Install dependencies:
-   ```bash
-   poetry install
-   ```
-
-2. Run the application locally:
-   ```bash
-   poetry run python src/main.py
-   ```
-
-3. Run tests:
-   ```bash
-   poetry run pytest
-   ```
-
-## Docker Build and Run
-
-1. Build the Docker image:
-   ```bash
-   ./build.sh
-   ```
-
-2. Run the container locally:
-   ```bash
-   ./run.sh
-   ```
-
-## Deployment to Knative
-
-1. Set your Docker registry:
-   ```bash
-   export DOCKER_REGISTRY="docker.io/yourusername"
-   ```
-
-2. Deploy to Knative:
-   ```bash
-   ./deploy.sh
-   ```
-
-3. Test the deployment:
-   ```bash
-   ./test-deployment.sh
-   ```
-
-## API Endpoints
-
-- `GET /`: Health check endpoint
-- `POST /process`: Process items with operations (sum, average, max, min)
-
-### Example Request
-
-```json
-{
-  "items": [
-    {"name": "item1", "value": 10.5},
-    {"name": "item2", "value": 20.5}
-  ],
-  "operation": "sum"
-}
-```
-
-### Example Response
-
-```json
-{
-  "result": 31.0,
-  "processed_items": 2,
-  "operation": "sum"
-}
-```
-```
-
-## 5. Extract Shared Agent Base Classes [pending]
-### Dependencies: 14.1
-### Description: Extract and refactor shared agent base classes from the monolithic codebase to be used by all agent microservices
+## 5. Configure RBAC and Validate End-to-End Functionality [pending]
+### Dependencies: 14.4
+### Description: Set up appropriate RBAC permissions to secure access to secrets and validate the entire secret synchronization process from AWS to applications running in vClusters.
 ### Details:
-1. Analyze the existing monolithic codebase in agents/ directory to identify shared agent functionality
-2. Create a common library structure for agent base classes
-3. Extract the base agent class with common functionality
-4. Create specialized base classes for deterministic and LLM-based agents
-5. Implement proper dependency injection for configuration and external services
-6. Ensure backward compatibility with existing agent implementations
-7. Add environment variable handling for AGENT_TYPE and IMPLEMENTATION_TYPE
-
-## 6. Implement Orchestration Service Microservice [pending]
-### Dependencies: 14.5
-### Description: Extract and implement the orchestration service as a standalone microservice that coordinates the agent microservices
-### Details:
-1. Extract orchestration logic from the monolith in /orchestration/ directory
-2. Implement service discovery using Kubernetes DNS
-3. Create API endpoints for frontend communication
-4. Implement message passing using Redis
-5. Add proper error handling and retry mechanisms
-6. Implement logging and monitoring
-7. Add health check endpoints
-8. Implement circuit breakers for resilience
-9. Configure environment variables for service configuration
-
-## 7. Implement Agent Microservices [pending]
-### Dependencies: 14.5, 14.6
-### Description: Extract and implement each of the 14 agent microservices from the monolithic codebase
-### Details:
-1. For each agent type (business-analyst, business-architect, etc.):
-   - Extract agent-specific code from the monolith in agents/ directory
-   - Create deterministic and anthropic variants
-   - Implement agent-specific API endpoints
-   - Add proper error handling and logging
-   - Add health check endpoints
-2. Ensure all agents follow the same interface pattern
-3. Implement proper configuration management using environment variables
-4. Configure AGENT_TYPE and IMPLEMENTATION_TYPE environment variables
-5. Handle Knative scale-to-zero scenarios with proper initialization
-6. Implement proper error handling for external service dependencies
-
-## 8. Adapt Streamlit Frontend for Microservices [pending]
-### Dependencies: 14.6
-### Description: Modify the Streamlit frontend to work with the new microservice architecture
-### Details:
-1. Update API calls to target the orchestration service
-2. Implement proper error handling for service unavailability
-3. Add service health monitoring
-4. Update UI to reflect the microservice architecture
-5. Implement caching for improved performance
-6. Containerize the Streamlit frontend as a standalone service
-7. Configure environment variables for service discovery
-
-## 9. Implement Redis Service Integration [pending]
-### Dependencies: 14.6
-### Description: Set up and configure Redis for inter-service communication and state management
-### Details:
-1. Configure Redis service for development and production
-2. Implement message queue patterns for agent communication
-3. Set up caching for improved performance
-4. Implement proper error handling for Redis connection issues
-5. Add monitoring and logging for Redis operations
-6. Configure Redis persistence for data durability
-7. Set up proper Redis security configuration
-
-## 10. Create Kubernetes Deployment Manifests [pending]
-### Dependencies: 14.7, 14.8, 14.9
-### Description: Create Kubernetes deployment manifests for all 17 microservices
-### Details:
-1. Create deployment manifests for each microservice
-2. Configure service resources and scaling parameters
-3. Set up service discovery and networking
-4. Configure environment variables and secrets
-5. Implement health checks and readiness probes
-6. Create a Helm chart for easy deployment
-7. Configure proper resource limits and requests
-8. Add appropriate labels and annotations for Kubernetes management
-
-## 11. Create Knative Service Definitions [pending]
-### Dependencies: 14.10
-### Description: Create Knative service definitions for all microservices to enable serverless deployment
-### Details:
-1. Create Knative service definitions for each microservice
-2. Configure autoscaling parameters (minScale, maxScale)
-3. Set up proper resource allocation
-4. Configure environment variables and secrets
-5. Implement proper container configuration
-6. Set up service networking and discovery
-7. Configure proper health checks and probes
-
-## 12. Implement CI/CD Pipeline for Container Builds [pending]
-### Dependencies: 14.11
-### Description: Create CI/CD pipeline for building and deploying container images to the ghcr.io registry
-### Details:
-1. Set up GitHub Actions workflow for container builds
-2. Configure image tagging for ghcr.io/health-service-idp/ registry
-3. Implement automated testing before deployment
-4. Set up deployment to Knative environment
-5. Configure proper versioning and tagging strategy
-6. Implement security scanning for container images
-7. Set up proper access controls and secrets management
+1. Create Role and RoleBinding resources to restrict access to secrets within each vCluster namespace
+2. Configure NetworkPolicies to limit which pods can access the Kubernetes API for secret retrieval
+3. Implement PodSecurityPolicies or Pod Security Standards to prevent privilege escalation
+4. Perform end-to-end testing with actual application deployments in vClusters
+5. Document the entire setup including troubleshooting steps for common issues
+6. Create monitoring alerts for secret synchronization failures
 

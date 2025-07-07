@@ -1,0 +1,20 @@
+# Simple vCluster claim with explicit component selection
+# Subnet configuration is handled automatically via EnvironmentConfig
+apiVersion: platform.example.org/v1alpha1
+kind: VClusterEnvironmentClaim
+metadata:
+  name: test-vcluster
+  namespace: default
+spec:
+  name: test-env
+  domain: test-env.local
+  components:
+    # Observability stack
+    grafana: true
+    prometheus: true
+    jaeger: true
+    kiali: false
+    # GitOps
+    argoCD: false
+    # External access
+    apiGateway: true

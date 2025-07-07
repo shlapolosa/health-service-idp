@@ -1,0 +1,232 @@
+# Crossplane Compositions for NEW OAM Infrastructure Components
+# These complement the existing compositions and add support for additional infrastructure types
+
+---
+# 1. Snowflake Data Warehouse Composition
+# Creates a Terraform workspace to provision Snowflake resources
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: snowflake-datawarehouse-composition
+  labels:
+    crossplane.io/xrd: xsnowflakedatawarehouses.platform.example.org
+    provider: terraform
+spec:
+  writeConnectionSecretsToNamespace: crossplane-system
+  compositeTypeRef:
+    apiVersion: platform.example.org/v1alpha1
+    kind: XSnowflakeDataWarehouse
+  resources:
+  
+  # Terraform Workspace for Snowflake resources
+  - name: snowflake-workspace
+    base:
+      apiVersion: tf.crossplane.io/v1alpha1
+      kind: Workspace
+      spec:
+        forProvider:
+          source: Inline
+          module: |
+            terraform {
+              required_providers {
+                snowflake = {
+                  source = "Snowflake-Labs/snowflake"
+                  version = "~> 0.87"
+                }
+              }
+            }
+            
+            variable "warehouse_name" {
+              type = string
+            }
+            
+            variable "database_name" {
+              type = string
+            }
+            
+            variable "warehouse_size" {
+              type = string
+              default = "X-SMALL"
+            }
+            
+            resource "snowflake_warehouse" "main" {
+              name           = var.warehouse_name
+              warehouse_size = var.warehouse_size
+              auto_suspend   = 60
+              auto_resume    = true
+              initially_suspended = true
+            }
+            
+            resource "snowflake_database" "main" {
+              name = var.database_name
+            }
+            
+            output "warehouse_name" {
+              value = snowflake_warehouse.main.name
+            }
+            
+            output "database_name" {
+              value = snowflake_database.main.name
+            }
+        writeConnectionSecretsToNamespace: crossplane-system
+        providerConfigRef:
+          name: terraform-snowflake
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-snowflake"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.vars[0].value
+      transforms:
+      - type: string
+        string:
+          fmt: "%s_WAREHOUSE"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.vars[1].value
+      transforms:
+      - type: string
+        string:
+          fmt: "%s_DB"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.warehouseSize
+      toFieldPath: spec.forProvider.vars[2].value
+
+---
+# 2. Enhanced Neon Postgres Composition
+# Extends existing External Secrets to support app-specific database schemas
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: neon-postgres-composition
+  labels:
+    crossplane.io/xrd: xneonpostgres.platform.example.org
+    provider: external-secrets
+spec:
+  writeConnectionSecretsToNamespace: crossplane-system
+  compositeTypeRef:
+    apiVersion: platform.example.org/v1alpha1
+    kind: XNeonPostgres
+  resources:
+  
+  # External Secret to sync Neon credentials with app-specific database
+  - name: neon-external-secret
+    base:
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+      spec:
+        refreshInterval: 1h
+        secretStoreRef:
+          kind: ClusterSecretStore
+          name: aws-secretsmanager
+        target:
+          name: placeholder
+          creationPolicy: Owner
+        data:
+        - secretKey: PGHOST
+          remoteRef:
+            key: neon-postgres/credentials
+            property: PGHOST
+        - secretKey: PGUSER
+          remoteRef:
+            key: neon-postgres/credentials
+            property: PGUSER
+        - secretKey: PGPASSWORD
+          remoteRef:
+            key: neon-postgres/credentials
+            property: PGPASSWORD
+        - secretKey: PGPORT
+          remoteRef:
+            key: neon-postgres/credentials
+            property: PGPORT
+        - secretKey: PGDATABASE
+          remoteRef:
+            key: neon-postgres/credentials
+            property: PGDATABASE
+        - secretKey: DATABASE_URL
+          remoteRef:
+            key: neon-postgres/credentials
+            property: DATABASE_URL
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-neon-secret"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.namespace
+      toFieldPath: metadata.namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.target.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-db-credentials"
+
+---
+# 3. Data Pipeline Composition using existing Helm provider
+# Creates Airflow-based data pipelines
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: data-pipeline-composition
+  labels:
+    crossplane.io/xrd: xdatapipelines.platform.example.org
+    provider: helm
+spec:
+  writeConnectionSecretsToNamespace: crossplane-system
+  compositeTypeRef:
+    apiVersion: platform.example.org/v1alpha1
+    kind: XDataPipeline
+  resources:
+  
+  # Airflow Helm Release
+  - name: airflow-release
+    base:
+      apiVersion: helm.crossplane.io/v1beta1
+      kind: Release
+      spec:
+        forProvider:
+          chart:
+            name: airflow
+            repository: https://airflow.apache.org
+            version: "1.11.0"
+          namespace: placeholder
+          skipCreateNamespace: false
+          values:
+            executor: "CeleryExecutor"
+            webserver:
+              service:
+                type: ClusterIP
+            postgresql:
+              enabled: true
+            redis:
+              enabled: true
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-airflow"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.namespace
+      toFieldPath: spec.forProvider.namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.resources.replicas
+      toFieldPath: spec.forProvider.values.webserver.replicas
+      transforms:
+      - type: convert
+        convert:
+          toType: string

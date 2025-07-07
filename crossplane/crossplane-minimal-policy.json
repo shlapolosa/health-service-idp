@@ -1,0 +1,38 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:GetRole",
+        "iam:ListRoles",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:ListAttachedRolePolicies",
+        "iam:TagRole",
+        "iam:UntagRole",
+        "iam:CreateServiceLinkedRole",
+        "apigateway:*",
+        "s3:*",
+        "ec2:*",
+        "elasticloadbalancing:*",
+        "autoscaling:*",
+        "cloudwatch:*",
+        "cloudformation:*",
+        "sns:*",
+        "sqs:*",
+        "lambda:*",
+        "rds:*",
+        "eks:*",
+        "ecr:*",
+        "logs:*",
+        "secretsmanager:*",
+        "kms:*",
+        "sts:AssumeRole"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

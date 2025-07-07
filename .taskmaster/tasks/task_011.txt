@@ -1,100 +1,125 @@
 # Task ID: 11
-# Title: Install ArgoCD in Virtual Kubernetes Cluster
-# Status: done
-# Dependencies: 10
-# Priority: medium
-# Description: Install and configure ArgoCD in the existing virtual Kubernetes cluster to enable GitOps-based continuous delivery for the application components.
+# Title: Set up Crossplane with Required Providers
+# Status: pending
+# Dependencies: None
+# Priority: high
+# Description: Install and configure Crossplane with necessary providers (Helm, AWS, GitHub, Kubernetes) in the management cluster to enable infrastructure provisioning via CRDs.
 # Details:
-1. Access the existing virtual Kubernetes cluster (vcluster) that has been set up with Karpenter and autoscaling capabilities.
-2. Add the ArgoCD Helm repository:
-   
-   helm repo add argo https://argoproj.github.io/argo-helm
-   helm repo update
-   
-3. Create a dedicated namespace for ArgoCD:
-   
-   kubectl create namespace argocd
-   
-4. Install ArgoCD using Helm with customized values:
-   
-   helm install argocd argo/argo-cd \
-     --namespace argocd \
-     --set server.service.type=LoadBalancer \
-     --set controller.metrics.enabled=true \
-     --set server.metrics.enabled=true
-   
-5. Configure RBAC for ArgoCD to ensure proper access controls:
-   
-   kubectl apply -f argocd-rbac-config.yaml -n argocd
-   
-6. Set up the initial admin password and secure it using Kubernetes secrets:
-   
-   kubectl -n argocd patch secret argocd-secret \
-     -p '{"stringData": {"admin.password": "$2a$10$..."}}'
-   
-7. Configure ArgoCD to monitor the application Git repositories:
-   
-   kubectl apply -f application-repos.yaml -n argocd
-   
-8. Create ArgoCD Application manifests for each component of the system:
-   
-   kubectl apply -f applications/ -n argocd
-   
-9. Set up ArgoCD projects to organize applications and enforce security boundaries:
-   
-   kubectl apply -f projects/ -n argocd
-   
-10. Integrate ArgoCD with the monitoring stack (Prometheus/Grafana) installed in Task 10:
-    
-    kubectl apply -f argocd-servicemonitor.yaml -n argocd
-    
-11. Document the ArgoCD access URLs, credentials (stored securely), and usage instructions for the development team.
+Install Crossplane v1.14.0+ using Helm chart with the following providers:
+1. provider-helm v0.16.0+ for deploying Helm charts
+2. provider-aws v0.43.0+ for AWS resources (API Gateway, IAM)
+3. provider-github v0.7.0+ for repository operations
+4. provider-kubernetes v0.10.0+ for K8s resource management
 
-Key Considerations:
-- Ensure ArgoCD has appropriate resource requests and limits to function properly in the vcluster environment
-- Configure network policies to secure ArgoCD components
-- Set up proper backup for ArgoCD configurations and state
-- Implement GitOps principles for managing the application deployment lifecycle
+Implementation steps:
+```bash
+# Install Crossplane using Helm
+helm repo add crossplane-stable https://charts.crossplane.io/stable
+helm install crossplane crossplane-stable/crossplane --namespace crossplane-system --create-namespace --version 1.14.0
+
+# Install providers
+kubectl apply -f - <<EOF
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-aws
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/provider-aws:v0.43.0
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-helm
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/provider-helm:v0.16.0
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-github
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/provider-github:v0.7.0
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-kubernetes
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v0.10.0
+EOF
+```
+
+Configure provider credentials using ProviderConfig resources for each provider. Set up appropriate IAM roles and service accounts with least privilege principles. For AWS, use IRSA (IAM Roles for Service Accounts) to avoid storing credentials.
 
 # Test Strategy:
-1. Verify ArgoCD installation and pod health:
-   
-   kubectl get pods -n argocd
-   kubectl get svc -n argocd
-   
-   All pods should be in Running state with appropriate readiness and liveness.
+1. Verify all providers are installed and in 'Healthy' state using `kubectl get providers`
+2. Test each provider with a simple resource creation (e.g., create a test S3 bucket with AWS provider)
+3. Validate provider permissions by attempting operations that should succeed and fail
+4. Create a simple Composition and XRD to verify Crossplane's core functionality
 
-2. Test ArgoCD UI accessibility:
-   - Access the ArgoCD UI through the LoadBalancer service
-   - Verify successful login with admin credentials
-   - Confirm the dashboard loads correctly
+# Subtasks:
+## 1. Install Crossplane Core Using Helm [pending]
+### Dependencies: None
+### Description: Set up the Crossplane core components in the management cluster using Helm chart version 1.14.0+.
+### Details:
+1. Add the Crossplane Helm repository
+2. Create a dedicated namespace 'crossplane-system'
+3. Install Crossplane using Helm with version 1.14.0 or newer
+4. Verify the installation by checking that all Crossplane pods are running
+5. Ensure the Crossplane CRDs are properly installed
 
-3. Validate ArgoCD CLI functionality:
-   
-   argocd login <ARGOCD_SERVER>
-   argocd cluster list
-   argocd app list
-   
-   Commands should execute successfully without errors.
+## 2. Install Required Crossplane Providers [pending]
+### Dependencies: 11.1
+### Description: Install the four required Crossplane providers: AWS, Helm, GitHub, and Kubernetes with their specified versions.
+### Details:
+Create and apply Provider resources for each required provider with the specified versions:
+1. provider-aws v0.43.0+
+2. provider-helm v0.16.0+
+3. provider-github v0.7.0+
+4. provider-kubernetes v0.10.0+
 
-4. Test application deployment workflow:
-   - Create a test application in ArgoCD pointing to a sample repository
-   - Verify the application syncs correctly
-   - Make a change to the repository and confirm ArgoCD detects and applies the change
+Use the kubectl apply command with the YAML configuration as provided in the task description. Monitor the provider installation status until all providers are healthy.
 
-5. Verify RBAC configurations:
-   - Test access with different user roles
-   - Confirm appropriate permissions are enforced
+## 3. Configure AWS Provider with IRSA [pending]
+### Dependencies: 11.2
+### Description: Set up AWS provider credentials using IAM Roles for Service Accounts (IRSA) to avoid storing credentials directly.
+### Details:
+1. Create an IAM role with necessary permissions following least privilege principles
+2. Configure IRSA for the Crossplane AWS provider:
+   - Create a service account in the crossplane-system namespace
+   - Annotate the service account with the IAM role ARN
+   - Update the AWS provider deployment to use this service account
+3. Create and apply an AWS ProviderConfig that references the service account
+4. Test the AWS provider configuration with a simple AWS resource creation
 
-6. Test integration with monitoring:
-   - Verify ArgoCD metrics are being collected by Prometheus
-   - Check that ArgoCD dashboards are available in Grafana
+## 4. Configure Remaining Providers (Helm, GitHub, Kubernetes) [pending]
+### Dependencies: 11.2
+### Description: Set up credentials and configurations for the Helm, GitHub, and Kubernetes providers.
+### Details:
+For each provider:
 
-7. Perform a disaster recovery test:
-   - Backup ArgoCD state
-   - Simulate a failure scenario
-   - Restore from backup and verify functionality
+1. Helm Provider:
+   - Create a ProviderConfig that uses in-cluster configuration
+   - Configure any necessary release repositories
 
-8. Validate resource usage and scaling:
-   - Monitor ArgoCD resource consumption under load
-   - Verify Karpenter properly scales nodes when needed
+2. GitHub Provider:
+   - Create a GitHub personal access token with appropriate permissions
+   - Store the token as a Kubernetes secret
+   - Create a ProviderConfig that references this secret
+
+3. Kubernetes Provider:
+   - Set up a ProviderConfig using in-cluster configuration for same-cluster resources
+   - For multi-cluster management, create kubeconfig secrets and reference them in additional ProviderConfigs
+
+## 5. Implement Least Privilege Security Controls [pending]
+### Dependencies: 11.3, 11.4
+### Description: Review and refine all provider configurations to ensure they follow least privilege principles and implement proper security controls.
+### Details:
+1. Audit all provider configurations and associated IAM roles/permissions
+2. Restrict AWS IAM role permissions to only what's necessary for the specific resources being managed
+3. Limit GitHub token permissions to only required scopes
+4. For Kubernetes provider, ensure RBAC is properly configured with minimal permissions
+5. Document all security configurations and permissions
+6. Implement proper secret management for any credentials
+7. Set up monitoring for Crossplane components
+

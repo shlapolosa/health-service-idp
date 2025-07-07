@@ -1,0 +1,298 @@
+# Knative Serving Cost-Optimized Configuration
+# Aligned with vCluster + Karpenter cost optimization strategy
+
+---
+# Cost-Optimized Autoscaler Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-autoscaler
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/component: autoscaler-config
+data:
+  # Cost optimization: Allow scale-to-zero for non-critical services
+  enable-scale-to-zero: "true"
+  scale-to-zero-grace-period: "30s"        # Standard grace period
+  scale-to-zero-pod-retention-period: "2m" # Longer retention to avoid thrashing
+  
+  # Scaling Parameters - Conservative for cost optimization
+  min-scale: "0"                           # Allow scale-to-zero by default
+  max-scale: "5"                           # Lower max scale to control costs
+  initial-scale: "0"                       # Start with zero for cost savings
+  allow-zero-initial-scale: "true"         # Allow cold starts for cost optimization
+  
+  # Scaling Rates - Moderate to prevent excessive node provisioning
+  max-scale-up-rate: "5.0"                # Moderate scale-up rate
+  max-scale-down-rate: "2.0"              # Standard scale-down rate
+  
+  # Panic Mode Settings - Balanced for cost and performance
+  panic-window-percentage: "10.0"         # Standard panic window
+  panic-threshold-percentage: "200.0"     # Standard panic threshold
+  stable-window: "60s"                    # Standard stable window
+  
+  # Concurrency Settings - Optimized for efficient resource usage
+  container-concurrency-target-default: "50"     # Lower concurrency for better resource utilization
+  container-concurrency-target-percentage: "70"   # Standard target percentage
+  target-burst-capacity: "100"                   # Moderate burst capacity
+  
+  # Activator Settings
+  activator-capacity: "50"                # Lower capacity for cost optimization
+  
+  # Health Check Endpoint
+  concurrency-state-endpoint: "/health"   # Standard health endpoint
+
+---
+# Cost-Optimized Deployment Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-deployment
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/component: deployment-config
+data:
+  # Progressive deployment settings
+  progressDeadline: "300s"                # Shorter deadline for faster feedback
+  
+  # Resource optimization for queue sidecar
+  queueSidecarCPURequest: "25m"          # Minimal CPU request
+  queueSidecarMemoryRequest: "50Mi"      # Minimal memory request
+  queueSidecarCPULimit: "100m"          # Low CPU limit
+  queueSidecarMemoryLimit: "100Mi"      # Low memory limit
+  
+  # Registry settings
+  registriesSkippingTagResolving: "ko.local,dev.local,docker.io"
+
+---
+# Cost-Optimized Defaults Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-defaults
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/component: defaults-config
+data:
+  # Default resource requests/limits for cost optimization
+  revision-cpu-request: "100m"           # Minimal CPU request
+  revision-memory-request: "128Mi"       # Minimal memory request
+  revision-cpu-limit: "500m"            # Moderate CPU limit
+  revision-memory-limit: "256Mi"        # Moderate memory limit
+  
+  # Default container concurrency
+  container-concurrency: "50"           # Lower default concurrency
+  
+  # Default timeout
+  revision-timeout-seconds: "300"       # 5 minutes default timeout
+  
+  # Default annotations for cost optimization
+  revision-annotations: |
+    # Cost optimization annotations
+    cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+    # Karpenter optimization
+    karpenter.sh/do-not-evict: "false"
+
+---
+# Network Configuration for Cost Optimization
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-network
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/component: network-config
+data:
+  # Ingress settings - Use internal load balancer for cost savings
+  ingress-class: "istio.ingress.networking.knative.dev"
+  
+  # Domain configuration for internal services
+  domain-template: "{{.Name}}.{{.Namespace}}.svc.cluster.local"
+  
+  # Timeout settings - Shorter timeouts for cost optimization
+  default-timeout: "300s"               # 5 minutes
+  max-timeout: "600s"                   # 10 minutes max
+  
+  # Internal only by default for cost optimization
+  default-visibility: "cluster-local"
+
+---
+# Cost-Optimized GC Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-gc
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/component: gc-config
+data:
+  # Aggressive garbage collection for cost optimization
+  stale-revision-create-delay: "2h"       # Shorter delay
+  stale-revision-timeout: "6h"           # Shorter timeout
+  stale-revision-minimum-generations: "1" # Keep minimum generations
+  
+  # Cleanup settings - More aggressive for cost savings
+  stale-revision-lastpinned-debounce: "1h" # Shorter debounce
+
+---
+# Cost-Optimized Observability Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-observability
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/component: observability-config
+data:
+  # Minimal logging for cost optimization
+  logging.enable-var-log-collection: "false"
+  logging.revision-timeout-seconds: "60"
+  
+  # Metrics configuration - Essential metrics only
+  metrics.backend-destination: "prometheus"
+  metrics.request-metrics-backend-destination: "prometheus"
+  
+  # Disable expensive features
+  profiling.enable: "false"
+  
+  # Sample rates for cost optimization
+  metrics.request-metrics-sample-rate: "0.1"    # 10% sampling
+
+---
+# Cost-Optimized Service Template
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: cost-optimized-template
+  namespace: default
+  annotations:
+    # Cost optimization: Scale to zero when not in use
+    autoscaling.knative.dev/min-scale: "0"           # Scale to zero
+    autoscaling.knative.dev/max-scale: "3"           # Low max scale
+    autoscaling.knative.dev/target: "50"             # Moderate concurrency
+    
+    # Scale-to-zero optimization
+    autoscaling.knative.dev/scale-to-zero-pod-retention-period: "30s"
+    
+    # Resource optimization
+    autoscaling.knative.dev/window: "60s"            # Standard window
+    
+    # Internal-only for cost savings
+    serving.knative.dev/visibility: "cluster-local"
+    
+    # Karpenter optimization
+    karpenter.sh/do-not-evict: "false"
+    cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+spec:
+  template:
+    metadata:
+      annotations:
+        # Cost-optimized scaling
+        autoscaling.knative.dev/min-scale: "0"
+        autoscaling.knative.dev/max-scale: "3"
+        autoscaling.knative.dev/target: "50"
+        
+        # Resource optimization for queue proxy
+        queue.sidecar.serving.knative.dev/cpu-resource-request: "25m"
+        queue.sidecar.serving.knative.dev/memory-resource-request: "50Mi"
+        queue.sidecar.serving.knative.dev/cpu-resource-limit: "100m"
+        queue.sidecar.serving.knative.dev/memory-resource-limit: "100Mi"
+    spec:
+      # Lower concurrency for better resource utilization
+      containerConcurrency: 50
+      
+      # Shorter timeout for cost optimization
+      timeoutSeconds: 300  # 5 minutes
+      
+      containers:
+      - name: application
+        image: gcr.io/cloudrun/hello  # Replace with actual image
+        ports:
+        - containerPort: 8080
+          name: http1
+          protocol: TCP
+        
+        env:
+        - name: PORT
+          value: "8080"
+        
+        # Minimal resource requests for cost optimization
+        resources:
+          requests:
+            cpu: 100m      # Minimal CPU request
+            memory: 128Mi  # Minimal memory request
+          limits:
+            cpu: 500m      # Moderate CPU limit
+            memory: 256Mi  # Moderate memory limit
+        
+        # Health checks optimized for cost
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 15    # Less frequent checks
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10    # Less frequent checks
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        
+        # Security context
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1001
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+
+---
+# Cost-Optimized Critical Service Template (for services that need some warmth)
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: critical-service-template
+  namespace: default
+  annotations:
+    # Minimal warmth for critical services
+    autoscaling.knative.dev/min-scale: "1"           # Keep 1 warm instance
+    autoscaling.knative.dev/max-scale: "5"           # Low max scale
+    autoscaling.knative.dev/target: "75"             # Higher concurrency per instance
+    
+    # Longer retention for critical services
+    autoscaling.knative.dev/scale-to-zero-pod-retention-period: "5m"
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/min-scale: "1"
+        autoscaling.knative.dev/max-scale: "5"
+        autoscaling.knative.dev/target: "75"
+    spec:
+      containerConcurrency: 75  # Higher concurrency for efficiency
+      containers:
+      - name: application
+        image: gcr.io/cloudrun/hello
+        resources:
+          requests:
+            cpu: 200m      # Slightly higher for critical services
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 512Mi

@@ -1,0 +1,95 @@
+# Example VCluster claims showing explicit boolean component selection
+
+---
+# Minimal vCluster - just the cluster, no extras
+apiVersion: platform.example.org/v1alpha1
+kind: VClusterEnvironmentClaim
+metadata:
+  name: minimal-vcluster
+  namespace: default
+spec:
+  name: minimal-env
+  # All components default to false, so this creates just the vCluster
+
+---
+# Development vCluster with full observability stack
+apiVersion: platform.example.org/v1alpha1
+kind: VClusterEnvironmentClaim
+metadata:
+  name: dev-vcluster
+  namespace: default
+spec:
+  name: dev-env
+  domain: dev.mycompany.local
+  components:
+    # Full observability stack for development
+    grafana: true      # Metrics dashboards
+    prometheus: true   # Metrics collection
+    jaeger: true       # Distributed tracing
+    kiali: true        # Service mesh visualization
+    # GitOps for continuous deployment
+    argoCD: true       # GitOps deployments
+    # External access for testing
+    apiGateway: true   # AWS API Gateway integration
+
+---
+# Production vCluster with selective components
+apiVersion: platform.example.org/v1alpha1
+kind: VClusterEnvironmentClaim
+metadata:
+  name: prod-vcluster
+  namespace: default
+spec:
+  name: prod-env
+  domain: api.mycompany.com
+  components:
+    # Essential observability only
+    grafana: true      # Needed for monitoring dashboards
+    prometheus: true   # Needed for metrics collection
+    jaeger: false      # Skip tracing to reduce overhead
+    kiali: false       # Skip service mesh UI for production
+    # GitOps for production deployments
+    argoCD: true       # Essential for GitOps
+    # External access for users
+    apiGateway: true   # Essential for public API
+
+---
+# CI/CD testing vCluster - ephemeral with minimal components
+apiVersion: platform.example.org/v1alpha1
+kind: VClusterEnvironmentClaim
+metadata:
+  name: ci-test-vcluster
+  namespace: default
+spec:
+  name: ci-test-env
+  components:
+    # No observability needed for short-lived CI tests
+    grafana: false
+    prometheus: false
+    jaeger: false
+    kiali: false
+    # No GitOps needed - direct deployments in CI
+    argoCD: false
+    # API Gateway for integration tests
+    apiGateway: true   # Needed to test API endpoints
+
+---
+# Microservices development environment
+apiVersion: platform.example.org/v1alpha1
+kind: VClusterEnvironmentClaim
+metadata:
+  name: microservices-vcluster
+  namespace: default
+spec:
+  name: microservices-env
+  domain: microservices-dev.local
+  components:
+    # Full observability for microservices debugging
+    grafana: true      # Essential for multi-service dashboards
+    prometheus: true   # Essential for metrics across services
+    jaeger: true       # Essential for tracing across services
+    kiali: true        # Essential for service mesh topology
+    # GitOps for microservices deployment
+    argoCD: true       # Manage multiple application deployments
+    # External access for frontend/API testing
+    apiGateway: true   # Route traffic to different microservices

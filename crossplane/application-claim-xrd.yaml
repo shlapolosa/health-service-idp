@@ -1,0 +1,150 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xapplicationclaims.platform.example.org
+spec:
+  group: platform.example.org
+  names:
+    kind: XApplicationClaim
+    plural: xapplicationclaims
+  claimNames:
+    kind: ApplicationClaim
+    plural: applicationclaims
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            description: ApplicationClaim specification
+            properties:
+              appContainer:
+                type: string
+                description: Name of the AppContainer this microservice belongs to
+                pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+                maxLength: 63
+                default: "health-service-idp"
+              name:
+                type: string
+                description: Name of the microservice (must be DNS-1123 compliant)
+                pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+                maxLength: 63
+              language:
+                type: string
+                description: Programming language for the application
+                enum: [python, java]
+              framework:
+                type: string
+                description: Application framework to use
+                enum: [fastapi, springboot]
+              hasFrontend:
+                type: boolean
+                description: Whether the application includes a frontend component
+                default: false
+              database:
+                type: string
+                description: Database type to provision for the application
+                enum: [postgres, none]
+                default: none
+              cache:
+                type: string
+                description: Cache type to provision for the application
+                enum: [redis, none]
+                default: none
+              exposeApi:
+                type: boolean
+                description: Whether to expose the API via AWS API Gateway
+                default: false
+            required:
+            - name
+            - language
+            - framework
+          status:
+            type: object
+            description: ApplicationClaim status
+            properties:
+              ready:
+                type: boolean
+                description: Indicates whether the application is ready and deployed
+              repository:
+                type: object
+                description: GitHub repository information
+                properties:
+                  url:
+                    type: string
+                    description: GitHub repository URL
+                  branch:
+                    type: string
+                    description: Default branch name
+                  cloneUrl:
+                    type: string
+                    description: Git clone URL
+              application:
+                type: object
+                description: Deployed application information
+                properties:
+                  knativeService:
+                    type: string
+                    description: Knative service name
+                  endpoint:
+                    type: string
+                    description: Application endpoint URL
+                  apiGatewayEndpoint:
+                    type: string
+                    description: AWS API Gateway endpoint if exposeApi is true
+              infrastructure:
+                type: object
+                description: Provisioned infrastructure information
+                properties:
+                  database:
+                    type: object
+                    properties:
+                      endpoint:
+                        type: string
+                        description: Database connection endpoint
+                      credentials:
+                        type: string
+                        description: Secret name containing database credentials
+                  cache:
+                    type: object
+                    properties:
+                      endpoint:
+                        type: string
+                        description: Cache connection endpoint
+                      credentials:
+                        type: string
+                        description: Secret name containing cache credentials
+              cicd:
+                type: object
+                description: CI/CD pipeline information
+                properties:
+                  dockerImage:
+                    type: string
+                    description: Docker image repository and tag
+                  lastBuild:
+                    type: string
+                    description: Last successful build timestamp
+                  pipelineStatus:
+                    type: string
+                    description: Current pipeline status
+              conditions:
+                type: array
+                description: Detailed status conditions
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+                    reason:
+                      type: string
+                    message:
+                      type: string

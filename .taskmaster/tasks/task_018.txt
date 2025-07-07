@@ -1,0 +1,92 @@
+# Task ID: 18
+# Title: Set Up Observability Stack with Prometheus, Grafana, Jaeger, and Kiali
+# Status: pending
+# Dependencies: 13, 16
+# Priority: medium
+# Description: Install and configure the observability stack (Prometheus, Grafana, Jaeger, Kiali) for monitoring and tracing of vCluster environments and applications.
+# Details:
+1. Create Helm charts or Kustomize manifests for each component
+2. Configure Prometheus with appropriate scrape configs for Knative and Istio
+3. Set up Grafana dashboards for Kubernetes, Knative, and Istio metrics
+4. Configure Jaeger for distributed tracing
+5. Set up Kiali for service mesh visualization
+
+```yaml
+# Prometheus configuration for Knative and Istio metrics
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+    scrape_configs:
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+      - job_name: 'istio-mesh'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: istio-mesh
+```
+
+Implement a modular approach where components can be enabled/disabled based on the 'include' field in VClusterEnvironmentClaim. Configure proper resource limits and requests for each component to ensure stability.
+
+# Test Strategy:
+1. Verify installation of each component
+2. Test metric collection from Knative and Istio
+3. Validate Grafana dashboards for visibility into key metrics
+4. Test distributed tracing with Jaeger
+5. Verify service mesh visualization with Kiali
+6. Test resource usage and performance impact
+7. Validate that components can be enabled/disabled as specified
+
+# Subtasks:
+## 1. Create Helm Charts for Observability Components [pending]
+### Dependencies: None
+### Description: Develop Helm charts for Prometheus, Grafana, Jaeger, and Kiali that can be conditionally installed based on the 'include' field in VClusterEnvironmentClaim.
+### Details:
+Create a directory structure for Helm charts with separate charts for each component (prometheus, grafana, jaeger, kiali). Each chart should include templates for deployments, services, configmaps, and RBAC resources. Implement a values.yaml file for each chart with configurable resource limits/requests and other parameters. Create an umbrella chart that can conditionally enable/disable each component based on configuration values.
+
+## 2. Configure Prometheus with Scrape Configs for Knative and Istio [pending]
+### Dependencies: None
+### Description: Set up Prometheus with appropriate scrape configurations to collect metrics from Kubernetes, Knative, and Istio components.
+### Details:
+Extend the Prometheus Helm chart to include the provided scrape configuration for Kubernetes pods and Istio mesh. Add additional scrape configurations for Knative components (activator, autoscaler, controller). Configure appropriate relabeling rules to properly identify and categorize metrics. Set up alerting rules for critical service metrics. Ensure Prometheus has the necessary RBAC permissions to discover and scrape targets across namespaces.
+
+## 3. Set Up Grafana with Dashboards for Kubernetes, Knative, and Istio [pending]
+### Dependencies: None
+### Description: Configure Grafana with pre-built dashboards for visualizing metrics from Kubernetes, Knative, and Istio, and set up Prometheus as a data source.
+### Details:
+Configure Grafana to use Prometheus as a data source in the Helm chart. Import or create dashboards for Kubernetes cluster metrics, node metrics, and pod metrics. Import or create Knative-specific dashboards for monitoring serving and eventing components. Import or create Istio dashboards for monitoring service mesh performance. Set up a default organization, users, and permissions. Configure persistent storage for Grafana to retain dashboard configurations.
+
+## 4. Configure Jaeger for Distributed Tracing [pending]
+### Dependencies: None
+### Description: Set up Jaeger for collecting and visualizing distributed traces from applications and service mesh components.
+### Details:
+Configure Jaeger with appropriate storage backend (start with in-memory for development, Elasticsearch for production). Set up Jaeger agent as a DaemonSet to collect traces from each node. Configure sampling strategies to balance performance and observability. Integrate Jaeger with Istio to collect traces automatically from the service mesh. Create a service and ingress/route for accessing the Jaeger UI. Configure appropriate resource limits based on expected trace volume.
+
+## 5. Integrate Kiali for Service Mesh Visualization and Management [pending]
+### Dependencies: None
+### Description: Set up Kiali to provide visualization and management capabilities for the Istio service mesh.
+### Details:
+Configure Kiali to use Prometheus as a metrics source. Set up integration with Jaeger for trace visualization within Kiali. Configure RBAC for Kiali to access required Kubernetes resources. Set up authentication for the Kiali dashboard (OAuth or basic auth). Create a service and ingress/route for accessing the Kiali UI. Configure Kiali to display custom application health metrics. Ensure Kiali can properly visualize the service mesh topology for vCluster environments.
+

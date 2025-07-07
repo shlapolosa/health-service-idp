@@ -1,454 +1,110 @@
 # Task ID: 12
-# Title: Configure OAM Project with Knative and ArgoCD Deployment
-# Status: done
-# Dependencies: 11, 4
-# Priority: medium
-# Description: Set up an Open Application Model (OAM) project that leverages Knative for serverless capabilities and configure ArgoCD for GitOps-based deployment of the application components.
+# Title: Configure Karpenter for Dynamic Node Provisioning
+# Status: pending
+# Dependencies: None
+# Priority: high
+# Description: Set up Karpenter in the management cluster with appropriate provisioners, taints, and tolerations to support dynamic provisioning of nodes for vCluster workloads.
 # Details:
-1. Verify Knative and Istio installation:
-   
-   kubectl get pods -n knative-serving
-   kubectl get pods -n istio-system
-   
+Install Karpenter v0.30.0+ with the following configuration:
 
-2. Install Vela CLI if not already available:
-   
-   curl -fsSl https://kubevela.io/script/install.sh | bash
-   
+1. Create dedicated node templates for vCluster workloads with taints
+2. Configure provisioners with low scale-up delay (< 10s) to minimize cold start issues
+3. Set up appropriate instance types optimized for cost/performance
 
-3. Initialize OAM project structure:
-   
-   mkdir -p oam-knative-project/charts
-   mkdir -p oam-knative-project/applications
-   cd oam-knative-project
-   
+```yaml
+# Karpenter Provisioner for vCluster workloads
+apiVersion: karpenter.sh/v1alpha5
+kind: Provisioner
+metadata:
+  name: vcluster-provisioner
+spec:
+  requirements:
+    - key: karpenter.sh/capacity-type
+      operator: In
+      values: ["spot", "on-demand"]
+    - key: node.kubernetes.io/instance-type
+      operator: In
+      values: ["t3a.medium", "t3a.large", "m5a.large"]
+  taints:
+    - key: workload-type
+      value: vcluster
+      effect: NoSchedule
+  limits:
+    resources:
+      cpu: 1000
+      memory: 1000Gi
+  providerRef:
+    name: default
+  ttlSecondsAfterEmpty: 30
+  ttlSecondsUntilExpired: 2592000 # 30 days
+  startupTaints:
+    - key: node.kubernetes.io/not-ready
+      effect: NoSchedule
+  consolidation:
+    enabled: true
+```
 
-4. Create a KubeVela application definition file (application.yaml):
-   yaml
-   apiVersion: core.oam.dev/v1beta1
-   kind: Application
-   metadata:
-     name: agent-orchestration-system
-     namespace: default
-   spec:
-     components:
-       - name: orchestration-service
-         type: webservice
-         properties:
-           image: ${REGISTRY}/orchestration-service:${TAG}
-           ports:
-             - port: 8080
-               expose: true
-           env:
-             - name: REDIS_HOST
-               value: redis-service
-         traits:
-           - type: scaler
-             properties:
-               replicas: 2
-           - type: service-binding
-             properties:
-               envMappings:
-                 REDIS_PASSWORD:
-                   secret: redis-credentials
-                   key: password
-       - name: agent-function
-         type: knative-serving
-         properties:
-           image: ${REGISTRY}/agent-function:${TAG}
-           port: 8080
-   
-
-5. Create a Vela component definition for Knative integration:
-   yaml
-   apiVersion: core.oam.dev/v1beta1
-   kind: ComponentDefinition
-   metadata:
-     name: knative-serving
-     namespace: vela-system
-     annotations:
-       definition.oam.dev/description: "Knative serving component for serverless workloads"
-   spec:
-     workload:
-       definition:
-         apiVersion: serving.knative.dev/v1
-         kind: Service
-     schematic:
-       cue:
-         template: |
-           output: {
-             apiVersion: "serving.knative.dev/v1"
-             kind:       "Service"
-             metadata: name: context.name
-             spec: {
-               template: {
-                 spec: {
-                   containers: [{
-                     image: parameter.image
-                     ports: [{
-                       containerPort: parameter.port
-                     }]
-                     if parameter["env"] != _|_ {
-                       env: parameter.env
-                     }
-                   }]
-                 }
-               }
-             }
-           }
-           parameter: {
-             image: string
-             port: *8080 | int
-             env?: [...{
-               name:  string
-               value: string
-             }]
-           }
-   
-
-6. Create ArgoCD application manifest for GitOps deployment:
-   yaml
-   apiVersion: argoproj.io/v1alpha1
-   kind: Application
-   metadata:
-     name: agent-orchestration-oam
-     namespace: argocd
-   spec:
-     project: default
-     source:
-       repoURL: https://github.com/yourusername/oam-knative-project.git
-       targetRevision: HEAD
-       path: ./
-     destination:
-       server: https://kubernetes.default.svc
-       namespace: default
-     syncPolicy:
-       automated:
-         prune: true
-         selfHeal: true
-       syncOptions:
-         - CreateNamespace=true
-   
-
-7. Configure Vela to use Knative for function deployment:
-   
-   vela component apply knative-serving --namespace vela-system
-   
-
-8. Test Knative function deployment using Vela:
-   
-   vela init sample-function --type knative-serving
-   cd sample-function
-   # Edit the function code as needed
-   vela up
-   
-
-9. Set up a Git repository for the OAM project:
-   
-   git init
-   git add .
-   git commit -m "Initial OAM project setup with Knative integration"
-   git remote add origin https://github.com/yourusername/oam-knative-project.git
-   git push -u origin main
-   
-
-10. Apply the ArgoCD application to enable GitOps deployment:
-    
-    kubectl apply -f argocd-application.yaml
-    
-
-11. Configure ArgoCD to monitor the Git repository for changes:
-    
-    argocd app sync agent-orchestration-oam
-    
-
-12. Implement CI pipeline to update application images and trigger ArgoCD sync:
-    - Create GitHub Actions or Jenkins pipeline
-    - Configure image build and push to registry
-    - Update image tags in OAM application definition
-    - Commit changes to trigger ArgoCD sync
+Implement node template with appropriate security groups, IAM roles, and subnet configuration. Configure Karpenter to use interruption handling for Spot instances to improve reliability.
 
 # Test Strategy:
-1. Verify Vela and Knative CLI installation:
-   
-   vela version
-   kn version
-   func version
-   
-
-2. Test OAM component definition registration:
-   
-   vela component list
-   
-   Verify that the "knative-serving" component type is listed.
-
-3. Validate the OAM application configuration:
-   
-   vela validate -f application.yaml
-   
-
-4. Test deployment of a sample Knative function:
-   
-   func create -l python sample-function
-   cd sample-function
-   func deploy
-   
-   Verify the function is deployed and accessible.
-
-5. Test auto-scaling of the Knative service:
-   
-   # Generate load to the function
-   hey -z 1m -c 50 http://sample-function.default.example.com
-   # Check scaling behavior
-   kubectl get pods -n default
-   
-
-6. Verify ArgoCD deployment:
-   
-   argocd app get agent-orchestration-oam
-   
-   Ensure the application is synced and healthy.
-
-7. Test GitOps workflow:
-   
-   # Make a change to the application.yaml
-   git commit -am "Update application configuration"
-   git push
-   # Verify ArgoCD detects and applies changes
-   argocd app get agent-orchestration-oam
-   
-
-8. Validate service connectivity:
-   
-   # Test connectivity between components
-   kubectl exec -it deployment/orchestration-service -- curl agent-function.default.svc.cluster.local
-   
-
-9. Perform end-to-end testing:
-   - Deploy a complete application with multiple components
-   - Verify all components are running
-   - Test communication between components
-   - Verify Knative auto-scaling functionality
-
-10. Test rollback capability:
-    
-    argocd app history agent-orchestration-oam
-    argocd app rollback agent-orchestration-oam 1
-    
-    Verify the application rolls back to the previous version.
+1. Deploy a test pod with the vCluster taint toleration and verify Karpenter provisions a new node
+2. Test scale-down by removing workloads and verifying node termination
+3. Measure node provisioning latency to ensure it meets cold-start requirements (<30s)
+4. Verify proper instance type selection based on workload requirements
+5. Test interruption handling by simulating a spot instance interruption
 
 # Subtasks:
-## 1. Verify Knative Installation and Configuration [done]
+## 1. Install Karpenter v0.30.0+ in the management cluster [pending]
 ### Dependencies: None
-### Description: Ensure Knative Serving is properly installed and configured in the Kubernetes cluster before proceeding with OAM setup.
+### Description: Install Karpenter v0.30.0+ in the management cluster using Helm and configure the necessary AWS infrastructure components.
 ### Details:
-1. Check Knative Serving installation: `kubectl get pods -n knative-serving`
-2. Verify Knative version: `kubectl get namespace knative-serving -o jsonpath='{.metadata.labels.serving\.knative\.dev/release}'`
-3. Confirm Knative CRDs are installed: `kubectl get crd | grep knative`
-4. Test basic Knative functionality by deploying a sample service:
-yaml
-apiVersion: serving.knative.dev/v1
-kind: Service
-metadata:
-  name: hello
-  namespace: default
-spec:
-  template:
-    spec:
-      containers:
-        - image: gcr.io/knative-samples/helloworld-go
-          env:
-            - name: TARGET
-              value: "Knative Test"
+1. Create necessary IAM roles for Karpenter with appropriate permissions for EC2 instance management
+2. Set up IRSA (IAM Roles for Service Accounts) for Karpenter
+3. Install Karpenter using Helm chart version 0.30.0 or newer
+4. Configure Karpenter controller with appropriate AWS region and cluster name
+5. Verify Karpenter installation by checking pods and controller logs
 
-5. Verify the service is running: `kubectl get ksvc hello`
-6. Document any configuration issues and resolve them before proceeding.
-
-## 2. Set Up OAM Project Structure [done]
+## 2. Create node template with security groups and IAM configuration [pending]
 ### Dependencies: 12.1
-### Description: Create the necessary directory structure and configuration files for the OAM project.
+### Description: Create a node template for Karpenter that includes the necessary security groups, IAM roles, and subnet configuration for vCluster workloads.
 ### Details:
-1. Create project directory structure:
+1. Create an EC2 NodeClass or equivalent resource defining the node template
+2. Configure security groups that allow necessary network traffic for vCluster workloads
+3. Set up IAM instance profile with permissions for node operations
+4. Configure subnet selection to use private subnets in multiple availability zones
+5. Set up appropriate user data for node bootstrap process
+6. Configure instance metadata service (IMDSv2) for security
 
-mkdir -p oam-project/{base,components,traits,applications,workflows}
-
-2. Initialize Git repository:
-
-cd oam-project
-git init
-
-3. Create a README.md with project overview
-4. Set up .gitignore file for Kubernetes and development artifacts
-5. Create a basic project configuration file (project.yaml):
-yaml
-name: oam-project
-description: OAM-based application deployment with Knative and ArgoCD
-version: 0.1.0
-maintainers:
-  - name: DevOps Team
-    email: devops@example.com
-
-6. Document the project structure in README.md with explanations for each directory's purpose
-7. Commit the initial structure: `git add . && git commit -m "Initial OAM project structure"`
-
-## 3. Define KubeVela Application Components [done]
+## 3. Configure vCluster provisioner with taints and instance types [pending]
 ### Dependencies: 12.2
-### Description: Create the component definitions for the application using KubeVela's OAM implementation.
+### Description: Create the Karpenter provisioner for vCluster workloads with appropriate taints, instance types, and capacity settings as specified in the requirements.
 ### Details:
-1. Install KubeVela CLI if not already installed: `curl -fsSl https://kubevela.io/script/install.sh | bash`
-2. Verify KubeVela installation: `vela version`
-3. Create a basic component definition in `components/web-service.yaml`:
-yaml
-apiVersion: core.oam.dev/v1beta1
-kind: ComponentDefinition
-metadata:
-  name: web-service
-  namespace: vela-system
-spec:
-  workload:
-    definition:
-      apiVersion: serving.knative.dev/v1
-      kind: Service
-  schematic:
-    cue:
-      template: |
-        output: {
-          apiVersion: "serving.knative.dev/v1"
-          kind:       "Service"
-          metadata: name: context.name
-          spec: {
-            template: {
-              spec: {
-                containers: [{
-                  image: parameter.image
-                  env: parameter.env
-                  ports: [{
-                    containerPort: parameter.port
-                  }]
-                }]
-              }
-            }
-          }
-        }
-        parameter: {
-          image: string
-          port: *80 | int
-          env: [...{
-            name:  string
-            value: string
-          }]
-        }
+1. Create the vcluster-provisioner resource as specified in the YAML template
+2. Configure the instance types (t3a.medium, t3a.large, m5a.large) optimized for cost/performance
+3. Set up taints with key 'workload-type', value 'vcluster', and effect 'NoSchedule'
+4. Configure resource limits (CPU: 1000, Memory: 1000Gi)
+5. Set ttlSecondsAfterEmpty to 30 and ttlSecondsUntilExpired to 2592000 (30 days)
+6. Enable consolidation for cost optimization
 
-4. Apply the component definition: `kubectl apply -f components/web-service.yaml`
-5. Verify the component is registered: `vela components`
-6. Test the component by creating a simple application that uses it
-7. Document the component parameters and usage examples
-
-## 4. Create OAM Application Configuration [done]
+## 4. Implement Spot instance interruption handling [pending]
 ### Dependencies: 12.3
-### Description: Define the complete application using OAM application configuration, including components and traits.
+### Description: Configure Karpenter to handle Spot instance interruptions gracefully to improve reliability of vCluster workloads running on Spot instances.
 ### Details:
-1. Create a trait definition for scaling in `traits/auto-scaler.yaml`:
-yaml
-apiVersion: core.oam.dev/v1beta1
-kind: TraitDefinition
-metadata:
-  name: auto-scaler
-  namespace: vela-system
-spec:
-  appliesToWorkloads:
-    - web-service
-  schematic:
-    cue:
-      template: |
-        patch: {
-          spec: {
-            template: {
-              metadata: annotations: {
-                "autoscaling.knative.dev/minScale": parameter.min
-                "autoscaling.knative.dev/maxScale": parameter.max
-                if parameter.target != _|_ {
-                  "autoscaling.knative.dev/target": parameter.target
-                }
-              }
-            }
-          }
-        }
-        parameter: {
-          min: *"1" | string
-          max: *"10" | string
-          target?: string
-        }
+1. Enable the AWS Node Termination Handler or Karpenter's built-in interruption handling
+2. Configure appropriate draining behavior for Spot instances receiving interruption notices
+3. Set up event handling for EC2 Spot Instance Interruption Warning events
+4. Implement graceful pod termination with appropriate termination grace periods
+5. Configure Karpenter to quickly provision replacement capacity when interruptions occur
+6. Set up monitoring and alerting for Spot instance interruptions
 
-2. Apply the trait definition: `kubectl apply -f traits/auto-scaler.yaml`
-3. Create an application configuration in `applications/web-app.yaml`:
-yaml
-apiVersion: core.oam.dev/v1beta1
-kind: Application
-metadata:
-  name: web-application
-  namespace: default
-spec:
-  components:
-    - name: frontend
-      type: web-service
-      properties:
-        image: nginx:latest
-        port: 80
-        env:
-          - name: ENV
-            value: "production"
-      traits:
-        - type: auto-scaler
-          properties:
-            min: "2"
-            max: "5"
-            target: "80"
-
-4. Apply the application: `kubectl apply -f applications/web-app.yaml`
-5. Verify the application is deployed: `vela ls`
-6. Test the application functionality and scaling behavior
-7. Document the application configuration options and trait parameters
-
-## 5. Integrate with ArgoCD for GitOps Deployment [done]
-### Dependencies: 12.4
-### Description: Set up ArgoCD to manage the OAM application deployment using GitOps principles.
+## 5. Optimize Karpenter for fast scale-up and minimal cold start [pending]
+### Dependencies: 12.3, 12.4
+### Description: Fine-tune Karpenter configuration to minimize scale-up delay and cold start issues for vCluster workloads.
 ### Details:
-1. Verify ArgoCD installation: `kubectl get pods -n argocd`
-2. Create an ArgoCD application manifest in `argocd/application.yaml`:
-yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: oam-application
-  namespace: argocd
-spec:
-  project: default
-  source:
-    repoURL: https://github.com/yourusername/oam-project.git
-    targetRevision: HEAD
-    path: applications
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: default
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
-
-3. Apply the ArgoCD application: `kubectl apply -f argocd/application.yaml`
-4. Push your OAM project to GitHub:
-
-git remote add origin https://github.com/yourusername/oam-project.git
-git push -u origin main
-
-5. Verify ArgoCD syncs the application: `argocd app get oam-application`
-6. Set up a test workflow to validate the GitOps process:
-   - Make a change to the application configuration
-   - Commit and push the change
-   - Verify ArgoCD detects and applies the change
-7. Document the ArgoCD integration process and monitoring procedures
-8. Create a CI pipeline configuration file (.github/workflows/ci.yaml or .gitlab-ci.yml) to validate OAM configurations before they're applied
+1. Configure provisioner with low scale-up delay (< 10s) as required
+2. Implement appropriate node initialization and readiness settings
+3. Configure kubelet startup parameters for faster node registration
+4. Set up node warm pools if necessary for critical workloads
+5. Implement monitoring for scale-up events and latency
+6. Document the configuration and performance characteristics for the team
 

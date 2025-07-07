@@ -1,0 +1,114 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xappcontainerclaims.platform.example.org
+spec:
+  group: platform.example.org
+  names:
+    kind: XAppContainerClaim
+    plural: xappcontainerclaims
+  claimNames:
+    kind: AppContainerClaim
+    plural: appcontainerclaims
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            description: AppContainerClaim specification for creating application container infrastructure
+            properties:
+              name:
+                type: string
+                description: Name of the application container (must be DNS-1123 compliant)
+                pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+                maxLength: 63
+              description:
+                type: string
+                description: Description of the application container
+                default: "CLAUDE.md-compliant application container"
+              gitHubOrg:
+                type: string
+                description: GitHub organization where repositories will be created
+                default: "socrates12345"
+              dockerRegistry:
+                type: string
+                description: Docker registry for container images
+                default: "docker.io/socrates12345"
+              enableObservability:
+                type: boolean
+                description: Whether to enable observability stack (Prometheus, Grafana, Jaeger)
+                default: true
+              enableSecurity:
+                type: boolean
+                description: Whether to enable security scanning and policies
+                default: true
+            required:
+            - name
+          status:
+            type: object
+            description: AppContainerClaim status
+            properties:
+              ready:
+                type: boolean
+                description: Indicates whether the app container is ready
+              sourceRepository:
+                type: object
+                description: Source repository information
+                properties:
+                  url:
+                    type: string
+                    description: Source repository URL
+                  branch:
+                    type: string
+                    description: Default branch name
+                  cloneUrl:
+                    type: string
+                    description: Git clone URL
+              gitopsRepository:
+                type: object
+                description: GitOps repository information
+                properties:
+                  url:
+                    type: string
+                    description: GitOps repository URL
+                  branch:
+                    type: string
+                    description: Default branch name
+                  cloneUrl:
+                    type: string
+                    description: Git clone URL
+              infrastructure:
+                type: object
+                description: Infrastructure status
+                properties:
+                  cicdConfigured:
+                    type: boolean
+                    description: CI/CD pipeline configured
+                  argoCDConfigured:
+                    type: boolean
+                    description: ArgoCD app-of-apps configured
+                  secretsConfigured:
+                    type: boolean
+                    description: Secrets management configured
+              conditions:
+                type: array
+                description: Detailed status conditions
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+                    reason:
+                      type: string
+                    message:
+                      type: string

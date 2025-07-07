@@ -1,0 +1,123 @@
+# Knative Serving Installation and Configuration
+# This file contains all necessary manifests for Knative Serving with cold start protection
+
+---
+# Knative Serving Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: knative-serving
+  labels:
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/component: knative-serving
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+
+---
+# Knative Serving CRDs Installation Job
+# This job installs the latest Knative Serving CRDs
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: knative-serving-crds-installer
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/component: installer
+spec:
+  template:
+    spec:
+      serviceAccountName: knative-installer
+      restartPolicy: OnFailure
+      containers:
+      - name: knative-installer
+        image: bitnami/kubectl:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "Installing Knative Serving CRDs..."
+          
+          # Install Knative Serving CRDs (v1.12.0)
+          kubectl apply -f https://github.com/knative/serving/releases/download/knative-v1.12.0/serving-crds.yaml
+          
+          echo "Waiting for CRDs to be established..."
+          kubectl wait --for condition=established --timeout=60s crd/services.serving.knative.dev
+          kubectl wait --for condition=established --timeout=60s crd/configurations.serving.knative.dev
+          kubectl wait --for condition=established --timeout=60s crd/revisions.serving.knative.dev
+          kubectl wait --for condition=established --timeout=60s crd/routes.serving.knative.dev
+          
+          echo "Knative Serving CRDs installed successfully"
+
+---
+# Knative Serving Core Installation Job
+# This job installs the Knative Serving core components
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: knative-serving-core-installer
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/component: installer
+spec:
+  template:
+    spec:
+      serviceAccountName: knative-installer
+      restartPolicy: OnFailure
+      containers:
+      - name: knative-core-installer
+        image: bitnami/kubectl:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "Installing Knative Serving Core..."
+          
+          # Install Knative Serving Core (v1.12.0)
+          kubectl apply -f https://github.com/knative/serving/releases/download/knative-v1.12.0/serving-core.yaml
+          
+          echo "Waiting for Knative Serving components to be ready..."
+          kubectl wait --for=condition=Ready pod -l app=controller -n knative-serving --timeout=300s
+          kubectl wait --for=condition=Ready pod -l app=activator -n knative-serving --timeout=300s
+          kubectl wait --for=condition=Ready pod -l app=autoscaler -n knative-serving --timeout=300s
+          kubectl wait --for=condition=Ready pod -l app=webhook -n knative-serving --timeout=300s
+          
+          echo "Knative Serving Core installed successfully"
+
+---
+# ServiceAccount for Knative installation
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: knative-installer
+  namespace: knative-serving
+
+---
+# ClusterRole for Knative installation
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: knative-installer
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["*"]
+
+---
+# ClusterRoleBinding for Knative installation
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: knative-installer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: knative-installer
+subjects:
+- kind: ServiceAccount
+  name: knative-installer
+  namespace: knative-serving

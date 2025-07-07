@@ -1,0 +1,673 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: app-container-claim-composition
+  labels:
+    crossplane.io/xrd: xappcontainerclaims.platform.example.org
+    provider: github-kubernetes-helm
+spec:
+  writeConnectionSecretsToNamespace: crossplane-system
+  compositeTypeRef:
+    apiVersion: platform.example.org/v1alpha1
+    kind: XAppContainerClaim
+  environment:
+    environmentRefs:
+    - type: Selector
+      selector:
+        matchLabels:
+        - key: environment
+          type: Value
+          value: default
+  resources:
+  
+  # Create Source Repository (microservices container)
+  - name: source-repository
+    base:
+      apiVersion: repo.github.upbound.io/v1alpha1
+      kind: Repository
+      spec:
+        forProvider:
+          name: placeholder
+          description: "CLAUDE.md-compliant microservices container"
+          private: false
+          autoInit: true
+          gitIgnoreTemplate: "Python"
+          licenseTemplate: mit
+          topics: ["microservices", "crossplane", "claude-compliant", "app-container"]
+        providerConfigRef:
+          name: github-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.name
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.description
+      toFieldPath: spec.forProvider.description
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-source-repo"
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.htmlUrl
+      toFieldPath: status.sourceRepository.url
+      policy:
+        fromFieldPath: Optional
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.cloneUrl
+      toFieldPath: status.sourceRepository.cloneUrl
+      policy:
+        fromFieldPath: Optional
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.defaultBranch
+      toFieldPath: status.sourceRepository.branch
+      policy:
+        fromFieldPath: Optional
+
+  # Create GitOps Repository
+  - name: gitops-repository
+    base:
+      apiVersion: repo.github.upbound.io/v1alpha1
+      kind: Repository
+      spec:
+        forProvider:
+          name: placeholder
+          description: "GitOps repository for app container deployment manifests"
+          private: false
+          autoInit: true
+          gitIgnoreTemplate: "Go"
+          licenseTemplate: mit
+          topics: ["gitops", "argocd", "oam", "kubernetes"]
+        providerConfigRef:
+          name: github-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-gitops"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-gitops-repo"
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.htmlUrl
+      toFieldPath: status.gitopsRepository.url
+      policy:
+        fromFieldPath: Optional
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.cloneUrl
+      toFieldPath: status.gitopsRepository.cloneUrl
+      policy:
+        fromFieldPath: Optional
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.defaultBranch
+      toFieldPath: status.gitopsRepository.branch
+      policy:
+        fromFieldPath: Optional
+
+  # Setup Source Repository Structure
+  - name: source-repo-setup
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: placeholder
+              namespace: default
+            spec:
+              template:
+                spec:
+                  serviceAccountName: crossplane-github-provider
+                  restartPolicy: OnFailure
+                  containers:
+                  - name: source-repo-setup
+                    image: alpine/git:latest
+                    command:
+                    - /bin/sh
+                    - -c
+                    - |
+                      set -e
+                      echo "Setting up source repository structure for $APP_NAME..."
+                      
+                      TEMP_DIR="/tmp/repo-$APP_NAME"
+                      mkdir -p $TEMP_DIR
+                      cd $TEMP_DIR
+                      
+                      # Clone the repository
+                      git clone $SOURCE_CLONE_URL .
+                      
+                      # Create microservices container structure
+                      mkdir -p microservices
+                      mkdir -p shared-libs/common
+                      mkdir -p .github/workflows
+                      mkdir -p .github/scripts
+                      
+                      # Copy the existing comprehensive GitOps workflow
+                      cat > .github/workflows/comprehensive-gitops.yml << 'EOF'
+                      name: Comprehensive GitOps Pipeline
+                      
+                      on:
+                        push:
+                          branches: [ main, develop, 'feature/*', 'hotfix/*', 'release/*' ]
+                          paths:
+                            - 'microservices/**'
+                        pull_request:
+                          branches: [ main ]
+                          paths:
+                            - 'microservices/**'
+                      
+                      permissions:
+                        contents: read
+                        actions: read
+                        security-events: write
+                        packages: write
+                      
+                      env:
+                        REGISTRY: docker.io
+                        REGISTRY_USERNAME: $DOCKER_REGISTRY_USER
+                        GITOPS_REPO: $APP_NAME-gitops
+                        GITOPS_BRANCH: main
+                      
+                      jobs:
+                        detect-changes:
+                          runs-on: ubuntu-latest
+                          outputs:
+                            changed-services: ${{ steps.changes.outputs.changed-services }}
+                            changed-services-json: ${{ steps.changes.outputs.changed-services-json }}
+                            should-deploy: ${{ steps.changes.outputs.should-deploy }}
+                          steps:
+                            - name: Checkout code
+                              uses: actions/checkout@v4
+                              with:
+                                fetch-depth: 0
+                            - name: Detect changed services
+                              id: changes
+                              run: |
+                                if [ "${{ github.event_name }}" = "pull_request" ]; then
+                                  CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | grep -E '^microservices/' || true)
+                                else
+                                  CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -E '^microservices/' || true)
+                                fi
+                                
+                                CHANGED_SERVICES=""
+                                CHANGED_SERVICES_JSON="[]"
+                                
+                                if [ ! -z "$CHANGED_FILES" ]; then
+                                  SERVICE_NAMES=$(echo "$CHANGED_FILES" | cut -d'/' -f1-2 | sort -u | grep '^microservices/' | cut -d'/' -f2)
+                                  CHANGED_SERVICES=$(echo "$SERVICE_NAMES" | tr '\n' ',' | sed 's/,$//')
+                                  
+                                  if [ ! -z "$SERVICE_NAMES" ]; then
+                                    CHANGED_SERVICES_JSON="["
+                                    FIRST=true
+                                    for service in $SERVICE_NAMES; do
+                                      if [ "$FIRST" = true ]; then
+                                        CHANGED_SERVICES_JSON="$CHANGED_SERVICES_JSON\"$service\""
+                                        FIRST=false
+                                      else
+                                        CHANGED_SERVICES_JSON="$CHANGED_SERVICES_JSON,\"$service\""
+                                      fi
+                                    done
+                                    CHANGED_SERVICES_JSON="$CHANGED_SERVICES_JSON]"
+                                  fi
+                                fi
+                                
+                                SHOULD_DEPLOY="false"
+                                if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+                                  SHOULD_DEPLOY="true"
+                                fi
+                                
+                                echo "changed-services=$CHANGED_SERVICES" >> $GITHUB_OUTPUT
+                                echo "changed-services-json=$CHANGED_SERVICES_JSON" >> $GITHUB_OUTPUT
+                                echo "should-deploy=$SHOULD_DEPLOY" >> $GITHUB_OUTPUT
+                      
+                        build-and-push:
+                          needs: detect-changes
+                          if: needs.detect-changes.outputs.changed-services != '' && fromJson(needs.detect-changes.outputs.changed-services-json)[0] != null
+                          runs-on: ubuntu-latest
+                          strategy:
+                            matrix:
+                              service: ${{ fromJson(needs.detect-changes.outputs.changed-services-json) }}
+                          steps:
+                            - name: Checkout code
+                              uses: actions/checkout@v4
+                            - name: Set up Docker Buildx
+                              uses: docker/setup-buildx-action@v3
+                            - name: Log in to Docker Registry
+                              uses: docker/login-action@v3
+                              with:
+                                registry: ${{ env.REGISTRY }}
+                                username: ${{ env.REGISTRY_USERNAME }}
+                                password: ${{ secrets.DOCKER_PASSWORD }}
+                            - name: Build and push
+                              run: |
+                                COMMIT_SHA="${GITHUB_SHA:0:7}"
+                                IMAGE_TAG="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/${{ matrix.service }}:$COMMIT_SHA"
+                                
+                                docker build -t "$IMAGE_TAG" \
+                                  --build-arg BUILD_COMMIT="$COMMIT_SHA" \
+                                  --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+                                  --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
+                                  --label "org.opencontainers.image.revision=${{ github.sha }}" \
+                                  ./microservices/${{ matrix.service }}
+                                
+                                docker push "$IMAGE_TAG"
+                                echo "✅ Successfully built and pushed ${{ matrix.service }}"
+                      
+                        trigger-gitops-update:
+                          needs: [detect-changes, build-and-push]
+                          if: needs.detect-changes.outputs.should-deploy == 'true'
+                          runs-on: ubuntu-latest
+                          steps:
+                            - name: Trigger GitOps repository update
+                              run: |
+                                SERVICES="${{ needs.detect-changes.outputs.changed-services }}"
+                                COMMIT_SHA="${GITHUB_SHA:0:7}"
+                                
+                                export GH_TOKEN="${{ secrets.PERSONAL_ACCESS_TOKEN }}"
+                                
+                                gh api repos/${{ github.repository_owner }}/${{ env.GITOPS_REPO }}/dispatches \
+                                  --method POST \
+                                  --field event_type=update-deployments \
+                                  --field client_payload[services]="$SERVICES" \
+                                  --field client_payload[source_commit]="${{ github.sha }}" \
+                                  --field client_payload[commit_sha]="$COMMIT_SHA" \
+                                  --field client_payload[registry]="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}"
+                      EOF
+                      
+                      # Create shared library structure
+                      cat > shared-libs/common/README.md << 'EOF'
+                      # Common Shared Library
+                      
+                      This directory contains shared code and utilities used across all microservices in this app container.
+                      
+                      ## Structure
+                      - `src/` - Shared source code
+                      - `tests/` - Shared tests
+                      - `docs/` - Shared documentation
+                      EOF
+                      
+                      # Create microservices README
+                      cat > microservices/README.md << 'EOF'
+                      # Microservices
+                      
+                      This directory contains all microservices for the application container.
+                      Each subdirectory represents a single microservice following CLAUDE.md standards.
+                      
+                      ## Adding New Microservices
+                      
+                      Use ApplicationClaim to add new microservices:
+                      
+                      ```yaml
+                      apiVersion: platform.example.org/v1alpha1
+                      kind: ApplicationClaim
+                      metadata:
+                        name: my-service
+                      spec:
+                        appContainer: $APP_NAME
+                        name: my-service
+                        language: python
+                        framework: fastapi
+                        database: postgres
+                        cache: redis
+                      ```
+                      
+                      ## Current Services
+                      
+                      - (Services will be listed here as they are added)
+                      EOF
+                      
+                      # Create main README
+                      cat > README.md << 'EOF'
+                      # $APP_NAME Application Container
+                      
+                      CLAUDE.md-compliant microservices application container with GitOps deployment.
+                      
+                      ## Architecture
+                      
+                      This application container follows the CLAUDE.md development methodology:
+                      
+                      - **Microservices**: Each service in `microservices/` follows Onion Architecture
+                      - **Shared Libraries**: Common code in `shared-libs/`
+                      - **GitOps**: Automated deployment via companion GitOps repository
+                      - **CI/CD**: Automatic building and deployment of changed services
+                      
+                      ## Structure
+                      
+                      ```
+                      $APP_NAME/
+                      ├── microservices/          # Individual microservices
+                      ├── shared-libs/           # Shared libraries and utilities  
+                      ├── .github/workflows/     # CI/CD pipelines
+                      └── README.md              # This file
+                      ```
+                      
+                      ## Development Workflow
+                      
+                      1. Create microservices using ApplicationClaim in your vCluster
+                      2. CI/CD automatically detects changes in `microservices/`
+                      3. Changed services are built and deployed via GitOps
+                      4. Monitor deployments in ArgoCD
+                      
+                      ## Adding New Services
+                      
+                      Use the ApplicationClaim CRD in your vCluster:
+                      
+                      ```bash
+                      kubectl apply -f - <<EOF
+                      apiVersion: platform.example.org/v1alpha1
+                      kind: ApplicationClaim
+                      metadata:
+                        name: my-new-service
+                      spec:
+                        appContainer: $APP_NAME
+                        name: my-new-service
+                        language: python
+                        framework: fastapi
+                        database: postgres
+                        cache: redis
+                      EOF
+                      ```
+                      
+                      ## GitOps Repository
+                      
+                      Deployment manifests are managed in the companion GitOps repository:
+                      `$GITOPS_CLONE_URL`
+                      EOF
+                      
+                      # Commit and push
+                      git config user.name "AppContainer Setup"
+                      git config user.email "appcontainer@platform.local"
+                      git add .
+                      git commit -m "Initialize CLAUDE.md-compliant app container structure
+                      
+                      - Add microservices directory structure
+                      - Add comprehensive GitOps CI/CD pipeline
+                      - Add shared libraries framework
+                      - Add documentation and examples
+                      - Follow CLAUDE.md development methodology"
+                      git push
+                      
+                      echo "Source repository structure created successfully"
+                    env:
+                    - name: APP_NAME
+                      value: placeholder
+                    - name: SOURCE_CLONE_URL
+                      value: placeholder
+                    - name: GITOPS_CLONE_URL
+                      value: placeholder
+                    - name: DOCKER_REGISTRY_USER
+                      value: placeholder
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-source-setup"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[0].value
+    - type: FromCompositeFieldPath
+      fromFieldPath: status.sourceRepository.cloneUrl
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[1].value
+      policy:
+        fromFieldPath: Required
+    - type: FromCompositeFieldPath
+      fromFieldPath: status.gitopsRepository.cloneUrl
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[2].value
+      policy:
+        fromFieldPath: Required
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.gitHubOrg
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[3].value
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-source-setup"
+
+  # Setup GitOps Repository Structure 
+  - name: gitops-repo-setup
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: placeholder
+              namespace: default
+            spec:
+              template:
+                spec:
+                  serviceAccountName: crossplane-github-provider
+                  restartPolicy: OnFailure
+                  containers:
+                  - name: gitops-repo-setup
+                    image: alpine/git:latest
+                    command:
+                    - /bin/sh
+                    - -c
+                    - |
+                      set -e
+                      echo "Setting up GitOps repository structure for $APP_NAME..."
+                      
+                      TEMP_DIR="/tmp/gitops-$APP_NAME"
+                      mkdir -p $TEMP_DIR
+                      cd $TEMP_DIR
+                      
+                      # Clone the GitOps repository
+                      git clone $GITOPS_CLONE_URL .
+                      
+                      # Create GitOps structure
+                      mkdir -p apps/environments/{dev,staging,production}
+                      mkdir -p oam
+                      mkdir -p manifests
+                      mkdir -p .github/workflows
+                      
+                      # Create App of Apps ArgoCD Application
+                      cat > apps/app-of-apps.yaml << 'EOF'
+                      apiVersion: argoproj.io/v1alpha1
+                      kind: Application
+                      metadata:
+                        name: $APP_NAME-app-of-apps
+                        namespace: argocd
+                        finalizers:
+                          - resources-finalizer.argocd.argoproj.io
+                      spec:
+                        project: default
+                        source:
+                          repoURL: $GITOPS_CLONE_URL
+                          targetRevision: HEAD
+                          path: apps/environments/production
+                        destination:
+                          server: https://kubernetes.default.svc
+                          namespace: $APP_NAME
+                        syncPolicy:
+                          automated:
+                            prune: true
+                            selfHeal: true
+                          syncOptions:
+                            - CreateNamespace=true
+                      EOF
+                      
+                      # Create ApplicationSet for microservices
+                      cat > apps/environments/production/applicationset.yaml << 'EOF'
+                      apiVersion: argoproj.io/v1alpha1
+                      kind: ApplicationSet
+                      metadata:
+                        name: $APP_NAME-microservices
+                        namespace: argocd
+                      spec:
+                        generators:
+                        - git:
+                            repoURL: $GITOPS_CLONE_URL
+                            revision: HEAD
+                            directories:
+                            - path: manifests/*
+                        template:
+                          metadata:
+                            name: '$APP_NAME-{{path.basename}}'
+                          spec:
+                            project: default
+                            source:
+                              repoURL: $GITOPS_CLONE_URL
+                              targetRevision: HEAD
+                              path: '{{path}}'
+                            destination:
+                              server: https://kubernetes.default.svc
+                              namespace: $APP_NAME
+                            syncPolicy:
+                              automated:
+                                prune: true
+                                selfHeal: true
+                              syncOptions:
+                                - CreateNamespace=true
+                      EOF
+                      
+                      # Create GitOps update workflow
+                      cat > .github/workflows/gitops-update.yml << 'EOF'
+                      name: GitOps Deployment Update
+                      
+                      on:
+                        repository_dispatch:
+                          types: [update-deployments]
+                      
+                      jobs:
+                        update-manifests:
+                          runs-on: ubuntu-latest
+                          steps:
+                            - name: Checkout GitOps repository
+                              uses: actions/checkout@v4
+                              with:
+                                token: ${{ secrets.GITHUB_TOKEN }}
+                            
+                            - name: Update deployment manifests
+                              run: |
+                                SERVICES="${{ github.event.client_payload.services }}"
+                                COMMIT_SHA="${{ github.event.client_payload.commit_sha }}"
+                                REGISTRY="${{ github.event.client_payload.registry }}"
+                                
+                                echo "Updating services: $SERVICES"
+                                echo "Commit SHA: $COMMIT_SHA"
+                                echo "Registry: $REGISTRY"
+                                
+                                IFS=',' read -ra SERVICE_ARRAY <<< "$SERVICES"
+                                for service in "${SERVICE_ARRAY[@]}"; do
+                                  if [ -f "manifests/$service/knative-service.yaml" ]; then
+                                    NEW_IMAGE="$REGISTRY/$service:$COMMIT_SHA"
+                                    echo "Updating $service to $NEW_IMAGE"
+                                    sed -i "s|image: $REGISTRY/$service:.*|image: $NEW_IMAGE|g" manifests/$service/knative-service.yaml
+                                  fi
+                                done
+                                
+                                git config user.name "GitOps Bot"
+                                git config user.email "gitops@platform.local"
+                                git add manifests/
+                                git commit -m "Update services: $SERVICES to commit $COMMIT_SHA" || echo "No changes to commit"
+                                git push
+                      EOF
+                      
+                      # Create README
+                      cat > README.md << 'EOF'
+                      # $APP_NAME GitOps Repository
+                      
+                      This repository contains the GitOps deployment manifests for the $APP_NAME application container.
+                      
+                      ## Structure
+                      
+                      ```
+                      $APP_NAME-gitops/
+                      ├── apps/                    # ArgoCD Applications
+                      │   ├── app-of-apps.yaml    # Main App of Apps
+                      │   └── environments/       # Environment-specific configs
+                      ├── oam/                     # OAM Components
+                      ├── manifests/               # Kubernetes manifests per service
+                      │   ├── service-1/          # Each microservice directory
+                      │   └── service-2/
+                      └── .github/workflows/       # GitOps automation
+                      ```
+                      
+                      ## Deployment Flow
+                      
+                      1. Source repository CI/CD builds and pushes images
+                      2. Source CI/CD sends repository_dispatch to this repo
+                      3. GitOps workflow updates manifest files with new image tags
+                      4. ArgoCD detects changes and deploys to cluster
+                      
+                      ## ArgoCD Applications
+                      
+                      - **App of Apps**: `$APP_NAME-app-of-apps` - Main application managing all microservices
+                      - **ApplicationSet**: Automatically creates ArgoCD apps for each service in `manifests/`
+                      
+                      ## Adding New Services
+                      
+                      When ApplicationClaim creates a new microservice, it automatically:
+                      1. Creates a directory in `manifests/[service-name]/`
+                      2. Generates Knative service and OAM component manifests
+                      3. Updates the ApplicationSet to include the new service
+                      EOF
+                      
+                      # Commit and push
+                      git config user.name "GitOps Setup"
+                      git config user.email "gitops@platform.local"
+                      git add .
+                      git commit -m "Initialize GitOps repository structure
+                      
+                      - Add ArgoCD App of Apps pattern
+                      - Add ApplicationSet for microservices
+                      - Add GitOps update automation
+                      - Add environment structure
+                      - Add OAM and manifests directories"
+                      git push
+                      
+                      echo "GitOps repository structure created successfully"
+                    env:
+                    - name: APP_NAME
+                      value: placeholder
+                    - name: GITOPS_CLONE_URL
+                      value: placeholder
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-gitops-setup"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[0].value
+    - type: FromCompositeFieldPath
+      fromFieldPath: status.gitopsRepository.cloneUrl
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[1].value
+      policy:
+        fromFieldPath: Required
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-gitops-setup"

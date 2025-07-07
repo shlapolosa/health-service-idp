@@ -1,266 +1,115 @@
 # Task ID: 13
-# Title: Set Up ArgoCD App of Apps Structure with Vela Components
-# Status: done
+# Title: Implement VClusterEnvironmentClaim CRD and Composition
+# Status: pending
 # Dependencies: 11, 12
-# Priority: medium
-# Description: Create the project structure for an ArgoCD app of apps pattern that integrates with KubeVela applications, including repository setup for components and container image storage.
+# Priority: high
+# Description: Create the VClusterEnvironmentClaim CRD and Crossplane Composition to provision isolated vClusters with Istio ingress and optional components (ArgoCD, observability stack).
 # Details:
-1. Create the base directory structure for the ArgoCD app of apps pattern:
+1. Define the VClusterEnvironmentClaim CRD with the schema specified in the PRD
+2. Create a Crossplane Composition that provisions:
+   - vCluster using Helm chart (v0.15.0+)
+   - Istio ingress (v1.18+) with Gateway
+   - Optional components based on the 'include' field
 
-mkdir -p argocd-vela-project/apps
-mkdir -p argocd-vela-project/components
-
-
-2. Set up the root application in ArgoCD (root-app.yaml):
-yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Application
+```yaml
+# VClusterEnvironmentClaim XRD
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
 metadata:
-  name: root-application
-  namespace: argocd
+  name: xvclusterenvironmentclaims.platform.example.org
 spec:
-  project: default
-  source:
-    repoURL: https://github.com/your-org/argocd-vela-project.git
-    targetRevision: HEAD
-    path: apps
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: argocd
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-
-
-3. Create GitHub repositories for each component:
-
-# Example using GitHub CLI
-gh repo create your-org/component-one --public
-gh repo create your-org/component-two --public
-gh repo create your-org/component-three --public
-
-
-4. Set up Google Container Registry (GCR) for image storage:
-
-# Authenticate with GCR
-gcloud auth configure-docker gcr.io
-
-# Create project structure for each component with Dockerfile
-for component in component-one component-two component-three; do
-  mkdir -p $component/src
-  cat > $component/Dockerfile << EOF
-FROM node:16-alpine
-WORKDIR /app
-COPY src/ .
-RUN npm install
-CMD ["npm", "start"]
-EOF
-done
-
-
-5. Create KubeVela application definition for each component (component-one.yaml):
-yaml
-apiVersion: core.oam.dev/v1beta1
-kind: Application
-metadata:
-  name: component-one
-  namespace: applications
-spec:
-  components:
-    - name: component-one
-      type: webservice
-      properties:
-        image: gcr.io/your-project/component-one:latest
-        ports:
-          - port: 8080
-            expose: true
-      traits:
-        - type: scaler
+  group: platform.example.org
+  names:
+    kind: XVClusterEnvironmentClaim
+    plural: xvclusterenvironmentclaims
+  claimNames:
+    kind: VClusterEnvironmentClaim
+    plural: vclusterenvironmentclaims
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
           properties:
-            replicas: 2
+            spec:
+              type: object
+              properties:
+                name:
+                  type: string
+                domain:
+                  type: string
+                  nullable: true
+                include:
+                  type: array
+                  items:
+                    type: string
+                    enum: [argoCD, grafana, prometheus, jaeger, kiali, apiGatewaySupport]
+              required: [name]
+```
 
-
-6. Create ArgoCD application definitions for each KubeVela application (apps/component-one.yaml):
-yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: component-one
-  namespace: argocd
-spec:
-  project: default
-  source:
-    repoURL: https://github.com/your-org/component-one.git
-    targetRevision: HEAD
-    path: deploy
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: applications
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-
-
-7. Set up CI/CD workflows for each component repository to build and push images to GCR:
-yaml
-# .github/workflows/build.yaml
-name: Build and Push
-
-on:
-  push:
-    branches: [ main ]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
-        with:
-          project_id: your-project
-          service_account_key: ${{ secrets.GCR_KEY }}
-          
-      - name: Build and push
-        run: |
-          gcloud auth configure-docker gcr.io
-          docker build -t gcr.io/your-project/component-one:${{ github.sha }} .
-          docker push gcr.io/your-project/component-one:${{ github.sha }}
-          docker tag gcr.io/your-project/component-one:${{ github.sha }} gcr.io/your-project/component-one:latest
-          docker push gcr.io/your-project/component-one:latest
-
-
-8. Configure ArgoCD to monitor the repositories:
-
-argocd repo add https://github.com/your-org/argocd-vela-project.git --name root-repo
-argocd repo add https://github.com/your-org/component-one.git --name component-one
-argocd repo add https://github.com/your-org/component-two.git --name component-two
-argocd repo add https://github.com/your-org/component-three.git --name component-three
-
-
-9. Apply the root application to bootstrap the entire system:
-
-kubectl apply -f root-app.yaml
-
+Implement the Composition to use Helm provider for vCluster and component installation. Use Kubernetes provider for namespace creation and service account setup. Configure Istio Gateway with proper domain settings if provided.
 
 # Test Strategy:
-1. Verify the GitHub repositories are correctly created and accessible:
-
-gh repo list your-org --limit 10
-
-
-2. Validate GCR access and permissions:
-
-gcloud container images list --repository=gcr.io/your-project
-
-
-3. Test the ArgoCD root application deployment:
-
-kubectl apply -f root-app.yaml
-kubectl get applications -n argocd
-argocd app get root-application
-
-Verify the root application is synced and healthy.
-
-4. Validate that child applications are automatically created:
-
-kubectl get applications -n argocd
-
-Confirm that component-one, component-two, etc. applications appear.
-
-5. Test the end-to-end workflow by making a change to a component repository:
-
-cd component-one
-# Make a change to the code
-git add .
-git commit -m "Test change"
-git push
-
-Verify in ArgoCD UI or CLI that the change is detected and deployed.
-
-6. Validate KubeVela application deployment:
-
-kubectl get application.core.oam.dev -n applications
-kubectl get deployment -n applications
-
-Confirm that the deployments are created as expected.
-
-7. Test container image build and push workflow:
-
-# Trigger GitHub Actions workflow manually or via commit
-gh workflow run build.yaml -R your-org/component-one
-
-Verify the image is built and pushed to GCR.
-
-8. Perform an integration test by accessing the deployed services:
-
-kubectl get svc -n applications
-# Use port-forward or ingress to access the service
-kubectl port-forward svc/component-one 8080:8080 -n applications
-curl http://localhost:8080
-
+1. Apply the VClusterEnvironmentClaim CRD and verify it's accepted
+2. Create a test claim with minimal configuration and verify vCluster is provisioned
+3. Test with various 'include' combinations to ensure optional components are correctly installed
+4. Verify Istio ingress is properly configured and accessible
+5. Test domain configuration if provided
+6. Validate that vCluster is running on nodes with appropriate taints/tolerations
 
 # Subtasks:
-## 1. Repository Structure Organization [done]
+## 1. Define VClusterEnvironmentClaim XRD [pending]
 ### Dependencies: None
-### Description: Set up the Git repository structure to support the ArgoCD App of Apps pattern
+### Description: Create the CompositeResourceDefinition (XRD) for VClusterEnvironmentClaim with the schema specified in the PRD
 ### Details:
-1. Create a main Git repository for the root application
-2. Define folder structure (apps/, templates/, environments/)
-3. Create README.md with repository purpose and structure documentation
-4. Set up branch protection rules for main/master branch
-5. Configure access controls and permissions
-6. Initialize with .gitignore for ArgoCD and Kubernetes artifacts
-7. Validation: Repository structure should follow GitOps best practices and be accessible to ArgoCD
+1. Create a YAML file for the XRD as shown in the PRD
+2. Add validation for the 'name' field (must be DNS-1123 compliant)
+3. Add description fields to document each property
+4. Define status subresource with appropriate fields (ready, clusterEndpoint, adminCredentials)
+5. Apply the XRD to the cluster using kubectl
 
-## 2. Root Application Configuration [done]
+## 2. Create base Composition for vCluster provisioning [pending]
 ### Dependencies: 13.1
-### Description: Configure the ArgoCD root application that will manage all child applications
+### Description: Implement the core Composition that provisions a vCluster using the Helm provider
 ### Details:
-1. Create root Application manifest in the main repository
-2. Configure sync policies (automated, self-heal, prune)
-3. Set up appropriate RBAC for the root application
-4. Define resource exclusions/inclusions
-5. Configure health checks for the root application
-6. Set up appropriate retry and timeout settings
-7. Validation: Root application should successfully sync and display in ArgoCD UI
+1. Create a Composition YAML file targeting the XRD
+2. Define resources for namespace creation
+3. Configure the Helm Release resource for vCluster v0.15.0+
+4. Set up proper values for the Helm chart (storage, service type, etc.)
+5. Define patches to propagate the name from claim to resources
+6. Configure readiness checks for the vCluster deployment
 
-## 3. Component Repository Setup [done]
-### Dependencies: 13.1
-### Description: Set up individual repositories for each application component with proper ArgoCD configuration
+## 3. Add Istio ingress with Gateway configuration [pending]
+### Dependencies: 13.2
+### Description: Extend the Composition to install Istio ingress and configure Gateway resources
 ### Details:
-1. Create separate repositories for each application component
-2. Set up standard structure for each component repo (manifests/, helm/, kustomize/)
-3. Create Application manifests for each component
-4. Configure component-specific sync policies
-5. Set up appropriate health checks for each component
-6. Document dependencies between components
-7. Validation: Each component repository should be properly structured and contain valid Kubernetes manifests
+1. Add Helm Release resource for Istio installation (v1.18+)
+2. Configure Istio Gateway resource with proper domain settings
+3. Create patches to use the domain from the claim if provided, or generate a default domain
+4. Set up Virtual Service to route traffic to the vCluster
+5. Configure TLS settings for secure access
+6. Add status patch to expose the ingress endpoint
 
-## 4. CI/CD Workflow Implementation [done]
-### Dependencies: 13.2, 13.3
-### Description: Implement CI/CD workflows for automated updates to the App of Apps structure
+## 4. Implement optional components installation logic [pending]
+### Dependencies: 13.3
+### Description: Add support for installing optional components based on the 'include' field
 ### Details:
-1. Set up CI/CD pipeline for the root application repository
-2. Configure workflows for component repositories
-3. Implement validation steps (manifest validation, policy checks)
-4. Set up automated testing of deployed applications
-5. Configure notifications for sync failures
-6. Implement promotion workflow between environments
-7. Validation: CI/CD pipelines should automatically update applications when changes are pushed
+1. Create conditional resources for each optional component (argoCD, grafana, prometheus, jaeger, kiali, apiGatewaySupport)
+2. Configure Helm Release resources for each component with appropriate versions
+3. Implement patches to conditionally include resources based on the 'include' array
+4. Set up dependencies between components (e.g., Grafana depends on Prometheus)
+5. Configure each component to work within the vCluster environment
 
-## 5. Testing and Validation Procedures [done]
+## 5. Implement status updates and credential management [pending]
 ### Dependencies: 13.4
-### Description: Develop comprehensive testing procedures for the App of Apps structure
+### Description: Configure the Composition to update status fields and manage admin credentials
 ### Details:
-1. Create test cases for application deployment
-2. Implement rollback testing procedures
-3. Set up monitoring for application health
-4. Document disaster recovery procedures
-5. Test multi-cluster deployment scenarios
-6. Implement chaos testing to verify resilience
-7. Validation: All applications should deploy correctly, and recovery procedures should work as expected
+1. Add patches to update the status.ready field based on all resources being ready
+2. Configure credential extraction from the vCluster secret
+3. Set up patches to populate status.adminCredentials with access information
+4. Add status.clusterEndpoint with connection details for both direct and ingress access
+5. Implement proper error handling for status updates
+6. Add connection instructions in a user-friendly format
 

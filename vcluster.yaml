@@ -17,7 +17,17 @@ controlPlane:
     embedded: false
   statefulSet:
     scheduling:
-      nodeSelector:
-        alpha.eksctl.io/nodegroup-name: socrateshlapolosa-karpenter-demo-ng-medium
-    nodeSelector:
-      alpha.eksctl.io/nodegroup-name: socrateshlapolosa-karpenter-demo-ng-medium
+      tolerations:
+        - key: vclusterID
+          value: architecture-vizualisation
+          effect: NoSchedule
+        - key: karpenter.sh/unschedulable
+          operator: Exists
+          effect: NoSchedule
+    tolerations:
+      - key: vclusterID
+        value: architecture-vizualisation
+        effect: NoSchedule
+      - key: karpenter.sh/unschedulable
+        operator: Exists
+        effect: NoSchedule

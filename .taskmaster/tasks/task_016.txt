@@ -1,0 +1,84 @@
+# Task ID: 16
+# Title: Configure Knative Serving with Cold Start Protection
+# Status: pending
+# Dependencies: 11
+# Priority: high
+# Description: Install and configure Knative Serving with optimized settings for cold start protection, including concurrency state endpoint and appropriate scaling parameters.
+# Details:
+1. Install Knative Serving v1.11.0+ in the management cluster
+2. Configure Activator with concurrency-state-endpoint
+3. Set up default autoscaling parameters for minimal cold start impact
+4. Create custom ConfigMap for Knative defaults
+
+```yaml
+# Install Knative Serving
+kubectl apply -f https://github.com/knative/serving/releases/download/knative-v1.11.0/serving-crds.yaml
+kubectl apply -f https://github.com/knative/serving/releases/download/knative-v1.11.0/serving-core.yaml
+
+# Configure Knative for cold start protection
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-autoscaler
+  namespace: knative-serving
+data:
+  enable-scale-to-zero: "true"
+  scale-to-zero-grace-period: "30s"
+  scale-to-zero-pod-retention-period: "1m"
+  min-scale: "1"
+  max-scale-up-rate: "10.0"
+  max-scale-down-rate: "2.0"
+  panic-window-percentage: "10.0"
+  panic-threshold-percentage: "200.0"
+  stable-window: "60s"
+  target-burst-capacity: "200"
+  container-concurrency-target-percentage: "70"
+  container-concurrency-target-default: "100"
+  activator-capacity: "100"
+  initial-scale: "1"
+  allow-zero-initial-scale: "false"
+  max-scale: "10"
+  concurrency-state-endpoint: "/healthz/concurrency"
+```
+
+Implement a default Knative Service template with appropriate annotations for autoscaling and concurrency. Create a pre-warming logic for latency-sensitive applications using a CronJob that sends periodic requests to keep services warm.
+
+# Test Strategy:
+1. Verify Knative Serving installation
+2. Test scale-to-zero and scale-from-zero behavior
+3. Measure cold start latency with and without concurrency-state-endpoint
+4. Test pre-warming logic for latency-sensitive applications
+5. Verify that no requests are lost during scale-up events
+6. Load test to ensure proper scaling under high concurrency
+
+# Subtasks:
+## 1. Install Knative Serving in the management cluster [pending]
+### Dependencies: None
+### Description: Install Knative Serving v1.11.0+ in the management cluster by applying the necessary YAML manifests for CRDs and core components.
+### Details:
+Use kubectl to apply the Knative Serving CRDs and core components from the official GitHub repository. Verify the installation by checking that all pods in the knative-serving namespace are running. Ensure that the Knative API resources are available by running 'kubectl api-resources | grep knative'.
+
+## 2. Configure Knative Autoscaler with cold start protection settings [pending]
+### Dependencies: 16.1
+### Description: Create and apply a ConfigMap for the Knative Autoscaler with optimized settings for cold start protection, including scale-to-zero parameters and concurrency settings.
+### Details:
+Create a ConfigMap named 'config-autoscaler' in the knative-serving namespace with the specified parameters for cold start protection. Key settings include: scale-to-zero-grace-period, min-scale, initial-scale, container-concurrency targets, and the concurrency-state-endpoint set to '/healthz/concurrency'. Apply the ConfigMap and verify it's correctly configured.
+
+## 3. Implement default Knative Service template with autoscaling annotations [pending]
+### Dependencies: 16.2
+### Description: Create a default Knative Service template with appropriate annotations for autoscaling and concurrency to be used as a reference for all services.
+### Details:
+Develop a YAML template for Knative Services that includes annotations for autoscaling such as 'autoscaling.knative.dev/minScale', 'autoscaling.knative.dev/target', and 'autoscaling.knative.dev/metric'. The template should set appropriate defaults for concurrency and include the health check endpoint that matches the concurrency-state-endpoint. Document the template and its annotations for team reference.
+
+## 4. Develop pre-warming logic using CronJob for latency-sensitive applications [pending]
+### Dependencies: 16.3
+### Description: Create a CronJob that sends periodic requests to keep latency-sensitive Knative services warm, preventing cold starts during periods of inactivity.
+### Details:
+Implement a Kubernetes CronJob that periodically sends HTTP requests to specified Knative services. The CronJob should use a simple container with curl or a similar tool to make requests to the service endpoints. Configure the schedule based on the scale-to-zero-grace-period to ensure services remain warm. Include logic to identify which services need warming based on labels or annotations.
+
+## 5. Create documentation and monitoring for cold start performance [pending]
+### Dependencies: 16.2, 16.3, 16.4
+### Description: Document the Knative cold start protection configuration and implement monitoring to track cold start performance metrics.
+### Details:
+Create comprehensive documentation explaining the cold start protection strategy, including the ConfigMap settings, service template annotations, and pre-warming mechanism. Implement Prometheus metrics collection for Knative services, focusing on activation time, request latencies, and concurrency. Set up Grafana dashboards to visualize these metrics and configure alerts for cold start issues.
+

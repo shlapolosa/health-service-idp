@@ -1,0 +1,75 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: crossplane-helm-provider-extended
+rules:
+# Core Kubernetes resources that Helm charts typically need
+- apiGroups: [""]
+  resources: 
+  - pods
+  - services
+  - serviceaccounts
+  - endpoints
+  - persistentvolumeclaims
+  - events
+  - configmaps
+  - secrets
+  - namespaces
+  verbs: ["*"]
+- apiGroups: ["apps"]
+  resources:
+  - deployments
+  - daemonsets
+  - replicasets
+  - statefulsets
+  verbs: ["*"]
+- apiGroups: ["extensions"]
+  resources:
+  - deployments
+  - daemonsets
+  - replicasets
+  - ingresses
+  verbs: ["*"]
+- apiGroups: ["networking.k8s.io"]
+  resources:
+  - ingresses
+  - networkpolicies
+  verbs: ["*"]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources:
+  - roles
+  - rolebindings
+  - clusterroles
+  - clusterrolebindings
+  verbs: ["*"]
+- apiGroups: ["policy"]
+  resources:
+  - poddisruptionbudgets
+  verbs: ["*"]
+- apiGroups: ["autoscaling"]
+  resources:
+  - horizontalpodautoscalers
+  verbs: ["*"]
+# Custom Resources that vCluster might need
+- apiGroups: ["apiextensions.k8s.io"]
+  resources:
+  - customresourcedefinitions
+  verbs: ["*"]
+- apiGroups: ["admissionregistration.k8s.io"]
+  resources:
+  - validatingwebhookconfigurations
+  - mutatingwebhookconfigurations
+  verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: crossplane-helm-provider-extended
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: crossplane-helm-provider-extended
+subjects:
+- kind: ServiceAccount
+  name: provider-helm-b4cc4c2c8db3
+  namespace: crossplane-system

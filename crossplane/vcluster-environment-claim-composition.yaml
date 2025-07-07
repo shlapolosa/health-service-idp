@@ -1,0 +1,1695 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: vcluster-environment-claim-composition
+  labels:
+    crossplane.io/xrd: xvclusterenvironmentclaims.platform.example.org
+    provider: helm-kubernetes
+spec:
+  writeConnectionSecretsToNamespace: crossplane-system
+  compositeTypeRef:
+    apiVersion: platform.example.org/v1alpha1
+    kind: XVClusterEnvironmentClaim
+  environment:
+    environmentRefs:
+    - type: Selector
+      selector:
+        matchLabels:
+        - key: environment
+          type: Value
+          value: default
+  resources:
+  # Create namespace for the vCluster
+  - name: vcluster-namespace
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: placeholder
+              labels:
+                vcluster.loft.sh/namespace: "true"
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-namespace"
+  
+  # Create vCluster using Helm
+  - name: vcluster-helm-release
+    base:
+      apiVersion: helm.crossplane.io/v1beta1
+      kind: Release
+      spec:
+        forProvider:
+          chart:
+            name: vcluster
+            repository: https://charts.loft.sh
+            version: "0.15.0"
+          namespace: placeholder
+          skipCreateNamespace: true
+          values:
+            # Basic vCluster configuration
+            controlPlane:
+              distro:
+                k8s:
+                  enabled: true
+                  apiServer:
+                    image:
+                      tag: v1.28.0
+                  controllerManager:
+                    image:
+                      tag: v1.28.0
+                  scheduler:
+                    image:
+                      tag: v1.28.0
+              backingStore:
+                etcd:
+                  deploy:
+                    enabled: true
+                    statefulSet:
+                      image:
+                        tag: 3.5.9-0
+            
+            # Syncer configuration
+            sync:
+              toHost:
+                persistentVolumes:
+                  enabled: true
+                priorityClasses:
+                  enabled: true
+                storageClasses:
+                  enabled: true
+              fromHost:
+                nodes:
+                  enabled: true
+                  selector:
+                    all: true
+                csiDrivers:
+                  enabled: false
+                csiStorageCapacities:
+                  enabled: false
+            
+            # Networking configuration
+            networking:
+              advanced:
+                proxyKubelets:
+                  byHostname: false
+                  byIP: false
+            
+            # Service configuration
+            service:
+              type: ClusterIP
+            
+            # Resource configuration
+            controlPlane:
+              statefulSet:
+                resources:
+                  requests:
+                    cpu: 200m
+                    memory: 512Mi
+                  limits:
+                    cpu: 1000m
+                    memory: 2Gi
+            
+            # Basic scheduling configuration  
+            # TODO: Add Karpenter-specific tolerations and nodeSelector for production:
+            # tolerations:
+            # - key: workload-type
+            #   value: vcluster
+            #   effect: NoSchedule
+            # nodeSelector:
+            #   workload-type: vcluster
+            
+            # Enable RBAC
+            rbac:
+              clusterRole:
+                create: true
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-vcluster"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.values.nameOverride
+    # Wait for namespace to be ready
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.values.fullnameOverride
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-vcluster"
+    
+    # Status patches to indicate readiness
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.state
+      toFieldPath: status.ready
+      transforms:
+      - type: map
+        map:
+          "deployed": true
+          "failed": false
+      policy:
+        fromFieldPath: Optional
+    
+    # Update cluster endpoint status
+    - type: ToCompositeFieldPath
+      fromFieldPath: spec.forProvider.namespace
+      toFieldPath: status.clusterEndpoint.direct
+      transforms:
+      - type: string
+        string:
+          fmt: "https://%s-vcluster.%s.svc.cluster.local:443"
+      policy:
+        fromFieldPath: Optional
+    
+    # Update connection credentials reference
+    - type: ToCompositeFieldPath
+      fromFieldPath: metadata.name
+      toFieldPath: status.adminCredentials.kubeconfig
+      transforms:
+      - type: string
+        string:
+          fmt: "Secret: %s-vcluster-connection in crossplane-system namespace"
+      policy:
+        fromFieldPath: Optional
+  
+  # Install Crossplane in vCluster
+  - name: vcluster-crossplane-install
+    base:
+      apiVersion: helm.crossplane.io/v1beta1
+      kind: Release
+      spec:
+        forProvider:
+          chart:
+            name: crossplane
+            repository: https://charts.crossplane.io/stable
+            version: "1.14.0"
+          namespace: crossplane-system
+          skipCreateNamespace: false
+          values:
+            # Crossplane configuration for vCluster
+            image:
+              tag: v1.14.0
+            resourcesCrossplane:
+              limits:
+                cpu: 500m
+                memory: 1Gi
+              requests:
+                cpu: 200m
+                memory: 512Mi
+            metrics:
+              enabled: true
+            webhooks:
+              enabled: true
+            args:
+              - --debug
+              - --enable-composition-revisions
+              - --enable-environment-configs
+        providerConfigRef:
+          name: vcluster-provider  # This will be created separately for each vCluster
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-crossplane"
+
+  # Install AppContainerClaim XRD in vCluster
+  - name: vcluster-app-container-claim-xrd
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: apiextensions.crossplane.io/v1
+            kind: CompositeResourceDefinition
+            metadata:
+              name: xappcontainerclaims.platform.example.org
+            spec:
+              group: platform.example.org
+              names:
+                kind: XAppContainerClaim
+                plural: xappcontainerclaims
+              claimNames:
+                kind: AppContainerClaim
+                plural: appcontainerclaims
+              versions:
+              - name: v1alpha1
+                served: true
+                referenceable: true
+                schema:
+                  openAPIV3Schema:
+                    type: object
+                    properties:
+                      spec:
+                        type: object
+                        description: AppContainerClaim specification for creating application container infrastructure
+                        properties:
+                          name:
+                            type: string
+                            description: Name of the application container (must be DNS-1123 compliant)
+                            pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+                            maxLength: 63
+                          description:
+                            type: string
+                            description: Description of the application container
+                            default: "CLAUDE.md-compliant application container"
+                          gitHubOrg:
+                            type: string
+                            description: GitHub organization where repositories will be created
+                            default: "socrates12345"
+                          dockerRegistry:
+                            type: string
+                            description: Docker registry for container images
+                            default: "docker.io/socrates12345"
+                          enableObservability:
+                            type: boolean
+                            description: Whether to enable observability stack (Prometheus, Grafana, Jaeger)
+                            default: true
+                          enableSecurity:
+                            type: boolean
+                            description: Whether to enable security scanning and policies
+                            default: true
+                        required:
+                        - name
+                      status:
+                        type: object
+                        description: AppContainerClaim status
+                        properties:
+                          ready:
+                            type: boolean
+                            description: Indicates whether the app container is ready
+                          sourceRepository:
+                            type: object
+                            description: Source repository information
+                            properties:
+                              url:
+                                type: string
+                                description: Source repository URL
+                              branch:
+                                type: string
+                                description: Default branch name
+                              cloneUrl:
+                                type: string
+                                description: Git clone URL
+                          gitopsRepository:
+                            type: object
+                            description: GitOps repository information
+                            properties:
+                              url:
+                                type: string
+                                description: GitOps repository URL
+                              branch:
+                                type: string
+                                description: Default branch name
+                              cloneUrl:
+                                type: string
+                                description: Git clone URL
+        providerConfigRef:
+          name: vcluster-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-app-container-xrd"
+
+  # Install ApplicationClaim XRD in vCluster
+  - name: vcluster-application-claim-xrd
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: apiextensions.crossplane.io/v1
+            kind: CompositeResourceDefinition
+            metadata:
+              name: xapplicationclaims.platform.example.org
+            spec:
+              group: platform.example.org
+              names:
+                kind: XApplicationClaim
+                plural: xapplicationclaims
+              claimNames:
+                kind: ApplicationClaim
+                plural: applicationclaims
+              versions:
+              - name: v1alpha1
+                served: true
+                referenceable: true
+                schema:
+                  openAPIV3Schema:
+                    type: object
+                    properties:
+                      spec:
+                        type: object
+                        description: ApplicationClaim specification
+                        properties:
+                          appContainer:
+                            type: string
+                            description: Name of the AppContainer this microservice belongs to
+                            pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+                            maxLength: 63
+                            default: "health-service-idp"
+                          name:
+                            type: string
+                            description: Name of the microservice (must be DNS-1123 compliant)
+                            pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+                            maxLength: 63
+                          language:
+                            type: string
+                            description: Programming language for the application
+                            enum: [python, java]
+                          framework:
+                            type: string
+                            description: Application framework to use
+                            enum: [fastapi, springboot]
+                          hasFrontend:
+                            type: boolean
+                            description: Whether the application includes a frontend component
+                            default: false
+                          database:
+                            type: string
+                            description: Database type to provision for the application
+                            enum: [postgres, none]
+                            default: none
+                          cache:
+                            type: string
+                            description: Cache type to provision for the application
+                            enum: [redis, none]
+                            default: none
+                          exposeApi:
+                            type: boolean
+                            description: Whether to expose the API via AWS API Gateway
+                            default: false
+                        required:
+                        - name
+                        - language
+                        - framework
+                      status:
+                        type: object
+                        description: ApplicationClaim status
+                        properties:
+                          ready:
+                            type: boolean
+                            description: Indicates whether the application is ready and deployed
+                          repository:
+                            type: object
+                            description: GitHub repository information
+                            properties:
+                              url:
+                                type: string
+                                description: GitHub repository URL
+                              branch:
+                                type: string
+                                description: Default branch name
+                              cloneUrl:
+                                type: string
+                                description: Git clone URL
+                          application:
+                            type: object
+                            description: Deployed application information
+                            properties:
+                              knativeService:
+                                type: string
+                                description: Knative service name
+                              endpoint:
+                                type: string
+                                description: Application endpoint URL
+                              apiGatewayEndpoint:
+                                type: string
+                                description: AWS API Gateway endpoint if exposeApi is true
+        providerConfigRef:
+          name: vcluster-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-app-claim-xrd"
+
+  # Install both AppContainerClaim and ApplicationClaim Compositions in vCluster
+  - name: vcluster-composition-installer
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: placeholder
+              namespace: crossplane-system
+            spec:
+              template:
+                spec:
+                  serviceAccountName: crossplane-installer
+                  restartPolicy: OnFailure
+                  containers:
+                  - name: composition-installer
+                    image: bitnami/kubectl:latest
+                    command:
+                    - /bin/sh
+                    - -c
+                    - |
+                      set -e
+                      echo "Installing Crossplane Compositions in vCluster..."
+                      
+                      # Note: In a production environment, these compositions would be
+                      # stored in a Git repository and applied via GitOps.
+                      # For now, we're embedding them directly in the installer.
+                      
+                      echo "✅ AppContainerClaim and ApplicationClaim Compositions would be installed here"
+                      echo "📋 TODO: Copy full compositions from host cluster or Git repository"
+                      echo "🔧 For now, vCluster will use the XRDs for API definitions"
+                      echo "🚀 Users can apply compositions manually or via GitOps after vCluster creation"
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-composition-installer"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-composition-installer"
+
+  # Install required Crossplane Providers in vCluster
+  - name: vcluster-crossplane-providers
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: placeholder
+              namespace: crossplane-system
+            spec:
+              template:
+                spec:
+                  serviceAccountName: crossplane-installer
+                  restartPolicy: OnFailure
+                  containers:
+                  - name: provider-installer
+                    image: bitnami/kubectl:latest
+                    command:
+                    - /bin/sh
+                    - -c
+                    - |
+                      set -e
+                      echo "Installing Crossplane Providers in vCluster..."
+                      
+                      # Install GitHub Provider
+                      kubectl apply -f - <<EOF
+                      apiVersion: pkg.crossplane.io/v1
+                      kind: Provider
+                      metadata:
+                        name: provider-github
+                      spec:
+                        package: xpkg.upbound.io/crossplane-contrib/provider-github:v0.7.0
+                      ---
+                      apiVersion: pkg.crossplane.io/v1
+                      kind: Provider
+                      metadata:
+                        name: provider-kubernetes
+                      spec:
+                        package: xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v0.10.0
+                      ---
+                      apiVersion: pkg.crossplane.io/v1
+                      kind: Provider
+                      metadata:
+                        name: provider-helm
+                      spec:
+                        package: xpkg.upbound.io/crossplane-contrib/provider-helm:v0.16.0
+                      EOF
+                      
+                      # Wait for providers to be healthy
+                      echo "Waiting for providers to be healthy..."
+                      kubectl wait --for=condition=Healthy provider/provider-github --timeout=300s || true
+                      kubectl wait --for=condition=Healthy provider/provider-kubernetes --timeout=300s || true
+                      kubectl wait --for=condition=Healthy provider/provider-helm --timeout=300s || true
+                      
+                      echo "Crossplane Providers installed successfully"
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-provider-installer"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-provider-installer"
+  
+  # Create ServiceAccount for vCluster access
+  - name: vcluster-admin-sa
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: ServiceAccount
+            metadata:
+              name: vcluster-admin
+              namespace: placeholder
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-admin-sa"
+  
+  # Create ClusterRoleBinding for admin access
+  - name: vcluster-admin-crb
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: ClusterRoleBinding
+            metadata:
+              name: placeholder
+            roleRef:
+              apiGroup: rbac.authorization.k8s.io
+              kind: ClusterRole
+              name: cluster-admin
+            subjects:
+            - kind: ServiceAccount
+              name: vcluster-admin
+              namespace: placeholder
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-admin-crb"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.subjects[0].namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-admin-crb"
+  
+  # Create Istio Gateway for external access
+  - name: vcluster-istio-gateway
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: networking.istio.io/v1beta1
+            kind: Gateway
+            metadata:
+              name: placeholder
+              namespace: placeholder
+            spec:
+              selector:
+                istio: ingressgateway
+              servers:
+              - port:
+                  number: 80
+                  name: http
+                  protocol: HTTP
+                hosts:
+                - placeholder
+              - port:
+                  number: 443
+                  name: https
+                  protocol: HTTPS
+                tls:
+                  mode: SIMPLE
+                  credentialName: vcluster-tls-secret
+                hosts:
+                - placeholder
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-gateway"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-gateway"
+    # Use custom domain if provided, otherwise use default service name
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.domain
+      toFieldPath: spec.forProvider.manifest.spec.servers[0].hosts[0]
+      policy:
+        fromFieldPath: Optional
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.domain
+      toFieldPath: spec.forProvider.manifest.spec.servers[1].hosts[0]
+      policy:
+        fromFieldPath: Optional
+    # Default to service name if no domain provided
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.spec.servers[0].hosts[0]
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-vcluster.local"
+      policy:
+        fromFieldPath: Optional
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.spec.servers[1].hosts[0]
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-vcluster.local"
+      policy:
+        fromFieldPath: Optional
+
+  # Create Istio VirtualService for routing
+  - name: vcluster-istio-virtualservice
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: networking.istio.io/v1beta1
+            kind: VirtualService
+            metadata:
+              name: placeholder
+              namespace: placeholder
+            spec:
+              hosts:
+              - placeholder
+              gateways:
+              - placeholder
+              http:
+              - match:
+                - uri:
+                    prefix: /
+                route:
+                - destination:
+                    host: placeholder
+                    port:
+                      number: 443
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-virtualservice"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-virtualservice"
+    # Set gateway reference
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.spec.gateways[0]
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-gateway"
+    # Set host (use domain if provided, otherwise default)
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.domain
+      toFieldPath: spec.forProvider.manifest.spec.hosts[0]
+      policy:
+        fromFieldPath: Optional
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.spec.hosts[0]
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-vcluster.local"
+      policy:
+        fromFieldPath: Optional
+    # Set destination service - route to vCluster service
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.spec.http[0].route[0].destination.host
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-vcluster"
+
+  # Create Job to extract kubeconfig and create connection secret
+  - name: vcluster-kubeconfig-job
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: placeholder
+              namespace: placeholder
+            spec:
+              template:
+                spec:
+                  serviceAccountName: vcluster-admin
+                  restartPolicy: OnFailure
+                  containers:
+                  - name: kubeconfig-extractor
+                    image: bitnami/kubectl:latest
+                    command:
+                    - /bin/bash
+                    - -c
+                    - |
+                      set -e
+                      echo "Waiting for vCluster to be ready..."
+                      sleep 60
+                      
+                      VCLUSTER_NAME=$(echo $HOSTNAME | cut -d'-' -f1-2)  # Extract from job name
+                      NAMESPACE=$VCLUSTER_NAME
+                      
+                      echo "Creating connection secret for vCluster: $VCLUSTER_NAME in namespace: $NAMESPACE"
+                      
+                      # Wait for vCluster service to be ready
+                      kubectl wait --for=condition=ready pod -l app=vcluster -n $NAMESPACE --timeout=300s || echo "Warning: Pod wait timeout"
+                      
+                      # Get service account token
+                      TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+                      
+                      # Create kubeconfig
+                      cat << EOF > /tmp/kubeconfig
+                      apiVersion: v1
+                      kind: Config
+                      clusters:
+                      - cluster:
+                          server: https://${VCLUSTER_NAME}-vcluster.${NAMESPACE}.svc.cluster.local:443
+                          insecure-skip-tls-verify: true
+                        name: ${VCLUSTER_NAME}
+                      contexts:
+                      - context:
+                          cluster: ${VCLUSTER_NAME}
+                          user: ${VCLUSTER_NAME}-admin
+                        name: ${VCLUSTER_NAME}
+                      current-context: ${VCLUSTER_NAME}
+                      users:
+                      - name: ${VCLUSTER_NAME}-admin
+                        user:
+                          token: ${TOKEN}
+                      EOF
+                      
+                      # Encode data
+                      KUBECONFIG_B64=$(cat /tmp/kubeconfig | base64 -w 0)
+                      ENDPOINT_B64=$(echo -n "https://${VCLUSTER_NAME}-vcluster.${NAMESPACE}.svc.cluster.local:443" | base64 -w 0)
+                      TOKEN_B64=$(echo -n ${TOKEN} | base64 -w 0)
+                      
+                      # Create connection secret
+                      cat << EOF | kubectl apply -f -
+                      apiVersion: v1
+                      kind: Secret
+                      metadata:
+                        name: ${VCLUSTER_NAME}-vcluster-connection
+                        namespace: crossplane-system
+                        labels:
+                          crossplane.io/connection-secret: "true"
+                          vcluster.name: "${VCLUSTER_NAME}"
+                      type: connection.crossplane.io/v1alpha1
+                      data:
+                        kubeconfig: ${KUBECONFIG_B64}
+                        endpoint: ${ENDPOINT_B64}
+                        token: ${TOKEN_B64}
+                      EOF
+                      
+                      # TODO: Add AWS Secrets Manager integration here
+                      # AWS CLI commands to create/update AWS secret with connection details
+                      # aws secretsmanager create-secret --name "vcluster/${VCLUSTER_NAME}/connection" \
+                      #   --secret-string "{\"kubeconfig\":\"$(cat /tmp/kubeconfig | base64)\",\"endpoint\":\"https://${VCLUSTER_NAME}-vcluster.${NAMESPACE}.svc.cluster.local:443\"}"
+                      
+                      echo "Connection secret created successfully: ${VCLUSTER_NAME}-vcluster-connection"
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-kubeconfig-job"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-kubeconfig-job"
+
+  # Optional Components - Istio Service Mesh
+  - name: vcluster-istio
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: placeholder
+              namespace: placeholder
+            spec:
+              template:
+                spec:
+                  serviceAccountName: vcluster-admin
+                  restartPolicy: OnFailure
+                  containers:
+                  - name: istio-installer
+                    image: istio/istioctl:1.19.0
+                    command:
+                    - /bin/sh
+                    - -c
+                    - |
+                      set -e
+                      echo "Installing Istio in vCluster..."
+                      
+                      # Install Istio with minimal profile for cost optimization
+                      istioctl install --set values.pilot.resources.requests.cpu=100m \
+                        --set values.pilot.resources.requests.memory=128Mi \
+                        --set values.pilot.resources.limits.cpu=500m \
+                        --set values.pilot.resources.limits.memory=256Mi \
+                        --set values.global.proxy.resources.requests.cpu=50m \
+                        --set values.global.proxy.resources.requests.memory=64Mi \
+                        --set values.global.proxy.resources.limits.cpu=200m \
+                        --set values.global.proxy.resources.limits.memory=128Mi \
+                        --set values.pilot.env.PILOT_ENABLE_KNATIVE_GATEWAY_API=true \
+                        -y
+                      
+                      # Wait for Istio to be ready
+                      kubectl wait --for=condition=Ready pod -l app=istiod -n istio-system --timeout=300s
+                      
+                      echo "Istio installed successfully in vCluster"
+        providerConfigRef:
+          name: vcluster-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-istio-installer"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-istio"
+    # Status patches for Istio
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.manifest.status.succeeded
+      toFieldPath: status.components.istio.ready
+      transforms:
+      - type: map
+        map:
+          1: true
+          0: false
+      policy:
+        fromFieldPath: Optional
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: status.components.istio.endpoint
+      transforms:
+      - type: string
+        string:
+          fmt: "http://istio-ingressgateway.istio-system.%s.svc.cluster.local"
+      policy:
+        fromFieldPath: Optional
+    # Only install if istio component is enabled
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.components.istio
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          true: "true"
+          false: "false"
+
+  # Optional Components - Knative Serving (requires Istio)
+  - name: vcluster-knative-serving
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: placeholder
+              namespace: placeholder
+            spec:
+              template:
+                spec:
+                  serviceAccountName: vcluster-admin
+                  restartPolicy: OnFailure
+                  containers:
+                  - name: knative-installer
+                    image: bitnami/kubectl:latest
+                    command:
+                    - /bin/sh
+                    - -c
+                    - |
+                      set -e
+                      echo "Installing Knative Serving in vCluster..."
+                      
+                      # Install Knative Serving CRDs
+                      kubectl apply -f https://github.com/knative/serving/releases/download/knative-v1.12.0/serving-crds.yaml
+                      
+                      # Wait for CRDs
+                      kubectl wait --for condition=established --timeout=60s crd/services.serving.knative.dev
+                      
+                      # Install Knative Serving Core
+                      kubectl apply -f https://github.com/knative/serving/releases/download/knative-v1.12.0/serving-core.yaml
+                      
+                      # Install Knative Istio Networking
+                      kubectl apply -f https://github.com/knative/net-istio/releases/download/knative-v1.12.0/net-istio.yaml
+                      
+                      # Wait for Knative components
+                      kubectl wait --for=condition=Ready pod -l app=controller -n knative-serving --timeout=300s
+                      kubectl wait --for=condition=Ready pod -l app=activator -n knative-serving --timeout=300s
+                      kubectl wait --for=condition=Ready pod -l app=autoscaler -n knative-serving --timeout=300s
+                      kubectl wait --for=condition=Ready pod -l app=webhook -n knative-serving --timeout=300s
+                      
+                      # Apply cost-optimized configuration
+                      cat <<EOF | kubectl apply -f -
+                      apiVersion: v1
+                      kind: ConfigMap
+                      metadata:
+                        name: config-autoscaler
+                        namespace: knative-serving
+                      data:
+                        enable-scale-to-zero: "true"
+                        scale-to-zero-grace-period: "30s"
+                        scale-to-zero-pod-retention-period: "2m"
+                        min-scale: "0"
+                        max-scale: "5"
+                        initial-scale: "0"
+                        allow-zero-initial-scale: "true"
+                        max-scale-up-rate: "5.0"
+                        max-scale-down-rate: "2.0"
+                        container-concurrency-target-default: "50"
+                        container-concurrency-target-percentage: "70"
+                        target-burst-capacity: "100"
+                        activator-capacity: "50"
+                        concurrency-state-endpoint: "/health"
+                      ---
+                      apiVersion: v1
+                      kind: ConfigMap
+                      metadata:
+                        name: config-defaults
+                        namespace: knative-serving
+                      data:
+                        revision-cpu-request: "100m"
+                        revision-memory-request: "128Mi"
+                        revision-cpu-limit: "500m"
+                        revision-memory-limit: "256Mi"
+                        container-concurrency: "50"
+                        revision-timeout-seconds: "300"
+                      ---
+                      apiVersion: v1
+                      kind: ConfigMap
+                      metadata:
+                        name: config-network
+                        namespace: knative-serving
+                      data:
+                        ingress-class: "istio.ingress.networking.knative.dev"
+                        domain-template: "{{.Name}}.{{.Namespace}}.svc.cluster.local"
+                        default-timeout: "300s"
+                        max-timeout: "600s"
+                        default-visibility: "cluster-local"
+                      EOF
+                      
+                      echo "Knative Serving installed successfully with cost optimization"
+        providerConfigRef:
+          name: vcluster-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-knative-installer"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-knative"
+    # Status patches for Knative
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.manifest.status.succeeded
+      toFieldPath: status.components.knativeServing.ready
+      transforms:
+      - type: map
+        map:
+          1: true
+          0: false
+      policy:
+        fromFieldPath: Optional
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: status.components.knativeServing.endpoint
+      transforms:
+      - type: string
+        string:
+          fmt: "http://istio-ingressgateway.istio-system.%s.svc.cluster.local"
+      policy:
+        fromFieldPath: Optional
+    # Only install if knativeServing component is enabled
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.components.knativeServing
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          true: "true"
+          false: "false"
+
+  # Optional Components - ArgoCD
+  - name: vcluster-argocd
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: argoproj.io/v1alpha1
+            kind: Application
+            metadata:
+              name: placeholder
+              namespace: placeholder
+            spec:
+              project: default
+              source:
+                repoURL: https://argoproj.github.io/argo-helm
+                chart: argo-cd
+                targetRevision: 5.46.8
+                helm:
+                  values: |
+                    server:
+                      service:
+                        type: ClusterIP
+                      ingress:
+                        enabled: false
+                    configs:
+                      params:
+                        server.insecure: true
+              destination:
+                server: https://kubernetes.default.svc
+                namespace: argocd
+              syncPolicy:
+                automated:
+                  prune: true
+                  selfHeal: true
+                syncOptions:
+                - CreateNamespace=true
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-argocd"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-argocd"
+    
+    # Status patch for ArgoCD readiness
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.manifest.status.health.status
+      toFieldPath: status.components.argoCD.ready
+      transforms:
+      - type: map
+        map:
+          "Healthy": true
+          "Degraded": false
+      policy:
+        fromFieldPath: Optional
+    
+    # Set ArgoCD endpoint
+    - type: ToCompositeFieldPath
+      fromFieldPath: spec.forProvider.manifest.metadata.namespace
+      toFieldPath: status.components.argoCD.endpoint
+      transforms:
+      - type: string
+        string:
+          fmt: "http://argocd-server.%s.svc.cluster.local:80"
+      policy:
+        fromFieldPath: Optional
+
+  # Optional Components - Grafana  
+  - name: vcluster-grafana
+    base:
+      apiVersion: helm.crossplane.io/v1beta1
+      kind: Release
+      spec:
+        forProvider:
+          chart:
+            name: grafana
+            repository: https://grafana.github.io/helm-charts
+            version: "7.0.3"
+          namespace: placeholder
+          skipCreateNamespace: false
+          values:
+            service:
+              type: ClusterIP
+            adminPassword: admin123
+            persistence:
+              enabled: false
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-grafana"
+    
+    # Status patch for Grafana readiness
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.state
+      toFieldPath: status.components.grafana.ready
+      transforms:
+      - type: map
+        map:
+          "deployed": true
+          "failed": false
+      policy:
+        fromFieldPath: Optional
+    
+    # Set Grafana endpoint
+    - type: ToCompositeFieldPath
+      fromFieldPath: spec.forProvider.namespace
+      toFieldPath: status.components.grafana.endpoint
+      transforms:
+      - type: string
+        string:
+          fmt: "http://grafana.%s.svc.cluster.local:80"
+      policy:
+        fromFieldPath: Optional
+    
+    # Add component enablement flag to resource labels
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.components.grafana
+      toFieldPath: spec.forProvider.values.enabled
+      transforms:
+      - type: convert
+        convert:
+          toType: string
+      policy:
+        fromFieldPath: Optional
+
+  # Optional Components - Prometheus
+  - name: vcluster-prometheus
+    base:
+      apiVersion: helm.crossplane.io/v1beta1
+      kind: Release
+      spec:
+        forProvider:
+          chart:
+            name: kube-prometheus-stack
+            repository: https://prometheus-community.github.io/helm-charts
+            version: "54.0.1"
+          namespace: placeholder
+          skipCreateNamespace: false
+          values:
+            prometheus:
+              service:
+                type: ClusterIP
+            grafana:
+              enabled: false
+            alertmanager:
+              enabled: false
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-prometheus"
+    
+    # Status patch for Prometheus readiness
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.state
+      toFieldPath: status.components.prometheus.ready
+      transforms:
+      - type: map
+        map:
+          "deployed": true
+          "failed": false
+      policy:
+        fromFieldPath: Optional
+    
+    # Set Prometheus endpoint
+    - type: ToCompositeFieldPath
+      fromFieldPath: spec.forProvider.namespace
+      toFieldPath: status.components.prometheus.endpoint
+      transforms:
+      - type: string
+        string:
+          fmt: "http://prometheus-server.%s.svc.cluster.local:80"
+      policy:
+        fromFieldPath: Optional
+
+  # Optional Components - Jaeger
+  - name: vcluster-jaeger
+    base:
+      apiVersion: helm.crossplane.io/v1beta1
+      kind: Release
+      spec:
+        forProvider:
+          chart:
+            name: jaeger
+            repository: https://jaegertracing.github.io/helm-charts
+            version: "0.71.11"
+          namespace: placeholder
+          skipCreateNamespace: false
+          values:
+            query:
+              service:
+                type: ClusterIP
+            collector:
+              service:
+                type: ClusterIP
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-jaeger"
+
+  # Optional Components - Kiali
+  - name: vcluster-kiali
+    base:
+      apiVersion: helm.crossplane.io/v1beta1
+      kind: Release
+      spec:
+        forProvider:
+          chart:
+            name: kiali-server
+            repository: https://kiali.org/helm-charts
+            version: "1.76.0"
+          namespace: placeholder
+          skipCreateNamespace: false
+          values:
+            auth:
+              strategy: anonymous
+            external_services:
+              prometheus:
+                url: http://prometheus-server.monitoring.svc.cluster.local:80
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-kiali"
+
+  # TODO: Implement proper conditional logic for optional components
+  # Current approach: Create all components but mark with component flags
+  # Future: Use Composition Functions for true conditional creation based on spec.components.* fields
+
+  # Note: VPC and subnet discovery is simplified - uses default EKS cluster VPC
+  # This assumes the vCluster is deployed in the same VPC as the management cluster
+
+  # AWS API Gateway V2 (HTTP API) for exposing vCluster applications
+  - name: vcluster-aws-api-gateway
+    base:
+      apiVersion: apigatewayv2.aws.upbound.io/v1beta1
+      kind: API
+      spec:
+        forProvider:
+          name: placeholder
+          protocolType: HTTP
+          description: "API Gateway for vCluster applications"
+          corsConfiguration:
+          - allowCredentials: false
+            allowHeaders: ["*"]
+            allowMethods: ["*"]
+            allowOrigins: ["*"]
+            exposeHeaders: ["*"]
+            maxAge: 86400
+          tags:
+            Environment: vcluster
+            ManagedBy: crossplane
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-api-gateway"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-api-gateway"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.tags.VCluster
+    
+    # Capture API Gateway ID for VPC Link integration
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.id
+      toFieldPath: status.apiGateway.id
+      policy:
+        fromFieldPath: Optional
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.apiEndpoint
+      toFieldPath: status.apiGateway.endpoint
+      policy:
+        fromFieldPath: Optional
+    
+    # Mark API Gateway as enabled based on component flag
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.components.apiGateway
+      toFieldPath: spec.forProvider.tags.ComponentEnabled
+      transforms:
+      - type: convert
+        convert:
+          toType: string
+      policy:
+        fromFieldPath: Optional
+
+  # VPC Link - simplified to require manual subnet configuration initially
+  # TODO: Implement automatic subnet discovery via Composition Functions
+  - name: vcluster-vpc-link
+    base:
+      apiVersion: apigatewayv2.aws.upbound.io/v1beta1
+      kind: VPCLink
+      spec:
+        forProvider:
+          name: placeholder
+          # Subnet IDs from EnvironmentConfig
+          subnetIds: []  # Will be populated from environment data
+          tags:
+            Environment: vcluster
+            ManagedBy: crossplane
+            Instructions: "Configure subnetIds via EnvironmentConfig or manual override"
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-vpc-link"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-vpc-link"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.tags.VCluster
+    
+    # Use private subnet IDs from EnvironmentConfig
+    - type: FromEnvironmentFieldPath
+      fromFieldPath: vpc.privateSubnetIds
+      toFieldPath: spec.forProvider.subnetIds
+      policy:
+        fromFieldPath: Required
+    
+    # Capture VPC Link ID for integration
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.id
+      toFieldPath: status.apiGateway.vpcLinkId
+      policy:
+        fromFieldPath: Optional
+
+  # Default integration for vCluster ingress proxy (catch-all route)
+  - name: vcluster-api-integration
+    base:
+      apiVersion: apigatewayv2.aws.upbound.io/v1beta1
+      kind: Integration
+      spec:
+        forProvider:
+          apiId: placeholder
+          integrationType: HTTP_PROXY
+          connectionType: VPC_LINK
+          connectionId: placeholder
+          integrationMethod: ANY
+          integrationUri: placeholder
+          payloadFormatVersion: "1.0"
+          timeoutMilliseconds: 29000
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-api-integration"
+    # Reference the API Gateway ID
+    - type: FromCompositeFieldPath
+      fromFieldPath: status.apiGateway.id
+      toFieldPath: spec.forProvider.apiId
+      policy:
+        fromFieldPath: Required
+    # Reference the VPC Link ID
+    - type: FromCompositeFieldPath
+      fromFieldPath: status.apiGateway.vpcLinkId
+      toFieldPath: spec.forProvider.connectionId
+      policy:
+        fromFieldPath: Required
+    # Set integration URI to vCluster Istio ingress
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.integrationUri
+      transforms:
+      - type: string
+        string:
+          fmt: "http://%s-gateway.istio-system.svc.cluster.local"
+
+  # Default route to handle all requests
+  - name: vcluster-api-route
+    base:
+      apiVersion: apigatewayv2.aws.upbound.io/v1beta1
+      kind: Route
+      spec:
+        forProvider:
+          apiId: placeholder
+          routeKey: "ANY /{proxy+}"
+          target: placeholder
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-api-route"
+    # Reference the API Gateway ID
+    - type: FromCompositeFieldPath
+      fromFieldPath: status.apiGateway.id
+      toFieldPath: spec.forProvider.apiId
+      policy:
+        fromFieldPath: Required
+    # Reference the integration
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.target
+      transforms:
+      - type: string
+        string:
+          fmt: "integrations/%s-api-integration"
+
+  # API Gateway Stage (for deployment)
+  - name: vcluster-api-stage
+    base:
+      apiVersion: apigatewayv2.aws.upbound.io/v1beta1
+      kind: Stage
+      spec:
+        forProvider:
+          apiId: placeholder
+          name: "prod"
+          autoDeploy: true
+          description: "Production stage for vCluster API Gateway"
+          tags:
+            Environment: vcluster
+            ManagedBy: crossplane
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-api-stage"
+    # Reference the API Gateway ID
+    - type: FromCompositeFieldPath
+      fromFieldPath: status.apiGateway.id
+      toFieldPath: spec.forProvider.apiId
+      policy:
+        fromFieldPath: Required
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.tags.VCluster
+    
+    # Capture stage invoke URL
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.invokeUrl
+      toFieldPath: status.apiGateway.endpoint
+      policy:
+        fromFieldPath: Optional
+    
+    # Set stage name in status
+    - type: ToCompositeFieldPath
+      fromFieldPath: spec.forProvider.name
+      toFieldPath: status.apiGateway.stage
+      policy:
+        fromFieldPath: Optional

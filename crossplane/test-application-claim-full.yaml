@@ -1,0 +1,76 @@
+# Complete ApplicationClaim Example with Database and Cache
+# This example demonstrates all features of the ApplicationClaim:
+# - CLAUDE.md-compliant microservice creation
+# - PostgreSQL database provisioning
+# - Redis cache provisioning  
+# - GitOps integration
+# - CI/CD pipeline integration
+
+apiVersion: platform.example.org/v1alpha1
+kind: ApplicationClaim
+metadata:
+  name: user-management-service
+  namespace: default
+spec:
+  # AppContainer (defaults to health-service-idp if not specified)
+  appContainer: health-service-idp
+  
+  # Microservice details
+  name: user-management-service
+  language: python
+  framework: fastapi
+  
+  # Optional components
+  hasFrontend: false
+  database: postgres      # Will provision PostgreSQL
+  cache: redis           # Will provision Redis
+  exposeApi: true        # Will create AWS API Gateway integration
+
+---
+# Example without database/cache (minimal microservice)
+apiVersion: platform.example.org/v1alpha1
+kind: ApplicationClaim
+metadata:
+  name: notification-service
+  namespace: default
+spec:
+  # Uses default appContainer: health-service-idp
+  name: notification-service
+  language: python
+  framework: fastapi
+  # database: none (default)
+  # cache: none (default)
+  # hasFrontend: false (default)
+  # exposeApi: false (default)
+
+---
+# Example with custom AppContainer
+apiVersion: platform.example.org/v1alpha1
+kind: ApplicationClaim
+metadata:
+  name: auth-service
+  namespace: default
+spec:
+  appContainer: my-custom-container  # Must exist (created via AppContainerClaim)
+  name: auth-service
+  language: python
+  framework: fastapi
+  database: postgres
+  cache: redis
+  exposeApi: true
+
+---
+# Example Java SpringBoot service
+apiVersion: platform.example.org/v1alpha1
+kind: ApplicationClaim
+metadata:
+  name: payment-service
+  namespace: default
+spec:
+  name: payment-service
+  language: java
+  framework: springboot
+  database: postgres
+  cache: redis
+  hasFrontend: true
+  exposeApi: true

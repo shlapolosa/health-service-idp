@@ -1,0 +1,33 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: crossplane-network-policy
+  namespace: crossplane-system
+spec:
+  podSelector:
+    matchLabels:
+      app: crossplane
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: crossplane-system
+    - podSelector:
+        matchLabels:
+          app: crossplane
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: crossplane-system
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+    - protocol: UDP
+      port: 53

@@ -1,0 +1,230 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xvclusterenvironmentclaims.platform.example.org
+spec:
+  group: platform.example.org
+  names:
+    kind: XVClusterEnvironmentClaim
+    plural: xvclusterenvironmentclaims
+  claimNames:
+    kind: VClusterEnvironmentClaim
+    plural: vclusterenvironmentclaims
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            description: VClusterEnvironmentClaim specification
+            properties:
+              name:
+                type: string
+                description: Name of the vCluster environment (must be DNS-1123 compliant)
+                pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+                maxLength: 63
+              domain:
+                type: string
+                description: Optional custom domain for Istio ingress. If not provided, a default domain will be generated.
+                nullable: true
+                pattern: '^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$'
+              vpc:
+                type: object
+                description: VPC configuration for AWS API Gateway integration
+                nullable: true
+                properties:
+                  vpcId:
+                    type: string
+                    description: VPC ID for API Gateway integration. If not provided, uses default VPC.
+                    nullable: true
+                    pattern: '^vpc-[a-z0-9]+$'
+                  usePrivateSubnets:
+                    type: boolean
+                    description: Whether to use private subnets for VPC Link. Defaults to true for security.
+                    default: true
+                  region:
+                    type: string
+                    description: AWS region for VPC resources. If not provided, uses provider region.
+                    nullable: true
+              components:
+                type: object
+                description: Optional components to install in the vCluster environment
+                properties:
+                  istio:
+                    type: boolean
+                    description: Install Istio service mesh for advanced networking and security
+                    default: false
+                  knativeServing:
+                    type: boolean
+                    description: Install Knative Serving for serverless applications (requires Istio)
+                    default: false
+                  argoCD:
+                    type: boolean
+                    description: Install ArgoCD for GitOps deployments
+                    default: false
+                  grafana:
+                    type: boolean
+                    description: Install Grafana for metrics visualization
+                    default: false
+                  prometheus:
+                    type: boolean
+                    description: Install Prometheus for metrics collection
+                    default: false
+                  jaeger:
+                    type: boolean
+                    description: Install Jaeger for distributed tracing
+                    default: false
+                  kiali:
+                    type: boolean
+                    description: Install Kiali for service mesh observability
+                    default: false
+                  apiGateway:
+                    type: boolean
+                    description: Create AWS API Gateway integration for external access
+                    default: false
+            required:
+            - name
+          status:
+            type: object
+            description: VClusterEnvironmentClaim status
+            properties:
+              ready:
+                type: boolean
+                description: Indicates whether the vCluster environment is ready for use
+              clusterEndpoint:
+                type: object
+                description: Connection endpoints for the vCluster
+                properties:
+                  direct:
+                    type: string
+                    description: Direct cluster endpoint (load balancer or node port)
+                  ingress:
+                    type: string
+                    description: Istio ingress endpoint with domain
+              adminCredentials:
+                type: object
+                description: Admin credentials for accessing the vCluster
+                properties:
+                  kubeconfig:
+                    type: string
+                    description: Base64 encoded kubeconfig for admin access
+                  token:
+                    type: string
+                    description: Service account token for API access
+              components:
+                type: object
+                description: Status of installed optional components
+                properties:
+                  istio:
+                    type: object
+                    properties:
+                      ready:
+                        type: boolean
+                      endpoint:
+                        type: string
+                      version:
+                        type: string
+                  knativeServing:
+                    type: object
+                    properties:
+                      ready:
+                        type: boolean
+                      endpoint:
+                        type: string
+                      version:
+                        type: string
+                  argoCD:
+                    type: object
+                    properties:
+                      ready:
+                        type: boolean
+                      endpoint:
+                        type: string
+                  grafana:
+                    type: object
+                    properties:
+                      ready:
+                        type: boolean
+                      endpoint:
+                        type: string
+                  prometheus:
+                    type: object
+                    properties:
+                      ready:
+                        type: boolean
+                      endpoint:
+                        type: string
+                  jaeger:
+                    type: object
+                    properties:
+                      ready:
+                        type: boolean
+                      endpoint:
+                        type: string
+                  kiali:
+                    type: object
+                    properties:
+                      ready:
+                        type: boolean
+                      endpoint:
+                        type: string
+                  apiGatewaySupport:
+                    type: object
+                    properties:
+                      ready:
+                        type: boolean
+              apiGateway:
+                type: object
+                description: AWS API Gateway integration status
+                properties:
+                  id:
+                    type: string
+                    description: AWS API Gateway ID
+                  endpoint:
+                    type: string
+                    description: API Gateway endpoint URL
+                  vpcLinkId:
+                    type: string
+                    description: VPC Link ID for private integration
+                  stage:
+                    type: string
+                    description: API Gateway stage name
+                  ready:
+                    type: boolean
+                    description: Whether API Gateway integration is ready
+              networking:
+                type: object
+                description: Network configuration status
+                properties:
+                  vpcId:
+                    type: string
+                    description: VPC ID being used
+                  subnetIds:
+                    type: array
+                    description: Subnet IDs used for VPC Link
+                    items:
+                      type: string
+                  securityGroupId:
+                    type: string
+                    description: Security group ID for API Gateway
+              conditions:
+                type: array
+                description: Detailed status conditions
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+                    reason:
+                      type: string
+                    message:
+                      type: string

@@ -1,0 +1,369 @@
+# Knative Service Pre-warming for Cold Start Protection
+# This file contains CronJobs and monitoring for keeping services warm
+
+---
+# Namespace for pre-warming components
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: knative-prewarming
+  labels:
+    app.kubernetes.io/name: knative-prewarming
+    app.kubernetes.io/component: cold-start-protection
+
+---
+# ConfigMap for pre-warming configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prewarming-config
+  namespace: knative-prewarming
+  labels:
+    app.kubernetes.io/name: knative-prewarming
+    app.kubernetes.io/component: config
+data:
+  # Services to keep warm (JSON format)
+  services.json: |
+    {
+      "services": [
+        {
+          "name": "user-service",
+          "namespace": "default",
+          "interval": "2m",
+          "endpoint": "/health",
+          "expectedStatus": 200,
+          "timeout": "10s",
+          "priority": "high"
+        },
+        {
+          "name": "auth-service", 
+          "namespace": "default",
+          "interval": "5m",
+          "endpoint": "/ready",
+          "expectedStatus": 200,
+          "timeout": "5s", 
+          "priority": "medium"
+        }
+      ]
+    }
+  
+  # Pre-warming script
+  prewarming-script.sh: |
+    #!/bin/bash
+    set -e
+    
+    # Read services configuration
+    SERVICES_JSON="${SERVICES_JSON:-/config/services.json}"
+    
+    if [[ ! -f "$SERVICES_JSON" ]]; then
+      echo "Services configuration not found at $SERVICES_JSON"
+      exit 1
+    fi
+    
+    # Extract service details
+    SERVICE_NAME="${SERVICE_NAME:-}"
+    SERVICE_NAMESPACE="${SERVICE_NAMESPACE:-default}"
+    SERVICE_ENDPOINT="${SERVICE_ENDPOINT:-/health}"
+    EXPECTED_STATUS="${EXPECTED_STATUS:-200}"
+    TIMEOUT="${TIMEOUT:-10s}"
+    
+    if [[ -z "$SERVICE_NAME" ]]; then
+      echo "SERVICE_NAME environment variable is required"
+      exit 1
+    fi
+    
+    # Get Knative service URL
+    SERVICE_URL=$(kubectl get ksvc "$SERVICE_NAME" -n "$SERVICE_NAMESPACE" -o jsonpath='{.status.url}' 2>/dev/null || echo "")
+    
+    if [[ -z "$SERVICE_URL" ]]; then
+      echo "Could not find Knative service $SERVICE_NAME in namespace $SERVICE_NAMESPACE"
+      exit 1
+    fi
+    
+    # Construct full URL
+    FULL_URL="${SERVICE_URL}${SERVICE_ENDPOINT}"
+    
+    echo "Pre-warming service: $SERVICE_NAME"
+    echo "URL: $FULL_URL"
+    echo "Expected status: $EXPECTED_STATUS"
+    echo "Timeout: $TIMEOUT"
+    
+    # Make request to warm up the service
+    RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time "${TIMEOUT//s/}" "$FULL_URL" || echo "000")
+    
+    if [[ "$RESPONSE_CODE" -eq "$EXPECTED_STATUS" ]]; then
+      echo "✅ Service $SERVICE_NAME warmed successfully (HTTP $RESPONSE_CODE)"
+    else
+      echo "⚠️  Service $SERVICE_NAME warming failed (HTTP $RESPONSE_CODE, expected $EXPECTED_STATUS)"
+      exit 1
+    fi
+
+---
+# Pre-warming CronJob Template
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: knative-prewarming-high-priority
+  namespace: knative-prewarming
+  labels:
+    app.kubernetes.io/name: knative-prewarming
+    app.kubernetes.io/component: cronjob
+    priority: high
+spec:
+  schedule: "*/2 * * * *"  # Every 2 minutes
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: knative-prewarming
+            app.kubernetes.io/component: warmer
+        spec:
+          serviceAccountName: knative-prewarmer
+          restartPolicy: OnFailure
+          containers:
+          - name: prewarmer
+            image: curlimages/curl:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              # Install kubectl
+              apk add --no-cache curl
+              curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+              chmod +x kubectl
+              mv kubectl /usr/local/bin/
+              
+              # Source the pre-warming script
+              source /scripts/prewarming-script.sh
+            env:
+            - name: SERVICE_NAME
+              value: "user-service"  # Override per service
+            - name: SERVICE_NAMESPACE
+              value: "default"
+            - name: SERVICE_ENDPOINT
+              value: "/health"
+            - name: EXPECTED_STATUS
+              value: "200"
+            - name: TIMEOUT
+              value: "10s"
+            volumeMounts:
+            - name: prewarming-config
+              mountPath: /config
+            - name: prewarming-scripts
+              mountPath: /scripts
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                cpu: 200m
+                memory: 128Mi
+          volumes:
+          - name: prewarming-config
+            configMap:
+              name: prewarming-config
+              items:
+              - key: services.json
+                path: services.json
+          - name: prewarming-scripts
+            configMap:
+              name: prewarming-config
+              items:
+              - key: prewarming-script.sh
+                path: prewarming-script.sh
+                mode: 0755
+
+---
+# Medium Priority Pre-warming CronJob
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: knative-prewarming-medium-priority
+  namespace: knative-prewarming
+  labels:
+    app.kubernetes.io/name: knative-prewarming
+    app.kubernetes.io/component: cronjob
+    priority: medium
+spec:
+  schedule: "*/5 * * * *"  # Every 5 minutes
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: knative-prewarming
+            app.kubernetes.io/component: warmer
+        spec:
+          serviceAccountName: knative-prewarmer
+          restartPolicy: OnFailure
+          containers:
+          - name: prewarmer
+            image: curlimages/curl:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              # Install kubectl
+              apk add --no-cache curl
+              curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+              chmod +x kubectl
+              mv kubectl /usr/local/bin/
+              
+              # Source the pre-warming script
+              source /scripts/prewarming-script.sh
+            env:
+            - name: SERVICE_NAME
+              value: "auth-service"  # Override per service
+            - name: SERVICE_NAMESPACE
+              value: "default"
+            - name: SERVICE_ENDPOINT
+              value: "/ready"
+            - name: EXPECTED_STATUS
+              value: "200"
+            - name: TIMEOUT
+              value: "5s"
+            volumeMounts:
+            - name: prewarming-config
+              mountPath: /config
+            - name: prewarming-scripts
+              mountPath: /scripts
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                cpu: 200m
+                memory: 128Mi
+          volumes:
+          - name: prewarming-config
+            configMap:
+              name: prewarming-config
+              items:
+              - key: services.json
+                path: services.json
+          - name: prewarming-scripts
+            configMap:
+              name: prewarming-config
+              items:
+              - key: prewarming-script.sh
+                path: prewarming-script.sh
+                mode: 0755
+
+---
+# ServiceAccount for pre-warming jobs
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: knative-prewarmer
+  namespace: knative-prewarming
+
+---
+# ClusterRole for pre-warming (read Knative services)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: knative-prewarmer
+rules:
+- apiGroups: ["serving.knative.dev"]
+  resources: ["services", "revisions", "routes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["services", "endpoints"]
+  verbs: ["get", "list"]
+
+---
+# ClusterRoleBinding for pre-warming
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: knative-prewarmer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: knative-prewarmer
+subjects:
+- kind: ServiceAccount
+  name: knative-prewarmer
+  namespace: knative-prewarming
+
+---
+# ServiceMonitor for pre-warming metrics (if Prometheus is available)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: knative-prewarming-metrics
+  namespace: knative-prewarming
+  labels:
+    app.kubernetes.io/name: knative-prewarming
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: knative-prewarming
+      app.kubernetes.io/component: metrics
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+
+---
+# Service for exposing pre-warming metrics
+apiVersion: v1
+kind: Service
+metadata:
+  name: knative-prewarming-metrics
+  namespace: knative-prewarming
+  labels:
+    app.kubernetes.io/name: knative-prewarming
+    app.kubernetes.io/component: metrics
+spec:
+  selector:
+    app.kubernetes.io/name: knative-prewarming-monitor
+  ports:
+  - name: metrics
+    port: 8080
+    targetPort: 8080
+  type: ClusterIP
+
+---
+# Deployment for pre-warming monitoring
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: knative-prewarming-monitor
+  namespace: knative-prewarming
+  labels:
+    app.kubernetes.io/name: knative-prewarming-monitor
+    app.kubernetes.io/component: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: knative-prewarming-monitor
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: knative-prewarming-monitor
+        app.kubernetes.io/component: monitoring
+    spec:
+      serviceAccountName: knative-prewarmer
+      containers:
+      - name: monitor
+        image: prom/node-exporter:latest
+        ports:
+        - containerPort: 8080
+          name: metrics
+        resources:
+          requests:
+            cpu: 25m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi

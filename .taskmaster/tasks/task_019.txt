@@ -1,0 +1,120 @@
+# Task ID: 19
+# Title: Implement GitHub Actions CI/CD Templates
+# Status: pending
+# Dependencies: 15
+# Priority: medium
+# Description: Create GitHub Actions workflow templates for Python (FastAPI) and Java (Spring Boot) applications with CI/CD pipelines to Docker Hub and GitOps updates.
+# Details:
+1. Create GitHub Actions workflow templates for each language/framework
+2. Configure Docker Hub authentication and image pushing
+3. Implement GitOps updates to ArgoCD repository
+4. Set up proper testing and validation steps
+
+```yaml
+# GitHub Actions workflow for Python/FastAPI
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    - name: Test with pytest
+      run: pytest
+
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    - name: Login to DockerHub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: Build and push
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: true
+        tags: socrates12345/${{ github.event.repository.name }}:latest
+
+  update-gitops:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        repository: socrates12345/gitops-repo
+        token: ${{ secrets.GITOPS_PAT }}
+    - name: Update image tag
+      run: |
+        cd apps/${{ github.event.repository.name }}
+        sed -i 's|image: socrates12345/${{ github.event.repository.name }}:.*|image: socrates12345/${{ github.event.repository.name }}:latest|' deployment.yaml
+        git config user.name github-actions
+        git config user.email github-actions@github.com
+        git add .
+        git commit -m "Update ${{ github.event.repository.name }} image to latest"
+        git push
+```
+
+Implement similar workflow for Java/Spring Boot with appropriate build tools (Maven/Gradle). Configure secrets for Docker Hub and GitOps repository access. Set up proper caching for dependencies to speed up builds.
+
+# Test Strategy:
+1. Test workflow with sample Python/FastAPI application
+2. Test workflow with sample Java/Spring Boot application
+3. Verify Docker image is built and pushed to Docker Hub
+4. Validate GitOps update to ArgoCD repository
+5. Test error handling and notifications
+6. Verify that tests are run before building/pushing
+7. Test with various dependency configurations
+
+# Subtasks:
+## 1. Create Python/FastAPI GitHub Actions workflow template [pending]
+### Dependencies: None
+### Description: Implement a complete GitHub Actions workflow template for Python/FastAPI applications with testing, Docker image building, and pushing to Docker Hub.
+### Details:
+Create a YAML file named 'python-fastapi-workflow.yml' with jobs for testing, building Docker images, and pushing to Docker Hub. Include proper caching for pip dependencies to speed up builds. Configure the workflow to trigger on push to main branch and pull requests. Use the provided example as a starting point, but enhance it with dependency caching and multi-stage Docker builds for smaller images.
+
+## 2. Create Java/Spring Boot GitHub Actions workflow template [pending]
+### Dependencies: None
+### Description: Implement a complete GitHub Actions workflow template for Java/Spring Boot applications with Maven/Gradle build, testing, Docker image building, and pushing to Docker Hub.
+### Details:
+Create a YAML file named 'java-springboot-workflow.yml' with jobs for building with Maven/Gradle, running tests, building Docker images, and pushing to Docker Hub. Include proper caching for Maven/Gradle dependencies. Configure the workflow to use JDK 17, run unit and integration tests, and build optimized Docker images. Include both Maven and Gradle configurations with conditional execution based on which build tool is detected in the repository.
+
+## 3. Implement GitOps update workflow component [pending]
+### Dependencies: 19.1, 19.2
+### Description: Create a reusable GitHub Actions workflow component that updates the GitOps repository with the new image tag after successful Docker image build and push.
+### Details:
+Create a YAML file named 'gitops-update.yml' that can be included in both Python and Java workflows. This component should checkout the GitOps repository, update the appropriate Kubernetes manifest files with the new image tag, commit the changes, and push them back to the repository. Configure proper authentication using GitHub Personal Access Tokens (PATs) stored as secrets. Include error handling and validation to ensure the GitOps repository is in the expected state before making changes.
+
+## 4. Configure secrets management and documentation [pending]
+### Dependencies: 19.1, 19.2, 19.3
+### Description: Set up the required secrets for Docker Hub authentication and GitOps repository access, and create comprehensive documentation for using the workflow templates.
+### Details:
+Create a README.md file explaining how to set up the required secrets in the GitHub repository: DOCKERHUB_USERNAME, DOCKERHUB_TOKEN, and GITOPS_PAT. Include step-by-step instructions for generating these tokens/credentials from Docker Hub and GitHub. Document how to configure the workflows for specific projects, including any customization options. Create a template for the GitOps repository structure that works with the update workflow.
+
+## 5. Implement workflow templates with matrix builds and environment deployments [pending]
+### Dependencies: 19.1, 19.2, 19.3, 19.4
+### Description: Enhance the workflow templates to support matrix builds for multiple Python/Java versions and deployment to different environments (dev, staging, production).
+### Details:
+Update both workflow templates to include matrix builds that test against multiple language versions (e.g., Python 3.9, 3.10, 3.11 or Java 11, 17, 21). Add environment-specific deployment configurations that tag Docker images appropriately (e.g., :dev, :staging, :production) based on the branch or tag that triggered the workflow. Implement conditional GitOps updates that target the correct environment folder in the GitOps repository. Include proper approval gates for production deployments using GitHub environments with required reviewers.
+

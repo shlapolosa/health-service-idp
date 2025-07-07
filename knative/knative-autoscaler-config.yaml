@@ -1,0 +1,144 @@
+# Knative Autoscaler Configuration for Cold Start Protection
+# This ConfigMap optimizes Knative Serving for minimal cold start impact
+
+---
+# Autoscaler Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-autoscaler
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/component: autoscaler-config
+data:
+  # Cold Start Protection Settings
+  enable-scale-to-zero: "true"
+  scale-to-zero-grace-period: "30s"        # Time to wait before scaling to zero
+  scale-to-zero-pod-retention-period: "1m" # Time to retain pods at zero scale
+  
+  # Scaling Parameters
+  min-scale: "1"                           # Minimum number of replicas
+  max-scale: "10"                          # Maximum number of replicas
+  initial-scale: "1"                       # Initial number of replicas
+  allow-zero-initial-scale: "false"        # Prevent initial scale to zero
+  
+  # Scaling Rates
+  max-scale-up-rate: "10.0"               # Maximum scale-up rate per second
+  max-scale-down-rate: "2.0"              # Maximum scale-down rate per second
+  
+  # Panic Mode Settings (for traffic spikes)
+  panic-window-percentage: "10.0"         # Percentage of stable window for panic mode
+  panic-threshold-percentage: "200.0"     # Threshold for entering panic mode
+  stable-window: "60s"                    # Window for stable metrics
+  
+  # Concurrency Settings
+  container-concurrency-target-default: "100"    # Default target concurrency
+  container-concurrency-target-percentage: "70"   # Target percentage of max concurrency
+  target-burst-capacity: "200"                   # Burst capacity for traffic spikes
+  
+  # Activator Settings
+  activator-capacity: "100"               # Activator capacity
+  
+  # Health Check Endpoint for Concurrency State
+  concurrency-state-endpoint: "/healthz/concurrency"
+
+---
+# Deployment Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-deployment
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/component: deployment-config
+data:
+  # Progressive deployment settings
+  progressDeadline: "600s"                # Maximum time for deployment
+  queueSidecarImage: gcr.io/knative-releases/knative.dev/serving/cmd/queue@sha256:latest
+  
+  # Registry settings for private registries
+  registriesSkippingTagResolving: "ko.local,dev.local"
+
+---
+# Network Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-network
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/component: network-config
+data:
+  # Ingress settings
+  ingress-class: "istio.ingress.networking.knative.dev"
+  
+  # Domain configuration
+  domain-template: "{{.Name}}.{{.Namespace}}.{{.Domain}}"
+  
+  # Timeout settings
+  default-timeout: "600s"
+  max-timeout: "3600s"
+
+---
+# Observability Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-observability
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/component: observability-config
+data:
+  # Logging configuration
+  logging.enable-var-log-collection: "false"
+  logging.revision-timeout-seconds: "120"
+  
+  # Metrics configuration
+  metrics.backend-destination: "prometheus"
+  metrics.request-metrics-backend-destination: "prometheus"
+  metrics.stackdriver-project-id: ""
+  
+  # Profiling
+  profiling.enable: "false"
+
+---
+# GC Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-gc
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/component: gc-config
+data:
+  # Garbage collection settings
+  stale-revision-create-delay: "24h"       # Delay before marking revisions as stale
+  stale-revision-timeout: "15h"           # Timeout for stale revisions
+  stale-revision-minimum-generations: "1"  # Minimum generations to keep
+  
+  # Cleanup settings
+  stale-revision-lastpinned-debounce: "5h" # Debounce for last pinned revisions
+
+---
+# Leader Election Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-leader-election
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/component: leader-election-config
+data:
+  # Leader election settings for high availability
+  lease-duration: "60s"                   # Duration of leader lease
+  renew-deadline: "40s"                   # Deadline for renewing lease
+  retry-period: "10s"                     # Period between retry attempts
+  
+  # Enable leader election for controllers
+  enable-controller-leader-election: "true"

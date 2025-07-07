@@ -1,0 +1,210 @@
+# Task ID: 20
+# Title: Create Application Templates for Python and Java
+# Status: pending
+# Dependencies: 15, 19
+# Priority: medium
+# Description: Develop template repositories for Python (FastAPI) and Java (Spring Boot) applications with proper structure, Dockerfile, configuration, and integration with Auth0 and Neon Postgres.
+# Details:
+1. Create template repositories for each language/framework
+2. Implement proper Dockerfile with multi-stage builds
+3. Configure Auth0 integration
+4. Set up Neon Postgres connection
+5. Implement health checks and metrics endpoints
+
+**Python/FastAPI Template:**
+```python
+# main.py
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import OAuth2AuthorizationCodeBearer
+import os
+import httpx
+from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+
+app = FastAPI()
+
+# Auth0 configuration
+auth0_domain = os.getenv("AUTH0_DOMAIN")
+auth0_client_id = os.getenv("AUTH0_CLIENT_ID")
+auth0_client_secret = os.getenv("AUTH0_CLIENT_SECRET")
+
+oauth2_scheme = OAuth2AuthorizationCodeBearer(
+    authorizationUrl=f"https://{auth0_domain}/authorize",
+    tokenUrl=f"https://{auth0_domain}/oauth/token"
+)
+
+# Database configuration
+database_url = f"postgresql://{os.getenv('PGUSER')}:{os.getenv('PGPASSWORD')}@{os.getenv('PGHOST')}/{os.getenv('PGDATABASE')}"
+engine = create_engine(database_url)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+class Item(Base):
+    __tablename__ = "items"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    description = Column(String)
+
+Base.metadata.create_all(bind=engine)
+
+# Health check endpoint for Knative
+@app.get("/healthz/concurrency")
+async def health_check():
+    return {"status": "ok"}
+
+# Metrics endpoint for Prometheus
+@app.get("/metrics")
+async def metrics():
+    return {"requests_total": 0}
+
+@app.get("/")
+async def root():
+    return {"message": "Hello World"}
+
+@app.get("/items/")
+async def read_items(token: str = Depends(oauth2_scheme)):
+    # Verify token with Auth0
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            f"https://{auth0_domain}/userinfo",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication credentials"
+            )
+    
+    # Query database
+    db = SessionLocal()
+    items = db.query(Item).all()
+    db.close()
+    return items
+```
+
+**Dockerfile for Python/FastAPI:**
+```dockerfile
+# Build stage
+FROM python:3.11-slim AS builder
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
+
+# Final stage
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY --from=builder /app/wheels /wheels
+COPY --from=builder /app/requirements.txt .
+
+RUN pip install --no-cache /wheels/*
+
+COPY . .
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+```
+
+Implement similar templates for Java/Spring Boot with appropriate structure and configuration. Include documentation and examples for common use cases.
+
+# Test Strategy:
+1. Test template repositories with sample data
+2. Verify Auth0 integration works correctly
+3. Test Neon Postgres connection and queries
+4. Validate health check and metrics endpoints
+5. Test Dockerfile builds and runs correctly
+6. Verify that environment variables are properly used
+7. Test with various configuration options
+
+# Subtasks:
+## 1. Create Python/FastAPI Template Repository Structure [pending]
+### Dependencies: None
+### Description: Set up a complete template repository for Python/FastAPI applications with proper directory structure, configuration files, and basic application setup.
+### Details:
+Create a new GitHub repository with the following structure:
+- `/app`: Main application code
+- `/tests`: Unit and integration tests
+- `/docs`: Documentation
+- `requirements.txt`: Dependencies
+- `requirements-dev.txt`: Development dependencies
+- `.env.example`: Example environment variables
+- `.gitignore`: Configured for Python
+- `README.md`: Setup and usage instructions
+
+Implement the FastAPI application with proper structure including routes, models, and services directories. Include configuration for environment variables loading and logging.
+
+## 2. Create Java/Spring Boot Template Repository Structure [pending]
+### Dependencies: None
+### Description: Set up a complete template repository for Java/Spring Boot applications with proper directory structure, configuration files, and basic application setup.
+### Details:
+Create a new GitHub repository with Maven/Gradle project structure:
+- `src/main/java`: Main application code with package structure
+- `src/main/resources`: Configuration files (application.properties/yml)
+- `src/test`: Test classes
+- `.gitignore`: Configured for Java
+- `README.md`: Setup and usage instructions
+
+Implement Spring Boot application with proper structure including controllers, services, repositories, and models. Include configuration for profiles (dev, prod) and logging.
+
+## 3. Implement Multi-stage Dockerfiles and Docker Compose [pending]
+### Dependencies: 20.1, 20.2
+### Description: Create optimized Dockerfiles for both Python and Java templates with multi-stage builds and Docker Compose configurations for local development.
+### Details:
+For Python/FastAPI:
+- Create multi-stage Dockerfile as shown in the example
+- Add Docker Compose file with Postgres service for local development
+
+For Java/Spring Boot:
+- Create multi-stage Dockerfile using Maven/Gradle build and JRE runtime
+- Add Docker Compose file with Postgres service for local development
+
+Both should include:
+- Health check configurations
+- Environment variable handling
+- Proper security practices (non-root user, etc.)
+- Volume mounts for development
+
+## 4. Implement Auth0 Integration for Both Templates [pending]
+### Dependencies: 20.1, 20.2
+### Description: Add complete Auth0 integration to both template applications including configuration, middleware/filters, and example protected routes.
+### Details:
+For Python/FastAPI:
+- Implement Auth0 authentication using the OAuth2AuthorizationCodeBearer
+- Add middleware for token validation
+- Create example protected and public routes
+
+For Java/Spring Boot:
+- Implement Auth0 authentication using Spring Security
+- Configure security filters for JWT validation
+- Create example protected and public endpoints
+
+Both should include:
+- Clear documentation on Auth0 setup requirements
+- Environment variable configuration
+- Role-based access control examples
+
+## 5. Implement Neon Postgres Connection and Observability [pending]
+### Dependencies: 20.1, 20.2, 20.3, 20.4
+### Description: Add database connection configuration for Neon Postgres and implement health checks, metrics, and logging for observability.
+### Details:
+For Python/FastAPI:
+- Configure SQLAlchemy for Neon Postgres connection with connection pooling
+- Add Prometheus metrics endpoint
+- Implement structured logging
+- Add health check endpoints for Knative
+
+For Java/Spring Boot:
+- Configure Spring Data JPA for Neon Postgres connection
+- Add Micrometer/Prometheus integration
+- Configure structured JSON logging
+- Implement Spring Boot Actuator endpoints
+
+Both should include:
+- Database migration tools (Alembic for Python, Flyway/Liquibase for Java)
+- Connection retry logic
+- Example entity/model and repository
+- Documentation on connection string format for Neon
+

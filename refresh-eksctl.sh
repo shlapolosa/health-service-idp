@@ -172,24 +172,25 @@ spec:
           values: ["spot", "on-demand"]
         - key: karpenter.k8s.aws/instance-category
           operator: In
-          values: ["c", "m", "r", "t"]
+          values: ["t"]                    # Prefer t3 family for cost optimization
         - key: karpenter.k8s.aws/instance-generation
           operator: Gt
-          values: ["2"]
+          values: ["2"]                    # t3 and newer
         - key: karpenter.k8s.aws/instance-size
           operator: In
-          values: ["medium", "large", "xlarge"]
+          values: ["medium"]               # Limit to t3.medium for consistency
       nodeClassRef:
         group: karpenter.k8s.aws
         kind: EC2NodeClass
         name: default
       expireAfter: 720h # 30 * 24h = 720h
   limits:
-    cpu: 20
-    memory: 500Gi
+    cpu: 16        # Limit to ~4 t3.medium instances (4 vCPU each)
+    memory: 64Gi   # Limit to ~4 t3.medium instances (16GB each)
   disruption:
-    consolidationPolicy: WhenEmptyOrUnderutilized
-    consolidateAfter: 1m
+    consolidationPolicy: WhenEmpty      # Only consolidate truly empty nodes
+    consolidateAfter: 10m              # Wait 10 minutes before consolidation
+    expireAfter: 10m                   # Minimum node lifetime 10 minutes
 ---
 apiVersion: karpenter.k8s.aws/v1
 kind: EC2NodeClass

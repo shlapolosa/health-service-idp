@@ -1,0 +1,202 @@
+# Default Knative Service Template with Cold Start Protection
+# This template provides optimal settings for Knative services
+
+---
+# Example Knative Service with Cold Start Protection
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: example-service
+  namespace: default
+  annotations:
+    # Cold start protection annotations
+    autoscaling.knative.dev/min-scale: "1"           # Keep at least 1 replica
+    autoscaling.knative.dev/max-scale: "10"          # Maximum 10 replicas
+    autoscaling.knative.dev/initial-scale: "1"       # Start with 1 replica
+    
+    # Concurrency settings
+    autoscaling.knative.dev/target: "100"            # Target 100 concurrent requests
+    autoscaling.knative.dev/target-utilization-percentage: "70"  # 70% utilization target
+    
+    # Scaling behavior
+    autoscaling.knative.dev/window: "60s"            # 60s observation window
+    autoscaling.knative.dev/panic-window-percentage: "10.0"  # 10% panic window
+    autoscaling.knative.dev/panic-threshold-percentage: "200.0"  # 200% panic threshold
+    
+    # Scale-to-zero settings
+    autoscaling.knative.dev/scale-to-zero-pod-retention-period: "1m"  # Retain pods for 1 minute
+    
+    # Traffic management
+    serving.knative.dev/visibility: "cluster-local"  # Internal only (remove for external access)
+    
+    # Performance optimizations
+    features.knative.dev/podspec-schedulingGates: "enabled"
+    features.knative.dev/podspec-runtimeclass: "enabled"
+spec:
+  template:
+    metadata:
+      annotations:
+        # Container-level settings
+        autoscaling.knative.dev/min-scale: "1"
+        autoscaling.knative.dev/max-scale: "10"
+        autoscaling.knative.dev/target: "100"
+        
+        # Health check endpoints
+        autoscaling.knative.dev/concurrency-state-endpoint: "/healthz/concurrency"
+        
+        # Queue proxy settings
+        queue.sidecar.serving.knative.dev/cpu-resource-request: "25m"
+        queue.sidecar.serving.knative.dev/memory-resource-request: "50Mi"
+        queue.sidecar.serving.knative.dev/cpu-resource-limit: "1000m"
+        queue.sidecar.serving.knative.dev/memory-resource-limit: "200Mi"
+        
+        # Security context
+        run.googleapis.com/execution-environment: "gen2"
+    spec:
+      # Container concurrency (requests per container)
+      containerConcurrency: 100
+      
+      # Timeout settings
+      timeoutSeconds: 300  # 5 minutes
+      
+      containers:
+      - name: application
+        image: gcr.io/cloudrun/hello  # Replace with actual image
+        ports:
+        - containerPort: 8080
+          name: http1
+          protocol: TCP
+        
+        env:
+        - name: PORT
+          value: "8080"
+        - name: TARGET
+          value: "World"
+        
+        # Resource requirements
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 512Mi
+        
+        # Health checks for cold start protection
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        
+        # Startup probe for slow-starting applications
+        startupProbe:
+          httpGet:
+            path: /startup
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 12  # Allow up to 60s for startup
+        
+        # Security context
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1001
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+
+---
+# Service Template for Database-Connected Applications
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: database-service-template
+  namespace: default
+  annotations:
+    # Adjusted for database connections
+    autoscaling.knative.dev/min-scale: "2"           # Keep 2 replicas for DB connections
+    autoscaling.knative.dev/max-scale: "20"          # Higher max for DB workloads
+    autoscaling.knative.dev/target: "50"             # Lower concurrency for DB operations
+    autoscaling.knative.dev/scale-to-zero-pod-retention-period: "5m"  # Longer retention
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/min-scale: "2"
+        autoscaling.knative.dev/max-scale: "20"
+        autoscaling.knative.dev/target: "50"
+    spec:
+      containerConcurrency: 50  # Lower concurrency for DB operations
+      timeoutSeconds: 600       # Longer timeout for DB operations
+      containers:
+      - name: application
+        image: gcr.io/cloudrun/hello  # Replace with actual image
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: url
+        - name: DB_POOL_SIZE
+          value: "5"
+        - name: DB_MAX_OVERFLOW
+          value: "10"
+        resources:
+          requests:
+            cpu: 500m     # Higher CPU for DB operations
+            memory: 512Mi # More memory for connection pooling
+          limits:
+            cpu: 2000m
+            memory: 1Gi
+
+---
+# Service Template for High-Traffic Applications
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: high-traffic-service-template
+  namespace: default
+  annotations:
+    # Optimized for high traffic
+    autoscaling.knative.dev/min-scale: "5"           # Higher minimum scale
+    autoscaling.knative.dev/max-scale: "100"         # Much higher maximum
+    autoscaling.knative.dev/target: "200"            # Higher concurrency target
+    autoscaling.knative.dev/window: "30s"            # Faster scaling decisions
+    autoscaling.knative.dev/panic-window-percentage: "5.0"   # Faster panic mode
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/min-scale: "5"
+        autoscaling.knative.dev/max-scale: "100"
+        autoscaling.knative.dev/target: "200"
+    spec:
+      containerConcurrency: 200  # High concurrency
+      containers:
+      - name: application
+        image: gcr.io/cloudrun/hello  # Replace with actual image
+        resources:
+          requests:
+            cpu: 1000m    # Higher resource allocation
+            memory: 1Gi
+          limits:
+            cpu: 4000m
+            memory: 2Gi

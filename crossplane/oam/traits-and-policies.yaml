@@ -1,0 +1,486 @@
+# OAM TraitDefinitions and PolicyDefinitions for infrastructure and application management
+
+---
+# 1. Ingress Trait Definition
+apiVersion: core.oam.dev/v1beta1
+kind: TraitDefinition
+metadata:
+  name: ingress
+  annotations:
+    definition.oam.dev/description: "Configure ingress routing for web services"
+spec:
+  appliesToWorkloads:
+  - webservice
+  schematic:
+    cue:
+      template: |
+        outputs: ingress: {
+          apiVersion: "networking.k8s.io/v1"
+          kind: "Ingress"
+          metadata: {
+            name: context.name + "-ingress"
+            namespace: context.namespace
+            annotations: {
+              "kubernetes.io/ingress.class": "istio"
+              if parameter.enableTLS {
+                "cert-manager.io/cluster-issuer": parameter.clusterIssuer
+              }
+            }
+          }
+          spec: {
+            if parameter.enableTLS {
+              tls: [{
+                hosts: [parameter.domain]
+                secretName: context.name + "-tls"
+              }]
+            }
+            rules: [{
+              host: parameter.domain
+              http: {
+                paths: [{
+                  path: parameter.path
+                  pathType: "Prefix"
+                  backend: {
+                    service: {
+                      name: context.name
+                      port: {
+                        number: context.port
+                      }
+                    }
+                  }
+                }]
+              }
+            }]
+          }
+        }
+        
+        parameter: {
+          // Required
+          domain: string
+          
+          // Optional
+          path: *"/" | string
+          enableTLS: *true | bool
+          clusterIssuer: *"letsencrypt-prod" | string
+        }
+
+---
+# 2. Autoscaler Trait Definition
+apiVersion: core.oam.dev/v1beta1
+kind: TraitDefinition
+metadata:
+  name: autoscaler
+  annotations:
+    definition.oam.dev/description: "Horizontal Pod Autoscaler for applications"
+spec:
+  appliesToWorkloads:
+  - webservice
+  - tfjob
+  schematic:
+    cue:
+      template: |
+        outputs: hpa: {
+          apiVersion: "autoscaling/v2"
+          kind: "HorizontalPodAutoscaler"
+          metadata: {
+            name: context.name + "-hpa"
+            namespace: context.namespace
+          }
+          spec: {
+            scaleTargetRef: {
+              apiVersion: "apps/v1"
+              kind: "Deployment"
+              name: context.name
+            }
+            minReplicas: parameter.minReplicas
+            maxReplicas: parameter.maxReplicas
+            metrics: [
+              if parameter.targetCPU != _|_ {
+                {
+                  type: "Resource"
+                  resource: {
+                    name: "cpu"
+                    target: {
+                      type: "Utilization"
+                      averageUtilization: parameter.targetCPU
+                    }
+                  }
+                }
+              },
+              if parameter.targetMemory != _|_ {
+                {
+                  type: "Resource"
+                  resource: {
+                    name: "memory"
+                    target: {
+                      type: "Utilization"
+                      averageUtilization: parameter.targetMemory
+                    }
+                  }
+                }
+              }
+            ]
+            behavior: {
+              scaleUp: {
+                stabilizationWindowSeconds: parameter.scaleUpStabilization
+                policies: [{
+                  type: "Percent"
+                  value: 100
+                  periodSeconds: 15
+                }]
+              }
+              scaleDown: {
+                stabilizationWindowSeconds: parameter.scaleDownStabilization
+                policies: [{
+                  type: "Percent"
+                  value: 50
+                  periodSeconds: 60
+                }]
+              }
+            }
+          }
+        }
+        
+        parameter: {
+          // Required
+          minReplicas: int
+          maxReplicas: int
+          
+          // Optional
+          targetCPU?: int
+          targetMemory?: int
+          scaleUpStabilization: *60 | int
+          scaleDownStabilization: *300 | int
+        }
+
+---
+# 3. Kafka Producer Trait Definition
+apiVersion: core.oam.dev/v1beta1
+kind: TraitDefinition
+metadata:
+  name: kafka-producer
+  annotations:
+    definition.oam.dev/description: "Configure application as Kafka producer"
+spec:
+  appliesToWorkloads:
+  - webservice
+  schematic:
+    cue:
+      template: |
+        outputs: configmap: {
+          apiVersion: "v1"
+          kind: "ConfigMap"
+          metadata: {
+            name: context.name + "-kafka-producer-config"
+            namespace: context.namespace
+          }
+          data: {
+            "kafka.properties": """
+              bootstrap.servers=\(parameter.kafkaCluster):9092
+              key.serializer=org.apache.kafka.common.serialization.StringSerializer
+              value.serializer=org.apache.kafka.common.serialization.StringSerializer
+              acks=all
+              retries=3
+              batch.size=16384
+              linger.ms=1
+              buffer.memory=33554432
+              """
+            "topics.json": parameter.topics
+          }
+        }
+        
+        // Patch the workload to add Kafka environment variables
+        patch: {
+          spec: template: spec: containers: [{
+            env: [
+              {
+                name: "KAFKA_BOOTSTRAP_SERVERS"
+                value: parameter.kafkaCluster + ":9092"
+              },
+              {
+                name: "KAFKA_TOPICS"
+                valueFrom: {
+                  configMapKeyRef: {
+                    name: context.name + "-kafka-producer-config"
+                    key: "topics.json"
+                  }
+                }
+              }
+            ]
+            volumeMounts: [{
+              name: "kafka-config"
+              mountPath: "/etc/kafka"
+            }]
+          }]
+          volumes: [{
+            name: "kafka-config"
+            configMap: {
+              name: context.name + "-kafka-producer-config"
+            }
+          }]
+        }
+        
+        parameter: {
+          // Required
+          topics: [...string]
+          
+          // Optional
+          kafkaCluster: *"kafka" | string
+        }
+
+---
+# 4. Kafka Consumer Trait Definition
+apiVersion: core.oam.dev/v1beta1
+kind: TraitDefinition
+metadata:
+  name: kafka-consumer
+  annotations:
+    definition.oam.dev/description: "Configure application as Kafka consumer"
+spec:
+  appliesToWorkloads:
+  - webservice
+  schematic:
+    cue:
+      template: |
+        outputs: configmap: {
+          apiVersion: "v1"
+          kind: "ConfigMap"
+          metadata: {
+            name: context.name + "-kafka-consumer-config"
+            namespace: context.namespace
+          }
+          data: {
+            "kafka.properties": """
+              bootstrap.servers=\(parameter.kafkaCluster):9092
+              key.deserializer=org.apache.kafka.common.serialization.StringDeserializer
+              value.deserializer=org.apache.kafka.common.serialization.StringDeserializer
+              group.id=\(parameter.consumerGroup)
+              auto.offset.reset=earliest
+              enable.auto.commit=true
+              auto.commit.interval.ms=1000
+              """
+            "topics.json": parameter.topics
+            "consumer.group": parameter.consumerGroup
+          }
+        }
+        
+        // Patch the workload to add Kafka environment variables
+        patch: {
+          spec: template: spec: containers: [{
+            env: [
+              {
+                name: "KAFKA_BOOTSTRAP_SERVERS"
+                value: parameter.kafkaCluster + ":9092"
+              },
+              {
+                name: "KAFKA_TOPICS"
+                valueFrom: {
+                  configMapKeyRef: {
+                    name: context.name + "-kafka-consumer-config"
+                    key: "topics.json"
+                  }
+                }
+              },
+              {
+                name: "KAFKA_CONSUMER_GROUP"
+                valueFrom: {
+                  configMapKeyRef: {
+                    name: context.name + "-kafka-consumer-config"
+                    key: "consumer.group"
+                  }
+                }
+              }
+            ]
+            volumeMounts: [{
+              name: "kafka-config"
+              mountPath: "/etc/kafka"
+            }]
+          }]
+          volumes: [{
+            name: "kafka-config"
+            configMap: {
+              name: context.name + "-kafka-consumer-config"
+            }
+          }]
+        }
+        
+        parameter: {
+          // Required
+          topics: [...string]
+          consumerGroup: string
+          
+          // Optional
+          kafkaCluster: *"kafka" | string
+        }
+
+---
+# 5. Health Policy Definition
+apiVersion: core.oam.dev/v1beta1
+kind: PolicyDefinition
+metadata:
+  name: health
+  annotations:
+    definition.oam.dev/description: "Health checking policy for applications"
+spec:
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "standard.oam.dev/v1alpha1"
+          kind: "HealthScope"
+          metadata: {
+            name: context.appName + "-health"
+            namespace: context.namespace
+          }
+          spec: {
+            probeInterval: parameter.probeInterval
+            probeTimeout: parameter.probeTimeout
+            workloadRefs: [
+              for comp in context.components {
+                {
+                  apiVersion: comp.apiVersion
+                  kind: comp.kind
+                  name: comp.name
+                }
+              }
+            ]
+          }
+        }
+        
+        parameter: {
+          // Optional
+          probeInterval: *30 | int
+          probeTimeout: *10 | int
+        }
+
+---
+# 6. Security Policy Definition
+apiVersion: core.oam.dev/v1beta1
+kind: PolicyDefinition
+metadata:
+  name: security-policy
+  annotations:
+    definition.oam.dev/description: "Security policies for application access control"
+spec:
+  schematic:
+    cue:
+      template: |
+        outputs: {
+          networkPolicy: {
+            apiVersion: "networking.k8s.io/v1"
+            kind: "NetworkPolicy"
+            metadata: {
+              name: context.appName + "-security"
+              namespace: context.namespace
+            }
+            spec: {
+              podSelector: {
+                matchLabels: {
+                  "app.oam.dev/name": context.appName
+                }
+              }
+              policyTypes: ["Ingress", "Egress"]
+              ingress: [
+                {
+                  from: [
+                    if parameter.allowedOrigins != _|_ {
+                      for origin in parameter.allowedOrigins {
+                        {
+                          namespaceSelector: {
+                            matchLabels: {
+                              "kubernetes.io/metadata.name": origin
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      namespaceSelector: {
+                        matchLabels: {
+                          "name": "istio-system"
+                        }
+                      }
+                    }
+                  ]
+                  ports: [{
+                    protocol: "TCP"
+                    port: 8080
+                  }]
+                }
+              ]
+              egress: [
+                {
+                  to: []
+                  ports: [
+                    {
+                      protocol: "TCP"
+                      port: 53
+                    },
+                    {
+                      protocol: "UDP" 
+                      port: 53
+                    },
+                    {
+                      protocol: "TCP"
+                      port: 443
+                    },
+                    {
+                      protocol: "TCP"
+                      port: 80
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+        
+        parameter: {
+          // Optional
+          allowedOrigins?: [...string]
+        }
+
+---
+# 7. Override Policy Definition
+apiVersion: core.oam.dev/v1beta1
+kind: PolicyDefinition
+metadata:
+  name: override
+  annotations:
+    definition.oam.dev/description: "Override component configurations selectively"
+spec:
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "standard.oam.dev/v1alpha1"
+          kind: "Override"
+          metadata: {
+            name: context.appName + "-overrides"
+            namespace: context.namespace
+          }
+          spec: {
+            components: [
+              for comp in parameter.components {
+                {
+                  name: comp.name
+                  if comp.properties != _|_ {
+                    properties: comp.properties
+                  }
+                  if comp.traits != _|_ {
+                    traits: comp.traits
+                  }
+                }
+              }
+            ]
+          }
+        }
+        
+        parameter: {
+          // Required
+          components: [...{
+            name: string
+            properties?: {...}
+            traits?: [...]
+          }]
+        }

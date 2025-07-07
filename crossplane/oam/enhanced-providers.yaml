@@ -1,0 +1,83 @@
+# Enhanced Crossplane Providers for OAM Infrastructure Components
+# These complement the existing providers with additional capabilities
+
+---
+# Terraform Provider for Snowflake, Neon, Auth0 integrations
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-terraform
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/provider-terraform:v0.15.0
+
+---
+# Enhanced AWS Provider for additional services
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-aws-apigateway
+spec:
+  package: xpkg.upbound.io/upbound/provider-aws-apigatewayv2:v0.43.0
+
+---
+# HTTP Provider for REST API integrations (Neon, Auth0 APIs)
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-http
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/provider-http:v0.4.0
+
+---
+# Terraform ProviderConfig for Snowflake
+apiVersion: tf.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: terraform-snowflake
+spec:
+  credentials:
+    source: Secret
+    secretRef:
+      namespace: crossplane-system
+      name: snowflake-terraform-creds
+      key: credentials
+  configuration: |
+    terraform {
+      required_providers {
+        snowflake = {
+          source = "Snowflake-Labs/snowflake"
+          version = "~> 0.87"
+        }
+      }
+    }
+    
+    provider "snowflake" {
+      account  = var.snowflake_account
+      username = var.snowflake_username
+      password = var.snowflake_password
+      region   = var.snowflake_region
+    }
+
+---
+# HTTP ProviderConfig for API integrations
+apiVersion: http.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: default-http
+spec:
+  credentials:
+    source: Secret
+    secretRef:
+      namespace: crossplane-system
+      name: http-provider-creds
+      key: credentials
+
+---
+# Enhanced AWS ProviderConfig for API Gateway
+apiVersion: aws.upbound.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: aws-apigateway
+spec:
+  credentials:
+    source: IRSA  # Uses existing AWS IRSA setup

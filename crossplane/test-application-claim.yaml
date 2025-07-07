@@ -1,0 +1,49 @@
+# Test ApplicationClaim examples
+
+---
+# Basic Python FastAPI application
+apiVersion: platform.example.org/v1alpha1
+kind: ApplicationClaim
+metadata:
+  name: simple-python-api
+  namespace: default
+spec:
+  name: simple-python-api
+  language: python
+  framework: fastapi
+  hasFrontend: false
+  database: none
+  cache: none
+  exposeApi: false
+
+---
+# Java Spring Boot application with database and cache
+apiVersion: platform.example.org/v1alpha1
+kind: ApplicationClaim
+metadata:
+  name: java-fullstack-app
+  namespace: default
+spec:
+  name: java-fullstack-app
+  language: java
+  framework: springboot
+  hasFrontend: true
+  database: postgres
+  cache: redis
+  exposeApi: true
+
+---
+# Python microservice with database only
+apiVersion: platform.example.org/v1alpha1
+kind: ApplicationClaim
+metadata:
+  name: python-microservice
+  namespace: default
+spec:
+  name: python-microservice
+  language: python
+  framework: fastapi
+  hasFrontend: false
+  database: postgres
+  cache: none
+  exposeApi: true

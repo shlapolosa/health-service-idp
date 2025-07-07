@@ -1,0 +1,94 @@
+# Example VCluster Claims with Knative Serving and Istio Options
+
+---
+# Basic VCluster with Istio only
+apiVersion: platform.example.org/v1alpha1
+kind: VClusterEnvironmentClaim
+metadata:
+  name: dev-cluster
+  namespace: default
+spec:
+  name: dev-cluster
+  components:
+    istio: true              # Install Istio service mesh
+    knativeServing: false    # Don't install Knative
+    argoCD: true            # Install ArgoCD for GitOps
+    grafana: false          # Skip Grafana for cost savings
+    prometheus: false       # Skip Prometheus for cost savings
+
+---
+# Full Featured VCluster with Knative + Istio
+apiVersion: platform.example.org/v1alpha1
+kind: VClusterEnvironmentClaim
+metadata:
+  name: production-cluster
+  namespace: default
+spec:
+  name: production-cluster
+  domain: "api.example.com"  # Custom domain
+  components:
+    istio: true              # Install Istio service mesh
+    knativeServing: true     # Install Knative Serving (requires Istio)
+    argoCD: true            # Install ArgoCD for GitOps
+    grafana: true           # Install Grafana for monitoring
+    prometheus: true        # Install Prometheus for metrics
+    jaeger: true            # Install Jaeger for tracing
+    kiali: true             # Install Kiali for service mesh observability
+    apiGateway: true        # Create AWS API Gateway integration
+
+---
+# Cost-Optimized VCluster with Knative only
+apiVersion: platform.example.org/v1alpha1
+kind: VClusterEnvironmentClaim
+metadata:
+  name: serverless-cluster
+  namespace: default
+spec:
+  name: serverless-cluster
+  components:
+    istio: true              # Required for Knative
+    knativeServing: true     # Install Knative for serverless workloads
+    argoCD: true            # Basic GitOps
+    grafana: false          # Cost optimization: no monitoring
+    prometheus: false       # Cost optimization: no metrics
+    jaeger: false           # Cost optimization: no tracing
+    kiali: false            # Cost optimization: no service mesh UI
+    apiGateway: false       # Cost optimization: internal only
+
+---
+# Minimal VCluster (no optional components)
+apiVersion: platform.example.org/v1alpha1
+kind: VClusterEnvironmentClaim
+metadata:
+  name: minimal-cluster
+  namespace: default
+spec:
+  name: minimal-cluster
+  components:
+    istio: false            # No service mesh
+    knativeServing: false   # No serverless
+    argoCD: false          # No GitOps
+    grafana: false         # No monitoring
+    prometheus: false      # No metrics
+    jaeger: false          # No tracing
+    kiali: false           # No observability
+    apiGateway: false      # No external access
+
+---
+# Istio-only VCluster (service mesh without serverless)
+apiVersion: platform.example.org/v1alpha1
+kind: VClusterEnvironmentClaim
+metadata:
+  name: service-mesh-cluster
+  namespace: default
+spec:
+  name: service-mesh-cluster
+  components:
+    istio: true              # Install Istio for microservices
+    knativeServing: false    # No serverless (regular deployments)
+    argoCD: true            # GitOps deployment
+    grafana: true           # Service mesh monitoring
+    prometheus: true        # Metrics collection
+    jaeger: true            # Distributed tracing
+    kiali: true             # Service mesh visualization
+    apiGateway: true        # External API access

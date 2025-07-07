@@ -1,0 +1,112 @@
+# Task ID: 17
+# Title: Implement AWS API Gateway Integration for Service Exposure
+# Status: pending
+# Dependencies: 15, 16
+# Priority: medium
+# Description: Create the infrastructure to automatically provision AWS API Gateway endpoints for applications with exposeApi: true, including VPC Link for internal services.
+# Details:
+1. Create a Crossplane Composition for AWS API Gateway resources
+2. Implement logic to detect 'exposeApi: true' in ApplicationClaim
+3. Configure VPC Link for internal services
+4. Set up public routes for external services
+
+```yaml
+# AWS API Gateway Composition
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: apigateway.platform.example.org
+spec:
+  compositeTypeRef:
+    apiVersion: platform.example.org/v1alpha1
+    kind: XApiGateway
+  resources:
+    - name: apigateway
+      base:
+        apiVersion: apigateway.aws.crossplane.io/v1alpha1
+        kind: RestAPI
+        spec:
+          forProvider:
+            region: us-west-2
+            name: "{{.parameters.name}}-api"
+            description: "API Gateway for {{.parameters.name}}"
+            endpointConfiguration:
+              types: [REGIONAL]
+            apiKeySource: HEADER
+          providerConfigRef:
+            name: aws-provider
+    - name: vpclink
+      base:
+        apiVersion: apigateway.aws.crossplane.io/v1alpha1
+        kind: VpcLink
+        spec:
+          forProvider:
+            region: us-west-2
+            name: "{{.parameters.name}}-vpclink"
+            targetArns: ["{{.parameters.nlbArn}}"] # NLB ARN for internal services
+          providerConfigRef:
+            name: aws-provider
+```
+
+Implement a controller or webhook that watches for ApplicationClaim resources with exposeApi: true and creates the necessary API Gateway resources. Configure proper IAM permissions for API Gateway to access the VPC Link and NLB.
+
+# Test Strategy:
+1. Create an ApplicationClaim with exposeApi: true
+2. Verify API Gateway is provisioned
+3. Test internal service access via VPC Link
+4. Test public route access
+5. Verify proper authentication and authorization
+6. Test error handling and retry logic
+7. Validate that API Gateway is properly integrated with the Knative service
+
+# Subtasks:
+## 1. Create XApiGateway CRD and Composition [pending]
+### Dependencies: None
+### Description: Define the XApiGateway Custom Resource Definition and complete the Composition for AWS API Gateway resources including VPC Link integration.
+### Details:
+1. Create the XApiGateway CRD with appropriate fields (name, namespace, exposeApi flag, nlbArn, etc.)
+2. Complete the Composition template with all necessary resources (RestAPI, VpcLink, Resources, Methods, Integrations)
+3. Add support for both internal (VPC Link) and external (public) service exposure patterns
+4. Define proper composition parameters for dynamic configuration
+5. Include IAM role resources in the composition for API Gateway permissions
+
+## 2. Implement ApplicationClaim Controller with API Gateway Detection [pending]
+### Dependencies: 17.1
+### Description: Create a controller that watches ApplicationClaim resources and detects the 'exposeApi: true' flag to trigger API Gateway provisioning.
+### Details:
+1. Create a new controller or extend existing one to watch ApplicationClaim resources
+2. Add logic to detect the 'exposeApi: true' flag in ApplicationClaim spec
+3. Extract service information (name, namespace, ports) from the ApplicationClaim
+4. Implement reconciliation logic to create or update an XApiGateway resource when needed
+5. Handle deletion of API Gateway resources when ApplicationClaim is deleted
+
+## 3. Implement NLB Discovery and VPC Link Configuration [pending]
+### Dependencies: 17.2
+### Description: Create logic to discover or provision Network Load Balancers for internal services and configure VPC Links to connect API Gateway to these NLBs.
+### Details:
+1. Implement logic to discover existing NLBs for the service or provision new ones if needed
+2. Extract the NLB ARN and store it for use in the VPC Link configuration
+3. Configure the VPC Link with the correct NLB ARN in the XApiGateway resource
+4. Set up proper security groups and network configurations for the VPC Link
+5. Implement health checks and validation for the NLB-VPC Link connection
+
+## 4. Configure API Gateway Routes and Integrations [pending]
+### Dependencies: 17.3
+### Description: Implement the logic to set up API Gateway routes, methods, and integrations based on the service endpoints.
+### Details:
+1. Create Resource and Method resources in the API Gateway composition for each service endpoint
+2. Configure HTTP_PROXY integration for VPC Link (internal) services
+3. Set up direct integrations for external services
+4. Implement path mapping and route configuration based on service metadata
+5. Configure appropriate request/response mappings and transformations
+
+## 5. Implement Deployment and Stage Management [pending]
+### Dependencies: 17.4
+### Description: Create the logic to manage API Gateway deployments, stages, and provide endpoint information back to users.
+### Details:
+1. Add Deployment and Stage resources to the API Gateway composition
+2. Implement logic to trigger new deployments when API configuration changes
+3. Configure stage variables and settings (logging, throttling, etc.)
+4. Update the ApplicationClaim status with the API Gateway endpoint URL
+5. Implement a mechanism to output API keys or IAM permissions if authentication is required
+

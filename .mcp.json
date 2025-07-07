@@ -16,6 +16,10 @@
       "env": {
         "MEMORY_FILE_PATH": "memory.json"
       }
+    },
+    "puppeteer": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-puppeteer"]
     }
   }
 }

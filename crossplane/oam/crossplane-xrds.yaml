@@ -1,0 +1,432 @@
+# Enhanced Crossplane XRDs for OAM Infrastructure Components
+# These extend existing Crossplane capabilities to support OAM component definitions
+
+---
+# 1. Snowflake Data Warehouse XRD
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xsnowflakedatawarehouses.platform.example.org
+spec:
+  group: platform.example.org
+  names:
+    kind: XSnowflakeDataWarehouse
+    plural: xsnowflakedatawarehouses
+  claimNames:
+    kind: SnowflakeDataWarehouse
+    plural: snowflakedatawarehouses
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            description: SnowflakeDataWarehouse specification
+            properties:
+              name:
+                type: string
+                description: Name of the Snowflake warehouse and database
+                pattern: '^[a-zA-Z0-9]([a-zA-Z0-9_]*[a-zA-Z0-9])?$'
+                maxLength: 63
+              accountIdentifier:
+                type: string
+                description: Snowflake account identifier
+              warehouseSize:
+                type: string
+                description: Size of the Snowflake warehouse
+                enum: ["X-SMALL", "SMALL", "MEDIUM", "LARGE", "X-LARGE", "2X-LARGE", "3X-LARGE", "4X-LARGE"]
+                default: "X-SMALL"
+              autoSuspend:
+                type: integer
+                description: Auto-suspend time in seconds
+                default: 60
+                minimum: 60
+                maximum: 86400
+              database:
+                type: string
+                description: Database name
+                nullable: true
+            required:
+            - name
+            - accountIdentifier
+          status:
+            type: object
+            description: SnowflakeDataWarehouse status
+            properties:
+              ready:
+                type: boolean
+                description: Indicates whether the Snowflake warehouse is ready
+              warehouse:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: Warehouse name
+                  size:
+                    type: string
+                    description: Warehouse size
+                  state:
+                    type: string
+                    description: Warehouse state
+              database:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: Database name
+                  url:
+                    type: string
+                    description: Database connection URL
+              credentials:
+                type: object
+                properties:
+                  connectionSecret:
+                    type: string
+                    description: Name of secret containing connection details
+              conditions:
+                type: array
+                description: Detailed status conditions
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+                    reason:
+                      type: string
+                    message:
+                      type: string
+
+---
+# 2. Neon Postgres XRD (for individual databases/schemas)
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xneonpostgres.platform.example.org
+spec:
+  group: platform.example.org
+  names:
+    kind: XNeonPostgres
+    plural: xneonpostgres
+  claimNames:
+    kind: NeonPostgres
+    plural: neonpostgres
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            description: NeonPostgres specification
+            properties:
+              name:
+                type: string
+                description: Name of the database/schema
+                pattern: '^[a-zA-Z0-9]([a-zA-Z0-9_]*[a-zA-Z0-9])?$'
+                maxLength: 63
+              namespace:
+                type: string
+                description: Target namespace for credentials
+              database:
+                type: string
+                description: Database name within Neon cluster
+                default: "postgres"
+              schema:
+                type: string
+                description: Schema name for application isolation
+                nullable: true
+            required:
+            - name
+            - namespace
+          status:
+            type: object
+            description: NeonPostgres status
+            properties:
+              ready:
+                type: boolean
+                description: Indicates whether the database is ready
+              connection:
+                type: object
+                properties:
+                  host:
+                    type: string
+                    description: Database host
+                  port:
+                    type: string
+                    description: Database port
+                  database:
+                    type: string
+                    description: Database name
+                  schema:
+                    type: string
+                    description: Schema name
+              credentials:
+                type: object
+                properties:
+                  secretName:
+                    type: string
+                    description: Name of secret containing database credentials
+                  secretNamespace:
+                    type: string
+                    description: Namespace containing the secret
+              conditions:
+                type: array
+                description: Detailed status conditions
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+                    reason:
+                      type: string
+                    message:
+                      type: string
+
+---
+# 3. Auth0 Identity Provider XRD
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xauth0idps.platform.example.org
+spec:
+  group: platform.example.org
+  names:
+    kind: XAuth0IDP
+    plural: xauth0idps
+  claimNames:
+    kind: Auth0IDP
+    plural: auth0idps
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            description: Auth0IDP specification
+            properties:
+              name:
+                type: string
+                description: Name of the Auth0 integration
+                pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+                maxLength: 63
+              namespace:
+                type: string
+                description: Target namespace for credentials
+              application:
+                type: object
+                description: Auth0 application configuration
+                properties:
+                  name:
+                    type: string
+                    description: Auth0 application name
+                  type:
+                    type: string
+                    description: Auth0 application type
+                    enum: ["spa", "regular_web", "native", "machine_to_machine"]
+                    default: "regular_web"
+                  callbacks:
+                    type: array
+                    description: Allowed callback URLs
+                    items:
+                      type: string
+                  allowedOrigins:
+                    type: array
+                    description: Allowed origin URLs
+                    items:
+                      type: string
+            required:
+            - name
+            - namespace
+          status:
+            type: object
+            description: Auth0IDP status
+            properties:
+              ready:
+                type: boolean
+                description: Indicates whether the Auth0 integration is ready
+              application:
+                type: object
+                properties:
+                  clientId:
+                    type: string
+                    description: Auth0 application client ID
+                  domain:
+                    type: string
+                    description: Auth0 domain
+                  audience:
+                    type: string
+                    description: Auth0 API audience
+              credentials:
+                type: object
+                properties:
+                  secretName:
+                    type: string
+                    description: Name of secret containing Auth0 credentials
+                  secretNamespace:
+                    type: string
+                    description: Namespace containing the secret
+              conditions:
+                type: array
+                description: Detailed status conditions
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+                    reason:
+                      type: string
+                    message:
+                      type: string
+
+---
+# 4. Data Pipeline XRD
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xdatapipelines.platform.example.org
+spec:
+  group: platform.example.org
+  names:
+    kind: XDataPipeline
+    plural: xdatapipelines
+  claimNames:
+    kind: DataPipeline
+    plural: datapipelines
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            description: DataPipeline specification
+            properties:
+              name:
+                type: string
+                description: Name of the data pipeline
+                pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+                maxLength: 63
+              namespace:
+                type: string
+                description: Target namespace for pipeline deployment
+              engine:
+                type: string
+                description: Data pipeline engine
+                enum: ["airflow", "prefect", "dagster"]
+                default: "airflow"
+              schedule:
+                type: string
+                description: Cron schedule for pipeline execution
+                nullable: true
+              source:
+                type: object
+                description: Data source configuration
+                properties:
+                  type:
+                    type: string
+                    description: Source type
+                    enum: ["postgres", "snowflake", "s3", "api"]
+                  connectionSecret:
+                    type: string
+                    description: Secret containing source connection details
+              destination:
+                type: object
+                description: Data destination configuration
+                properties:
+                  type:
+                    type: string
+                    description: Destination type
+                    enum: ["postgres", "snowflake", "s3"]
+                  connectionSecret:
+                    type: string
+                    description: Secret containing destination connection details
+              resources:
+                type: object
+                description: Resource requirements
+                properties:
+                  cpu:
+                    type: string
+                    description: CPU request/limit
+                    default: "500m"
+                  memory:
+                    type: string
+                    description: Memory request/limit
+                    default: "1Gi"
+                  replicas:
+                    type: integer
+                    description: Number of replicas
+                    default: 1
+                    minimum: 1
+                    maximum: 10
+            required:
+            - name
+            - namespace
+            - source
+            - destination
+          status:
+            type: object
+            description: DataPipeline status
+            properties:
+              ready:
+                type: boolean
+                description: Indicates whether the pipeline is ready
+              pipeline:
+                type: object
+                properties:
+                  endpoint:
+                    type: string
+                    description: Pipeline management endpoint
+                  lastRun:
+                    type: string
+                    description: Last successful run timestamp
+                    format: date-time
+                  status:
+                    type: string
+                    description: Current pipeline status
+                    enum: ["running", "paused", "failed", "success"]
+              conditions:
+                type: array
+                description: Detailed status conditions
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+                    reason:
+                      type: string
+                    message:
+                      type: string
