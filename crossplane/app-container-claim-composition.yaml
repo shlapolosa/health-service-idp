@@ -10,14 +10,6 @@ spec:
   compositeTypeRef:
     apiVersion: platform.example.org/v1alpha1
     kind: XAppContainerClaim
-  environment:
-    environmentRefs:
-    - type: Selector
-      selector:
-        matchLabels:
-        - key: environment
-          type: Value
-          value: default
   resources:
   
   # Create Source Repository (microservices container)
@@ -362,22 +354,23 @@ spec:
                       
                       ## Adding New Services
                       
-                      Use the ApplicationClaim CRD in your vCluster:
+                      Edit the OAM Application in the GitOps repository:
                       
-                      ```bash
-                      kubectl apply -f - <<EOF
-                      apiVersion: platform.example.org/v1alpha1
-                      kind: ApplicationClaim
+                      ```yaml
+                      # File: oam/application.yaml
+                      apiVersion: core.oam.dev/v1beta1
+                      kind: Application
                       metadata:
-                        name: my-new-service
+                        name: $APP_NAME
                       spec:
-                        appContainer: $APP_NAME
-                        name: my-new-service
-                        language: python
-                        framework: fastapi
-                        database: postgres
-                        cache: redis
-                      EOF
+                        components:
+                        - name: my-service
+                          type: microservice-with-db
+                          properties:
+                            language: python
+                            framework: fastapi
+                            database: postgres
+                            cache: redis
                       ```
                       
                       ## GitOps Repository
@@ -478,11 +471,245 @@ spec:
                       # Clone the GitOps repository
                       git clone $GITOPS_CLONE_URL .
                       
-                      # Create GitOps structure
+                      # Create GitOps structure matching OAM-DRIVEN-DEVELOPMENT-GUIDE.md
+                      mkdir -p apps
                       mkdir -p apps/environments/{dev,staging,production}
-                      mkdir -p oam
+                      mkdir -p oam/applications
+                      mkdir -p oam/components  
+                      mkdir -p oam/workflows
                       mkdir -p manifests
                       mkdir -p .github/workflows
+                      
+                      # Create blank OAM Application template
+                      cat > oam/applications/application.yaml << 'EOF'
+                      apiVersion: core.oam.dev/v1beta1
+                      kind: Application
+                      metadata:
+                        name: $APP_NAME
+                        namespace: $APP_NAME
+                      spec:
+                        components: []
+                        # Add your components here using the following types:
+                        # - microservice-with-db: Full-featured microservice with database and cache
+                        # - react-frontend: React TypeScript frontend with Material-UI
+                        # - static-site: Static website hosting
+                        # - kafka-service: Event streaming service
+                        # - data-pipeline: ETL and data processing workflows
+                        # 
+                        # Example:
+                        # components:
+                        # - name: api-backend
+                        #   type: microservice-with-db
+                        #   properties:
+                        #     language: python
+                        #     framework: fastapi
+                        #     database: postgres
+                        #     cache: redis
+                        #     exposeApi: true
+                        # - name: web-frontend
+                        #   type: react-frontend
+                        #   properties:
+                        #     framework: react
+                        #     styling: material-ui
+                        #     apiEndpoint: /api
+                        
+                        # Workflow configuration for proper component ordering
+                        workflow:
+                          steps:
+                          - name: provision-infrastructure
+                            type: create-crossplane-claims
+                            timeout: 15m
+                          - name: wait-for-infrastructure
+                            type: wait-for-claims
+                            timeout: 10m
+                            dependsOn: ["provision-infrastructure"]
+                          - name: deploy-applications
+                            type: create-crossplane-claims
+                            timeout: 10m
+                            dependsOn: ["wait-for-infrastructure"]
+                          - name: validate-deployment
+                            type: wait-for-claims
+                            timeout: 5m
+                            dependsOn: ["deploy-applications"]
+                          
+                          # Failure handling
+                          onFailure:
+                            steps:
+                            - name: cleanup-resources
+                              type: cleanup-failed-claims
+                              timeout: 5m
+                        
+                        # Policies for execution order
+                        policies:
+                        - name: execution-order
+                          type: crossplane-execution-order
+                          properties:
+                            phases: ["infrastructure", "application"]
+                            phaseDelay: "30s"
+                            parallelWithinPhase: true
+                        
+                        # Traits for automatic workflow execution
+                        traits:
+                        - type: crossplane-workflow
+                          properties:
+                            enabled: true
+                            timeout: "30m"
+                            retries: 3
+                            cleanupOnFailure: true
+                      EOF
+                      
+                      # Create workflow templates directory
+                      cat > oam/workflows/README.md << 'EOF'
+                      # OAM Workflows
+                      
+                      This directory contains KubeVela workflow definitions for managing application lifecycle.
+                      
+                      ## Available Workflows
+                      
+                      - `crossplane-integration.yaml` - Handles OAM → Crossplane ApplicationClaim creation
+                      - `dependency-management.yaml` - Manages component dependencies and ordering
+                      - `failure-recovery.yaml` - Handles failure scenarios and cleanup
+                      
+                      ## Usage
+                      
+                      Workflows are automatically triggered when OAM Applications are created or updated.
+                      The system handles:
+                      
+                      1. **Infrastructure Provisioning**: Databases, caches, messaging systems
+                      2. **Application Deployment**: Microservices, frontends, static sites
+                      3. **Pipeline Orchestration**: Data processing workflows
+                      4. **Dependency Management**: Proper ordering and readiness checks
+                      5. **Failure Recovery**: Cleanup and retry mechanisms
+                      EOF
+                      
+                      # Create components directory with examples
+                      cat > oam/components/README.md << 'EOF'
+                      # OAM Components
+                      
+                      This directory contains generated OAM Component definitions created by ApplicationClaims.
+                      
+                      ## Generated Components
+                      
+                      When you add components to `oam/applications/application.yaml`, the system automatically:
+                      
+                      1. Creates ApplicationClaims in the vCluster
+                      2. Generates OAM Component definitions here
+                      3. Creates Kubernetes manifests in `../manifests/`
+                      4. Updates ArgoCD applications for deployment
+                      
+                      ## Component Types
+                      
+                      - **microservice-with-db**: Full-featured microservice with database and cache
+                      - **react-frontend**: React TypeScript frontend with Material-UI
+                      - **static-site**: Static website hosting
+                      - **kafka-service**: Event streaming service
+                      - **data-pipeline**: ETL and data processing workflows
+                      
+                      ## Example Generated Component
+                      
+                      ```yaml
+                      apiVersion: core.oam.dev/v1beta1
+                      kind: Component
+                      metadata:
+                        name: user-service
+                        namespace: $APP_NAME
+                      spec:
+                        workload:
+                          apiVersion: serving.knative.dev/v1
+                          kind: Service
+                          metadata:
+                            name: user-service
+                          spec:
+                            template:
+                              spec:
+                                containers:
+                                - name: user-service
+                                  image: docker.io/socrates12345/user-service:latest
+                        parameters:
+                        - name: image
+                          fieldPaths: ["spec.template.spec.containers[0].image"]
+                      ```
+                      EOF
+                      
+                      # Create OAM Application ArgoCD Application
+                      cat > apps/oam-application.yaml << 'EOF'
+                      apiVersion: argoproj.io/v1alpha1
+                      kind: Application
+                      metadata:
+                        name: $APP_NAME-oam-app
+                        namespace: argocd
+                        finalizers:
+                          - resources-finalizer.argocd.argoproj.io
+                        annotations:
+                          argocd.argoproj.io/sync-wave: "1"
+                          notifications.argoproj.io/subscribe.on-sync-succeeded.slack: "deployments"
+                      spec:
+                        project: default
+                        source:
+                          repoURL: $GITOPS_CLONE_URL
+                          targetRevision: HEAD
+                          path: oam/applications
+                        destination:
+                          server: https://kubernetes.default.svc
+                          namespace: $APP_NAME
+                        syncPolicy:
+                          automated:
+                            prune: true
+                            selfHeal: true
+                          syncOptions:
+                            - CreateNamespace=true
+                            - RespectIgnoreDifferences=true
+                          retry:
+                            limit: 5
+                            backoff:
+                              duration: 5s
+                              factor: 2
+                              maxDuration: 3m
+                        # Watch for changes in OAM Application
+                        info:
+                        - name: Description
+                          value: OAM Application that drives Crossplane ApplicationClaim creation
+                        - name: Workflow
+                          value: Automatically creates ApplicationClaims when OAM components are added
+                      EOF
+                      
+                      # Create ApplicationSet for generated components
+                      cat > apps/oam-components.yaml << 'EOF'
+                      apiVersion: argoproj.io/v1alpha1
+                      kind: ApplicationSet
+                      metadata:
+                        name: $APP_NAME-oam-components
+                        namespace: argocd
+                      spec:
+                        generators:
+                        - git:
+                            repoURL: $GITOPS_CLONE_URL
+                            revision: HEAD
+                            files:
+                            - path: "oam/components/*.yaml"
+                        template:
+                          metadata:
+                            name: '$APP_NAME-component-{{path.basename}}'
+                            annotations:
+                              argocd.argoproj.io/sync-wave: "2"
+                          spec:
+                            project: default
+                            source:
+                              repoURL: $GITOPS_CLONE_URL
+                              targetRevision: HEAD
+                              path: oam/components
+                              directory:
+                                include: '{{path.basename}}.yaml'
+                            destination:
+                              server: https://kubernetes.default.svc
+                              namespace: $APP_NAME
+                            syncPolicy:
+                              automated:
+                                prune: true
+                                selfHeal: true
+                              syncOptions:
+                                - CreateNamespace=true
+                      EOF
                       
                       # Create App of Apps ArgoCD Application
                       cat > apps/app-of-apps.yaml << 'EOF'
@@ -600,7 +827,10 @@ spec:
                       ├── apps/                    # ArgoCD Applications
                       │   ├── app-of-apps.yaml    # Main App of Apps
                       │   └── environments/       # Environment-specific configs
-                      ├── oam/                     # OAM Components
+                      ├── oam/                     # OAM Applications and Components
+                      │   ├── applications/        # OAM Applications (edit here)
+                      │   ├── components/          # Generated OAM Components
+                      │   └── workflows/           # Workflow definitions
                       ├── manifests/               # Kubernetes manifests per service
                       │   ├── service-1/          # Each microservice directory
                       │   └── service-2/

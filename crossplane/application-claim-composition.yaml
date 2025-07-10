@@ -10,14 +10,6 @@ spec:
   compositeTypeRef:
     apiVersion: platform.example.org/v1alpha1
     kind: XApplicationClaim
-  environment:
-    environmentRefs:
-    - type: Selector
-      selector:
-        matchLabels:
-        - key: environment
-          type: Value
-          value: default
   resources:
   
   # Add microservice to existing AppContainer source repository
@@ -537,8 +529,8 @@ spec:
                       EOF
                       fi
                       
-                      # Create OAM Component
-                      cd ../../oam
+                      # Create OAM Component in correct directory
+                      cd ../../oam/components
                       cat > $SERVICE_NAME.yaml << EOF
                       apiVersion: core.oam.dev/v1beta1
                       kind: Component
