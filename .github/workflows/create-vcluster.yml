@@ -4,7 +4,8 @@ on:
     types: [slack_create_vcluster]
 
 env:
-  AWS_REGION: us-west-2
+  AWS_DEFAULT_REGION: us-east-2  # SSO region for authentication
+  EKS_REGION: us-west-2          # EKS cluster region
 
 permissions:
   id-token: write
@@ -132,13 +133,14 @@ jobs:
         echo "Ref: ${{ github.ref }}"
         echo "Event: ${{ github.event_name }}"
         echo "AWS Role ARN: ${{ secrets.AWS_ROLE_ARN }}"
-        echo "AWS Region: ${{ env.AWS_REGION }}"
+        echo "Auth Region: ${{ env.AWS_DEFAULT_REGION }}"
+        echo "EKS Region: ${{ env.EKS_REGION }}"
     
     - name: Setup AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-        aws-region: ${{ env.AWS_REGION }}
+        aws-region: ${{ env.AWS_DEFAULT_REGION }}
         role-session-name: GitHubActions-VCluster-${{ github.run_id }}
         role-duration-seconds: 3600
     
@@ -149,8 +151,8 @@ jobs:
     
     - name: Configure kubectl
       run: |
-        # Configure kubectl to use AWS EKS
-        aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ secrets.EKS_CLUSTER_NAME }}
+        # Configure kubectl to use AWS EKS (EKS cluster is in us-west-2)
+        aws eks update-kubeconfig --region ${{ env.EKS_REGION }} --name ${{ secrets.EKS_CLUSTER_NAME }}
         
         # Test connection
         kubectl cluster-info --request-timeout=10s
