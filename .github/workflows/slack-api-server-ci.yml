@@ -34,7 +34,7 @@ permissions:
 
 env:
   REGISTRY: docker.io
-  REGISTRY_USERNAME: shlapolosa
+  REGISTRY_USERNAME: socrates12345
   SERVICE_NAME: slack-api-server
   PYTHON_VERSION: '3.11'
 
