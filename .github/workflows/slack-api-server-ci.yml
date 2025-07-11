@@ -142,6 +142,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build-and-push]
     if: github.ref == 'refs/heads/main' || github.event_name == 'repository_dispatch'
+    outputs:
+      image-tag: ${{ needs.build-and-push.outputs.image-tag }}
     steps:
       - name: Trigger GitOps repository update
         run: |
@@ -232,17 +234,178 @@ jobs:
           
           echo "✅ VCluster creation request processed!"
 
-  # Phase 6: Notification
-  notify:
+  # Phase 6: Slack Notifications
+  slack-notify-success:
     runs-on: ubuntu-latest
-    needs: [trigger-gitops, handle-vcluster-creation]
-    if: always() && (needs.trigger-gitops.result == 'success' || needs.handle-vcluster-creation.result == 'success')
+    needs: [trigger-gitops]
+    if: needs.trigger-gitops.result == 'success' && github.ref == 'refs/heads/main'
     steps:
-      - name: Notify success
+      - name: Send Slack Success Notification
         run: |
-          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-            echo "🎉 VCluster creation workflow completed successfully!"
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{
+              \"blocks\": [
+                {
+                  \"type\": \"header\",
+                  \"text\": {
+                    \"type\": \"plain_text\",
+                    \"text\": \"🚀 Slack API Server Deployment Successful\"
+                  }
+                },
+                {
+                  \"type\": \"section\",
+                  \"fields\": [
+                    {
+                      \"type\": \"mrkdwn\",
+                      \"text\": \"*Service:* ${{ env.SERVICE_NAME }}\"
+                    },
+                    {
+                      \"type\": \"mrkdwn\",
+                      \"text\": \"*Version:* ${{ needs.trigger-gitops.outputs.image-tag || 'latest' }}\"
+                    },
+                    {
+                      \"type\": \"mrkdwn\",
+                      \"text\": \"*Branch:* ${{ github.ref_name }}\"
+                    },
+                    {
+                      \"type\": \"mrkdwn\",
+                      \"text\": \"*Commit:* \`${{ github.sha }}\`\"
+                    }
+                  ]
+                },
+                {
+                  \"type\": \"section\",
+                  \"text\": {
+                    \"type\": \"mrkdwn\",
+                    \"text\": \"✅ *Deployment Status:* Successfully deployed to Kubernetes via ArgoCD\\n📦 *Image:* \`${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/${{ env.SERVICE_NAME }}:${{ needs.trigger-gitops.outputs.image-tag || 'latest' }}\`\\n🔗 *GitOps:* Repository dispatch event sent successfully\"
+                  }
+                },
+                {
+                  \"type\": \"actions\",
+                  \"elements\": [
+                    {
+                      \"type\": \"button\",
+                      \"text\": {
+                        \"type\": \"plain_text\",
+                        \"text\": \"View GitHub Action\"
+                      },
+                      \"url\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+                    },
+                    {
+                      \"type\": \"button\",
+                      \"text\": {
+                        \"type\": \"plain_text\",
+                        \"text\": \"View API Docs\"
+                      },
+                      \"url\": \"http://af433f091b55640038c23af3a641d716-112208284.us-west-2.elb.amazonaws.com/docs\"
+                    }
+                  ]
+                }
+              ]
+            }" \
+            "${{ secrets.SLACK_WEBHOOK_URL }}"
+
+  slack-notify-failure:
+    runs-on: ubuntu-latest
+    needs: [security-scan, test, build-and-push, trigger-gitops, handle-vcluster-creation]
+    if: always() && (needs.security-scan.result == 'failure' || needs.test.result == 'failure' || needs.build-and-push.result == 'failure' || needs.trigger-gitops.result == 'failure')
+    steps:
+      - name: Send Slack Failure Notification
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{
+              \"blocks\": [
+                {
+                  \"type\": \"header\",
+                  \"text\": {
+                    \"type\": \"plain_text\",
+                    \"text\": \"❌ Slack API Server Deployment Failed\"
+                  }
+                },
+                {
+                  \"type\": \"section\",
+                  \"fields\": [
+                    {
+                      \"type\": \"mrkdwn\",
+                      \"text\": \"*Service:* ${{ env.SERVICE_NAME }}\"
+                    },
+                    {
+                      \"type\": \"mrkdwn\",
+                      \"text\": \"*Branch:* ${{ github.ref_name }}\"
+                    },
+                    {
+                      \"type\": \"mrkdwn\",
+                      \"text\": \"*Commit:* \`${{ github.sha }}\`\"
+                    },
+                    {
+                      \"type\": \"mrkdwn\",
+                      \"text\": \"*Triggered by:* ${{ github.actor }}\"
+                    }
+                  ]
+                },
+                {
+                  \"type\": \"section\",
+                  \"text\": {
+                    \"type\": \"mrkdwn\",
+                    \"text\": \"❌ **Pipeline Failed**\\n\\n*Failed Jobs:*\\n${{ needs.security-scan.result == 'failure' && '• Security Scan\\n' || '' }}${{ needs.test.result == 'failure' && '• Tests\\n' || '' }}${{ needs.build-and-push.result == 'failure' && '• Build & Push\\n' || '' }}${{ needs.trigger-gitops.result == 'failure' && '• GitOps Deployment\\n' || '' }}\\n\\nPlease check the GitHub Action logs for details.\"
+                  }
+                },
+                {
+                  \"type\": \"actions\",
+                  \"elements\": [
+                    {
+                      \"type\": \"button\",
+                      \"text\": {
+                        \"type\": \"plain_text\",
+                        \"text\": \"View Failed Action\"
+                      },
+                      \"url\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+                    }
+                  ]
+                }
+              ]
+            }" \
+            "${{ secrets.SLACK_WEBHOOK_URL }}"
+
+  # VCluster Creation Notification (for repository_dispatch events)
+  slack-notify-vcluster:
+    runs-on: ubuntu-latest
+    needs: [handle-vcluster-creation]
+    if: always() && github.event_name == 'repository_dispatch' && github.event.action == 'slack_create_vcluster'
+    steps:
+      - name: Send VCluster Slack Notification
+        run: |
+          if [ "${{ needs.handle-vcluster-creation.result }}" = "success" ]; then
+            STATUS="✅ VCluster creation workflow completed successfully!"
+            COLOR="good"
           else
-            echo "🎉 Slack API Server GitOps deployment triggered successfully!"
-            echo "🔗 Check ArgoCD for deployment status"
+            STATUS="❌ VCluster creation workflow failed!"
+            COLOR="danger"
           fi
+          
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{
+              \"blocks\": [
+                {
+                  \"type\": \"section\",
+                  \"text\": {
+                    \"type\": \"mrkdwn\",
+                    \"text\": \"$STATUS\\n\\n*VCluster:* ${{ github.event.client_payload.vcluster_name }}\\n*Namespace:* ${{ github.event.client_payload.namespace }}\\n*User:* ${{ github.event.client_payload.user }}\"
+                  }
+                },
+                {
+                  \"type\": \"actions\",
+                  \"elements\": [
+                    {
+                      \"type\": \"button\",
+                      \"text\": {
+                        \"type\": \"plain_text\",
+                        \"text\": \"View GitHub Action\"
+                      },
+                      \"url\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+                    }
+                  ]
+                }
+              ]
+            }" \
+            "${{ secrets.SLACK_WEBHOOK_URL }}"
