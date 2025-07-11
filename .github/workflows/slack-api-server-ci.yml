@@ -163,13 +163,12 @@ jobs:
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/shlapolosa/health-service-idp-gitops/dispatches" \
             -d "{
-              \"event_type\": \"update-slack-api-server\",
+              \"event_type\": \"simple-update\",
               \"client_payload\": {
-                \"service\": \"$SERVICE_NAME\",
-                \"image\": \"$NEW_IMAGE\",
-                \"version\": \"${{ needs.build-and-push.outputs.image-tag }}\",
+                \"services\": \"$SERVICE_NAME\",
                 \"source_commit\": \"$SOURCE_COMMIT\",
                 \"commit_sha\": \"$COMMIT_SHA\",
+                \"registry\": \"${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}\",
                 \"branch\": \"${{ github.ref_name }}\",
                 \"workflow_run\": \"${{ github.run_id }}\"
               }
