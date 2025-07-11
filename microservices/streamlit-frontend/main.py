@@ -1,4 +1,4 @@
-# Test Slack notifications for GitOps pipeline
+# Test updated Slack webhook URL
 import streamlit as st
 from components.navigation import NavigationManager, ViewType
 from components.views import ViewRenderer
