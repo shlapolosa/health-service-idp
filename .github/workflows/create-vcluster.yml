@@ -1,0 +1,546 @@
+name: Create VCluster from Slack
+on:
+  repository_dispatch:
+    types: [slack_create_vcluster]
+
+env:
+  AWS_REGION: us-west-2
+
+jobs:
+  create-vcluster:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+    
+    - name: Validate Input Parameters
+      id: validate
+      run: |
+        VCLUSTER_NAME="${{ github.event.client_payload.vcluster_name }}"
+        NAMESPACE="${{ github.event.client_payload.namespace }}"
+        REPOSITORY="${{ github.event.client_payload.repository }}"
+        USER="${{ github.event.client_payload.user }}"
+        
+        # Capabilities (with defaults)
+        OBSERVABILITY="${{ github.event.client_payload.capabilities.observability || 'true' }}"
+        SECURITY="${{ github.event.client_payload.capabilities.security || 'true' }}"
+        GITOPS="${{ github.event.client_payload.capabilities.gitops || 'true' }}"
+        MONITORING="${{ github.event.client_payload.capabilities.monitoring || 'true' }}"
+        LOGGING="${{ github.event.client_payload.capabilities.logging || 'true' }}"
+        NETWORKING="${{ github.event.client_payload.capabilities.networking || 'true' }}"
+        AUTOSCALING="${{ github.event.client_payload.capabilities.autoscaling || 'true' }}"
+        BACKUP="${{ github.event.client_payload.capabilities.backup || 'false' }}"
+        
+        # Resource specifications (with defaults)
+        CPU_LIMIT="${{ github.event.client_payload.resources.cpu_limit || '2000m' }}"
+        MEMORY_LIMIT="${{ github.event.client_payload.resources.memory_limit || '4Gi' }}"
+        STORAGE_SIZE="${{ github.event.client_payload.resources.storage_size || '10Gi' }}"
+        NODE_COUNT="${{ github.event.client_payload.resources.node_count || '3' }}"
+        
+        echo "🔍 Validating input parameters..."
+        
+        # Validation rules
+        if [[ ! "$VCLUSTER_NAME" =~ ^[a-z0-9-]+$ ]] || [[ ${#VCLUSTER_NAME} -gt 20 ]]; then
+          echo "❌ Invalid vcluster name: $VCLUSTER_NAME (must be lowercase alphanumeric with hyphens, max 20 chars)"
+          echo "valid=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        
+        if [[ ! "$NAMESPACE" =~ ^[a-z0-9-]+$ ]] || [[ ${#NAMESPACE} -gt 15 ]]; then
+          echo "❌ Invalid namespace: $NAMESPACE (must be lowercase alphanumeric with hyphens, max 15 chars)"
+          echo "valid=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        
+        if [[ -n "$REPOSITORY" && ! "$REPOSITORY" =~ ^[a-z0-9-]+$ ]]; then
+          echo "❌ Invalid repository name: $REPOSITORY (must be lowercase alphanumeric with hyphens)"
+          echo "valid=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        
+        # Validate boolean capabilities
+        for cap in "$OBSERVABILITY" "$SECURITY" "$GITOPS" "$MONITORING" "$LOGGING" "$NETWORKING" "$AUTOSCALING" "$BACKUP"; do
+          if [[ ! "$cap" =~ ^(true|false)$ ]]; then
+            echo "❌ Invalid capability value: $cap (must be true or false)"
+            echo "valid=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+        done
+        
+        echo "✅ Parameters validated successfully"
+        echo "valid=true" >> $GITHUB_OUTPUT
+        
+        # Output validated parameters
+        echo "vcluster_name=$VCLUSTER_NAME" >> $GITHUB_OUTPUT
+        echo "namespace=$NAMESPACE" >> $GITHUB_OUTPUT
+        echo "repository=$REPOSITORY" >> $GITHUB_OUTPUT
+        echo "user=$USER" >> $GITHUB_OUTPUT
+        
+        # Capabilities
+        echo "observability=$OBSERVABILITY" >> $GITHUB_OUTPUT
+        echo "security=$SECURITY" >> $GITHUB_OUTPUT
+        echo "gitops=$GITOPS" >> $GITHUB_OUTPUT
+        echo "monitoring=$MONITORING" >> $GITHUB_OUTPUT
+        echo "logging=$LOGGING" >> $GITHUB_OUTPUT
+        echo "networking=$NETWORKING" >> $GITHUB_OUTPUT
+        echo "autoscaling=$AUTOSCALING" >> $GITHUB_OUTPUT
+        echo "backup=$BACKUP" >> $GITHUB_OUTPUT
+        
+        # Resources
+        echo "cpu_limit=$CPU_LIMIT" >> $GITHUB_OUTPUT
+        echo "memory_limit=$MEMORY_LIMIT" >> $GITHUB_OUTPUT
+        echo "storage_size=$STORAGE_SIZE" >> $GITHUB_OUTPUT
+        echo "node_count=$NODE_COUNT" >> $GITHUB_OUTPUT
+        
+        echo "📋 Configuration Summary:"
+        echo "  VCluster: $VCLUSTER_NAME"
+        echo "  Namespace: $NAMESPACE"
+        echo "  Repository: ${REPOSITORY:-'none'}"
+        echo "  Observability: $OBSERVABILITY"
+        echo "  Security: $SECURITY"
+        echo "  GitOps: $GITOPS"
+        echo "  Monitoring: $MONITORING"
+        echo "  CPU Limit: $CPU_LIMIT"
+        echo "  Memory Limit: $MEMORY_LIMIT"
+    
+    - name: Setup AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        aws-region: ${{ env.AWS_REGION }}
+        role-session-name: GitHubActions-VCluster-${{ github.run_id }}
+    
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.28.0'
+    
+    - name: Configure kubectl
+      run: |
+        mkdir -p ~/.kube
+        echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > ~/.kube/config
+        chmod 600 ~/.kube/config
+        
+        # Test connection
+        kubectl cluster-info --request-timeout=10s
+        echo "✅ Kubernetes connection established"
+    
+    - name: Check if VCluster Already Exists
+      id: check_exists
+      run: |
+        if kubectl get vclusterenvironmentclaim ${{ steps.validate.outputs.vcluster_name }} -n ${{ steps.validate.outputs.namespace }} 2>/dev/null; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+          echo "⚠️ VCluster ${{ steps.validate.outputs.vcluster_name }} already exists in namespace ${{ steps.validate.outputs.namespace }}"
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+          echo "✅ VCluster name is available"
+        fi
+    
+    - name: Create Namespace
+      if: steps.check_exists.outputs.exists == 'false'
+      run: |
+        kubectl create namespace ${{ steps.validate.outputs.namespace }} --dry-run=client -o yaml | kubectl apply -f -
+        
+        # Add labels to namespace
+        kubectl label namespace ${{ steps.validate.outputs.namespace }} \
+          created-by=slack-integration \
+          managed-by=crossplane \
+          vcluster-name=${{ steps.validate.outputs.vcluster_name }} \
+          --overwrite
+        
+        echo "✅ Namespace ${{ steps.validate.outputs.namespace }} ready"
+    
+    - name: Create VCluster Environment Claim
+      if: steps.check_exists.outputs.exists == 'false'
+      run: |
+        cat <<EOF | kubectl apply -f -
+        apiVersion: platform.example.org/v1alpha1
+        kind: VClusterEnvironmentClaim
+        metadata:
+          name: ${{ steps.validate.outputs.vcluster_name }}
+          namespace: ${{ steps.validate.outputs.namespace }}
+          annotations:
+            created-by: "slack-integration"
+            created-at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            requested-by: "${{ steps.validate.outputs.user }}"
+            github-run-id: "${{ github.run_id }}"
+            github-workflow: "${{ github.workflow }}"
+            slack-channel: "${{ github.event.client_payload.slack_channel || 'unknown' }}"
+          labels:
+            managed-by: "crossplane"
+            created-via: "slack"
+            environment-type: "development"
+        spec:
+          name: ${{ steps.validate.outputs.vcluster_name }}
+          description: "VCluster created via Slack by ${{ steps.validate.outputs.user }}"
+          
+          # Capabilities Configuration
+          enableObservability: ${{ steps.validate.outputs.observability }}
+          enableSecurity: ${{ steps.validate.outputs.security }}
+          enableGitOps: ${{ steps.validate.outputs.gitops }}
+          enableMonitoring: ${{ steps.validate.outputs.monitoring }}
+          enableLogging: ${{ steps.validate.outputs.logging }}
+          enableNetworking: ${{ steps.validate.outputs.networking }}
+          enableAutoscaling: ${{ steps.validate.outputs.autoscaling }}
+          enableBackup: ${{ steps.validate.outputs.backup }}
+          
+          # Resource Configuration
+          resources:
+            cpuLimit: "${{ steps.validate.outputs.cpu_limit }}"
+            memoryLimit: "${{ steps.validate.outputs.memory_limit }}"
+            storageSize: "${{ steps.validate.outputs.storage_size }}"
+            nodeCount: ${{ steps.validate.outputs.node_count }}
+          
+          # Platform Configuration
+          gitHubOrg: "shlapolosa"
+          dockerRegistry: "docker.io/socrates12345"
+          
+          # Advanced Configuration
+          vcluster:
+            version: "0.19.0"
+            isolationMode: "workload"
+            enableHA: false
+            enableIngress: true
+            enableLoadBalancer: true
+          
+          # Networking Configuration
+          networking:
+            serviceType: "LoadBalancer"
+            enableNetworkPolicies: ${{ steps.validate.outputs.networking }}
+            enableServiceMesh: ${{ steps.validate.outputs.networking }}
+          
+          # Security Configuration
+          security:
+            enablePodSecurityStandards: ${{ steps.validate.outputs.security }}
+            enableRBAC: true
+            enableAdmissionControllers: ${{ steps.validate.outputs.security }}
+            enableNetworkPolicies: ${{ steps.validate.outputs.security }}
+        EOF
+        
+        echo "✅ VClusterEnvironmentClaim created: ${{ steps.validate.outputs.vcluster_name }}"
+    
+    - name: Create AppContainer Claim
+      if: steps.validate.outputs.repository != '' && steps.check_exists.outputs.exists == 'false'
+      run: |
+        cat <<EOF | kubectl apply -f -
+        apiVersion: platform.example.org/v1alpha1
+        kind: AppContainerClaim
+        metadata:
+          name: ${{ steps.validate.outputs.repository }}
+          namespace: ${{ steps.validate.outputs.namespace }}
+          annotations:
+            created-by: "slack-integration"
+            created-at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            requested-by: "${{ steps.validate.outputs.user }}"
+            github-run-id: "${{ github.run_id }}"
+            vcluster-name: "${{ steps.validate.outputs.vcluster_name }}"
+          labels:
+            managed-by: "crossplane"
+            vcluster: "${{ steps.validate.outputs.vcluster_name }}"
+        spec:
+          name: ${{ steps.validate.outputs.repository }}
+          description: "AppContainer for ${{ steps.validate.outputs.repository }} in vCluster ${{ steps.validate.outputs.vcluster_name }}"
+          gitHubOrg: "shlapolosa"
+          dockerRegistry: "docker.io/socrates12345"
+          
+          # Inherit capabilities from vCluster
+          enableObservability: ${{ steps.validate.outputs.observability }}
+          enableSecurity: ${{ steps.validate.outputs.security }}
+          enableMonitoring: ${{ steps.validate.outputs.monitoring }}
+          enableLogging: ${{ steps.validate.outputs.logging }}
+          
+          # Application-specific configuration
+          applications:
+            defaultLanguage: "python"
+            defaultFramework: "fastapi"
+            enableAutoScaling: ${{ steps.validate.outputs.autoscaling }}
+            enableBackup: ${{ steps.validate.outputs.backup }}
+        EOF
+        
+        echo "✅ AppContainerClaim created: ${{ steps.validate.outputs.repository }}"
+    
+    - name: Wait for VCluster Readiness
+      if: steps.check_exists.outputs.exists == 'false'
+      timeout-minutes: 15
+      run: |
+        echo "⏳ Waiting for VCluster to be ready..."
+        
+        START_TIME=$(date +%s)
+        while true; do
+          CURRENT_TIME=$(date +%s)
+          ELAPSED=$((CURRENT_TIME - START_TIME))
+          
+          STATUS=$(kubectl get vclusterenvironmentclaim ${{ steps.validate.outputs.vcluster_name }} -n ${{ steps.validate.outputs.namespace }} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
+          REASON=$(kubectl get vclusterenvironmentclaim ${{ steps.validate.outputs.vcluster_name }} -n ${{ steps.validate.outputs.namespace }} -o jsonpath='{.status.conditions[?(@.type=="Ready")].reason}' 2>/dev/null || echo "")
+          MESSAGE=$(kubectl get vclusterenvironmentclaim ${{ steps.validate.outputs.vcluster_name }} -n ${{ steps.validate.outputs.namespace }} -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}' 2>/dev/null || echo "")
+          
+          echo "⏱️  Elapsed: ${ELAPSED}s | Status: $STATUS | Reason: $REASON"
+          
+          if [[ "$STATUS" == "True" ]]; then
+            echo "✅ VCluster is ready!"
+            break
+          elif [[ "$STATUS" == "False" ]]; then
+            echo "❌ VCluster failed to provision"
+            echo "   Reason: $REASON"
+            echo "   Message: $MESSAGE"
+            exit 1
+          fi
+          
+          # Show progress every 60 seconds
+          if [[ $((ELAPSED % 60)) -eq 0 ]] && [[ $ELAPSED -gt 0 ]]; then
+            echo "📊 Still provisioning... (${ELAPSED}s elapsed)"
+          fi
+          
+          sleep 30
+        done
+    
+    - name: Get VCluster Connection Info
+      if: steps.check_exists.outputs.exists == 'false'
+      id: connection
+      run: |
+        # Extract connection details from VCluster status
+        ENDPOINT=$(kubectl get vclusterenvironmentclaim ${{ steps.validate.outputs.vcluster_name }} -n ${{ steps.validate.outputs.namespace }} -o jsonpath='{.status.vcluster.endpoint}' 2>/dev/null || echo "")
+        LOAD_BALANCER=$(kubectl get vclusterenvironmentclaim ${{ steps.validate.outputs.vcluster_name }} -n ${{ steps.validate.outputs.namespace }} -o jsonpath='{.status.loadBalancer.hostname}' 2>/dev/null || echo "")
+        KUBECONFIG_SECRET=$(kubectl get vclusterenvironmentclaim ${{ steps.validate.outputs.vcluster_name }} -n ${{ steps.validate.outputs.namespace }} -o jsonpath='{.status.vcluster.kubeconfigSecret}' 2>/dev/null || echo "")
+        
+        # Get observability endpoints if enabled
+        GRAFANA_URL=""
+        ARGOCD_URL=""
+        JAEGER_URL=""
+        
+        if [[ "${{ steps.validate.outputs.observability }}" == "true" ]]; then
+          GRAFANA_URL=$(kubectl get vclusterenvironmentclaim ${{ steps.validate.outputs.vcluster_name }} -n ${{ steps.validate.outputs.namespace }} -o jsonpath='{.status.observability.grafana.url}' 2>/dev/null || echo "")
+          ARGOCD_URL=$(kubectl get vclusterenvironmentclaim ${{ steps.validate.outputs.vcluster_name }} -n ${{ steps.validate.outputs.namespace }} -o jsonpath='{.status.observability.argocd.url}' 2>/dev/null || echo "")
+          JAEGER_URL=$(kubectl get vclusterenvironmentclaim ${{ steps.validate.outputs.vcluster_name }} -n ${{ steps.validate.outputs.namespace }} -o jsonpath='{.status.observability.jaeger.url}' 2>/dev/null || echo "")
+        fi
+        
+        echo "endpoint=$ENDPOINT" >> $GITHUB_OUTPUT
+        echo "load_balancer=$LOAD_BALANCER" >> $GITHUB_OUTPUT
+        echo "kubeconfig_secret=$KUBECONFIG_SECRET" >> $GITHUB_OUTPUT
+        echo "grafana_url=$GRAFANA_URL" >> $GITHUB_OUTPUT
+        echo "argocd_url=$ARGOCD_URL" >> $GITHUB_OUTPUT
+        echo "jaeger_url=$JAEGER_URL" >> $GITHUB_OUTPUT
+        
+        echo "🔗 VCluster Connection Details:"
+        echo "   Endpoint: $ENDPOINT"
+        echo "   Load Balancer: $LOAD_BALANCER"
+        echo "   Kubeconfig Secret: $KUBECONFIG_SECRET"
+        [[ -n "$GRAFANA_URL" ]] && echo "   Grafana: $GRAFANA_URL"
+        [[ -n "$ARGOCD_URL" ]] && echo "   ArgoCD: $ARGOCD_URL"
+        [[ -n "$JAEGER_URL" ]] && echo "   Jaeger: $JAEGER_URL"
+    
+    - name: Generate VCluster Access Instructions
+      if: steps.check_exists.outputs.exists == 'false'
+      id: instructions
+      run: |
+        cat <<EOF > vcluster-access.md
+        # VCluster Access Instructions
+        
+        ## Connection Details
+        - **VCluster Name**: \`${{ steps.validate.outputs.vcluster_name }}\`
+        - **Namespace**: \`${{ steps.validate.outputs.namespace }}\`
+        - **Endpoint**: \`${{ steps.connection.outputs.endpoint }}\`
+        - **Load Balancer**: \`${{ steps.connection.outputs.load_balancer }}\`
+        
+        ## Access via kubectl
+        \`\`\`bash
+        # Get the kubeconfig
+        kubectl get secret ${{ steps.connection.outputs.kubeconfig_secret }} -n ${{ steps.validate.outputs.namespace }} -o jsonpath='{.data.config}' | base64 -d > vcluster-${{ steps.validate.outputs.vcluster_name }}.kubeconfig
+        
+        # Use the kubeconfig
+        export KUBECONFIG=vcluster-${{ steps.validate.outputs.vcluster_name }}.kubeconfig
+        kubectl get nodes
+        \`\`\`
+        
+        ## Access via vcluster CLI
+        \`\`\`bash
+        vcluster connect ${{ steps.validate.outputs.vcluster_name }} --namespace ${{ steps.validate.outputs.namespace }}
+        \`\`\`
+        
+        ## Observability Access
+        EOF
+        
+        if [[ "${{ steps.validate.outputs.observability }}" == "true" ]]; then
+          cat <<EOF >> vcluster-access.md
+        - **Grafana**: ${{ steps.connection.outputs.grafana_url }}
+        - **ArgoCD**: ${{ steps.connection.outputs.argocd_url }}
+        - **Jaeger**: ${{ steps.connection.outputs.jaeger_url }}
+        EOF
+        fi
+        
+        cat <<EOF >> vcluster-access.md
+        
+        ## Enabled Capabilities
+        - Observability: ${{ steps.validate.outputs.observability }}
+        - Security: ${{ steps.validate.outputs.security }}
+        - GitOps: ${{ steps.validate.outputs.gitops }}
+        - Monitoring: ${{ steps.validate.outputs.monitoring }}
+        - Logging: ${{ steps.validate.outputs.logging }}
+        - Networking: ${{ steps.validate.outputs.networking }}
+        - Autoscaling: ${{ steps.validate.outputs.autoscaling }}
+        - Backup: ${{ steps.validate.outputs.backup }}
+        
+        ## Resource Limits
+        - CPU: ${{ steps.validate.outputs.cpu_limit }}
+        - Memory: ${{ steps.validate.outputs.memory_limit }}
+        - Storage: ${{ steps.validate.outputs.storage_size }}
+        - Nodes: ${{ steps.validate.outputs.node_count }}
+        EOF
+        
+        echo "📄 Access instructions generated"
+    
+    - name: Send Slack Success Notification
+      if: success() && steps.check_exists.outputs.exists == 'false'
+      run: |
+        # Create capabilities summary
+        CAPABILITIES=""
+        [[ "${{ steps.validate.outputs.observability }}" == "true" ]] && CAPABILITIES="${CAPABILITIES}🔍 Observability "
+        [[ "${{ steps.validate.outputs.security }}" == "true" ]] && CAPABILITIES="${CAPABILITIES}🔒 Security "
+        [[ "${{ steps.validate.outputs.gitops }}" == "true" ]] && CAPABILITIES="${CAPABILITIES}🔄 GitOps "
+        [[ "${{ steps.validate.outputs.monitoring }}" == "true" ]] && CAPABILITIES="${CAPABILITIES}📊 Monitoring "
+        [[ "${{ steps.validate.outputs.logging }}" == "true" ]] && CAPABILITIES="${CAPABILITIES}📝 Logging "
+        [[ "${{ steps.validate.outputs.networking }}" == "true" ]] && CAPABILITIES="${CAPABILITIES}🌐 Networking "
+        [[ "${{ steps.validate.outputs.autoscaling }}" == "true" ]] && CAPABILITIES="${CAPABILITIES}📈 Autoscaling "
+        [[ "${{ steps.validate.outputs.backup }}" == "true" ]] && CAPABILITIES="${CAPABILITIES}💾 Backup "
+        
+        curl -X POST -H 'Content-type: application/json' \
+        --data "{
+          \"text\": \"✅ VCluster Created Successfully!\",
+          \"blocks\": [
+            {
+              \"type\": \"header\",
+              \"text\": {
+                \"type\": \"plain_text\",
+                \"text\": \"🎉 VCluster Creation Complete\"
+              }
+            },
+            {
+              \"type\": \"section\",
+              \"fields\": [
+                {
+                  \"type\": \"mrkdwn\",
+                  \"text\": \"*Name:*\n\`${{ steps.validate.outputs.vcluster_name }}\`\"
+                },
+                {
+                  \"type\": \"mrkdwn\",
+                  \"text\": \"*Namespace:*\n\`${{ steps.validate.outputs.namespace }}\`\"
+                },
+                {
+                  \"type\": \"mrkdwn\",
+                  \"text\": \"*Repository:*\n\`${{ steps.validate.outputs.repository }}\`\"
+                },
+                {
+                  \"type\": \"mrkdwn\",
+                  \"text\": \"*Requested by:*\n@${{ steps.validate.outputs.user }}\"
+                }
+              ]
+            },
+            {
+              \"type\": \"section\",
+              \"text\": {
+                \"type\": \"mrkdwn\",
+                \"text\": \"*🚀 Capabilities Enabled:*\n${CAPABILITIES}\"
+              }
+            },
+            {
+              \"type\": \"section\",
+              \"text\": {
+                \"type\": \"mrkdwn\",
+                \"text\": \"*📊 Resources:*\nCPU: ${{ steps.validate.outputs.cpu_limit }} | Memory: ${{ steps.validate.outputs.memory_limit }} | Storage: ${{ steps.validate.outputs.storage_size }} | Nodes: ${{ steps.validate.outputs.node_count }}\"
+              }
+            },
+            {
+              \"type\": \"section\",
+              \"text\": {
+                \"type\": \"mrkdwn\",
+                \"text\": \"*🔗 Endpoints:*\nVCluster: \`${{ steps.connection.outputs.endpoint }}\`\nLoad Balancer: \`${{ steps.connection.outputs.load_balancer }}\`\"
+              }
+            },
+            {
+              \"type\": \"actions\",
+              \"elements\": [
+                {
+                  \"type\": \"button\",
+                  \"text\": {
+                    \"type\": \"plain_text\",
+                    \"text\": \"📋 View GitHub Action\"
+                  },
+                  \"url\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+                }
+              ]
+            }
+          ]
+        }" \
+        ${{ secrets.SLACK_WEBHOOK_URL }}
+    
+    - name: Send Slack Failure Notification
+      if: failure()
+      run: |
+        curl -X POST -H 'Content-type: application/json' \
+        --data "{
+          \"text\": \"❌ VCluster Creation Failed\",
+          \"blocks\": [
+            {
+              \"type\": \"header\",
+              \"text\": {
+                \"type\": \"plain_text\",
+                \"text\": \"❌ VCluster Creation Failed\"
+              }
+            },
+            {
+              \"type\": \"section\",
+              \"fields\": [
+                {
+                  \"type\": \"mrkdwn\",
+                  \"text\": \"*Name:*\n\`${{ steps.validate.outputs.vcluster_name || github.event.client_payload.vcluster_name }}\`\"
+                },
+                {
+                  \"type\": \"mrkdwn\",
+                  \"text\": \"*Namespace:*\n\`${{ steps.validate.outputs.namespace || github.event.client_payload.namespace }}\`\"
+                },
+                {
+                  \"type\": \"mrkdwn\",
+                  \"text\": \"*Requested by:*\n@${{ steps.validate.outputs.user || github.event.client_payload.user }}\"
+                },
+                {
+                  \"type\": \"mrkdwn\",
+                  \"text\": \"*Error:*\nCheck GitHub Action logs\"
+                }
+              ]
+            },
+            {
+              \"type\": \"actions\",
+              \"elements\": [
+                {
+                  \"type\": \"button\",
+                  \"text\": {
+                    \"type\": \"plain_text\",
+                    \"text\": \"🔍 View Logs\"
+                  },
+                  \"url\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+                }
+              ]
+            }
+          ]
+        }" \
+        ${{ secrets.SLACK_WEBHOOK_URL }}
+    
+    - name: Handle Existing VCluster
+      if: steps.check_exists.outputs.exists == 'true'
+      run: |
+        curl -X POST -H 'Content-type: application/json' \
+        --data "{
+          \"text\": \"⚠️ VCluster Already Exists\",
+          \"blocks\": [
+            {
+              \"type\": \"section\",
+              \"text\": {
+                \"type\": \"mrkdwn\",
+                \"text\": \"*VCluster Already Exists* ⚠️\n\n*Details:*\n• Name: \`${{ steps.validate.outputs.vcluster_name }}\`\n• Namespace: \`${{ steps.validate.outputs.namespace }}\`\n• Requested by: @${{ steps.validate.outputs.user }}\n\nUse a different name or delete the existing vCluster first.\"
+              }
+            }
+          ]
+        }" \
+        ${{ secrets.SLACK_WEBHOOK_URL }}
