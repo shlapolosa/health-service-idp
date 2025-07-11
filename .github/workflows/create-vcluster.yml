@@ -6,6 +6,10 @@ on:
 env:
   AWS_REGION: us-west-2
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   create-vcluster:
     runs-on: ubuntu-latest
@@ -105,12 +109,30 @@ jobs:
         echo "  CPU Limit: $CPU_LIMIT"
         echo "  Memory Limit: $MEMORY_LIMIT"
     
+    - name: Send Slack Progress - Starting
+      run: |
+        curl -X POST -H 'Content-type: application/json' \
+        --data "{
+          \"text\": \"🚀 VCluster Creation Started\",
+          \"blocks\": [
+            {
+              \"type\": \"section\",
+              \"text\": {
+                \"type\": \"mrkdwn\",
+                \"text\": \"🚀 *VCluster Creation Started*\\n\\n*Details:*\\n• Name: \`${{ github.event.client_payload.vcluster_name }}\`\\n• Namespace: \`${{ github.event.client_payload.namespace }}\`\\n• Requested by: @${{ github.event.client_payload.user }}\\n\\n*Status:* Setting up AWS credentials...\"
+              }
+            }
+          ]
+        }" \
+        ${{ secrets.SLACK_WEBHOOK_URL }}
+    
     - name: Setup AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
         aws-region: ${{ env.AWS_REGION }}
         role-session-name: GitHubActions-VCluster-${{ github.run_id }}
+        role-duration-seconds: 3600
     
     - name: Setup kubectl
       uses: azure/setup-kubectl@v3
@@ -125,6 +147,14 @@ jobs:
         # Test connection
         kubectl cluster-info --request-timeout=10s
         echo "✅ Kubernetes connection established"
+    
+    - name: Send Slack Progress - Connected to Kubernetes
+      run: |
+        curl -X POST -H 'Content-type: application/json' \
+        --data "{
+          \"text\": \"✅ Connected to Kubernetes cluster - proceeding with VCluster creation\"
+        }" \
+        ${{ secrets.SLACK_WEBHOOK_URL }}
     
     - name: Check if VCluster Already Exists
       id: check_exists
@@ -220,6 +250,15 @@ jobs:
         
         echo "✅ VClusterEnvironmentClaim created: ${{ steps.validate.outputs.vcluster_name }}"
     
+    - name: Send Slack Progress - VCluster Claim Created
+      if: steps.check_exists.outputs.exists == 'false'
+      run: |
+        curl -X POST -H 'Content-type: application/json' \
+        --data "{
+          \"text\": \"📝 VCluster environment claim created - waiting for provisioning to complete...\"
+        }" \
+        ${{ secrets.SLACK_WEBHOOK_URL }}
+    
     - name: Create AppContainer Claim
       if: steps.validate.outputs.repository != '' && steps.check_exists.outputs.exists == 'false'
       run: |
@@ -266,6 +305,13 @@ jobs:
       run: |
         echo "⏳ Waiting for VCluster to be ready..."
         
+        # Send initial waiting notification
+        curl -X POST -H 'Content-type: application/json' \
+        --data "{
+          \"text\": \"⏳ VCluster provisioning in progress - this may take up to 15 minutes...\"
+        }" \
+        ${{ secrets.SLACK_WEBHOOK_URL }}
+        
         START_TIME=$(date +%s)
         while true; do
           CURRENT_TIME=$(date +%s)
@@ -290,6 +336,14 @@ jobs:
           # Show progress every 60 seconds
           if [[ $((ELAPSED % 60)) -eq 0 ]] && [[ $ELAPSED -gt 0 ]]; then
             echo "📊 Still provisioning... (${ELAPSED}s elapsed)"
+            # Send Slack update every 5 minutes
+            if [[ $((ELAPSED % 300)) -eq 0 ]]; then
+              curl -X POST -H 'Content-type: application/json' \
+              --data "{
+                \"text\": \"⏳ VCluster still provisioning... ${ELAPSED}s elapsed (Status: $STATUS)\"
+              }" \
+              ${{ secrets.SLACK_WEBHOOK_URL }}
+            fi
           fi
           
           sleep 30
