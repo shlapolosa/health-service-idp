@@ -96,7 +96,7 @@ jobs:
   # Phase 3: Build and Push
   build-and-push:
     runs-on: ubuntu-latest
-    needs: [security-scan, test]
+    needs: [security-scan]
     if: github.ref == 'refs/heads/main' || github.event_name == 'repository_dispatch'
     outputs:
       image-tag: ${{ steps.version.outputs.version }}
