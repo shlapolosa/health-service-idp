@@ -13,7 +13,7 @@ Go to: **https://github.com/shlapolosa/health-service-idp/settings/secrets/actio
 ### 1. AWS_ROLE_ARN
 ```
 Name: AWS_ROLE_ARN
-Value: arn:aws:iam::263350857079:role/GitHubActionsRole
+Value: arn:aws:iam::263350857079:role/VClusterAutomationRole
 ```
 
 ### 2. EKS_CLUSTER_NAME
@@ -67,7 +67,7 @@ Once all 3 secrets are configured:
 
 | Component | Status | Value/Location |
 |-----------|--------|----------------|
-| AWS IAM Role | ✅ Created | `arn:aws:iam::263350857079:role/GitHubActionsRole` |
+| AWS IAM Role | ✅ Created | `arn:aws:iam::263350857079:role/VClusterAutomationRole` |
 | EKS Cluster Access | ✅ Verified | `socrateshlapolosa-karpenter-demo` |
 | GitHub Secrets | ✅ Configured | 3 secrets: AWS_ROLE_ARN, EKS_CLUSTER_NAME, SLACK_WEBHOOK_URL |
 | Slack Webhook | ✅ Working | Webhook tested successfully |
@@ -76,7 +76,7 @@ Once all 3 secrets are configured:
 
 ```bash
 # Copy AWS Role ARN
-echo "arn:aws:iam::263350857079:role/GitHubActionsRole" | pbcopy
+echo "arn:aws:iam::263350857079:role/VClusterAutomationRole" | pbcopy
 
 # Copy EKS Cluster Name
 echo "socrateshlapolosa-karpenter-demo" | pbcopy
