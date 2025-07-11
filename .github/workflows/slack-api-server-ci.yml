@@ -1,0 +1,274 @@
+name: Slack API Server CI/CD
+
+on:
+  push:
+    branches: [ main, develop, 'feature/*', 'hotfix/*', 'release/*' ]
+    paths:
+      - 'slack-api-server/src/**'
+      - 'slack-api-server/tests/**'
+      - 'slack-api-server/main.py'
+      - 'slack-api-server/Dockerfile'
+      - 'slack-api-server/pyproject.toml'
+      - 'slack-api-server/requirements.txt'
+      - 'slack-api-server/deployment.yaml'
+      - '.github/workflows/slack-api-server-ci.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'slack-api-server/src/**'
+      - 'slack-api-server/tests/**'
+      - 'slack-api-server/main.py'
+      - 'slack-api-server/Dockerfile'
+      - 'slack-api-server/pyproject.toml'
+      - 'slack-api-server/requirements.txt'
+      - 'slack-api-server/deployment.yaml'
+      - '.github/workflows/slack-api-server-ci.yml'
+  repository_dispatch:
+    types: [slack_create_vcluster]
+
+permissions:
+  contents: read
+  actions: read
+  security-events: write
+  packages: write
+
+env:
+  REGISTRY: docker.io
+  REGISTRY_USERNAME: shlapolosa
+  SERVICE_NAME: slack-api-server
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # Phase 1: Security Scanning and Code Quality
+  security-scan:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'repository_dispatch'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Phase 2: Testing
+  test:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'repository_dispatch'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        working-directory: slack-api-server
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m spacy download en_core_web_sm
+
+      - name: Run unit tests
+        working-directory: slack-api-server
+        run: |
+          python -m pytest tests/unit/ -v --tb=short
+
+      - name: Run integration tests
+        working-directory: slack-api-server
+        run: |
+          python -m pytest tests/integration/ -v --tb=short
+        env:
+          PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+
+  # Phase 3: Build and Push
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: [security-scan, test]
+    if: github.ref == 'refs/heads/main' || github.event_name == 'repository_dispatch'
+    outputs:
+      image-tag: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate version
+        id: version
+        run: |
+          BASE_VERSION=$(cat .version 2>/dev/null || echo "1.0")
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          VERSION="${BASE_VERSION}.${SHORT_SHA}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Generated version: ${VERSION}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: slack-api-server
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/${{ env.SERVICE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/${{ env.SERVICE_NAME }}:${{ steps.version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+  # Phase 4: Deploy to Kubernetes
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+    if: github.ref == 'refs/heads/main' || github.event_name == 'repository_dispatch'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-session-name: SlackAPIServerDeploy
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name ${{ secrets.EKS_CLUSTER_NAME }}
+
+      - name: Update deployment image
+        working-directory: slack-api-server
+        run: |
+          # Update the image tag in deployment.yaml
+          sed -i "s|image: ${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/${{ env.SERVICE_NAME }}:.*|image: ${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/${{ env.SERVICE_NAME }}:${{ needs.build-and-push.outputs.image-tag }}|g" deployment.yaml
+
+      - name: Deploy to Kubernetes
+        working-directory: slack-api-server
+        run: |
+          # Apply RBAC and secrets first
+          kubectl apply -f rbac.yaml
+          
+          # Apply deployment and service
+          kubectl apply -f deployment.yaml
+          
+          # Apply Istio Gateway and VirtualService
+          kubectl apply -f istio-gateway.yaml
+          
+      - name: Wait for deployment
+        run: |
+          kubectl wait --for=condition=Available deployment/${{ env.SERVICE_NAME }} --timeout=300s
+          
+      - name: Get service info
+        run: |
+          kubectl get deployment ${{ env.SERVICE_NAME }} -o wide
+          kubectl get service ${{ env.SERVICE_NAME }} -o wide
+          kubectl get gateway slack-api-gateway -o wide
+          kubectl get virtualservice slack-api-virtualservice -o wide
+          
+          # Get Istio Gateway info
+          GATEWAY_IP=$(kubectl get svc istio-ingressgateway -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "Not available")
+          GATEWAY_HOSTNAME=$(kubectl get svc istio-ingressgateway -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "Not available")
+          
+          echo "Service deployed successfully!"
+          echo "Istio Gateway IP: $GATEWAY_IP"
+          echo "Istio Gateway Hostname: $GATEWAY_HOSTNAME"
+          echo "Access via: http://$GATEWAY_HOSTNAME or https://$GATEWAY_HOSTNAME"
+          
+      - name: Run deployment tests
+        run: |
+          # Test via port-forward since ingress might not be immediately available
+          kubectl port-forward deployment/${{ env.SERVICE_NAME }} 8080:8080 &
+          sleep 10
+          
+          # Test health endpoint
+          curl -f "http://localhost:8080/health" || exit 1
+          
+          # Test docs endpoint
+          curl -f "http://localhost:8080/docs" || exit 1
+          
+          echo "✅ Deployment tests passed!"
+
+  # Phase 5: Handle VCluster Creation (Repository Dispatch)
+  handle-vcluster-creation:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'repository_dispatch' && github.event.action == 'slack_create_vcluster'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Parse VCluster request
+        id: parse
+        run: |
+          echo "vcluster_name=${{ github.event.client_payload.vcluster_name }}" >> $GITHUB_OUTPUT
+          echo "namespace=${{ github.event.client_payload.namespace }}" >> $GITHUB_OUTPUT
+          echo "user=${{ github.event.client_payload.user }}" >> $GITHUB_OUTPUT
+          echo "slack_channel=${{ github.event.client_payload.slack_channel }}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-session-name: VClusterCreation
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name ${{ secrets.EKS_CLUSTER_NAME }}
+
+      - name: Create VCluster
+        run: |
+          echo "🚀 Creating VCluster: ${{ steps.parse.outputs.vcluster_name }}"
+          echo "📁 Namespace: ${{ steps.parse.outputs.namespace }}"
+          echo "👤 User: ${{ steps.parse.outputs.user }}"
+          echo "💬 Slack Channel: ${{ steps.parse.outputs.slack_channel }}"
+          
+          # Create namespace if it doesn't exist
+          kubectl create namespace ${{ steps.parse.outputs.namespace }} --dry-run=client -o yaml | kubectl apply -f -
+          
+          # TODO: Implement actual VCluster creation using Crossplane
+          # For now, just create a placeholder configmap
+          kubectl create configmap vcluster-request-${{ steps.parse.outputs.vcluster_name }} \
+            --from-literal=name=${{ steps.parse.outputs.vcluster_name }} \
+            --from-literal=namespace=${{ steps.parse.outputs.namespace }} \
+            --from-literal=user=${{ steps.parse.outputs.user }} \
+            --from-literal=slack_channel=${{ steps.parse.outputs.slack_channel }} \
+            --from-literal=status=pending \
+            --namespace=${{ steps.parse.outputs.namespace }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+          
+          echo "✅ VCluster creation request processed!"
+
+  # Phase 6: Notification
+  notify:
+    runs-on: ubuntu-latest
+    needs: [deploy, handle-vcluster-creation]
+    if: always() && (needs.deploy.result == 'success' || needs.handle-vcluster-creation.result == 'success')
+    steps:
+      - name: Notify success
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "🎉 VCluster creation workflow completed successfully!"
+          else
+            echo "🎉 Slack API Server deployed successfully!"
+          fi
