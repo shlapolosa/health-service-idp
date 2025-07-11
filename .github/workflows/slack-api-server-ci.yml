@@ -137,77 +137,51 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: linux/amd64,linux/arm64
 
-  # Phase 4: Deploy to Kubernetes
-  deploy:
+  # Phase 4: Trigger GitOps Deployment
+  trigger-gitops:
     runs-on: ubuntu-latest
     needs: [build-and-push]
     if: github.ref == 'refs/heads/main' || github.event_name == 'repository_dispatch'
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
-          role-session-name: SlackAPIServerDeploy
-
-      - name: Update kubeconfig
+      - name: Trigger GitOps repository update
         run: |
-          aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name ${{ secrets.EKS_CLUSTER_NAME }}
-
-      - name: Update deployment image
-        working-directory: slack-api-server
-        run: |
-          # Update the image tag in deployment.yaml
-          sed -i "s|image: ${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/${{ env.SERVICE_NAME }}:.*|image: ${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/${{ env.SERVICE_NAME }}:${{ needs.build-and-push.outputs.image-tag }}|g" deployment.yaml
-
-      - name: Deploy to Kubernetes
-        working-directory: slack-api-server
-        run: |
-          # Apply RBAC and secrets first
-          kubectl apply -f rbac.yaml
+          echo "🚀 Triggering GitOps repository update for Slack API Server..."
           
-          # Apply deployment and service
-          kubectl apply -f deployment.yaml
+          # Prepare deployment data
+          SERVICE_NAME="${{ env.SERVICE_NAME }}"
+          NEW_IMAGE="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/${{ env.SERVICE_NAME }}:${{ needs.build-and-push.outputs.image-tag }}"
+          SOURCE_COMMIT="${{ github.sha }}"
+          COMMIT_SHA="${GITHUB_SHA:0:7}"
           
-          # Apply Istio Gateway and VirtualService
-          kubectl apply -f istio-gateway.yaml
+          echo "Service: $SERVICE_NAME"
+          echo "New image: $NEW_IMAGE"
+          echo "Source commit: $SOURCE_COMMIT"
           
-      - name: Wait for deployment
-        run: |
-          kubectl wait --for=condition=Available deployment/${{ env.SERVICE_NAME }} --timeout=300s
+          # Trigger repository dispatch to GitOps repository
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.PERSONAL_ACCESS_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/shlapolosa/health-service-idp-gitops/dispatches" \
+            -d "{
+              \"event_type\": \"update-slack-api-server\",
+              \"client_payload\": {
+                \"service\": \"$SERVICE_NAME\",
+                \"image\": \"$NEW_IMAGE\",
+                \"version\": \"${{ needs.build-and-push.outputs.image-tag }}\",
+                \"source_commit\": \"$SOURCE_COMMIT\",
+                \"commit_sha\": \"$COMMIT_SHA\",
+                \"branch\": \"${{ github.ref_name }}\",
+                \"workflow_run\": \"${{ github.run_id }}\"
+              }
+            }"
           
-      - name: Get service info
-        run: |
-          kubectl get deployment ${{ env.SERVICE_NAME }} -o wide
-          kubectl get service ${{ env.SERVICE_NAME }} -o wide
-          kubectl get gateway slack-api-gateway -o wide
-          kubectl get virtualservice slack-api-virtualservice -o wide
-          
-          # Get Istio Gateway info
-          GATEWAY_IP=$(kubectl get svc istio-ingressgateway -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "Not available")
-          GATEWAY_HOSTNAME=$(kubectl get svc istio-ingressgateway -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "Not available")
-          
-          echo "Service deployed successfully!"
-          echo "Istio Gateway IP: $GATEWAY_IP"
-          echo "Istio Gateway Hostname: $GATEWAY_HOSTNAME"
-          echo "Access via: http://$GATEWAY_HOSTNAME or https://$GATEWAY_HOSTNAME"
-          
-      - name: Run deployment tests
-        run: |
-          # Test via port-forward since ingress might not be immediately available
-          kubectl port-forward deployment/${{ env.SERVICE_NAME }} 8080:8080 &
-          sleep 10
-          
-          # Test health endpoint
-          curl -f "http://localhost:8080/health" || exit 1
-          
-          # Test docs endpoint
-          curl -f "http://localhost:8080/docs" || exit 1
-          
-          echo "✅ Deployment tests passed!"
+          if [ $? -eq 0 ]; then
+            echo "✅ GitOps repository dispatch event sent successfully!"
+            echo "🔗 ArgoCD will handle the deployment automatically"
+          else
+            echo "❌ Failed to send dispatch event"
+            exit 1
+          fi
 
   # Phase 5: Handle VCluster Creation (Repository Dispatch)
   handle-vcluster-creation:
@@ -262,13 +236,14 @@ jobs:
   # Phase 6: Notification
   notify:
     runs-on: ubuntu-latest
-    needs: [deploy, handle-vcluster-creation]
-    if: always() && (needs.deploy.result == 'success' || needs.handle-vcluster-creation.result == 'success')
+    needs: [trigger-gitops, handle-vcluster-creation]
+    if: always() && (needs.trigger-gitops.result == 'success' || needs.handle-vcluster-creation.result == 'success')
     steps:
       - name: Notify success
         run: |
           if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
             echo "🎉 VCluster creation workflow completed successfully!"
           else
-            echo "🎉 Slack API Server deployed successfully!"
+            echo "🎉 Slack API Server GitOps deployment triggered successfully!"
+            echo "🔗 Check ArgoCD for deployment status"
           fi
