@@ -4,16 +4,19 @@ services:
   slack-api-server:
     build: .
     ports:
-      - "5000:5000"
+      - "8080:8080"
     environment:
-      - SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET}
-      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
-      - GITHUB_REPO=${GITHUB_REPO:-shlapolosa/health-service-idp}
-      - DEBUG=${DEBUG:-false}
-    restart: unless-stopped
+      - LOG_LEVEL=DEBUG
+      - ENVIRONMENT=development
+      - PERSONAL_ACCESS_TOKEN=${PERSONAL_ACCESS_TOKEN:-your_github_token_here}
+      - GITHUB_REPOSITORY=${GITHUB_REPOSITORY:-shlapolosa/health-service-idp}
+      - SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET:-your_slack_signing_secret}
+    volumes:
+      - ./src:/app/src
+      - ./main.py:/app/main.py
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3

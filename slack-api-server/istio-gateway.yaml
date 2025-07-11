@@ -1,0 +1,52 @@
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: slack-api-gateway
+  namespace: default
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*"
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: slack-api-tls
+    hosts:
+    - "*"
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: slack-api-virtualservice
+  namespace: default
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - slack-api-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /slack
+    route:
+    - destination:
+        host: slack-api-server.default.svc.cluster.local
+        port:
+          number: 80
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: slack-api-server.default.svc.cluster.local
+        port:
+          number: 80

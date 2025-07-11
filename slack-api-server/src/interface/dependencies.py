@@ -1,0 +1,98 @@
+"""
+Interface Layer - Dependency Injection
+Provides dependency injection for FastAPI controllers
+"""
+
+import os
+from typing import Optional
+from functools import lru_cache
+
+from ..application.use_cases import (
+    ProcessSlackCommandUseCase,
+    CreateVClusterUseCase,
+    VerifySlackRequestUseCase
+)
+from ..domain.services import (
+    VClusterFactoryService,
+    VClusterValidationService,
+    SlackResponseBuilderService
+)
+from ..infrastructure.nlp_parser import EnhancedNLPParser
+from ..infrastructure.github_client import GitHubApiClient
+from ..infrastructure.slack_verifier import SlackSignatureVerifier
+
+
+@lru_cache()
+def get_github_client() -> GitHubApiClient:
+    """Get GitHub API client singleton."""
+    token = os.getenv('PERSONAL_ACCESS_TOKEN')
+    repository = os.getenv('GITHUB_REPOSITORY', 'shlapolosa/health-service-idp')
+    
+    if not token:
+        raise ValueError("PERSONAL_ACCESS_TOKEN environment variable is required")
+    
+    return GitHubApiClient(token=token, repository=repository)
+
+
+@lru_cache()
+def get_nlp_parser() -> EnhancedNLPParser:
+    """Get NLP parser singleton."""
+    return EnhancedNLPParser()
+
+
+@lru_cache()
+def get_slack_verifier() -> Optional[SlackSignatureVerifier]:
+    """Get Slack signature verifier singleton."""
+    signing_secret = os.getenv('SLACK_SIGNING_SECRET')
+    
+    if not signing_secret:
+        return None
+    
+    return SlackSignatureVerifier(signing_secret)
+
+
+@lru_cache()
+def get_vcluster_factory_service() -> VClusterFactoryService:
+    """Get VCluster factory service singleton."""
+    return VClusterFactoryService()
+
+
+@lru_cache()
+def get_vcluster_validation_service() -> VClusterValidationService:
+    """Get VCluster validation service singleton."""
+    return VClusterValidationService()
+
+
+@lru_cache()
+def get_slack_response_builder_service() -> SlackResponseBuilderService:
+    """Get Slack response builder service singleton."""
+    return SlackResponseBuilderService()
+
+
+def get_create_vcluster_use_case() -> CreateVClusterUseCase:
+    """Get create VCluster use case with dependencies."""
+    return CreateVClusterUseCase(
+        parser=get_nlp_parser(),
+        github_dispatcher=get_github_client(),
+        factory=get_vcluster_factory_service(),
+        validator=get_vcluster_validation_service(),
+        response_builder=get_slack_response_builder_service()
+    )
+
+
+def get_process_slack_command_use_case() -> ProcessSlackCommandUseCase:
+    """Get process Slack command use case with dependencies."""
+    return ProcessSlackCommandUseCase(
+        create_vcluster_use_case=get_create_vcluster_use_case(),
+        response_builder=get_slack_response_builder_service()
+    )
+
+
+def get_verify_slack_request_use_case() -> Optional[VerifySlackRequestUseCase]:
+    """Get verify Slack request use case with dependencies."""
+    verifier = get_slack_verifier()
+    
+    if not verifier:
+        return None
+    
+    return VerifySlackRequestUseCase(verifier)
