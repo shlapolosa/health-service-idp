@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: oam-application-analyzer
+  namespace: crossplane-system
+  annotations:
+    description: "Service account for OAM Application Analyzer"
+    
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: oam-application-analyzer
+rules:
+# OAM Application resources
+- apiGroups: ["core.oam.dev"]
+  resources: ["applications", "components", "applicationconfigurations"]
+  verbs: ["get", "list", "watch", "patch", "update"]
+
+# Platform custom resources
+- apiGroups: ["platform.example.org"]
+  resources: ["applicationclaims", "appcontainerclaims"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Crossplane composite resources
+- apiGroups: ["platform.example.org"]
+  resources: ["xapplicationclaims", "xappcontainerclaims"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Kubernetes core resources
+- apiGroups: [""]
+  resources: ["namespaces", "configmaps", "secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Batch resources for job management
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Apps resources
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "daemonsets", "statefulsets"]
+  verbs: ["get", "list", "watch"]
+
+# Knative resources
+- apiGroups: ["serving.knative.dev"]
+  resources: ["services", "configurations", "revisions", "routes"]
+  verbs: ["get", "list", "watch"]
+
+# Helm resources
+- apiGroups: ["helm.crossplane.io"]
+  resources: ["releases"]
+  verbs: ["get", "list", "watch"]
+
+# Kubernetes provider resources
+- apiGroups: ["kubernetes.crossplane.io"]
+  resources: ["objects"]
+  verbs: ["get", "list", "watch"]
+
+# Custom Resource Definitions
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["get", "list", "watch"]
+
+# Events for logging
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: oam-application-analyzer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: oam-application-analyzer
+subjects:
+- kind: ServiceAccount
+  name: oam-application-analyzer
+  namespace: crossplane-system

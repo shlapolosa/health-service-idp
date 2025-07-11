@@ -1693,3 +1693,375 @@ spec:
       toFieldPath: status.apiGateway.stage
       policy:
         fromFieldPath: Optional
+
+  # Deploy OAM Application Analyzer in vCluster
+  - name: oam-analyzer-namespace
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: oam-analyzer-system
+              labels:
+                name: oam-analyzer-system
+        references:
+        - patchesFrom:
+            apiVersion: v1
+            kind: Secret
+            name: vcluster-kubeconfig
+            namespace: crossplane-system
+            fieldPath: data.config
+          toFieldPath: spec.connectionDetails[0].value
+        connectionDetails:
+        - fromConnectionSecretKey: kubeconfig
+          name: kubeconfig
+          type: Raw
+        providerConfigRef:
+          name: vcluster-provider-config
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-oam-analyzer-ns"
+
+  # Deploy OAM Analyzer RBAC in vCluster
+  - name: oam-analyzer-rbac
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: List
+            items:
+            # ServiceAccount
+            - apiVersion: v1
+              kind: ServiceAccount
+              metadata:
+                name: oam-application-analyzer
+                namespace: oam-analyzer-system
+            # ClusterRole
+            - apiVersion: rbac.authorization.k8s.io/v1
+              kind: ClusterRole
+              metadata:
+                name: oam-application-analyzer
+              rules:
+              - apiGroups: ["core.oam.dev"]
+                resources: ["applications", "components", "applicationconfigurations"]
+                verbs: ["get", "list", "watch", "patch", "update"]
+              - apiGroups: ["platform.example.org"]
+                resources: ["applicationclaims", "appcontainerclaims"]
+                verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+              - apiGroups: [""]
+                resources: ["namespaces", "configmaps", "secrets", "events"]
+                verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+              - apiGroups: ["batch"]
+                resources: ["jobs", "cronjobs"]
+                verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+              - apiGroups: ["apiextensions.k8s.io"]
+                resources: ["customresourcedefinitions"]
+                verbs: ["get", "list", "watch"]
+            # ClusterRoleBinding
+            - apiVersion: rbac.authorization.k8s.io/v1
+              kind: ClusterRoleBinding
+              metadata:
+                name: oam-application-analyzer
+              roleRef:
+                apiGroup: rbac.authorization.k8s.io
+                kind: ClusterRole
+                name: oam-application-analyzer
+              subjects:
+              - kind: ServiceAccount
+                name: oam-application-analyzer
+                namespace: oam-analyzer-system
+        references:
+        - patchesFrom:
+            apiVersion: v1
+            kind: Secret
+            name: vcluster-kubeconfig
+            namespace: crossplane-system
+            fieldPath: data.config
+          toFieldPath: spec.connectionDetails[0].value
+        connectionDetails:
+        - fromConnectionSecretKey: kubeconfig
+          name: kubeconfig
+          type: Raw
+        providerConfigRef:
+          name: vcluster-provider-config
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-oam-analyzer-rbac"
+
+  # Deploy GitHub analyzer secret in vCluster (references host cluster secret)
+  - name: oam-analyzer-secret
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: github-analyzer-credentials
+              namespace: oam-analyzer-system
+            type: Opaque
+            data:
+              # Token will be populated from host cluster github-token secret
+              token: "placeholder-will-be-replaced"
+              # GitHub owner (base64 encoded: shlapolosa)
+              owner: "c2hsYXBvbG9zYQ=="
+        references:
+        - patchesFrom:
+            apiVersion: v1
+            kind: Secret
+            name: github-token
+            namespace: crossplane-system
+            fieldPath: data.token
+          toFieldPath: spec.forProvider.manifest.data.token
+        - patchesFrom:
+            apiVersion: v1
+            kind: Secret
+            name: vcluster-kubeconfig
+            namespace: crossplane-system
+            fieldPath: data.config
+          toFieldPath: spec.connectionDetails[0].value
+        connectionDetails:
+        - fromConnectionSecretKey: kubeconfig
+          name: kubeconfig
+          type: Raw
+        providerConfigRef:
+          name: vcluster-provider-config
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-oam-analyzer-secret"
+
+  # Deploy OAM Analyzer CronJob in vCluster
+  - name: oam-analyzer-cronjob
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: batch/v1
+            kind: CronJob
+            metadata:
+              name: oam-application-analyzer
+              namespace: oam-analyzer-system
+            spec:
+              schedule: "*/2 * * * *"
+              jobTemplate:
+                spec:
+                  template:
+                    spec:
+                      serviceAccountName: oam-application-analyzer
+                      restartPolicy: OnFailure
+                      containers:
+                      - name: analyzer
+                        image: bitnami/kubectl:latest
+                        command:
+                        - /bin/bash
+                        - -c
+                        - |
+                          set -e
+                          apt-get update && apt-get install -y curl
+                          echo "🔍 OAM Application Infrastructure Analyzer (vCluster)"
+                          echo "Time: $(date)"
+                          echo "=============================================="
+                          
+                          # Simplified analyzer for vCluster context
+                          check_github_repo() {
+                            local repo_name="$1"
+                            local org="${GITHUB_ORG:-shlapolosa}"
+                            if [ -n "$GITHUB_TOKEN" ]; then
+                              local response_code=$(curl -s -o /dev/null -w "%{http_code}" \
+                                -H "Authorization: token $GITHUB_TOKEN" \
+                                "https://api.github.com/repos/$org/$repo_name")
+                              [ "$response_code" = "200" ]
+                            else
+                              return 1
+                            fi
+                          }
+                          
+                          infer_language_framework() {
+                            echo "python,fastapi"  # Default for vCluster
+                          }
+                          
+                          detect_database_needs() {
+                            local component_yaml="$1"
+                            local service_name="$2"
+                            if echo "$component_yaml" | grep -A 20 "name: $service_name" | grep -q "DATABASE_URL"; then
+                              echo "postgres"
+                            else
+                              echo "none"
+                            fi
+                          }
+                          
+                          detect_cache_needs() {
+                            local component_yaml="$1"
+                            local service_name="$2"
+                            if echo "$component_yaml" | grep -A 20 "name: $service_name" | grep -q "REDIS_URL"; then
+                              echo "redis"
+                            else
+                              echo "none"
+                            fi
+                          }
+                          
+                          create_application_claim() {
+                            local service_name="$1"
+                            local namespace="$2"
+                            local app_container="$3"
+                            local language="$4"
+                            local framework="$5"
+                            local database="$6"
+                            local cache="$7"
+                            local source_app="$8"
+                            
+                            echo "🏗️  Creating ApplicationClaim for: $service_name"
+                            cat <<EOF | kubectl apply -f -
+                          apiVersion: platform.example.org/v1alpha1
+                          kind: ApplicationClaim
+                          metadata:
+                            name: $service_name
+                            namespace: $namespace
+                            annotations:
+                              generated-by: "oam-analyzer-vcluster"
+                              generated-at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+                              source-application: "$source_app"
+                            labels:
+                              generated-by: "oam-analyzer"
+                          spec:
+                            appContainer: $app_container
+                            name: $service_name
+                            language: $language
+                            framework: $framework
+                            database: $database
+                            cache: $cache
+                            frontend: false
+                            exposeApi: false
+                            messaging: none
+                            apiEndpoint: /api
+                          EOF
+                          }
+                          
+                          # Main analyzer logic
+                          echo "🚀 Starting vCluster OAM Application monitoring..."
+                          
+                          if ! kubectl get crd applications.core.oam.dev >/dev/null 2>&1; then
+                            echo "⚠️  OAM Application CRD not found, skipping analysis"
+                            exit 0
+                          fi
+                          
+                          applications=$(kubectl get applications.core.oam.dev --all-namespaces --no-headers 2>/dev/null | awk '{print $1 " " $2}')
+                          
+                          if [ -z "$applications" ]; then
+                            echo "ℹ️  No OAM Applications found in vCluster"
+                            exit 0
+                          fi
+                          
+                          echo "📋 Found OAM Applications:"
+                          echo "$applications" | sed 's/^/   /'
+                          
+                          while read -r namespace name; do
+                            if [ -n "$namespace" ] && [ -n "$name" ]; then
+                              echo "📋 Analyzing: $name in namespace: $namespace"
+                              
+                              app_yaml=$(kubectl get application.core.oam.dev "$name" -n "$namespace" -o yaml 2>/dev/null)
+                              if [ $? -ne 0 ]; then
+                                continue
+                              fi
+                              
+                              if echo "$app_yaml" | grep -q "processed-by.*oam-analyzer"; then
+                                echo "✅ Application $name already processed"
+                                continue
+                              fi
+                              
+                              components=$(echo "$app_yaml" | grep -A 1000 "components:" | grep -E "^  - name:" | awk '{print $3}')
+                              
+                              for component in $components; do
+                                if [ -n "$component" ]; then
+                                  component_type=$(echo "$app_yaml" | grep -A 10 "name: $component" | grep "type:" | head -1 | awk '{print $2}')
+                                  
+                                  if [[ "$component_type" == "webservice" ]]; then
+                                    if ! kubectl get applicationclaim "$component" -n "$namespace" >/dev/null 2>&1; then
+                                      if ! check_github_repo "$component"; then
+                                        lang_fw=$(infer_language_framework "$app_yaml" "$component")
+                                        language=$(echo "$lang_fw" | cut -d',' -f1)
+                                        framework=$(echo "$lang_fw" | cut -d',' -f2)
+                                        database=$(detect_database_needs "$app_yaml" "$component")
+                                        cache=$(detect_cache_needs "$app_yaml" "$component")
+                                        
+                                        create_application_claim "$component" "$namespace" "$name" "$language" "$framework" "$database" "$cache" "$name"
+                                      fi
+                                    fi
+                                  fi
+                                fi
+                              done
+                              
+                              kubectl annotate application.core.oam.dev "$name" -n "$namespace" processed-by=oam-analyzer-vcluster processed-at="$(date -u +%Y-%m-%dT%H:%M:%SZ)" --overwrite
+                            fi
+                          done <<< "$applications"
+                          
+                          echo "✅ vCluster OAM Application monitoring completed!"
+                        
+                        env:
+                        - name: GITHUB_ORG
+                          value: "shlapolosa"
+                        - name: GITHUB_TOKEN
+                          valueFrom:
+                            secretKeyRef:
+                              name: github-analyzer-credentials
+                              key: token
+                              optional: true
+                        - name: DOCKER_REGISTRY
+                          value: "docker.io/socrates12345"
+                        resources:
+                          requests:
+                            cpu: 100m
+                            memory: 256Mi
+                          limits:
+                            cpu: 500m
+                            memory: 512Mi
+              successfulJobsHistoryLimit: 3
+              failedJobsHistoryLimit: 1
+        references:
+        - patchesFrom:
+            apiVersion: v1
+            kind: Secret
+            name: vcluster-kubeconfig
+            namespace: crossplane-system
+            fieldPath: data.config
+          toFieldPath: spec.connectionDetails[0].value
+        connectionDetails:
+        - fromConnectionSecretKey: kubeconfig
+          name: kubeconfig
+          type: Raw
+        providerConfigRef:
+          name: vcluster-provider-config
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-oam-analyzer-cronjob"
