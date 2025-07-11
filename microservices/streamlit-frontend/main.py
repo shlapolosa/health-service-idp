@@ -1,3 +1,4 @@
+# Test Slack notifications for GitOps pipeline
 import streamlit as st
 from components.navigation import NavigationManager, ViewType
 from components.views import ViewRenderer
