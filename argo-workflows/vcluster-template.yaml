@@ -1,0 +1,179 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: vcluster-creation
+  namespace: argo
+spec:
+  entrypoint: create-vcluster
+  arguments:
+    parameters:
+    - name: vcluster-name
+      value: "default-cluster"
+    - name: namespace
+      value: "default"
+    - name: size
+      value: "medium"
+    - name: capabilities
+      value: "{}"
+    - name: user
+      value: "unknown"
+    - name: slack-channel
+      value: "unknown"
+    - name: slack-user-id
+      value: "unknown"
+
+  templates:
+  - name: create-vcluster
+    steps:
+    - - name: validate-request
+        template: validate-vcluster-request
+    - - name: create-vcluster-claim
+        template: create-claim
+        when: "{{steps.validate-request.outputs.result}} == success"
+    - - name: notify-slack-success
+        template: notify-slack
+        arguments:
+          parameters:
+          - name: status
+            value: "success"
+          - name: message
+            value: "VCluster {{workflow.parameters.vcluster-name}} created successfully"
+        when: "{{steps.create-vcluster-claim.outputs.result}} == success"
+    - - name: notify-slack-failure
+        template: notify-slack
+        arguments:
+          parameters:
+          - name: status
+            value: "failure"
+          - name: message
+            value: "VCluster {{workflow.parameters.vcluster-name}} creation failed"
+        when: "{{steps.create-vcluster-claim.outputs.result}} != success"
+
+  - name: validate-vcluster-request
+    script:
+      image: alpine:3.18
+      command: [sh]
+      source: |
+        echo "🔍 Validating VCluster request..."
+        echo "Name: {{workflow.parameters.vcluster-name}}"
+        echo "Namespace: {{workflow.parameters.namespace}}"
+        echo "Size: {{workflow.parameters.size}}"
+        echo "User: {{workflow.parameters.user}}"
+        
+        # Basic validation
+        if [ -z "{{workflow.parameters.vcluster-name}}" ]; then
+          echo "❌ VCluster name is required"
+          exit 1
+        fi
+        
+        # Validate name format (lowercase, alphanumeric, hyphens)
+        if ! echo "{{workflow.parameters.vcluster-name}}" | grep -E '^[a-z0-9][a-z0-9-]*[a-z0-9]$'; then
+          echo "❌ Invalid VCluster name format"
+          exit 1
+        fi
+        
+        echo "✅ Validation successful"
+        echo "success"
+
+  - name: create-claim
+    script:
+      image: bitnami/kubectl:1.28
+      command: [sh]
+      source: |
+        echo "🚀 Creating VCluster claim..."
+        
+        # Parse capabilities
+        CAPABILITIES='{{workflow.parameters.capabilities}}'
+        OBSERVABILITY=$(echo $CAPABILITIES | grep -o '"observability":"[^"]*"' | cut -d'"' -f4 || echo "true")
+        SECURITY=$(echo $CAPABILITIES | grep -o '"security":"[^"]*"' | cut -d'"' -f4 || echo "true")
+        GITOPS=$(echo $CAPABILITIES | grep -o '"gitops":"[^"]*"' | cut -d'"' -f4 || echo "true")
+        
+        # Size to resource mapping
+        case "{{workflow.parameters.size}}" in
+          "small")
+            CPU_LIMIT="1000m"
+            MEMORY_LIMIT="2Gi"
+            STORAGE_SIZE="10Gi"
+            ;;
+          "large")
+            CPU_LIMIT="4000m"
+            MEMORY_LIMIT="8Gi"
+            STORAGE_SIZE="50Gi"
+            ;;
+          "xlarge")
+            CPU_LIMIT="8000m"
+            MEMORY_LIMIT="16Gi"
+            STORAGE_SIZE="100Gi"
+            ;;
+          *)
+            CPU_LIMIT="2000m"
+            MEMORY_LIMIT="4Gi"
+            STORAGE_SIZE="20Gi"
+            ;;
+        esac
+        
+        # Create VCluster claim manifest
+        cat <<EOF | kubectl apply -f -
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: vcluster-claim-{{workflow.parameters.vcluster-name}}
+          namespace: {{workflow.parameters.namespace}}
+          labels:
+            app: vcluster
+            type: claim
+            created-by: slack
+        data:
+          vcluster-name: "{{workflow.parameters.vcluster-name}}"
+          namespace: "{{workflow.parameters.namespace}}"
+          size: "{{workflow.parameters.size}}"
+          cpu-limit: "$CPU_LIMIT"
+          memory-limit: "$MEMORY_LIMIT"
+          storage-size: "$STORAGE_SIZE"
+          observability: "$OBSERVABILITY"
+          security: "$SECURITY"
+          gitops: "$GITOPS"
+          requested-by: "{{workflow.parameters.user}}"
+          slack-channel: "{{workflow.parameters.slack-channel}}"
+          slack-user-id: "{{workflow.parameters.slack-user-id}}"
+          created-at: "$(date -Iseconds)"
+          status: "pending"
+        EOF
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ VCluster claim created successfully"
+          echo "success"
+        else
+          echo "❌ Failed to create VCluster claim"
+          echo "failure"
+        fi
+
+  - name: notify-slack
+    inputs:
+      parameters:
+      - name: status
+      - name: message
+    script:
+      image: curlimages/curl:8.5.0
+      command: [sh]
+      source: |
+        echo "📱 Sending Slack notification..."
+        
+        if [ "{{inputs.parameters.status}}" = "success" ]; then
+          EMOJI="✅"
+          COLOR="good"
+        else
+          EMOJI="❌"
+          COLOR="danger"
+        fi
+        
+        # Note: This is a placeholder - in production, you'd get the webhook URL from a secret
+        echo "Would send to Slack: $EMOJI {{inputs.parameters.message}}"
+        echo "VCluster: {{workflow.parameters.vcluster-name}}"
+        echo "User: {{workflow.parameters.user}}"
+        echo "Channel: {{workflow.parameters.slack-channel}}"
+        
+        # TODO: Replace with actual Slack webhook call when implementing
+        # curl -X POST -H 'Content-type: application/json' \
+        #   --data "{\"text\":\"$EMOJI {{inputs.parameters.message}}\"}" \
+        #   "$SLACK_WEBHOOK_URL"

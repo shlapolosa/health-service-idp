@@ -8,12 +8,12 @@ from typing import Dict, Tuple
 
 import requests
 
-from ..application.use_cases import GitHubDispatcherInterface
+from ..application.use_cases import VClusterDispatcherInterface
 
 logger = logging.getLogger(__name__)
 
 
-class GitHubApiClient(GitHubDispatcherInterface):
+class GitHubApiClient(VClusterDispatcherInterface):
     """GitHub API client for repository dispatch operations."""
 
     def __init__(self, token: str, repository: str, timeout: int = 10):

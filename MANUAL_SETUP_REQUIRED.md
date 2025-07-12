@@ -15,7 +15,6 @@ Go to: **https://github.com/shlapolosa/health-service-idp/settings/secrets/actio
 Name: AWS_ROLE_ARN
 Value: arn:aws:iam::263350857079:role/VClusterAutomationRole
 ```
-
 ### 2. EKS_CLUSTER_NAME
 ```
 Name: EKS_CLUSTER_NAME

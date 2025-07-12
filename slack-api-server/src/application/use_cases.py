@@ -18,13 +18,24 @@ from ..domain.services import (CommandParserInterface,
 logger = logging.getLogger(__name__)
 
 
-class GitHubDispatcherInterface(ABC):
-    """Interface for GitHub repository dispatch operations."""
+class VClusterDispatcherInterface(ABC):
+    """Interface for VCluster creation dispatch operations."""
 
     @abstractmethod
     def trigger_vcluster_creation(self, payload: Dict) -> Tuple[bool, str]:
-        """Trigger VCluster creation via GitHub repository dispatch."""
+        """Trigger VCluster creation via the dispatcher implementation."""
         pass
+
+    @abstractmethod
+    def validate_configuration(self) -> Tuple[bool, str]:
+        """Validate dispatcher configuration."""
+        pass
+
+
+# Keep for backward compatibility
+class GitHubDispatcherInterface(VClusterDispatcherInterface):
+    """Interface for GitHub repository dispatch operations (extends VClusterDispatcherInterface)."""
+    pass
 
 
 class SlackVerifierInterface(ABC):
@@ -44,14 +55,14 @@ class CreateVClusterUseCase:
     def __init__(
         self,
         parser: CommandParserInterface,
-        github_dispatcher: GitHubDispatcherInterface,
+        vcluster_dispatcher: VClusterDispatcherInterface,
         factory: VClusterFactoryService = None,
         validator: VClusterValidationService = None,
         response_builder: SlackResponseBuilderService = None,
     ):
         """Initialize use case with dependencies."""
         self.parser = parser
-        self.github_dispatcher = github_dispatcher
+        self.vcluster_dispatcher = vcluster_dispatcher
         self.factory = factory or VClusterFactoryService()
         self.validator = validator or VClusterValidationService()
         self.response_builder = response_builder or SlackResponseBuilderService()
@@ -89,12 +100,12 @@ class CreateVClusterUseCase:
                 logger.warning(f"Validation failed: {error_message}")
                 return self.response_builder.build_error_response(error_message)
 
-            # Trigger GitHub Action
-            payload = request.to_github_payload()
-            success, message = self.github_dispatcher.trigger_vcluster_creation(payload)
+            # Trigger VCluster creation via dispatcher
+            payload = request.to_github_payload()  # This method can be kept/renamed to to_dispatch_payload()
+            success, message = self.vcluster_dispatcher.trigger_vcluster_creation(payload)
 
             if not success:
-                logger.error(f"GitHub dispatch failed: {message}")
+                logger.error(f"VCluster dispatch failed: {message}")
                 return self.response_builder.build_error_response(
                     f"Failed to trigger creation: {message}"
                 )

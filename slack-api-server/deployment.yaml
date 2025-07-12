@@ -45,6 +45,12 @@ spec:
               name: slack-credentials
               key: signing-secret
               optional: true
+        - name: VCLUSTER_DISPATCHER
+          value: "argo"
+        - name: ARGO_SERVER_URL
+          value: "http://argo-server.argo:2746"
+        - name: ARGO_NAMESPACE
+          value: "argo"
         resources:
           limits:
             cpu: "1"

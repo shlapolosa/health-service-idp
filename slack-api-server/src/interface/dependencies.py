@@ -13,6 +13,8 @@ from ..application.use_cases import (CreateVClusterUseCase,
 from ..domain.services import (SlackResponseBuilderService,
                                VClusterFactoryService,
                                VClusterValidationService)
+from ..application.use_cases import VClusterDispatcherInterface
+from ..infrastructure.argo_client import ArgoWorkflowsClient
 from ..infrastructure.github_client import GitHubApiClient
 from ..infrastructure.nlp_parser import EnhancedNLPParser
 from ..infrastructure.slack_verifier import SlackSignatureVerifier
@@ -28,6 +30,31 @@ def get_github_client() -> GitHubApiClient:
         raise ValueError("PERSONAL_ACCESS_TOKEN environment variable is required")
 
     return GitHubApiClient(token=token, repository=repository)
+
+
+@lru_cache()
+def get_argo_client() -> ArgoWorkflowsClient:
+    """Get Argo Workflows client singleton."""
+    # Argo server is accessible within the cluster
+    argo_server_url = os.getenv("ARGO_SERVER_URL", "http://argo-server.argo:2746")
+    argo_namespace = os.getenv("ARGO_NAMESPACE", "argo")
+    
+    return ArgoWorkflowsClient(server_url=argo_server_url, namespace=argo_namespace)
+
+
+@lru_cache()
+def get_vcluster_dispatcher() -> VClusterDispatcherInterface:
+    """Get VCluster dispatcher based on configuration."""
+    # Use environment variable to select dispatcher type
+    dispatcher_type = os.getenv("VCLUSTER_DISPATCHER", "argo").lower()
+    
+    if dispatcher_type == "github":
+        return get_github_client()
+    elif dispatcher_type == "argo":
+        return get_argo_client()
+    else:
+        # Default to Argo if invalid value
+        return get_argo_client()
 
 
 @lru_cache()
@@ -69,7 +96,7 @@ def get_create_vcluster_use_case() -> CreateVClusterUseCase:
     """Get create VCluster use case with dependencies."""
     return CreateVClusterUseCase(
         parser=get_nlp_parser(),
-        github_dispatcher=get_github_client(),
+        vcluster_dispatcher=get_vcluster_dispatcher(),
         factory=get_vcluster_factory_service(),
         validator=get_vcluster_validation_service(),
         response_builder=get_slack_response_builder_service(),
