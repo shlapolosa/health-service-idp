@@ -57,7 +57,7 @@ metadata:
     service-type: api-server
 type: Opaque
 stringData:
-  personal-access-token: "REPLACE_WITH_ACTUAL_TOKEN"
+  personal-access-token: "${PERSONAL_ACCESS_TOKEN}"
 ---
 apiVersion: v1
 kind: Secret
@@ -69,4 +69,4 @@ metadata:
     service-type: api-server
 type: Opaque
 stringData:
-  signing-secret: "REPLACE_WITH_ACTUAL_SECRET"
+  signing-secret: "${SLACK_SIGNING_SECRET}"

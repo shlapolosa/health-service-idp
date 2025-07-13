@@ -8,9 +8,23 @@ NAMESPACE="${NAMESPACE:-default}"
 
 echo "🚀 Deploying ${SERVICE_NAME} to Kubernetes..."
 
-# Apply RBAC and secrets first
+# Check for required environment variables
+if [ -z "$PERSONAL_ACCESS_TOKEN" ]; then
+    echo "❌ PERSONAL_ACCESS_TOKEN environment variable is required"
+    exit 1
+fi
+
+if [ -z "$SLACK_SIGNING_SECRET" ]; then
+    echo "❌ SLACK_SIGNING_SECRET environment variable is required"
+    exit 1
+fi
+
+# Apply RBAC and secrets first with environment variable substitution
 echo "📋 Setting up RBAC and secrets..."
-kubectl apply -f rbac.yaml
+echo "🔐 Substituting environment variables in secrets..."
+sed -e "s|\${PERSONAL_ACCESS_TOKEN}|${PERSONAL_ACCESS_TOKEN}|g" \
+    -e "s|\${SLACK_SIGNING_SECRET}|${SLACK_SIGNING_SECRET}|g" \
+    rbac.yaml | kubectl apply -f -
 
 # Apply deployment and service
 echo "🚀 Deploying application..."
@@ -38,8 +52,8 @@ echo "🌍 Istio Gateway Hostname: ${GATEWAY_HOSTNAME}"
 echo "🔗 Access via: http://${GATEWAY_HOSTNAME} or https://${GATEWAY_HOSTNAME}"
 
 echo "📝 Don't forget to:"
-echo "  1. Update github-credentials secret with your PERSONAL_ACCESS_TOKEN"
-echo "  2. Update slack-credentials secret with your SLACK_SIGNING_SECRET"
+echo "  1. Set PERSONAL_ACCESS_TOKEN environment variable before deployment"
+echo "  2. Set SLACK_SIGNING_SECRET environment variable before deployment"
 echo "  3. Configure TLS certificate for the Istio Gateway"
 echo "  4. Use the Istio Gateway hostname for Slack webhook URLs"
 
