@@ -1,6 +1,6 @@
 # Slack API Server
 
-A FastAPI-based microservice for handling Slack slash commands and triggering VCluster provisioning through GitHub Actions.
+A FastAPI-based microservice for handling Slack slash commands and triggering VCluster and AppContainer provisioning through GitOps workflows.
 
 ## Overview
 
