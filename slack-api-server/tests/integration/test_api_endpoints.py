@@ -110,12 +110,83 @@ class TestAPIEndpoints:
         assert data["response_type"] == "ephemeral"
         assert "VCluster Management Commands" in data["text"]
 
-    @patch("src.infrastructure.github_client.requests.post")
+    def test_slack_command_appcontainer_help(self):
+        """Test AppContainer help command."""
+        form_data = {
+            "command": "/appcontainer",
+            "text": "help",
+            "user_id": "U123456",
+            "user_name": "testuser",
+            "channel_id": "C123456",
+            "channel_name": "general",
+            "team_id": "T123456",
+            "team_domain": "testteam",
+        }
+
+        response = self.client.post("/slack/command", data=form_data)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["response_type"] == "ephemeral"
+        assert "AppContainer Management Commands" in data["text"]
+        assert "blocks" in data
+
+    def test_slack_command_app_cont_alias(self):
+        """Test /app-cont alias command."""
+        form_data = {
+            "command": "/app-cont",
+            "text": "help",
+            "user_id": "U123456",
+            "user_name": "testuser",
+            "channel_id": "C123456",
+            "channel_name": "general",
+            "team_id": "T123456",
+            "team_domain": "testteam",
+        }
+
+        response = self.client.post("/slack/command", data=form_data)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["response_type"] == "ephemeral"
+        assert "AppContainer Management Commands" in data["text"]
+
+    @patch("src.infrastructure.argo_client.requests.post")
+    def test_appcontainer_create_success(self, mock_post):
+        """Test successful AppContainer create command."""
+        # Mock successful Argo API response
+        mock_response = Mock()
+        mock_response.status_code = 201
+        mock_response.json.return_value = {"metadata": {"name": "appcontainer-creation-abc123"}}
+        mock_post.return_value = mock_response
+
+        form_data = {
+            "command": "/appcontainer",
+            "text": "create my-app",
+            "user_id": "U123456", 
+            "user_name": "testuser",
+            "channel_id": "C123456",
+            "channel_name": "general",
+            "team_id": "T123456",
+            "team_domain": "testteam",
+        }
+
+        response = self.client.post("/slack/command", data=form_data)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["response_type"] == "in_channel"
+        assert "AppContainer" in data["text"]
+        assert "creation started" in data["text"]
+        assert "blocks" in data
+
+    @patch("src.infrastructure.argo_client.requests.post")
     def test_slack_command_create_success(self, mock_post):
         """Test successful Slack create command."""
-        # Mock successful GitHub API response
+        # Mock successful Argo API response
         mock_response = Mock()
-        mock_response.status_code = 204
+        mock_response.status_code = 201
+        mock_response.json.return_value = {"metadata": {"name": "vcluster-creation-abc123"}}
         mock_post.return_value = mock_response
 
         form_data = {

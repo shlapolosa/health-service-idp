@@ -7,7 +7,8 @@ import os
 from functools import lru_cache
 from typing import Optional
 
-from ..application.use_cases import (CreateVClusterUseCase,
+from ..application.use_cases import (CreateAppContainerUseCase,
+                                     CreateVClusterUseCase,
                                      ProcessSlackCommandUseCase,
                                      VerifySlackRequestUseCase)
 from ..domain.services import (SlackResponseBuilderService,
@@ -103,10 +104,20 @@ def get_create_vcluster_use_case() -> CreateVClusterUseCase:
     )
 
 
+def get_create_appcontainer_use_case() -> CreateAppContainerUseCase:
+    """Get create AppContainer use case with dependencies."""
+    return CreateAppContainerUseCase(
+        parser=get_nlp_parser(),
+        vcluster_dispatcher=get_vcluster_dispatcher(),
+        response_builder=get_slack_response_builder_service(),
+    )
+
+
 def get_process_slack_command_use_case() -> ProcessSlackCommandUseCase:
     """Get process Slack command use case with dependencies."""
     return ProcessSlackCommandUseCase(
         create_vcluster_use_case=get_create_vcluster_use_case(),
+        create_appcontainer_use_case=get_create_appcontainer_use_case(),
         response_builder=get_slack_response_builder_service(),
     )
 
