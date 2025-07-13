@@ -63,6 +63,22 @@ spec:
             value: "{{workflow.parameters.target-vcluster}}"
     - - name: validate-request
         template: validate-microservice-request
+        arguments:
+          parameters:
+          - name: microservice-name
+            value: "{{workflow.parameters.microservice-name}}"
+          - name: language
+            value: "{{workflow.parameters.language}}"
+          - name: database
+            value: "{{workflow.parameters.database}}"
+          - name: cache
+            value: "{{workflow.parameters.cache}}"
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+          - name: github-org
+            value: "{{workflow.parameters.github-org}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
     - - name: notify-validated
         templateRef:
           name: slack-notifications
@@ -209,69 +225,78 @@ spec:
         when: "{{steps.validate-request.status}} != Succeeded or {{steps.create-appcontainer-for-microservice.status}} != Succeeded or {{steps.create-microservice-claim.status}} != Succeeded or {{steps.wait-for-microservice.status}} != Succeeded or {{steps.setup-ci-cd.status}} != Succeeded"
 
   - name: validate-microservice-request
+    inputs:
+      parameters:
+      - name: microservice-name
+      - name: language  
+      - name: database
+      - name: cache
+      - name: namespace
+      - name: github-org
+      - name: user
     script:
       image: alpine:3.18
       command: [sh]
       source: |
         echo "Validating Microservice request..."
-        echo "Name: {{workflow.parameters.microservice-name}}"
-        echo "Language: {{workflow.parameters.language}}"
-        echo "Database: {{workflow.parameters.database}}"
-        echo "Cache: {{workflow.parameters.cache}}"
-        echo "Namespace: {{workflow.parameters.namespace}}"
-        echo "GitHub Org: {{workflow.parameters.github-org}}"
-        echo "User: {{workflow.parameters.user}}"
+        echo "Name: {{inputs.parameters.microservice-name}}"
+        echo "Language: {{inputs.parameters.language}}"
+        echo "Database: {{inputs.parameters.database}}"
+        echo "Cache: {{inputs.parameters.cache}}"
+        echo "Namespace: {{inputs.parameters.namespace}}"
+        echo "GitHub Org: {{inputs.parameters.github-org}}"
+        echo "User: {{inputs.parameters.user}}"
         
         # Basic validation
-        if [ -z "{{workflow.parameters.microservice-name}}" ]; then
+        if [ -z "{{inputs.parameters.microservice-name}}" ]; then
           echo "Microservice name is required"
           exit 1
         fi
         
         # Validate name format (lowercase, alphanumeric, hyphens)
-        if ! echo "{{workflow.parameters.microservice-name}}" | grep -E '^[a-z0-9][a-z0-9-]*[a-z0-9]$'; then
+        if ! echo "{{inputs.parameters.microservice-name}}" | grep -E '^[a-z0-9][a-z0-9-]*[a-z0-9]$'; then
           echo "Invalid microservice name format (must be DNS-1123 compliant)"
           exit 1
         fi
         
         # Validate language
-        case "{{workflow.parameters.language}}" in
+        case "{{inputs.parameters.language}}" in
           python|java|fastapi|springboot)
-            echo "✅ Supported language: {{workflow.parameters.language}}"
+            echo "✅ Supported language: {{inputs.parameters.language}}"
             ;;
           *)
-            echo "❌ Unsupported language: {{workflow.parameters.language}}"
+            echo "❌ Unsupported language: {{inputs.parameters.language}}"
             echo "Supported: python, java, fastapi, springboot"
             exit 1
             ;;
         esac
         
         # Validate database
-        case "{{workflow.parameters.database}}" in
+        case "{{inputs.parameters.database}}" in
           none|postgresql|postgres)
-            echo "✅ Supported database: {{workflow.parameters.database}}"
+            echo "✅ Supported database: {{inputs.parameters.database}}"
             ;;
           *)
-            echo "❌ Unsupported database: {{workflow.parameters.database}}"
+            echo "❌ Unsupported database: {{inputs.parameters.database}}"
             echo "Supported: none, postgresql, postgres"
             exit 1
             ;;
         esac
         
         # Validate cache
-        case "{{workflow.parameters.cache}}" in
+        case "{{inputs.parameters.cache}}" in
           none|redis)
-            echo "✅ Supported cache: {{workflow.parameters.cache}}"
+            echo "✅ Supported cache: {{inputs.parameters.cache}}"
             ;;
           *)
-            echo "❌ Unsupported cache: {{workflow.parameters.cache}}"
+            echo "❌ Unsupported cache: {{inputs.parameters.cache}}"
             echo "Supported: none, redis"
             exit 1
             ;;
         esac
         
         # Validate GitHub organization
-        if [ -z "{{workflow.parameters.github-org}}" ]; then
+        if [ -z "{{inputs.parameters.github-org}}" ]; then
           echo "GitHub organization is required"
           exit 1
         fi

@@ -350,6 +350,8 @@ class TestAppContainerRequest:
             "docker-registry": "myregistry.com/myorg",
             "observability": "false",
             "security": "true",
+            "vcluster-name": "",
+            "auto-create-vcluster": "true",
             "user": "alice",
             "slack-channel": "C456",
             "slack-user-id": "alice",

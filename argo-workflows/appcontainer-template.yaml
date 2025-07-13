@@ -21,6 +21,10 @@ spec:
       value: "true"
     - name: security
       value: "true"
+    - name: vcluster-name
+      value: ""
+    - name: auto-create-vcluster
+      value: "true"
     - name: user
       value: "unknown"
     - name: slack-channel
@@ -31,29 +35,165 @@ spec:
   templates:
   - name: create-appcontainer
     steps:
+    - - name: notify-starting
+        templateRef:
+          name: slack-notifications
+          template: notify-appcontainer-starting
+        arguments:
+          parameters:
+          - name: appcontainer-name
+            value: "{{workflow.parameters.appcontainer-name}}"
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
+          - name: vcluster-name
+            value: "{{workflow.parameters.vcluster-name}}"
     - - name: validate-request
         template: validate-appcontainer-request
+    - - name: notify-validated
+        templateRef:
+          name: slack-notifications
+          template: send-slack-progress
+        arguments:
+          parameters:
+          - name: workflow-type
+            value: "appcontainer"
+          - name: resource-name
+            value: "{{workflow.parameters.appcontainer-name}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
+          - name: status
+            value: "validated"
+          - name: step-name
+            value: "✅ Request validated - setting up VCluster environment..."
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+        when: "{{steps.validate-request.status}} == Succeeded"
+    - - name: ensure-vcluster
+        template: ensure-vcluster-exists
+        when: "{{steps.validate-request.status}} == Succeeded"
+    - - name: notify-vcluster-ready
+        templateRef:
+          name: slack-notifications
+          template: send-slack-progress
+        arguments:
+          parameters:
+          - name: workflow-type
+            value: "appcontainer"
+          - name: resource-name
+            value: "{{workflow.parameters.appcontainer-name}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
+          - name: status
+            value: "vcluster-ready"
+          - name: step-name
+            value: "✅ VCluster ready - creating application resources..."
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+        when: "{{steps.ensure-vcluster.status}} == Succeeded"
     - - name: create-appcontainer-claim
         template: create-claim
-        when: "{{steps.validate-request.status}} == Succeeded"
-    - - name: notify-slack-success
-        template: notify-slack
+        when: "{{steps.ensure-vcluster.status}} == Succeeded"
+    - - name: notify-repositories
+        templateRef:
+          name: slack-notifications
+          template: notify-appcontainer-repositories
         arguments:
           parameters:
-          - name: status
-            value: "success"
-          - name: message
-            value: "AppContainer {{workflow.parameters.appcontainer-name}} created successfully"
+          - name: appcontainer-name
+            value: "{{workflow.parameters.appcontainer-name}}"
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
         when: "{{steps.create-appcontainer-claim.status}} == Succeeded"
-    - - name: notify-slack-failure
-        template: notify-slack
+    - - name: wait-for-repositories
+        template: wait-for-repositories
+        when: "{{steps.create-appcontainer-claim.status}} == Succeeded"
+    - - name: notify-microservices
+        templateRef:
+          name: slack-notifications
+          template: send-slack-progress
         arguments:
           parameters:
+          - name: workflow-type
+            value: "appcontainer"
+          - name: resource-name
+            value: "{{workflow.parameters.appcontainer-name}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
           - name: status
-            value: "failure"
-          - name: message
-            value: "AppContainer {{workflow.parameters.appcontainer-name}} creation failed"
-        when: "{{steps.create-appcontainer-claim.status}} != Succeeded"
+            value: "microservices"
+          - name: step-name
+            value: "🚀 Creating default microservice template..."
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+        when: "{{steps.wait-for-repositories.status}} == Succeeded"
+    - - name: create-default-microservice
+        template: create-default-microservice
+        when: "{{steps.wait-for-repositories.status}} == Succeeded"
+    - - name: notify-exposing
+        templateRef:
+          name: slack-notifications
+          template: send-slack-progress
+        arguments:
+          parameters:
+          - name: workflow-type
+            value: "appcontainer"
+          - name: resource-name
+            value: "{{workflow.parameters.appcontainer-name}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
+          - name: status
+            value: "exposing"
+          - name: step-name
+            value: "🌐 Configuring service mesh and exposing endpoints..."
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+        when: "{{steps.create-default-microservice.status}} == Succeeded"
+    - - name: expose-vcluster-services
+        template: expose-vcluster-services
+        when: "{{steps.create-default-microservice.status}} == Succeeded"
+    - - name: extract-appcontainer-info
+        template: extract-appcontainer-info
+        when: "{{steps.expose-vcluster-services.status}} == Succeeded"
+    - - name: notify-success
+        templateRef:
+          name: slack-notifications
+          template: notify-appcontainer-success
+        arguments:
+          parameters:
+          - name: appcontainer-name
+            value: "{{workflow.parameters.appcontainer-name}}"
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
+          - name: github-org
+            value: "{{workflow.parameters.github-org}}"
+          - name: vcluster-name
+            value: "{{workflow.parameters.vcluster-name}}"
+          - name: endpoints
+            value: "{{steps.extract-appcontainer-info.outputs.parameters.endpoints-summary}}"
+        when: "{{steps.expose-vcluster-services.status}} == Succeeded"
+    - - name: notify-failure
+        templateRef:
+          name: slack-notifications
+          template: notify-appcontainer-failure
+        arguments:
+          parameters:
+          - name: appcontainer-name
+            value: "{{workflow.parameters.appcontainer-name}}"
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
+          - name: error-message
+            value: "AppContainer creation failed - check workflow logs for details"
+          - name: failed-step
+            value: "AppContainer workflow failed"
+        when: "{{steps.validate-request.status}} != Succeeded or {{steps.ensure-vcluster.status}} != Succeeded or {{steps.create-appcontainer-claim.status}} != Succeeded or {{steps.wait-for-repositories.status}} != Succeeded or {{steps.create-default-microservice.status}} != Succeeded or {{steps.expose-vcluster-services.status}} != Succeeded"
 
   - name: validate-appcontainer-request
     script:
@@ -86,6 +226,74 @@ spec:
         fi
         
         echo "Validation successful"
+
+  - name: ensure-vcluster-exists
+    steps:
+    - - name: create-vcluster-for-appcontainer
+        templateRef:
+          name: vcluster-creation
+          template: create-vcluster
+        arguments:
+          parameters:
+          - name: vcluster-name
+            value: "{{workflow.parameters.vcluster-name}}"
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+          - name: size
+            value: "medium"
+          - name: capabilities
+            value: '{"observability":"true","security":"{{workflow.parameters.security}}","gitops":"true","logging":"true","networking":"true","autoscaling":"false","backup":"false"}'
+          - name: user
+            value: "{{workflow.parameters.user}}"
+          - name: slack-channel
+            value: "{{workflow.parameters.slack-channel}}"
+          - name: slack-user-id
+            value: "{{workflow.parameters.slack-user-id}}"
+        when: "{{workflow.parameters.auto-create-vcluster}} == true"
+    - - name: check-existing-vcluster
+        template: check-existing-vcluster
+        when: "{{workflow.parameters.auto-create-vcluster}} == false"
+
+  - name: check-existing-vcluster
+    script:
+      image: bitnami/kubectl:1.28
+      command: [sh]
+      source: |
+        echo "Checking existing vCluster for AppContainer deployment..."
+        
+        # Use provided vCluster name or derive from appcontainer name
+        TARGET_VCLUSTER="{{workflow.parameters.vcluster-name}}"
+        if [ -z "$TARGET_VCLUSTER" ]; then
+          TARGET_VCLUSTER="{{workflow.parameters.appcontainer-name}}-vcluster"
+        fi
+        
+        echo "🔍 Checking vCluster: $TARGET_VCLUSTER"
+        
+        # Check if vCluster exists
+        if ! kubectl get vclusterenvironmentclaim $TARGET_VCLUSTER -n {{workflow.parameters.namespace}} >/dev/null 2>&1; then
+          echo "❌ VCluster $TARGET_VCLUSTER does not exist"
+          echo "💡 Enable auto-create-vcluster or create the vCluster first"
+          exit 1
+        fi
+        
+        # Check required components
+        ARGOCD=$(kubectl get vclusterenvironmentclaim $TARGET_VCLUSTER -n {{workflow.parameters.namespace}} -o jsonpath='{.spec.components.argoCD}' 2>/dev/null || echo "false")
+        ISTIO=$(kubectl get vclusterenvironmentclaim $TARGET_VCLUSTER -n {{workflow.parameters.namespace}} -o jsonpath='{.spec.components.istio}' 2>/dev/null || echo "false")
+        KNATIVE=$(kubectl get vclusterenvironmentclaim $TARGET_VCLUSTER -n {{workflow.parameters.namespace}} -o jsonpath='{.spec.components.knativeServing}' 2>/dev/null || echo "false")
+        
+        echo "🔍 VCluster components:"
+        echo "  ArgoCD: $ARGOCD"
+        echo "  Istio: $ISTIO"
+        echo "  Knative Serving: $KNATIVE"
+        
+        if [ "$ARGOCD" = "true" ] && [ "$ISTIO" = "true" ] && [ "$KNATIVE" = "true" ]; then
+          echo "✅ VCluster has all required components for AppContainer"
+          exit 0
+        else
+          echo "❌ VCluster missing required components for AppContainer"
+          echo "💡 Required: ArgoCD=true, Istio=true, KnativeServing=true"
+          exit 1
+        fi
 
   - name: create-claim
     script:
@@ -124,7 +332,7 @@ spec:
         
         if [ $? -eq 0 ]; then
           echo "AppContainer claim created successfully"
-          echo "Creating repositories and CI/CD infrastructure..."
+          echo "Crossplane will now create repositories and CI/CD infrastructure..."
           echo "Source repo: https://github.com/{{workflow.parameters.github-org}}/{{workflow.parameters.appcontainer-name}}"
           echo "GitOps repo: https://github.com/{{workflow.parameters.github-org}}/{{workflow.parameters.appcontainer-name}}-gitops"
           exit 0
@@ -132,6 +340,289 @@ spec:
           echo "Failed to create AppContainer claim"
           exit 1
         fi
+
+  - name: wait-for-repositories
+    script:
+      image: bitnami/kubectl:1.28
+      command: [sh]
+      source: |
+        echo "Waiting for AppContainer repositories to be created by Crossplane..."
+        
+        # Wait for the AppContainer claim to have repository URLs in status
+        TIMEOUT=300
+        ELAPSED=0
+        
+        while [ $ELAPSED -lt $TIMEOUT ]; do
+          echo "Checking AppContainer claim status... (${ELAPSED}s/${TIMEOUT}s)"
+          
+          SOURCE_URL=$(kubectl get appcontainerclaim {{workflow.parameters.appcontainer-name}} -n {{workflow.parameters.namespace}} -o jsonpath='{.status.sourceRepository.url}' 2>/dev/null || echo "")
+          GITOPS_URL=$(kubectl get appcontainerclaim {{workflow.parameters.appcontainer-name}} -n {{workflow.parameters.namespace}} -o jsonpath='{.status.gitopsRepository.url}' 2>/dev/null || echo "")
+          
+          if [ ! -z "$SOURCE_URL" ] && [ ! -z "$GITOPS_URL" ]; then
+            echo "✅ Repositories created successfully!"
+            echo "Source: $SOURCE_URL"
+            echo "GitOps: $GITOPS_URL"
+            exit 0
+          fi
+          
+          sleep 10
+          ELAPSED=$((ELAPSED + 10))
+        done
+        
+        echo "❌ Timeout waiting for repositories to be created"
+        exit 1
+
+  - name: create-default-microservice
+    script:
+      image: bitnami/kubectl:1.28
+      command: [sh]
+      source: |
+        echo "Creating default microservice for AppContainer {{workflow.parameters.appcontainer-name}}..."
+        
+        # Determine target vCluster name  
+        TARGET_VCLUSTER="{{workflow.parameters.vcluster-name}}"
+        if [ -z "$TARGET_VCLUSTER" ] || [ "$TARGET_VCLUSTER" = "" ]; then
+          TARGET_VCLUSTER="{{workflow.parameters.appcontainer-name}}-vcluster"
+        fi
+        
+        echo "🚀 Creating default microservice in vCluster: $TARGET_VCLUSTER"
+        
+        # Create an ApplicationClaim for a default "hello-world" microservice
+        # This will be deployed inside the vCluster
+        cat <<EOF | kubectl apply -f -
+        apiVersion: platform.example.org/v1alpha1
+        kind: ApplicationClaim
+        metadata:
+          name: {{workflow.parameters.appcontainer-name}}-hello-world
+          namespace: $TARGET_VCLUSTER
+          labels:
+            created-by: appcontainer-workflow
+            app-container: "{{workflow.parameters.appcontainer-name}}"
+            microservice-type: default
+            target-vcluster: $TARGET_VCLUSTER
+        spec:
+          appContainer: "{{workflow.parameters.appcontainer-name}}"
+          name: hello-world
+          language: python
+          framework: fastapi
+          description: "Default CLAUDE.md-compliant microservice template"
+        EOF
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ Default microservice 'hello-world' created successfully"
+          echo "This provides a complete CLAUDE.md-compliant template structure"
+          echo "📁 Check: microservices/hello-world/ in your source repository"
+          exit 0
+        else
+          echo "❌ Failed to create default microservice"
+          exit 1
+        fi
+
+  - name: expose-vcluster-services
+    script:
+      image: bitnami/kubectl:1.28
+      command: [sh]
+      source: |
+        echo "Exposing vCluster services for AppContainer {{workflow.parameters.appcontainer-name}}..."
+        
+        # Use provided vCluster name or derive from appcontainer name
+        TARGET_VCLUSTER="{{workflow.parameters.vcluster-name}}"
+        if [ -z "$TARGET_VCLUSTER" ]; then
+          TARGET_VCLUSTER="{{workflow.parameters.appcontainer-name}}-vcluster"
+        fi
+        
+        echo "🌐 Setting up ingress for vCluster: $TARGET_VCLUSTER"
+        
+        # Create Istio Gateway for vCluster ArgoCD
+        cat <<EOF | kubectl apply -f -
+        apiVersion: networking.istio.io/v1beta1
+        kind: Gateway
+        metadata:
+          name: ${TARGET_VCLUSTER}-argocd-gateway
+          namespace: $TARGET_VCLUSTER
+          labels:
+            app-container: "{{workflow.parameters.appcontainer-name}}"
+            service-type: argocd
+        spec:
+          selector:
+            istio: ingressgateway
+          servers:
+          - port:
+              number: 80
+              name: http
+              protocol: HTTP
+            hosts:
+            - "${TARGET_VCLUSTER}-argocd.{{workflow.parameters.namespace}}.local"
+            - "${TARGET_VCLUSTER}-argocd.*"
+          - port:
+              number: 443
+              name: https
+              protocol: HTTPS
+            tls:
+              mode: SIMPLE
+            hosts:
+            - "${TARGET_VCLUSTER}-argocd.{{workflow.parameters.namespace}}.local"
+            - "${TARGET_VCLUSTER}-argocd.*"
+        EOF
+        
+        # Create VirtualService for ArgoCD
+        cat <<EOF | kubectl apply -f -
+        apiVersion: networking.istio.io/v1beta1
+        kind: VirtualService
+        metadata:
+          name: ${TARGET_VCLUSTER}-argocd-vs
+          namespace: $TARGET_VCLUSTER
+          labels:
+            app-container: "{{workflow.parameters.appcontainer-name}}"
+            service-type: argocd
+        spec:
+          hosts:
+          - "${TARGET_VCLUSTER}-argocd.{{workflow.parameters.namespace}}.local"
+          - "${TARGET_VCLUSTER}-argocd.*"
+          gateways:
+          - ${TARGET_VCLUSTER}-argocd-gateway
+          http:
+          - match:
+            - uri:
+                prefix: /
+            route:
+            - destination:
+                host: argocd-server.argocd.svc.cluster.local
+                port:
+                  number: 80
+            headers:
+              request:
+                set:
+                  Host: argocd-server.argocd.svc.cluster.local
+        EOF
+        
+        # Create Gateway for Knative services (application microservices)
+        cat <<EOF | kubectl apply -f -
+        apiVersion: networking.istio.io/v1beta1
+        kind: Gateway
+        metadata:
+          name: ${TARGET_VCLUSTER}-apps-gateway
+          namespace: $TARGET_VCLUSTER
+          labels:
+            app-container: "{{workflow.parameters.appcontainer-name}}"
+            service-type: applications
+        spec:
+          selector:
+            istio: ingressgateway
+          servers:
+          - port:
+              number: 80
+              name: http
+              protocol: HTTP
+            hosts:
+            - "*.{{workflow.parameters.appcontainer-name}}.{{workflow.parameters.namespace}}.local"
+            - "*.{{workflow.parameters.appcontainer-name}}.*"
+          - port:
+              number: 443
+              name: https
+              protocol: HTTPS
+            tls:
+              mode: SIMPLE
+            hosts:
+            - "*.{{workflow.parameters.appcontainer-name}}.{{workflow.parameters.namespace}}.local"
+            - "*.{{workflow.parameters.appcontainer-name}}.*"
+        EOF
+        
+        # Create VirtualService for hello-world microservice
+        cat <<EOF | kubectl apply -f -
+        apiVersion: networking.istio.io/v1beta1
+        kind: VirtualService
+        metadata:
+          name: hello-world-vs
+          namespace: {{workflow.parameters.namespace}}
+          labels:
+            app-container: "{{workflow.parameters.appcontainer-name}}"
+            service-type: microservice
+            microservice: hello-world
+        spec:
+          hosts:
+          - "hello-world.{{workflow.parameters.appcontainer-name}}.{{workflow.parameters.namespace}}.local"
+          - "hello-world.{{workflow.parameters.appcontainer-name}}.*"
+          gateways:
+          - ${TARGET_VCLUSTER}-apps-gateway
+          http:
+          - match:
+            - uri:
+                prefix: /
+            route:
+            - destination:
+                host: hello-world.{{workflow.parameters.namespace}}.svc.cluster.local
+                port:
+                  number: 80
+        EOF
+        
+        # Get ingress details
+        ARGOCD_URL="http://${TARGET_VCLUSTER}-argocd.{{workflow.parameters.namespace}}.local"
+        HELLO_WORLD_URL="http://hello-world.{{workflow.parameters.appcontainer-name}}.{{workflow.parameters.namespace}}.local"
+        
+        echo "✅ Services exposed successfully!"
+        echo ""
+        echo "🎯 Access URLs:"
+        echo "  📊 ArgoCD (GitOps): $ARGOCD_URL"
+        echo "  🚀 Hello World Service: $HELLO_WORLD_URL"
+        echo ""
+        echo "📋 Next steps:"
+        echo "  1. Access ArgoCD to manage deployments"
+        echo "  2. Add more microservices using ApplicationClaim"
+        echo "  3. Configure custom domains and TLS"
+        echo "  4. Monitor with Grafana and Jaeger"
+        
+        exit 0
+
+  - name: extract-appcontainer-info
+    outputs:
+      parameters:
+      - name: endpoints-summary
+        valueFrom:
+          path: /tmp/endpoints.txt
+    script:
+      image: bitnami/kubectl:1.28
+      command: [sh]
+      source: |
+        echo "🔍 Extracting AppContainer connection information..."
+        
+        # Use provided vCluster name or derive from appcontainer name
+        TARGET_VCLUSTER="{{workflow.parameters.vcluster-name}}"
+        if [ -z "$TARGET_VCLUSTER" ]; then
+          TARGET_VCLUSTER="{{workflow.parameters.appcontainer-name}}-vcluster"
+        fi
+        
+        echo "🔍 Extracting endpoints for AppContainer: {{workflow.parameters.appcontainer-name}}"
+        echo "Target VCluster: $TARGET_VCLUSTER"
+        
+        # Build endpoints summary
+        ENDPOINTS_SUMMARY=""
+        
+        # ArgoCD endpoint
+        ARGOCD_URL="http://${TARGET_VCLUSTER}-argocd.{{workflow.parameters.namespace}}.local"
+        ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}🔄 ArgoCD: $ARGOCD_URL\\n"
+        
+        # Hello World microservice endpoint
+        HELLO_WORLD_URL="http://hello-world.{{workflow.parameters.appcontainer-name}}.{{workflow.parameters.namespace}}.local"
+        ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}🚀 Hello World Service: $HELLO_WORLD_URL\\n"
+        
+        # Check if Grafana is available (from VCluster observability)
+        GRAFANA_URL=$(kubectl get vclusterenvironmentclaim $TARGET_VCLUSTER -n {{workflow.parameters.namespace}} -o jsonpath='{.status.observability.grafana.url}' 2>/dev/null || echo "")
+        if [ -n "$GRAFANA_URL" ]; then
+          ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}📊 Grafana: $GRAFANA_URL\\n"
+        fi
+        
+        # Check if Jaeger is available
+        JAEGER_URL=$(kubectl get vclusterenvironmentclaim $TARGET_VCLUSTER -n {{workflow.parameters.namespace}} -o jsonpath='{.status.observability.jaeger.url}' 2>/dev/null || echo "")
+        if [ -n "$JAEGER_URL" ]; then
+          ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}🔍 Jaeger: $JAEGER_URL\\n"
+        fi
+        
+        # Write output to file
+        echo -e "$ENDPOINTS_SUMMARY" > /tmp/endpoints.txt
+        
+        echo "✅ AppContainer connection information extracted"
+        echo "Endpoints: $ENDPOINTS_SUMMARY"
 
   - name: notify-slack
     inputs:

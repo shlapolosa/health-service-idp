@@ -25,29 +25,97 @@ spec:
   templates:
   - name: create-vcluster
     steps:
+    - - name: notify-starting
+        templateRef:
+          name: slack-notifications
+          template: notify-vcluster-starting
+        arguments:
+          parameters:
+          - name: vcluster-name
+            value: "{{workflow.parameters.vcluster-name}}"
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
+          - name: capabilities
+            value: "{{workflow.parameters.capabilities}}"
     - - name: validate-request
         template: validate-vcluster-request
+    - - name: notify-validated
+        templateRef:
+          name: slack-notifications
+          template: send-slack-progress
+        arguments:
+          parameters:
+          - name: workflow-type
+            value: "vcluster"
+          - name: resource-name
+            value: "{{workflow.parameters.vcluster-name}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
+          - name: status
+            value: "validated"
+          - name: step-name
+            value: "✅ Parameters validated - creating VCluster claim..."
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+        when: "{{steps.validate-request.status}} == Succeeded"
     - - name: create-vcluster-claim
         template: create-claim
         when: "{{steps.validate-request.status}} == Succeeded"
-    - - name: notify-slack-success
-        template: notify-slack
+    - - name: notify-provisioning
+        templateRef:
+          name: slack-notifications
+          template: notify-vcluster-provisioning
         arguments:
           parameters:
-          - name: status
-            value: "success"
-          - name: message
-            value: "VCluster {{workflow.parameters.vcluster-name}} created successfully"
+          - name: vcluster-name
+            value: "{{workflow.parameters.vcluster-name}}"
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
         when: "{{steps.create-vcluster-claim.status}} == Succeeded"
-    - - name: notify-slack-failure
-        template: notify-slack
+    - - name: wait-for-vcluster
+        template: wait-for-readiness
+        when: "{{steps.create-vcluster-claim.status}} == Succeeded"
+    - - name: extract-connection-info
+        template: extract-connection-info
+        when: "{{steps.wait-for-vcluster.status}} == Succeeded"
+    - - name: notify-success
+        templateRef:
+          name: slack-notifications
+          template: notify-vcluster-success
         arguments:
           parameters:
-          - name: status
-            value: "failure"
-          - name: message
-            value: "VCluster {{workflow.parameters.vcluster-name}} creation failed"
-        when: "{{steps.create-vcluster-claim.status}} != Succeeded"
+          - name: vcluster-name
+            value: "{{workflow.parameters.vcluster-name}}"
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
+          - name: capabilities
+            value: "{{steps.extract-connection-info.outputs.parameters.capabilities-summary}}"
+          - name: endpoints
+            value: "{{steps.extract-connection-info.outputs.parameters.endpoints-summary}}"
+        when: "{{steps.wait-for-vcluster.status}} == Succeeded"
+    - - name: notify-failure
+        templateRef:
+          name: slack-notifications
+          template: notify-vcluster-failure
+        arguments:
+          parameters:
+          - name: vcluster-name
+            value: "{{workflow.parameters.vcluster-name}}"
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
+          - name: error-message
+            value: "VCluster creation failed - check workflow logs for details"
+          - name: failed-step
+            value: "{{= steps['validate-request'].status == 'Failed' ? 'Validation' : steps['create-vcluster-claim'].status == 'Failed' ? 'Claim Creation' : steps['wait-for-vcluster'].status == 'Failed' ? 'Provisioning' : 'Unknown' }}"
+        when: "{{steps.validate-request.status}} != Succeeded or {{steps.create-vcluster-claim.status}} != Succeeded or {{steps.wait-for-vcluster.status}} != Succeeded"
 
   - name: validate-vcluster-request
     script:
@@ -86,16 +154,45 @@ spec:
         echo "Ensuring namespace {{workflow.parameters.namespace}} exists..."
         kubectl create namespace {{workflow.parameters.namespace}} --dry-run=client -o yaml | kubectl apply -f -
         
-        # Parse capabilities and convert to booleans
+        # Parse capabilities and convert to VCluster component flags
         CAPABILITIES='{{workflow.parameters.capabilities}}'
-        OBSERVABILITY_VAL=$(echo $CAPABILITIES | grep -o '"observability":"[^"]*"' | cut -d'"' -f4 || echo "true")
-        SECURITY_VAL=$(echo $CAPABILITIES | grep -o '"security":"[^"]*"' | cut -d'"' -f4 || echo "true")
-        GITOPS_VAL=$(echo $CAPABILITIES | grep -o '"gitops":"[^"]*"' | cut -d'"' -f4 || echo "true")
+        echo "Parsing capabilities: $CAPABILITIES"
         
-        # Convert to boolean values for YAML
-        OBSERVABILITY=$([ "$OBSERVABILITY_VAL" = "true" ] && echo "true" || echo "false")
-        SECURITY=$([ "$SECURITY_VAL" = "true" ] && echo "true" || echo "false")
-        GITOPS=$([ "$GITOPS_VAL" = "true" ] && echo "true" || echo "false")
+        # Extract individual capability values
+        OBSERVABILITY_VAL=$(echo $CAPABILITIES | grep -o '"observability":"[^"]*"' | cut -d'"' -f4 || echo "false")
+        SECURITY_VAL=$(echo $CAPABILITIES | grep -o '"security":"[^"]*"' | cut -d'"' -f4 || echo "false")
+        GITOPS_VAL=$(echo $CAPABILITIES | grep -o '"gitops":"[^"]*"' | cut -d'"' -f4 || echo "false")
+        LOGGING_VAL=$(echo $CAPABILITIES | grep -o '"logging":"[^"]*"' | cut -d'"' -f4 || echo "false")
+        NETWORKING_VAL=$(echo $CAPABILITIES | grep -o '"networking":"[^"]*"' | cut -d'"' -f4 || echo "false")
+        AUTOSCALING_VAL=$(echo $CAPABILITIES | grep -o '"autoscaling":"[^"]*"' | cut -d'"' -f4 || echo "false")
+        BACKUP_VAL=$(echo $CAPABILITIES | grep -o '"backup":"[^"]*"' | cut -d'"' -f4 || echo "false")
+        
+        # Map capabilities to VCluster components
+        # Observability -> grafana, prometheus, jaeger, kiali  
+        GRAFANA=$([ "$OBSERVABILITY_VAL" = "true" ] && echo "true" || echo "false")
+        PROMETHEUS=$([ "$OBSERVABILITY_VAL" = "true" ] && echo "true" || echo "false")
+        JAEGER=$([ "$OBSERVABILITY_VAL" = "true" ] && echo "true" || echo "false")
+        KIALI=$([ "$OBSERVABILITY_VAL" = "true" ] && echo "true" || echo "false")
+        
+        # Networking -> istio, knativeServing
+        ISTIO=$([ "$NETWORKING_VAL" = "true" ] && echo "true" || echo "false")
+        KNATIVE_SERVING=$([ "$NETWORKING_VAL" = "true" ] && echo "true" || echo "false")
+        
+        # GitOps -> argoCD
+        ARGOCD=$([ "$GITOPS_VAL" = "true" ] && echo "true" || echo "false")
+        
+        # API Gateway (enabled for medium+ clusters with networking)
+        API_GATEWAY=$([ "$NETWORKING_VAL" = "true" ] && [ "{{workflow.parameters.size}}" != "small" ] && echo "true" || echo "false")
+        
+        echo "VCluster component configuration:"
+        echo "  istio: $ISTIO"
+        echo "  knativeServing: $KNATIVE_SERVING"
+        echo "  argoCD: $ARGOCD"
+        echo "  grafana: $GRAFANA"
+        echo "  prometheus: $PROMETHEUS"
+        echo "  jaeger: $JAEGER"
+        echo "  kiali: $KIALI"
+        echo "  apiGateway: $API_GATEWAY"
         
         # Size to resource mapping
         case "{{workflow.parameters.size}}" in
@@ -132,15 +229,21 @@ spec:
             created-by: slack
             requested-by: "{{workflow.parameters.user}}"
             slack-channel: "{{workflow.parameters.slack-channel}}"
+            size: "{{workflow.parameters.size}}"
+          annotations:
+            slack.requested-capabilities: "{{workflow.parameters.capabilities}}"
+            workflow.created-at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
         spec:
           name: {{workflow.parameters.vcluster-name}}
           components:
-            grafana: $OBSERVABILITY
-            prometheus: $OBSERVABILITY
-            jaeger: $OBSERVABILITY
-            kiali: $OBSERVABILITY
-            argoCD: $GITOPS
-            apiGateway: false
+            istio: $ISTIO
+            knativeServing: $KNATIVE_SERVING
+            argoCD: $ARGOCD
+            grafana: $GRAFANA
+            prometheus: $PROMETHEUS
+            jaeger: $JAEGER
+            kiali: $KIALI
+            apiGateway: $API_GATEWAY
         EOF
         
         if [ $? -eq 0 ]; then
@@ -150,6 +253,128 @@ spec:
           echo "Failed to create VCluster claim"
           exit 1
         fi
+
+  - name: wait-for-readiness
+    script:
+      image: bitnami/kubectl:1.28
+      command: [sh]
+      source: |
+        echo "⏳ Waiting for VCluster to be ready..."
+        
+        TIMEOUT=900  # 15 minutes
+        ELAPSED=0
+        LAST_PROGRESS=0
+        
+        while [ $ELAPSED -lt $TIMEOUT ]; do
+          STATUS=$(kubectl get vclusterenvironmentclaim {{workflow.parameters.vcluster-name}} -n {{workflow.parameters.namespace}} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
+          REASON=$(kubectl get vclusterenvironmentclaim {{workflow.parameters.vcluster-name}} -n {{workflow.parameters.namespace}} -o jsonpath='{.status.conditions[?(@.type=="Ready")].reason}' 2>/dev/null || echo "")
+          MESSAGE=$(kubectl get vclusterenvironmentclaim {{workflow.parameters.vcluster-name}} -n {{workflow.parameters.namespace}} -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}' 2>/dev/null || echo "")
+          
+          echo "⏱️  Elapsed: ${ELAPSED}s | Status: $STATUS | Reason: $REASON"
+          
+          if [ "$STATUS" = "True" ]; then
+            echo "✅ VCluster is ready!"
+            break
+          elif [ "$STATUS" = "False" ]; then
+            echo "❌ VCluster failed to provision"
+            echo "   Reason: $REASON"
+            echo "   Message: $MESSAGE"
+            exit 1
+          fi
+          
+          # Send progress notification every 5 minutes
+          if [ $((ELAPSED % 300)) -eq 0 ] && [ $ELAPSED -gt 0 ] && [ $ELAPSED -ne $LAST_PROGRESS ]; then
+            echo "📊 Still provisioning... (${ELAPSED}s elapsed)"
+            LAST_PROGRESS=$ELAPSED
+          fi
+          
+          sleep 30
+          ELAPSED=$((ELAPSED + 30))
+        done
+        
+        if [ $ELAPSED -ge $TIMEOUT ]; then
+          echo "❌ Timeout waiting for VCluster to be ready"
+          exit 1
+        fi
+
+  - name: extract-connection-info
+    outputs:
+      parameters:
+      - name: capabilities-summary
+        valueFrom:
+          path: /tmp/capabilities.txt
+      - name: endpoints-summary
+        valueFrom:
+          path: /tmp/endpoints.txt
+    script:
+      image: bitnami/kubectl:1.28
+      command: [sh]
+      source: |
+        echo "🔍 Extracting VCluster connection information..."
+        
+        # Parse capabilities to create summary
+        CAPABILITIES_JSON="{{workflow.parameters.capabilities}}"
+        echo "Parsing capabilities: $CAPABILITIES_JSON"
+        
+        CAPABILITIES_SUMMARY=""
+        if echo "$CAPABILITIES_JSON" | grep -q '"observability":"true"'; then
+          CAPABILITIES_SUMMARY="${CAPABILITIES_SUMMARY}🔍 Observability\\n"
+        fi
+        if echo "$CAPABILITIES_JSON" | grep -q '"security":"true"'; then
+          CAPABILITIES_SUMMARY="${CAPABILITIES_SUMMARY}🔒 Security\\n"
+        fi
+        if echo "$CAPABILITIES_JSON" | grep -q '"gitops":"true"'; then
+          CAPABILITIES_SUMMARY="${CAPABILITIES_SUMMARY}🔄 GitOps\\n"
+        fi
+        if echo "$CAPABILITIES_JSON" | grep -q '"networking":"true"'; then
+          CAPABILITIES_SUMMARY="${CAPABILITIES_SUMMARY}🌐 Service Mesh\\n"
+        fi
+        if echo "$CAPABILITIES_JSON" | grep -q '"logging":"true"'; then
+          CAPABILITIES_SUMMARY="${CAPABILITIES_SUMMARY}📝 Centralized Logging\\n"
+        fi
+        if echo "$CAPABILITIES_JSON" | grep -q '"autoscaling":"true"'; then
+          CAPABILITIES_SUMMARY="${CAPABILITIES_SUMMARY}📈 Auto-scaling\\n"
+        fi
+        if echo "$CAPABILITIES_JSON" | grep -q '"backup":"true"'; then
+          CAPABILITIES_SUMMARY="${CAPABILITIES_SUMMARY}💾 Backup & Recovery\\n"
+        fi
+        
+        # Extract endpoints from VCluster status
+        ENDPOINT=$(kubectl get vclusterenvironmentclaim {{workflow.parameters.vcluster-name}} -n {{workflow.parameters.namespace}} -o jsonpath='{.status.vcluster.endpoint}' 2>/dev/null || echo "")
+        LOAD_BALANCER=$(kubectl get vclusterenvironmentclaim {{workflow.parameters.vcluster-name}} -n {{workflow.parameters.namespace}} -o jsonpath='{.status.loadBalancer.hostname}' 2>/dev/null || echo "")
+        
+        ENDPOINTS_SUMMARY=""
+        if [ -n "$ENDPOINT" ]; then
+          ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}🔗 VCluster API: \`$ENDPOINT\`\\n"
+        fi
+        if [ -n "$LOAD_BALANCER" ]; then
+          ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}⚖️ Load Balancer: \`$LOAD_BALANCER\`\\n"
+        fi
+        
+        # Check for observability endpoints if enabled
+        if echo "$CAPABILITIES_JSON" | grep -q '"observability":"true"'; then
+          GRAFANA_URL=$(kubectl get vclusterenvironmentclaim {{workflow.parameters.vcluster-name}} -n {{workflow.parameters.namespace}} -o jsonpath='{.status.observability.grafana.url}' 2>/dev/null || echo "")
+          ARGOCD_URL=$(kubectl get vclusterenvironmentclaim {{workflow.parameters.vcluster-name}} -n {{workflow.parameters.namespace}} -o jsonpath='{.status.observability.argocd.url}' 2>/dev/null || echo "")
+          JAEGER_URL=$(kubectl get vclusterenvironmentclaim {{workflow.parameters.vcluster-name}} -n {{workflow.parameters.namespace}} -o jsonpath='{.status.observability.jaeger.url}' 2>/dev/null || echo "")
+          
+          if [ -n "$GRAFANA_URL" ]; then
+            ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}📊 Grafana: $GRAFANA_URL\\n"
+          fi
+          if [ -n "$ARGOCD_URL" ]; then
+            ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}🔄 ArgoCD: $ARGOCD_URL\\n"
+          fi
+          if [ -n "$JAEGER_URL" ]; then
+            ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}🔍 Jaeger: $JAEGER_URL\\n"
+          fi
+        fi
+        
+        # Write outputs to files
+        echo -e "$CAPABILITIES_SUMMARY" > /tmp/capabilities.txt
+        echo -e "$ENDPOINTS_SUMMARY" > /tmp/endpoints.txt
+        
+        echo "✅ Connection information extracted"
+        echo "Capabilities: $CAPABILITIES_SUMMARY"
+        echo "Endpoints: $ENDPOINTS_SUMMARY"
 
   - name: notify-slack
     inputs:
