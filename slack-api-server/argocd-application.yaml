@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/socrateshlapolosa/health-service-idp
+    repoURL: https://github.com/shlapolosa/health-service-idp
     targetRevision: HEAD
     path: slack-api-server
   destination:
