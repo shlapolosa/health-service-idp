@@ -108,13 +108,13 @@ spec:
         # Send progress notification
         curl -X POST -H 'Content-type: application/json' \
         --data "{
-          \"text\": \"$WORKFLOW_EMOJI {{inputs.parameters.workflow-type | title}} Progress\",
+          \"text\": \"$WORKFLOW_EMOJI {{inputs.parameters.workflow-type}} Progress\",
           \"blocks\": [
             {
               \"type\": \"section\",
               \"text\": {
                 \"type\": \"mrkdwn\",
-                \"text\": \"$WORKFLOW_EMOJI *{{inputs.parameters.workflow-type | title}} Progress*\\n\\n*Resource:* \`{{inputs.parameters.resource-name}}\`\\n*Namespace:* \`{{inputs.parameters.namespace}}\`\\n*User:* @{{inputs.parameters.user}}\\n\\n*Status:* {{inputs.parameters.step-name}}\"
+                \"text\": \"$WORKFLOW_EMOJI *{{inputs.parameters.workflow-type}} Progress*\\n\\n*Resource:* \`{{inputs.parameters.resource-name}}\`\\n*Namespace:* \`{{inputs.parameters.namespace}}\`\\n*User:* @{{inputs.parameters.user}}\\n\\n*Status:* {{inputs.parameters.step-name}}\"
               }
             }
           ]
@@ -196,7 +196,7 @@ spec:
         # Send success notification
         curl -X POST -H 'Content-type: application/json' \
         --data "{
-          \"text\": \"$WORKFLOW_EMOJI {{inputs.parameters.workflow-type | title}} Created Successfully!\",
+          \"text\": \"$WORKFLOW_EMOJI {{inputs.parameters.workflow-type}} Created Successfully!\",
           \"blocks\": [
             {
               \"type\": \"header\",
@@ -301,13 +301,13 @@ spec:
         # Send failure notification
         curl -X POST -H 'Content-type: application/json' \
         --data "{
-          \"text\": \"❌ {{inputs.parameters.workflow-type | title}} Creation Failed\",
+          \"text\": \"❌ {{inputs.parameters.workflow-type}} Creation Failed\",
           \"blocks\": [
             {
               \"type\": \"header\",
               \"text\": {
                 \"type\": \"plain_text\",
-                \"text\": \"❌ {{inputs.parameters.workflow-type | title}} Creation Failed\"
+                \"text\": \"❌ {{inputs.parameters.workflow-type}} Creation Failed\"
               }
             },
             {
@@ -679,15 +679,15 @@ spec:
                 },
                 {
                   \"type\": \"mrkdwn\",
-                  \"text\": \"*Language:*\\n{{inputs.parameters.language | title}}\"
+                  \"text\": \"*Language:*\\n{{inputs.parameters.language}}\"
                 },
                 {
                   \"type\": \"mrkdwn\",
-                  \"text\": \"*Database:*\\n{{inputs.parameters.database | title}}\"
+                  \"text\": \"*Database:*\\n{{inputs.parameters.database}}\"
                 },
                 {
                   \"type\": \"mrkdwn\",
-                  \"text\": \"*Cache:*\\n{{inputs.parameters.cache | title}}\"
+                  \"text\": \"*Cache:*\\n{{inputs.parameters.cache}}\"
                 },
                 {
                   \"type\": \"mrkdwn\",
@@ -804,7 +804,7 @@ spec:
                 },
                 {
                   \"type\": \"mrkdwn\",
-                  \"text\": \"*Language:*\\n{{inputs.parameters.language | title}}\"
+                  \"text\": \"*Language:*\\n{{inputs.parameters.language}}\"
                 },
                 {
                   \"type\": \"mrkdwn\",
@@ -812,11 +812,11 @@ spec:
                 },
                 {
                   \"type\": \"mrkdwn\",
-                  \"text\": \"*Database:*\\n{{inputs.parameters.database | title}}\"
+                  \"text\": \"*Database:*\\n{{inputs.parameters.database}}\"
                 },
                 {
                   \"type\": \"mrkdwn\",
-                  \"text\": \"*Cache:*\\n{{inputs.parameters.cache | title}}\"
+                  \"text\": \"*Cache:*\\n{{inputs.parameters.cache}}\"
                 }
               ]
             },
@@ -967,4 +967,3 @@ spec:
         "$WEBHOOK_URL"
         
         echo "✅ Microservice failure notification sent successfully"
-EOF < /dev/null

@@ -60,7 +60,7 @@ spec:
           - name: cache
             value: "{{workflow.parameters.cache}}"
           - name: target-vcluster
-            value: "{{= workflow.parameters['target-vcluster'] != '' ? workflow.parameters['target-vcluster'] : workflow.parameters['microservice-name'].replace('-service', '') + '-vcluster' }}"
+            value: "{{workflow.parameters.target-vcluster}}"
     - - name: validate-request
         template: validate-microservice-request
     - - name: notify-validated
@@ -89,7 +89,7 @@ spec:
         arguments:
           parameters:
           - name: appcontainer-name
-            value: "{{= workflow.parameters['microservice-name'].replace('-service', '') }}"
+            value: "{{workflow.parameters.microservice-name}}"
           - name: namespace
             value: "{{workflow.parameters.namespace}}"
           - name: description
@@ -103,7 +103,7 @@ spec:
           - name: security
             value: "{{workflow.parameters.security}}"
           - name: vcluster-name
-            value: "{{= workflow.parameters['target-vcluster'] != '' ? workflow.parameters['target-vcluster'] : workflow.parameters['microservice-name'].replace('-service', '') + '-vcluster' }}"
+            value: "{{workflow.parameters.target-vcluster}}"
           - name: auto-create-vcluster
             value: "{{workflow.parameters.auto-create-vcluster}}"
           - name: user
@@ -184,9 +184,9 @@ spec:
           - name: github-org
             value: "{{workflow.parameters.github-org}}"
           - name: target-vcluster
-            value: "{{= workflow.parameters['target-vcluster'] != '' ? workflow.parameters['target-vcluster'] : workflow.parameters['microservice-name'].replace('-service', '') + '-vcluster' }}"
+            value: "{{workflow.parameters.target-vcluster}}"
           - name: repository-name
-            value: "{{= workflow.parameters['microservice-name'].replace('-service', '') }}"
+            value: "{{workflow.parameters.microservice-name}}"
           - name: endpoints
             value: "{{steps.extract-microservice-info.outputs.parameters.endpoints-summary}}"
         when: "{{steps.setup-ci-cd.status}} == Succeeded"
@@ -205,7 +205,7 @@ spec:
           - name: error-message
             value: "Microservice creation failed - check workflow logs for details"
           - name: failed-step
-            value: "{{= steps['validate-request'].status == 'Failed' ? 'Validation' : steps['create-appcontainer-for-microservice'].status == 'Failed' ? 'AppContainer Creation' : steps['create-microservice-claim'].status == 'Failed' ? 'Microservice Claim' : steps['wait-for-microservice'].status == 'Failed' ? 'Microservice Provisioning' : steps['setup-ci-cd'].status == 'Failed' ? 'CI/CD Setup' : 'Unknown' }}"
+            value: "Workflow step failed - check logs"
         when: "{{steps.validate-request.status}} != Succeeded or {{steps.create-appcontainer-for-microservice.status}} != Succeeded or {{steps.create-microservice-claim.status}} != Succeeded or {{steps.wait-for-microservice.status}} != Succeeded or {{steps.setup-ci-cd.status}} != Succeeded"
 
   - name: validate-microservice-request
