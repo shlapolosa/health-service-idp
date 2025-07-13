@@ -226,6 +226,105 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
             logger.error(error_msg, exc_info=True)
             return False, error_msg
 
+    def trigger_microservice_creation(self, payload: Dict) -> Tuple[bool, str]:
+        """Trigger Microservice creation via Argo Workflows."""
+        microservice_name = payload.get("microservice-name", "unknown")
+        
+        # Create workflow submission for Microservice
+        workflow_spec = {
+            "namespace": self.namespace,
+            "serverDryRun": False,
+            "workflow": {
+                "metadata": {
+                    "generateName": "microservice-creation-",
+                    "namespace": self.namespace,
+                    "labels": {
+                        "created-by": "slack-api",
+                        "microservice-name": microservice_name,
+                        "user": payload.get("user", "unknown"),
+                        "language": payload.get("language", "python"),
+                        "database": payload.get("database", "none"),
+                        "cache": payload.get("cache", "none")
+                    }
+                },
+                "spec": {
+                    "workflowTemplateRef": {
+                        "name": "microservice-creation"
+                    },
+                    "arguments": {
+                        "parameters": [
+                            {"name": "microservice-name", "value": payload.get("microservice-name", "")},
+                            {"name": "namespace", "value": payload.get("namespace", "default")},
+                            {"name": "language", "value": payload.get("language", "python")},
+                            {"name": "database", "value": payload.get("database", "none")},
+                            {"name": "cache", "value": payload.get("cache", "none")},
+                            {"name": "description", "value": payload.get("description", "CLAUDE.md-compliant microservice")},
+                            {"name": "github-org", "value": payload.get("github-org", "socrates12345")},
+                            {"name": "docker-registry", "value": payload.get("docker-registry", "docker.io/socrates12345")},
+                            {"name": "observability", "value": payload.get("observability", "true")},
+                            {"name": "security", "value": payload.get("security", "true")},
+                            {"name": "target-vcluster", "value": payload.get("target-vcluster", "")},
+                            {"name": "auto-create-vcluster", "value": payload.get("auto-create-vcluster", "true")},
+                            {"name": "user", "value": payload.get("user", "unknown")},
+                            {"name": "slack-channel", "value": payload.get("slack-channel", "unknown")},
+                            {"name": "slack-user-id", "value": payload.get("slack-user-id", "unknown")},
+                        ]
+                    }
+                }
+            }
+        }
+
+        logger.info(f"🚀 Triggering Microservice creation workflow for: {microservice_name}")
+        logger.debug(f"Workflow spec: {json.dumps(workflow_spec, indent=2)}")
+
+        # Submit workflow to Argo
+        url = f"{self.base_url}/workflows/{self.namespace}"
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+
+        try:
+            response = requests.post(
+                url, 
+                headers=headers, 
+                json=workflow_spec, 
+                timeout=self.timeout
+            )
+
+            if response.status_code in [200, 201]:
+                workflow_data = response.json()
+                workflow_name = workflow_data.get("metadata", {}).get("name", "unknown")
+                success_msg = f"Microservice creation workflow started: {workflow_name}"
+                logger.info(f"✅ {success_msg}")
+                return True, success_msg
+            else:
+                error_msg = (
+                    f"Argo Workflows API error: {response.status_code} - {response.text}"
+                )
+                logger.error(f"❌ {error_msg}")
+                return False, error_msg
+
+        except requests.exceptions.Timeout:
+            error_msg = f"Argo Workflows API request timed out after {self.timeout} seconds"
+            logger.error(error_msg)
+            return False, error_msg
+
+        except requests.exceptions.ConnectionError:
+            error_msg = "Failed to connect to Argo Workflows API"
+            logger.error(error_msg)
+            return False, error_msg
+
+        except requests.RequestException as e:
+            error_msg = f"Argo Workflows API request failed: {str(e)}"
+            logger.error(error_msg)
+            return False, error_msg
+
+        except Exception as e:
+            error_msg = f"Unexpected error calling Argo Workflows API: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return False, error_msg
+
     def _extract_size_from_resources(self, client_payload: Dict) -> str:
         """Extract size preset from resource specifications."""
         resources = client_payload.get("resources", {})

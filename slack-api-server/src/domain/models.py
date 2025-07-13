@@ -169,6 +169,8 @@ class AppContainerRequest:
     docker_registry: str = "docker.io/socrates12345"
     enable_observability: bool = True
     enable_security: bool = True
+    vcluster_name: Optional[str] = None
+    auto_create_vcluster: bool = True
     original_text: Optional[str] = None
     created_at: datetime = None
 
@@ -204,10 +206,125 @@ class AppContainerRequest:
             "docker-registry": self.docker_registry,
             "observability": str(self.enable_observability).lower(),
             "security": str(self.enable_security).lower(),
+            "vcluster-name": self.vcluster_name or "",
+            "auto-create-vcluster": str(self.auto_create_vcluster).lower(),
             "user": self.user,
             "slack-channel": self.slack_channel,
             "slack-user-id": self.user,
         }
+
+
+class MicroserviceLanguage(Enum):
+    """Microservice language enumeration."""
+    
+    PYTHON = "python"
+    JAVA = "java"
+    SPRINGBOOT = "springboot"  # Alias for Java
+    FASTAPI = "fastapi"        # Alias for Python
+
+
+class MicroserviceDatabase(Enum):
+    """Microservice database enumeration."""
+    
+    NONE = "none"
+    POSTGRESQL = "postgresql"
+    POSTGRES = "postgres"      # Alias for PostgreSQL
+
+
+class MicroserviceCache(Enum):
+    """Microservice cache enumeration."""
+    
+    NONE = "none"
+    REDIS = "redis"
+
+
+@dataclass
+class MicroserviceRequest:
+    """Domain entity representing a Microservice creation request."""
+
+    name: str
+    namespace: str
+    user: str
+    slack_channel: str
+    language: MicroserviceLanguage = MicroserviceLanguage.PYTHON
+    database: MicroserviceDatabase = MicroserviceDatabase.NONE
+    cache: MicroserviceCache = MicroserviceCache.NONE
+    description: str = "CLAUDE.md-compliant microservice"
+    github_org: str = "socrates12345"
+    docker_registry: str = "docker.io/socrates12345"
+    enable_observability: bool = True
+    enable_security: bool = True
+    target_vcluster: Optional[str] = None
+    auto_create_vcluster: bool = True
+    original_text: Optional[str] = None
+    created_at: datetime = None
+
+    def __post_init__(self):
+        """Initialize computed fields."""
+        if self.created_at is None:
+            object.__setattr__(self, "created_at", datetime.now())
+
+        # Validate name and namespace (Kubernetes naming conventions)
+        self._validate_kubernetes_name(self.name, "name")
+        self._validate_kubernetes_name(self.namespace, "namespace")
+        
+        # Normalize language aliases
+        if self.language == MicroserviceLanguage.FASTAPI:
+            object.__setattr__(self, "language", MicroserviceLanguage.PYTHON)
+        elif self.language == MicroserviceLanguage.SPRINGBOOT:
+            object.__setattr__(self, "language", MicroserviceLanguage.JAVA)
+            
+        # Normalize database aliases
+        if self.database == MicroserviceDatabase.POSTGRES:
+            object.__setattr__(self, "database", MicroserviceDatabase.POSTGRESQL)
+
+    def _validate_kubernetes_name(self, value: str, field: str) -> None:
+        """Validate Kubernetes naming conventions."""
+        if not value:
+            raise ValueError(f"{field} cannot be empty")
+        if len(value) > 63:
+            raise ValueError(f"{field} cannot exceed 63 characters")
+        if not value.replace("-", "").isalnum():
+            raise ValueError(
+                f"{field} must contain only alphanumeric characters and hyphens"
+            )
+        if not value[0].isalnum() or not value[-1].isalnum():
+            raise ValueError(f"{field} must start and end with alphanumeric characters")
+
+    def to_argo_payload(self) -> Dict:
+        """Convert to Argo Workflows parameters."""
+        return {
+            "microservice-name": self.name,
+            "namespace": self.namespace,
+            "language": self.language.value,
+            "database": self.database.value,
+            "cache": self.cache.value,
+            "description": self.description,
+            "github-org": self.github_org,
+            "docker-registry": self.docker_registry,
+            "observability": str(self.enable_observability).lower(),
+            "security": str(self.enable_security).lower(),
+            "target-vcluster": self.target_vcluster or "",
+            "auto-create-vcluster": str(self.auto_create_vcluster).lower(),
+            "user": self.user,
+            "slack-channel": self.slack_channel,
+            "slack-user-id": self.user,
+        }
+
+    def get_repository_name(self) -> str:
+        """Get the repository name for the microservice."""
+        # Convert service name to repository name (e.g., order-service -> orders)
+        if self.name.endswith("-service"):
+            return self.name[:-8]  # Remove "-service" suffix
+        return self.name
+
+    def get_vcluster_name(self) -> str:
+        """Get the vCluster name for the microservice."""
+        if self.target_vcluster:
+            return self.target_vcluster
+        # Create vCluster name from repository name
+        repo_name = self.get_repository_name()
+        return f"{repo_name}-vcluster"
 
 
 @dataclass
@@ -215,9 +332,10 @@ class ParsedCommand:
     """Value object representing a parsed command result."""
 
     action: str  # create, list, delete, status, help
-    command_type: str = "vcluster"  # vcluster, appcontainer, application
+    command_type: str = "vcluster"  # vcluster, appcontainer, microservice
     vcluster_name: Optional[str] = None
     appcontainer_name: Optional[str] = None
+    microservice_name: Optional[str] = None
     namespace: str = "default"
     repository: Optional[str] = None
     size: VClusterSize = VClusterSize.MEDIUM
@@ -229,6 +347,12 @@ class ParsedCommand:
     docker_registry: str = "docker.io/socrates12345"
     enable_observability: bool = True
     enable_security: bool = True
+    target_vcluster: Optional[str] = None
+    auto_create_vcluster: bool = True
+    # Microservice specific fields
+    microservice_language: MicroserviceLanguage = MicroserviceLanguage.PYTHON
+    microservice_database: MicroserviceDatabase = MicroserviceDatabase.NONE
+    microservice_cache: MicroserviceCache = MicroserviceCache.NONE
     parsing_method: str = "regex"
 
     def __post_init__(self):
@@ -260,6 +384,12 @@ class InvalidSlackCommandError(DomainError):
 
 class InvalidAppContainerRequestError(DomainError):
     """Raised when AppContainer request is invalid."""
+
+    pass
+
+
+class InvalidMicroserviceRequestError(DomainError):
+    """Raised when Microservice request is invalid."""
 
     pass
 

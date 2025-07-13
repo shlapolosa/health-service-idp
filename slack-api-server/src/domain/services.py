@@ -7,8 +7,8 @@ from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Tuple
 
 from .models import (AppContainerRequest, Capability, CapabilitySet,
-                     InvalidVClusterRequestError, ParsedCommand, ResourceSpec,
-                     SlackCommand, VClusterRequest, VClusterSize)
+                     InvalidVClusterRequestError, MicroserviceRequest, ParsedCommand, 
+                     ResourceSpec, SlackCommand, VClusterRequest, VClusterSize)
 
 
 class CommandParserInterface(ABC):
@@ -293,6 +293,71 @@ class SlackResponseBuilderService:
                     "text": {
                         "type": "mrkdwn",
                         "text": "*Available Commands:*\n• `/appcontainer create [name] [options]` - Create new AppContainer\n• `/app-cont create [name] [options]` - Alias for AppContainer creation\n\n*Options:*\n• `description \"text\"` - Set container description\n• `github-org [org]` - Set GitHub organization\n• `namespace [ns]` - Set deployment namespace\n• `without security` - Disable security features\n• `without observability` - Disable observability\n\n*Example:*\n`/appcontainer create my-api description \"REST API service\" github-org mycompany namespace production`",
+                    },
+                }
+            ],
+        }
+
+    def build_microservice_success_response(self, request: MicroserviceRequest) -> Dict:
+        """Build success response for Microservice creation."""
+        return {
+            "response_type": "in_channel",
+            "text": f"🚀 Microservice `{request.name}` creation started",
+            "blocks": [
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "🚀 Microservice Creation Started",
+                    },
+                },
+                {
+                    "type": "section",
+                    "fields": [
+                        {"type": "mrkdwn", "text": f"*Name:*\n`{request.name}`"},
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Namespace:*\n`{request.namespace}`",
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Language:*\n{request.language.value.title()}",
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Database:*\n{request.database.value.title()}",
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Cache:*\n{request.cache.value.title()}",
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*GitHub Org:*\n{request.github_org}",
+                        },
+                    ],
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"⏳ *Status:* Creating microservice with complete OAM development environment...\n\n*Will create:*\n• 📚 Repository: `{request.get_repository_name()}`\n• 🔄 GitOps Repository: `{request.get_repository_name()}-gitops`\n• 🔧 VCluster: `{request.get_vcluster_name()}`",
+                    },
+                },
+            ],
+        }
+
+    def build_microservice_help_response(self) -> Dict:
+        """Build help response for Microservice commands."""
+        return {
+            "response_type": "ephemeral",
+            "text": "🤖 Microservice Management Commands",
+            "blocks": [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "*Available Commands:*\n• `/microservice create [name] [options]` - Create new microservice with OAM environment\n• `/service create [name] [options]` - Alias for microservice creation\n\n*Language Options:*\n• `python` or `fastapi` - Python with FastAPI framework\n• `java` or `springboot` - Java with Spring Boot framework\n\n*Database Options:*\n• `with database` or `with postgresql` - PostgreSQL database\n• `without database` - No database (default)\n\n*Cache Options:*\n• `with cache` or `with redis` - Redis cache\n• `without cache` - No cache (default)\n\n*VCluster Options:*\n• `vcluster [name]` - Use existing vCluster\n• `in namespace [name]` - Set deployment namespace\n\n*Examples:*\n• `/microservice create order-service`\n• `/microservice create user-service python with database`\n• `/microservice create payment-service java with redis vcluster finance-cluster`\n• `/microservice create inventory-service in namespace warehouse vcluster factory`",
                     },
                 }
             ],
