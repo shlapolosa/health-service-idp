@@ -6,7 +6,7 @@ A FastAPI-based microservice for handling Slack slash commands and triggering VC
 
 This service implements the Onion Architecture pattern and provides:
 - Slack slash command handling (`/vcluster` and `/appcontainer`)
-- Natural language processing with spaCy
+- Advanced natural language processing with spaCy
 - GitHub repository dispatch integration
 - VCluster provisioning automation
 - Comprehensive error handling and logging
