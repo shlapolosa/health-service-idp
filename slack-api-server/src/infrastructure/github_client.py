@@ -72,6 +72,13 @@ class GitHubApiClient(VClusterDispatcherInterface):
             logger.error(error_msg, exc_info=True)
             return False, error_msg
 
+    def trigger_appcontainer_creation(self, payload: Dict) -> Tuple[bool, str]:
+        """Trigger AppContainer creation via GitHub repository dispatch."""
+        # GitHub client doesn't support AppContainer creation directly
+        # This is handled by the Argo Workflows dispatcher
+        logger.warning("AppContainer creation not supported via GitHub dispatcher")
+        return False, "AppContainer creation not supported via GitHub dispatcher. Use Argo workflows dispatcher."
+
     def validate_configuration(self) -> Tuple[bool, str]:
         """Validate GitHub client configuration."""
         if not self.token:

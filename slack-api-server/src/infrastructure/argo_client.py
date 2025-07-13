@@ -135,6 +135,97 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
             logger.error(error_msg, exc_info=True)
             return False, error_msg
 
+    def trigger_appcontainer_creation(self, payload: Dict) -> Tuple[bool, str]:
+        """Trigger AppContainer creation via Argo Workflows."""
+        appcontainer_name = payload.get("appcontainer-name", "unknown")
+        
+        # Create workflow submission for AppContainer
+        workflow_spec = {
+            "namespace": self.namespace,
+            "serverDryRun": False,
+            "workflow": {
+                "metadata": {
+                    "generateName": "appcontainer-creation-",
+                    "namespace": self.namespace,
+                    "labels": {
+                        "created-by": "slack-api",
+                        "appcontainer-name": appcontainer_name,
+                        "user": payload.get("user", "unknown")
+                    }
+                },
+                "spec": {
+                    "workflowTemplateRef": {
+                        "name": "appcontainer-creation"
+                    },
+                    "arguments": {
+                        "parameters": [
+                            {"name": "appcontainer-name", "value": payload.get("appcontainer-name", "")},
+                            {"name": "namespace", "value": payload.get("namespace", "default")},
+                            {"name": "description", "value": payload.get("description", "CLAUDE.md-compliant application container")},
+                            {"name": "github-org", "value": payload.get("github-org", "socrates12345")},
+                            {"name": "docker-registry", "value": payload.get("docker-registry", "docker.io/socrates12345")},
+                            {"name": "observability", "value": payload.get("observability", "true")},
+                            {"name": "security", "value": payload.get("security", "true")},
+                            {"name": "user", "value": payload.get("user", "unknown")},
+                            {"name": "slack-channel", "value": payload.get("slack-channel", "unknown")},
+                            {"name": "slack-user-id", "value": payload.get("slack-user-id", "unknown")},
+                        ]
+                    }
+                }
+            }
+        }
+
+        logger.info(f"🚀 Triggering AppContainer creation workflow for: {appcontainer_name}")
+        logger.debug(f"Workflow spec: {json.dumps(workflow_spec, indent=2)}")
+
+        # Submit workflow to Argo
+        url = f"{self.base_url}/workflows/{self.namespace}"
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+
+        try:
+            response = requests.post(
+                url, 
+                headers=headers, 
+                json=workflow_spec, 
+                timeout=self.timeout
+            )
+
+            if response.status_code in [200, 201]:
+                workflow_data = response.json()
+                workflow_name = workflow_data.get("metadata", {}).get("name", "unknown")
+                success_msg = f"AppContainer creation workflow started: {workflow_name}"
+                logger.info(f"✅ {success_msg}")
+                return True, success_msg
+            else:
+                error_msg = (
+                    f"Argo Workflows API error: {response.status_code} - {response.text}"
+                )
+                logger.error(f"❌ {error_msg}")
+                return False, error_msg
+
+        except requests.exceptions.Timeout:
+            error_msg = f"Argo Workflows API request timed out after {self.timeout} seconds"
+            logger.error(error_msg)
+            return False, error_msg
+
+        except requests.exceptions.ConnectionError:
+            error_msg = "Failed to connect to Argo Workflows API"
+            logger.error(error_msg)
+            return False, error_msg
+
+        except requests.RequestException as e:
+            error_msg = f"Argo Workflows API request failed: {str(e)}"
+            logger.error(error_msg)
+            return False, error_msg
+
+        except Exception as e:
+            error_msg = f"Unexpected error calling Argo Workflows API: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return False, error_msg
+
     def _extract_size_from_resources(self, client_payload: Dict) -> str:
         """Extract size preset from resource specifications."""
         resources = client_payload.get("resources", {})

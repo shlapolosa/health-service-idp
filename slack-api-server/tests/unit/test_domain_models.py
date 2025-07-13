@@ -6,7 +6,8 @@ from datetime import datetime
 
 import pytest
 
-from src.domain.models import (Capability, CapabilitySet,
+from src.domain.models import (AppContainerRequest, Capability, CapabilitySet,
+                               InvalidAppContainerRequestError,
                                InvalidSlackCommandError,
                                InvalidVClusterRequestError, ParsedCommand,
                                ResourceSpec, SlackCommand, VClusterRequest,
@@ -257,3 +258,101 @@ class TestEnums:
         assert Capability.NETWORKING.value == "networking"
         assert Capability.AUTOSCALING.value == "autoscaling"
         assert Capability.BACKUP.value == "backup"
+
+
+class TestAppContainerRequest:
+    """Test AppContainerRequest domain entity."""
+
+    def test_valid_appcontainer_request(self):
+        """Test creating a valid AppContainerRequest."""
+        request = AppContainerRequest(
+            name="test-app",
+            namespace="dev",
+            user="testuser",
+            slack_channel="C123",
+            description="Test application container",
+            github_org="testorg",
+            docker_registry="registry.example.com/testorg",
+            enable_observability=True,
+            enable_security=False,
+            original_text="create test-app"
+        )
+
+        assert request.name == "test-app"
+        assert request.namespace == "dev"
+        assert request.user == "testuser"
+        assert request.slack_channel == "C123"
+        assert request.description == "Test application container"
+        assert request.github_org == "testorg"
+        assert request.docker_registry == "registry.example.com/testorg"
+        assert request.enable_observability is True
+        assert request.enable_security is False
+        assert request.original_text == "create test-app"
+        assert isinstance(request.created_at, datetime)
+
+    def test_appcontainer_request_defaults(self):
+        """Test AppContainerRequest with default values."""
+        request = AppContainerRequest(
+            name="test-app",
+            namespace="default",
+            user="testuser",
+            slack_channel="C123"
+        )
+
+        assert request.name == "test-app"
+        assert request.description == "CLAUDE.md-compliant application container"
+        assert request.github_org == "socrates12345"
+        assert request.docker_registry == "docker.io/socrates12345"
+        assert request.enable_observability is True
+        assert request.enable_security is True
+
+    def test_invalid_appcontainer_name(self):
+        """Test AppContainerRequest with invalid name."""
+        with pytest.raises(ValueError, match="name cannot be empty"):
+            AppContainerRequest(
+                name="",
+                namespace="default",
+                user="testuser",
+                slack_channel="C123"
+            )
+
+    def test_invalid_kubernetes_appcontainer_name(self):
+        """Test AppContainerRequest with invalid Kubernetes name."""
+        with pytest.raises(ValueError, match="name must start and end with alphanumeric characters"):
+            AppContainerRequest(
+                name="-invalid-name-",
+                namespace="default",
+                user="testuser",
+                slack_channel="C123"
+            )
+
+    def test_appcontainer_to_argo_payload(self):
+        """Test converting AppContainerRequest to Argo payload."""
+        request = AppContainerRequest(
+            name="test-app",
+            namespace="production",
+            user="alice",
+            slack_channel="C456",
+            description="Production app container",
+            github_org="myorg",
+            docker_registry="myregistry.com/myorg",
+            enable_observability=False,
+            enable_security=True
+        )
+
+        payload = request.to_argo_payload()
+
+        expected_payload = {
+            "appcontainer-name": "test-app",
+            "namespace": "production",
+            "description": "Production app container",
+            "github-org": "myorg",
+            "docker-registry": "myregistry.com/myorg",
+            "observability": "false",
+            "security": "true",
+            "user": "alice",
+            "slack-channel": "C456",
+            "slack-user-id": "alice",
+        }
+
+        assert payload == expected_payload

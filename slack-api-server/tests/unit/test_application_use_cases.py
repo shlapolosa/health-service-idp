@@ -6,11 +6,12 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from src.application.use_cases import (CreateVClusterUseCase,
+from src.application.use_cases import (CreateAppContainerUseCase,
+                                       CreateVClusterUseCase,
                                        HealthCheckUseCase,
                                        ProcessSlackCommandUseCase,
                                        VerifySlackRequestUseCase)
-from src.domain.models import (Capability, CapabilitySet,
+from src.domain.models import (AppContainerRequest, Capability, CapabilitySet,
                                InvalidVClusterRequestError, ParsedCommand,
                                ResourceSpec, SlackCommand, VClusterRequest,
                                VClusterSize)
@@ -22,14 +23,14 @@ class TestCreateVClusterUseCase:
     def setup_method(self):
         """Set up test fixtures."""
         self.mock_parser = Mock()
-        self.mock_github_dispatcher = Mock()
+        self.mock_vcluster_dispatcher = Mock()
         self.mock_factory = Mock()
         self.mock_validator = Mock()
         self.mock_response_builder = Mock()
 
         self.use_case = CreateVClusterUseCase(
             parser=self.mock_parser,
-            github_dispatcher=self.mock_github_dispatcher,
+            vcluster_dispatcher=self.mock_vcluster_dispatcher,
             factory=self.mock_factory,
             validator=self.mock_validator,
             response_builder=self.mock_response_builder,
@@ -59,7 +60,7 @@ class TestCreateVClusterUseCase:
         assert result == help_response
         self.mock_parser.parse_command.assert_called_once_with(command)
         self.mock_response_builder.build_help_response.assert_called_once()
-        self.mock_github_dispatcher.trigger_vcluster_creation.assert_not_called()
+        self.mock_vcluster_dispatcher.trigger_vcluster_creation.assert_not_called()
 
     def test_execute_unknown_action(self):
         """Test executing unknown action."""
@@ -84,7 +85,7 @@ class TestCreateVClusterUseCase:
 
         assert result == error_response
         self.mock_response_builder.build_error_response.assert_called_once()
-        self.mock_github_dispatcher.trigger_vcluster_creation.assert_not_called()
+        self.mock_vcluster_dispatcher.trigger_vcluster_creation.assert_not_called()
 
     def test_execute_create_success(self):
         """Test executing successful create command."""
@@ -117,7 +118,7 @@ class TestCreateVClusterUseCase:
         self.mock_parser.parse_command.return_value = parsed
         self.mock_factory.create_vcluster_request.return_value = request
         self.mock_validator.validate_request.return_value = (True, [])
-        self.mock_github_dispatcher.trigger_vcluster_creation.return_value = (
+        self.mock_vcluster_dispatcher.trigger_vcluster_creation.return_value = (
             True,
             "Success",
         )
@@ -131,7 +132,7 @@ class TestCreateVClusterUseCase:
         self.mock_parser.parse_command.assert_called_once_with(command)
         self.mock_factory.create_vcluster_request.assert_called_once()
         self.mock_validator.validate_request.assert_called_once_with(request)
-        self.mock_github_dispatcher.trigger_vcluster_creation.assert_called_once()
+        self.mock_vcluster_dispatcher.trigger_vcluster_creation.assert_called_once()
         self.mock_response_builder.build_success_response.assert_called_once_with(
             request
         )
@@ -161,7 +162,7 @@ class TestCreateVClusterUseCase:
         result = self.use_case.execute(command)
 
         assert result == error_response
-        self.mock_github_dispatcher.trigger_vcluster_creation.assert_not_called()
+        self.mock_vcluster_dispatcher.trigger_vcluster_creation.assert_not_called()
         self.mock_response_builder.build_error_response.assert_called_once()
 
     def test_execute_create_github_failure(self):
@@ -184,7 +185,7 @@ class TestCreateVClusterUseCase:
         self.mock_parser.parse_command.return_value = parsed
         self.mock_factory.create_vcluster_request.return_value = request
         self.mock_validator.validate_request.return_value = (True, [])
-        self.mock_github_dispatcher.trigger_vcluster_creation.return_value = (
+        self.mock_vcluster_dispatcher.trigger_vcluster_creation.return_value = (
             False,
             "API Error",
         )
@@ -225,10 +226,12 @@ class TestProcessSlackCommandUseCase:
     def setup_method(self):
         """Set up test fixtures."""
         self.mock_create_use_case = Mock()
+        self.mock_create_appcontainer_use_case = Mock()
         self.mock_response_builder = Mock()
 
         self.use_case = ProcessSlackCommandUseCase(
             create_vcluster_use_case=self.mock_create_use_case,
+            create_appcontainer_use_case=self.mock_create_appcontainer_use_case,
             response_builder=self.mock_response_builder,
         )
 
@@ -326,6 +329,50 @@ class TestProcessSlackCommandUseCase:
                 ].lower()
             )
 
+    def test_execute_appcontainer_command(self):
+        """Test executing AppContainer command."""
+        command = SlackCommand(
+            command="/appcontainer",
+            text="create my-app",
+            user_id="U123",
+            user_name="testuser",
+            channel_id="C123",
+            channel_name="general",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        appcontainer_response = {"response_type": "in_channel", "text": "Creating AppContainer..."}
+        self.mock_create_appcontainer_use_case.execute.return_value = appcontainer_response
+
+        result = self.use_case.execute(command)
+
+        assert result == appcontainer_response
+        self.mock_create_appcontainer_use_case.execute.assert_called_once_with(command)
+        self.mock_create_use_case.execute.assert_not_called()
+
+    def test_execute_app_cont_alias_command(self):
+        """Test executing /app-cont alias command."""
+        command = SlackCommand(
+            command="/app-cont",
+            text="create test-service",
+            user_id="U456",
+            user_name="alice",
+            channel_id="C456",
+            channel_name="backend",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        appcontainer_response = {"response_type": "in_channel", "text": "Creating AppContainer..."}
+        self.mock_create_appcontainer_use_case.execute.return_value = appcontainer_response
+
+        result = self.use_case.execute(command)
+
+        assert result == appcontainer_response
+        self.mock_create_appcontainer_use_case.execute.assert_called_once_with(command)
+        self.mock_create_use_case.execute.assert_not_called()
+
 
 class TestVerifySlackRequestUseCase:
     """Test VerifySlackRequestUseCase application service."""
@@ -399,3 +446,237 @@ class TestHealthCheckUseCase:
             # Just check that timestamp is a string, not the exact value
             assert isinstance(result["timestamp"], str)
             assert len(result["timestamp"]) > 0
+
+
+class TestCreateAppContainerUseCase:
+    """Test CreateAppContainerUseCase application service."""
+
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.mock_parser = Mock()
+        self.mock_vcluster_dispatcher = Mock()
+        self.mock_response_builder = Mock()
+        
+        self.use_case = CreateAppContainerUseCase(
+            parser=self.mock_parser,
+            vcluster_dispatcher=self.mock_vcluster_dispatcher,
+        )
+        # Inject the mock response builder
+        self.use_case.response_builder = self.mock_response_builder
+
+    def test_execute_success(self):
+        """Test successful AppContainer creation."""
+        command = SlackCommand(
+            command="/appcontainer",
+            text="create my-app",
+            user_id="U123",
+            user_name="testuser",
+            channel_id="C123",
+            channel_name="general",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        parsed = ParsedCommand(
+            action="create",
+            command_type="appcontainer",
+            appcontainer_name="my-app",
+            namespace="default",
+            description="CLAUDE.md-compliant application container",
+            github_org="socrates12345",
+            enable_observability=True,
+            enable_security=True,
+        )
+
+        success_response = {"response_type": "in_channel", "text": "AppContainer created"}
+        
+        self.mock_parser.parse_command.return_value = parsed
+        self.mock_vcluster_dispatcher.trigger_appcontainer_creation.return_value = (
+            True,
+            "AppContainer creation workflow started: appcontainer-creation-abc123",
+        )
+        self.mock_response_builder.build_appcontainer_success_response.return_value = success_response
+
+        result = self.use_case.execute(command)
+
+        assert result == success_response
+        
+        self.mock_parser.parse_command.assert_called_once_with(command)
+        self.mock_vcluster_dispatcher.trigger_appcontainer_creation.assert_called_once()
+        self.mock_response_builder.build_appcontainer_success_response.assert_called_once()
+
+        # Verify payload structure
+        call_args = self.mock_vcluster_dispatcher.trigger_appcontainer_creation.call_args[0][0]
+        assert call_args["appcontainer-name"] == "my-app"
+        assert call_args["namespace"] == "default"
+        assert call_args["user"] == "testuser"
+        assert call_args["slack-channel"] == "C123"
+
+    def test_execute_with_custom_parameters(self):
+        """Test AppContainer creation with custom parameters."""
+        command = SlackCommand(
+            command="/appcontainer",
+            text='create my-api description "REST API for user management" github-org mycompany',
+            user_id="U456",
+            user_name="alice",
+            channel_id="C456",
+            channel_name="backend",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        parsed = ParsedCommand(
+            action="create",
+            command_type="appcontainer",
+            appcontainer_name="my-api",
+            namespace="production",
+            description="REST API for user management",
+            github_org="mycompany",
+            docker_registry="docker.io/mycompany",
+            enable_observability=False,
+            enable_security=True,
+        )
+
+        success_response = {"response_type": "in_channel", "text": "AppContainer created"}
+        
+        self.mock_parser.parse_command.return_value = parsed
+        self.mock_vcluster_dispatcher.trigger_appcontainer_creation.return_value = (
+            True,
+            "AppContainer creation workflow started: appcontainer-creation-def456",
+        )
+        self.mock_response_builder.build_appcontainer_success_response.return_value = success_response
+
+        result = self.use_case.execute(command)
+
+        assert result == success_response
+        
+        # Verify payload with custom parameters
+        call_args = self.mock_vcluster_dispatcher.trigger_appcontainer_creation.call_args[0][0]
+        assert call_args["appcontainer-name"] == "my-api"
+        assert call_args["namespace"] == "production"
+        assert call_args["description"] == "REST API for user management"
+        assert call_args["github-org"] == "mycompany"
+        assert call_args["docker-registry"] == "docker.io/mycompany"
+        assert call_args["observability"] == "false"
+        assert call_args["security"] == "true"
+
+    def test_execute_workflow_failure(self):
+        """Test AppContainer creation with workflow failure."""
+        command = SlackCommand(
+            command="/appcontainer",
+            text="create test-app",
+            user_id="U123",
+            user_name="testuser",
+            channel_id="C123",
+            channel_name="general",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        parsed = ParsedCommand(
+            action="create",
+            command_type="appcontainer",
+            appcontainer_name="test-app",
+        )
+
+        error_response = {"response_type": "ephemeral", "text": "Failed to trigger creation"}
+        
+        self.mock_parser.parse_command.return_value = parsed
+        self.mock_vcluster_dispatcher.trigger_appcontainer_creation.return_value = (
+            False,
+            "Argo Workflows API error: 500 - Internal Server Error",
+        )
+        self.mock_response_builder.build_error_response.return_value = error_response
+
+        result = self.use_case.execute(command)
+
+        assert result == error_response
+        self.mock_response_builder.build_error_response.assert_called_once()
+
+    def test_execute_invalid_request(self):
+        """Test AppContainer creation with invalid request data."""
+        command = SlackCommand(
+            command="/appcontainer",
+            text="create -invalid-name-",
+            user_id="U123",
+            user_name="testuser",
+            channel_id="C123",
+            channel_name="general",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        parsed = ParsedCommand(
+            action="create",
+            command_type="appcontainer",
+            appcontainer_name="-invalid-name-",
+        )
+
+        error_response = {"response_type": "ephemeral", "text": "An unexpected error occurred"}
+        
+        self.mock_parser.parse_command.return_value = parsed
+        self.mock_response_builder.build_error_response.return_value = error_response
+
+        # AppContainerRequest validation should fail
+        result = self.use_case.execute(command)
+
+        assert result == error_response
+        self.mock_response_builder.build_error_response.assert_called_once()
+        
+        # Should not call the dispatcher
+        self.mock_vcluster_dispatcher.trigger_appcontainer_creation.assert_not_called()
+
+    def test_execute_parsing_exception(self):
+        """Test AppContainer creation with parsing exception."""
+        command = SlackCommand(
+            command="/appcontainer",
+            text="create test-app",
+            user_id="U123",
+            user_name="testuser",
+            channel_id="C123",
+            channel_name="general",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        error_response = {"response_type": "ephemeral", "text": "An unexpected error occurred"}
+        
+        self.mock_parser.parse_command.side_effect = Exception("Parsing failed")
+        self.mock_response_builder.build_error_response.return_value = error_response
+
+        result = self.use_case.execute(command)
+
+        assert result == error_response
+        self.mock_response_builder.build_error_response.assert_called_once()
+
+    def test_execute_missing_appcontainer_name(self):
+        """Test AppContainer creation without appcontainer name."""
+        command = SlackCommand(
+            command="/appcontainer",
+            text="create",
+            user_id="U123",
+            user_name="testuser",
+            channel_id="C123",
+            channel_name="general",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        parsed = ParsedCommand(
+            action="create",
+            command_type="appcontainer",
+            appcontainer_name=None,  # Missing name
+        )
+
+        error_response = {"response_type": "ephemeral", "text": "An unexpected error occurred"}
+        
+        self.mock_parser.parse_command.return_value = parsed
+        self.mock_response_builder.build_error_response.return_value = error_response
+
+        result = self.use_case.execute(command)
+
+        assert result == error_response
+        self.mock_response_builder.build_error_response.assert_called_once()
+        
+        # Should not call the dispatcher
+        self.mock_vcluster_dispatcher.trigger_appcontainer_creation.assert_not_called()

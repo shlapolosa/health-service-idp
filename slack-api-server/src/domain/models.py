@@ -157,16 +157,78 @@ class SlackCommand:
 
 
 @dataclass
+class AppContainerRequest:
+    """Domain entity representing an AppContainer creation request."""
+
+    name: str
+    namespace: str
+    user: str
+    slack_channel: str
+    description: str = "CLAUDE.md-compliant application container"
+    github_org: str = "socrates12345"
+    docker_registry: str = "docker.io/socrates12345"
+    enable_observability: bool = True
+    enable_security: bool = True
+    original_text: Optional[str] = None
+    created_at: datetime = None
+
+    def __post_init__(self):
+        """Initialize computed fields."""
+        if self.created_at is None:
+            object.__setattr__(self, "created_at", datetime.now())
+
+        # Validate name and namespace (Kubernetes naming conventions)
+        self._validate_kubernetes_name(self.name, "name")
+        self._validate_kubernetes_name(self.namespace, "namespace")
+
+    def _validate_kubernetes_name(self, value: str, field: str) -> None:
+        """Validate Kubernetes naming conventions."""
+        if not value:
+            raise ValueError(f"{field} cannot be empty")
+        if len(value) > 63:
+            raise ValueError(f"{field} cannot exceed 63 characters")
+        if not value.replace("-", "").isalnum():
+            raise ValueError(
+                f"{field} must contain only alphanumeric characters and hyphens"
+            )
+        if not value[0].isalnum() or not value[-1].isalnum():
+            raise ValueError(f"{field} must start and end with alphanumeric characters")
+
+    def to_argo_payload(self) -> Dict:
+        """Convert to Argo Workflows parameters."""
+        return {
+            "appcontainer-name": self.name,
+            "namespace": self.namespace,
+            "description": self.description,
+            "github-org": self.github_org,
+            "docker-registry": self.docker_registry,
+            "observability": str(self.enable_observability).lower(),
+            "security": str(self.enable_security).lower(),
+            "user": self.user,
+            "slack-channel": self.slack_channel,
+            "slack-user-id": self.user,
+        }
+
+
+@dataclass
 class ParsedCommand:
     """Value object representing a parsed command result."""
 
     action: str  # create, list, delete, status, help
+    command_type: str = "vcluster"  # vcluster, appcontainer, application
     vcluster_name: Optional[str] = None
+    appcontainer_name: Optional[str] = None
     namespace: str = "default"
     repository: Optional[str] = None
     size: VClusterSize = VClusterSize.MEDIUM
     enabled_capabilities: List[Capability] = None
     disabled_capabilities: List[Capability] = None
+    # AppContainer specific fields
+    description: Optional[str] = None
+    github_org: str = "socrates12345"
+    docker_registry: str = "docker.io/socrates12345"
+    enable_observability: bool = True
+    enable_security: bool = True
     parsing_method: str = "regex"
 
     def __post_init__(self):
@@ -192,6 +254,12 @@ class InvalidVClusterRequestError(DomainError):
 
 class InvalidSlackCommandError(DomainError):
     """Raised when Slack command is invalid."""
+
+    pass
+
+
+class InvalidAppContainerRequestError(DomainError):
+    """Raised when AppContainer request is invalid."""
 
     pass
 

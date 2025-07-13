@@ -285,7 +285,7 @@ class TestEnhancedNLPParser:
         """Test error handling during parsing."""
         # Mock parser to raise exception
         with patch.object(
-            self.parser, "_extract_action", side_effect=Exception("Test error")
+            self.parser, "_extract_command_type_and_action", side_effect=Exception("Test error")
         ):
             command = SlackCommand(
                 command="/vcluster",
@@ -335,3 +335,176 @@ class TestEnhancedNLPParser:
 
         assert parser.spacy_available is False
         assert parser.nlp is None
+
+    def test_parse_appcontainer_basic_command(self):
+        """Test parsing basic AppContainer command."""
+        command = SlackCommand(
+            command="/appcontainer",
+            text="create my-app",
+            user_id="U123",
+            user_name="testuser",
+            channel_id="C123",
+            channel_name="general",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        result = self.parser.parse_command(command)
+
+        assert result.action == "create"
+        assert result.command_type == "appcontainer"
+        assert result.appcontainer_name == "my-app"
+        assert result.namespace == "default"
+        assert result.description == "CLAUDE.md-compliant application container"
+        assert result.github_org == "socrates12345"
+        assert result.enable_observability is True
+        assert result.enable_security is True
+
+    def test_parse_appcontainer_with_namespace(self):
+        """Test parsing AppContainer command with namespace."""
+        command = SlackCommand(
+            command="/appcontainer",
+            text="create my-backend in namespace production",
+            user_id="U123",
+            user_name="testuser",
+            channel_id="C123",
+            channel_name="general",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        result = self.parser.parse_command(command)
+
+        assert result.action == "create"
+        assert result.command_type == "appcontainer"
+        assert result.appcontainer_name == "my-backend"
+        assert result.namespace == "production"
+
+    def test_parse_appcontainer_with_description(self):
+        """Test parsing AppContainer command with description."""
+        command = SlackCommand(
+            command="/appcontainer",
+            text='create my-api description "REST API for user management"',
+            user_id="U123",
+            user_name="testuser",
+            channel_id="C123",
+            channel_name="general",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        result = self.parser.parse_command(command)
+
+        assert result.action == "create"
+        assert result.command_type == "appcontainer"
+        assert result.appcontainer_name == "my-api"
+        assert result.description == "rest api for user management"
+
+    def test_parse_appcontainer_with_github_org(self):
+        """Test parsing AppContainer command with GitHub org."""
+        command = SlackCommand(
+            command="/appcontainer",
+            text="create my-service github-org mycompany",
+            user_id="U123",
+            user_name="testuser",
+            channel_id="C123",
+            channel_name="general",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        result = self.parser.parse_command(command)
+
+        assert result.action == "create"
+        assert result.command_type == "appcontainer"
+        assert result.appcontainer_name == "my-service"
+        assert result.github_org == "mycompany"
+
+    def test_parse_appcontainer_without_security(self):
+        """Test parsing AppContainer command without security."""
+        command = SlackCommand(
+            command="/appcontainer",
+            text="create test-app without security",
+            user_id="U123",
+            user_name="testuser",
+            channel_id="C123",
+            channel_name="general",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        result = self.parser.parse_command(command)
+
+        assert result.action == "create"
+        assert result.command_type == "appcontainer"
+        assert result.appcontainer_name == "test-app"
+        assert result.enable_security is False
+        assert result.enable_observability is True  # Should still be default
+
+    def test_parse_appcontainer_help_command(self):
+        """Test parsing AppContainer help command."""
+        command = SlackCommand(
+            command="/appcontainer",
+            text="help",
+            user_id="U123",
+            user_name="testuser",
+            channel_id="C123",
+            channel_name="general",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        result = self.parser.parse_command(command)
+
+        assert result.action == "help"
+        assert result.command_type == "appcontainer"
+
+    def test_extract_command_type_and_action(self):
+        """Test command type and action extraction."""
+        # Test VCluster command
+        vcluster_command = SlackCommand(
+            command="/vcluster",
+            text="create test",
+            user_id="U123",
+            user_name="testuser",
+            channel_id="C123",
+            channel_name="general",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        command_type, action = self.parser._extract_command_type_and_action(vcluster_command)
+        assert command_type == "vcluster"
+        assert action == "create"
+
+        # Test AppContainer command
+        appcontainer_command = SlackCommand(
+            command="/appcontainer",
+            text="create test",
+            user_id="U123",
+            user_name="testuser",
+            channel_id="C123",
+            channel_name="general",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        command_type, action = self.parser._extract_command_type_and_action(appcontainer_command)
+        assert command_type == "appcontainer"
+        assert action == "create"
+
+        # Test help action
+        help_command = SlackCommand(
+            command="/appcontainer",
+            text="help",
+            user_id="U123",
+            user_name="testuser",
+            channel_id="C123",
+            channel_name="general",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        command_type, action = self.parser._extract_command_type_and_action(help_command)
+        assert command_type == "appcontainer"
+        assert action == "help"

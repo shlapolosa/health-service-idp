@@ -6,9 +6,9 @@ Contains the core business rules and domain logic
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Tuple
 
-from .models import (Capability, CapabilitySet, InvalidVClusterRequestError,
-                     ParsedCommand, ResourceSpec, SlackCommand,
-                     VClusterRequest, VClusterSize)
+from .models import (AppContainerRequest, Capability, CapabilitySet,
+                     InvalidVClusterRequestError, ParsedCommand, ResourceSpec,
+                     SlackCommand, VClusterRequest, VClusterSize)
 
 
 class CommandParserInterface(ABC):
@@ -228,6 +228,71 @@ class SlackResponseBuilderService:
                     "text": {
                         "type": "mrkdwn",
                         "text": "*Available Commands:*\n• `/vcluster create [name] [options]` - Create new VCluster\n• `/vcluster list` - List existing VClusters\n• `/vcluster delete [name]` - Delete VCluster\n• `/vcluster status [name]` - Check VCluster status\n\n*Example:*\n`/vcluster create my-cluster with observability and security in namespace dev`",
+                    },
+                }
+            ],
+        }
+
+    def build_appcontainer_success_response(self, request: AppContainerRequest) -> Dict:
+        """Build success response for AppContainer creation."""
+        return {
+            "response_type": "in_channel",
+            "text": f"🚀 AppContainer `{request.name}` creation started",
+            "blocks": [
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "🚀 AppContainer Creation Started",
+                    },
+                },
+                {
+                    "type": "section",
+                    "fields": [
+                        {"type": "mrkdwn", "text": f"*Name:*\n`{request.name}`"},
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Namespace:*\n`{request.namespace}`",
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Description:*\n{request.description}",
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*GitHub Org:*\n{request.github_org}",
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Observability:*\n{'✅ Enabled' if request.enable_observability else '❌ Disabled'}",
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Security:*\n{'✅ Enabled' if request.enable_security else '❌ Disabled'}",
+                        },
+                    ],
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "⏳ *Status:* AppContainer provisioning started... You'll receive updates as the process progresses.",
+                    },
+                },
+            ],
+        }
+
+    def build_appcontainer_help_response(self) -> Dict:
+        """Build help response for AppContainer commands."""
+        return {
+            "response_type": "ephemeral",
+            "text": "🤖 AppContainer Management Commands",
+            "blocks": [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "*Available Commands:*\n• `/appcontainer create [name] [options]` - Create new AppContainer\n• `/app-cont create [name] [options]` - Alias for AppContainer creation\n\n*Options:*\n• `description \"text\"` - Set container description\n• `github-org [org]` - Set GitHub organization\n• `namespace [ns]` - Set deployment namespace\n• `without security` - Disable security features\n• `without observability` - Disable observability\n\n*Example:*\n`/appcontainer create my-api description \"REST API service\" github-org mycompany namespace production`",
                     },
                 }
             ],
