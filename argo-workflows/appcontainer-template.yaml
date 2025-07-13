@@ -1,0 +1,165 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: appcontainer-creation
+  namespace: argo
+spec:
+  entrypoint: create-appcontainer
+  arguments:
+    parameters:
+    - name: appcontainer-name
+      value: "default-app"
+    - name: namespace
+      value: "default"
+    - name: description
+      value: "CLAUDE.md-compliant application container"
+    - name: github-org
+      value: "socrates12345"
+    - name: docker-registry
+      value: "docker.io/socrates12345"
+    - name: observability
+      value: "true"
+    - name: security
+      value: "true"
+    - name: user
+      value: "unknown"
+    - name: slack-channel
+      value: "unknown"
+    - name: slack-user-id
+      value: "unknown"
+
+  templates:
+  - name: create-appcontainer
+    steps:
+    - - name: validate-request
+        template: validate-appcontainer-request
+    - - name: create-appcontainer-claim
+        template: create-claim
+        when: "{{steps.validate-request.status}} == Succeeded"
+    - - name: notify-slack-success
+        template: notify-slack
+        arguments:
+          parameters:
+          - name: status
+            value: "success"
+          - name: message
+            value: "AppContainer {{workflow.parameters.appcontainer-name}} created successfully"
+        when: "{{steps.create-appcontainer-claim.status}} == Succeeded"
+    - - name: notify-slack-failure
+        template: notify-slack
+        arguments:
+          parameters:
+          - name: status
+            value: "failure"
+          - name: message
+            value: "AppContainer {{workflow.parameters.appcontainer-name}} creation failed"
+        when: "{{steps.create-appcontainer-claim.status}} != Succeeded"
+
+  - name: validate-appcontainer-request
+    script:
+      image: alpine:3.18
+      command: [sh]
+      source: |
+        echo "Validating AppContainer request..."
+        echo "Name: {{workflow.parameters.appcontainer-name}}"
+        echo "Namespace: {{workflow.parameters.namespace}}"
+        echo "Description: {{workflow.parameters.description}}"
+        echo "GitHub Org: {{workflow.parameters.github-org}}"
+        echo "User: {{workflow.parameters.user}}"
+        
+        # Basic validation
+        if [ -z "{{workflow.parameters.appcontainer-name}}" ]; then
+          echo "AppContainer name is required"
+          exit 1
+        fi
+        
+        # Validate name format (lowercase, alphanumeric, hyphens)
+        if ! echo "{{workflow.parameters.appcontainer-name}}" | grep -E '^[a-z0-9][a-z0-9-]*[a-z0-9]$'; then
+          echo "Invalid AppContainer name format (must be DNS-1123 compliant)"
+          exit 1
+        fi
+        
+        # Validate GitHub organization
+        if [ -z "{{workflow.parameters.github-org}}" ]; then
+          echo "GitHub organization is required"
+          exit 1
+        fi
+        
+        echo "Validation successful"
+
+  - name: create-claim
+    script:
+      image: bitnami/kubectl:1.28
+      command: [sh]
+      source: |
+        echo "Creating AppContainer claim..."
+        
+        # Create namespace if it doesn't exist
+        echo "Ensuring namespace {{workflow.parameters.namespace}} exists..."
+        kubectl create namespace {{workflow.parameters.namespace}} --dry-run=client -o yaml | kubectl apply -f -
+        
+        # Parse boolean parameters
+        OBSERVABILITY=$([ "{{workflow.parameters.observability}}" = "true" ] && echo "true" || echo "false")
+        SECURITY=$([ "{{workflow.parameters.security}}" = "true" ] && echo "true" || echo "false")
+        
+        # Create AppContainer claim manifest
+        cat <<EOF | kubectl apply -f -
+        apiVersion: platform.example.org/v1alpha1
+        kind: AppContainerClaim
+        metadata:
+          name: {{workflow.parameters.appcontainer-name}}
+          namespace: {{workflow.parameters.namespace}}
+          labels:
+            created-by: slack
+            requested-by: "{{workflow.parameters.user}}"
+            slack-channel: "{{workflow.parameters.slack-channel}}"
+        spec:
+          name: {{workflow.parameters.appcontainer-name}}
+          description: "{{workflow.parameters.description}}"
+          gitHubOrg: "{{workflow.parameters.github-org}}"
+          dockerRegistry: "{{workflow.parameters.docker-registry}}"
+          enableObservability: $OBSERVABILITY
+          enableSecurity: $SECURITY
+        EOF
+        
+        if [ $? -eq 0 ]; then
+          echo "AppContainer claim created successfully"
+          echo "Creating repositories and CI/CD infrastructure..."
+          echo "Source repo: https://github.com/{{workflow.parameters.github-org}}/{{workflow.parameters.appcontainer-name}}"
+          echo "GitOps repo: https://github.com/{{workflow.parameters.github-org}}/{{workflow.parameters.appcontainer-name}}-gitops"
+          exit 0
+        else
+          echo "Failed to create AppContainer claim"
+          exit 1
+        fi
+
+  - name: notify-slack
+    inputs:
+      parameters:
+      - name: status
+      - name: message
+    script:
+      image: curlimages/curl:8.5.0
+      command: [sh]
+      source: |
+        echo "📱 Sending Slack notification..."
+        
+        if [ "{{inputs.parameters.status}}" = "success" ]; then
+          EMOJI="✅"
+          COLOR="good"
+        else
+          EMOJI="❌"
+          COLOR="danger"
+        fi
+        
+        # Note: This is a placeholder - in production, you'd get the webhook URL from a secret
+        echo "Would send to Slack: $EMOJI {{inputs.parameters.message}}"
+        echo "AppContainer: {{workflow.parameters.appcontainer-name}}"
+        echo "GitHub Org: {{workflow.parameters.github-org}}"
+        echo "User: {{workflow.parameters.user}}"
+        echo "Channel: {{workflow.parameters.slack-channel}}"
+        
+        # TODO: Replace with actual Slack webhook call when implementing
+        # curl -X POST -H 'Content-type: application/json' \
+        #   --data "{\"text\":\"$EMOJI {{inputs.parameters.message}}\"}" \
+        #   "$SLACK_WEBHOOK_URL"

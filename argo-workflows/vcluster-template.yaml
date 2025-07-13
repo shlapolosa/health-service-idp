@@ -29,7 +29,7 @@ spec:
         template: validate-vcluster-request
     - - name: create-vcluster-claim
         template: create-claim
-        when: "{{steps.validate-request.outputs.result}} == success"
+        when: "{{steps.validate-request.status}} == Succeeded"
     - - name: notify-slack-success
         template: notify-slack
         arguments:
@@ -38,7 +38,7 @@ spec:
             value: "success"
           - name: message
             value: "VCluster {{workflow.parameters.vcluster-name}} created successfully"
-        when: "{{steps.create-vcluster-claim.outputs.result}} == success"
+        when: "{{steps.create-vcluster-claim.status}} == Succeeded"
     - - name: notify-slack-failure
         template: notify-slack
         arguments:
@@ -47,14 +47,14 @@ spec:
             value: "failure"
           - name: message
             value: "VCluster {{workflow.parameters.vcluster-name}} creation failed"
-        when: "{{steps.create-vcluster-claim.outputs.result}} != success"
+        when: "{{steps.create-vcluster-claim.status}} != Succeeded"
 
   - name: validate-vcluster-request
     script:
       image: alpine:3.18
       command: [sh]
       source: |
-        echo "🔍 Validating VCluster request..."
+        echo "Validating VCluster request..."
         echo "Name: {{workflow.parameters.vcluster-name}}"
         echo "Namespace: {{workflow.parameters.namespace}}"
         echo "Size: {{workflow.parameters.size}}"
@@ -62,17 +62,17 @@ spec:
         
         # Basic validation
         if [ -z "{{workflow.parameters.vcluster-name}}" ]; then
-          echo "❌ VCluster name is required"
+          echo "VCluster name is required"
           exit 1
         fi
         
         # Validate name format (lowercase, alphanumeric, hyphens)
         if ! echo "{{workflow.parameters.vcluster-name}}" | grep -E '^[a-z0-9][a-z0-9-]*[a-z0-9]$'; then
-          echo "❌ Invalid VCluster name format"
+          echo "Invalid VCluster name format"
           exit 1
         fi
         
-        echo "✅ Validation successful"
+        echo "Validation successful"
         echo "success"
 
   - name: create-claim
@@ -80,13 +80,22 @@ spec:
       image: bitnami/kubectl:1.28
       command: [sh]
       source: |
-        echo "🚀 Creating VCluster claim..."
+        echo "Creating VCluster claim..."
         
-        # Parse capabilities
+        # Create namespace if it doesn't exist
+        echo "Ensuring namespace {{workflow.parameters.namespace}} exists..."
+        kubectl create namespace {{workflow.parameters.namespace}} --dry-run=client -o yaml | kubectl apply -f -
+        
+        # Parse capabilities and convert to booleans
         CAPABILITIES='{{workflow.parameters.capabilities}}'
-        OBSERVABILITY=$(echo $CAPABILITIES | grep -o '"observability":"[^"]*"' | cut -d'"' -f4 || echo "true")
-        SECURITY=$(echo $CAPABILITIES | grep -o '"security":"[^"]*"' | cut -d'"' -f4 || echo "true")
-        GITOPS=$(echo $CAPABILITIES | grep -o '"gitops":"[^"]*"' | cut -d'"' -f4 || echo "true")
+        OBSERVABILITY_VAL=$(echo $CAPABILITIES | grep -o '"observability":"[^"]*"' | cut -d'"' -f4 || echo "true")
+        SECURITY_VAL=$(echo $CAPABILITIES | grep -o '"security":"[^"]*"' | cut -d'"' -f4 || echo "true")
+        GITOPS_VAL=$(echo $CAPABILITIES | grep -o '"gitops":"[^"]*"' | cut -d'"' -f4 || echo "true")
+        
+        # Convert to boolean values for YAML
+        OBSERVABILITY=$([ "$OBSERVABILITY_VAL" = "true" ] && echo "true" || echo "false")
+        SECURITY=$([ "$SECURITY_VAL" = "true" ] && echo "true" || echo "false")
+        GITOPS=$([ "$GITOPS_VAL" = "true" ] && echo "true" || echo "false")
         
         # Size to resource mapping
         case "{{workflow.parameters.size}}" in
@@ -112,40 +121,34 @@ spec:
             ;;
         esac
         
-        # Create VCluster claim manifest
+        # Create VCluster environment claim manifest
         cat <<EOF | kubectl apply -f -
-        apiVersion: v1
-        kind: ConfigMap
+        apiVersion: platform.example.org/v1alpha1
+        kind: VClusterEnvironmentClaim
         metadata:
-          name: vcluster-claim-{{workflow.parameters.vcluster-name}}
+          name: {{workflow.parameters.vcluster-name}}
           namespace: {{workflow.parameters.namespace}}
           labels:
-            app: vcluster
-            type: claim
             created-by: slack
-        data:
-          vcluster-name: "{{workflow.parameters.vcluster-name}}"
-          namespace: "{{workflow.parameters.namespace}}"
-          size: "{{workflow.parameters.size}}"
-          cpu-limit: "$CPU_LIMIT"
-          memory-limit: "$MEMORY_LIMIT"
-          storage-size: "$STORAGE_SIZE"
-          observability: "$OBSERVABILITY"
-          security: "$SECURITY"
-          gitops: "$GITOPS"
-          requested-by: "{{workflow.parameters.user}}"
-          slack-channel: "{{workflow.parameters.slack-channel}}"
-          slack-user-id: "{{workflow.parameters.slack-user-id}}"
-          created-at: "$(date -Iseconds)"
-          status: "pending"
+            requested-by: "{{workflow.parameters.user}}"
+            slack-channel: "{{workflow.parameters.slack-channel}}"
+        spec:
+          name: {{workflow.parameters.vcluster-name}}
+          components:
+            grafana: $OBSERVABILITY
+            prometheus: $OBSERVABILITY
+            jaeger: $OBSERVABILITY
+            kiali: $OBSERVABILITY
+            argoCD: $GITOPS
+            apiGateway: false
         EOF
         
         if [ $? -eq 0 ]; then
-          echo "✅ VCluster claim created successfully"
-          echo "success"
+          echo "VCluster claim created successfully"
+          exit 0
         else
-          echo "❌ Failed to create VCluster claim"
-          echo "failure"
+          echo "Failed to create VCluster claim"
+          exit 1
         fi
 
   - name: notify-slack
