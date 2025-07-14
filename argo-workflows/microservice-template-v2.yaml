@@ -1,0 +1,496 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: microservice-creation-v2
+  namespace: argo
+  annotations:
+    description: "Microservice creation using Parameter Mapping Layer - clean separation and composition"
+spec:
+  entrypoint: create-microservice
+  arguments:
+    parameters:
+    - name: microservice-name
+      value: "default-service"
+    - name: namespace
+      value: "default"
+    - name: language
+      value: "python"
+    - name: database
+      value: "none"
+    - name: cache
+      value: "none"
+    - name: description
+      value: "CLAUDE.md-compliant microservice"
+    - name: github-org
+      value: "socrates12345"
+    - name: docker-registry
+      value: "docker.io/socrates12345"
+    - name: observability
+      value: "true"
+    - name: security
+      value: "true"
+    - name: target-vcluster
+      value: ""
+    - name: auto-create-vcluster
+      value: "true"
+    - name: user
+      value: "unknown"
+    - name: slack-channel
+      value: "unknown"
+    - name: slack-user-id
+      value: "unknown"
+
+  templates:
+  - name: create-microservice
+    steps:
+    - - name: notify-starting
+        templateRef:
+          name: slack-notifications
+          template: notify-microservice-starting
+        arguments:
+          parameters:
+          - name: microservice-name
+            value: "{{workflow.parameters.microservice-name}}"
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
+          - name: language
+            value: "{{workflow.parameters.language}}"
+          - name: database
+            value: "{{workflow.parameters.database}}"
+          - name: cache
+            value: "{{workflow.parameters.cache}}"
+          - name: target-vcluster
+            value: "{{workflow.parameters.target-vcluster}}"
+    - - name: validate-request
+        template: validate-microservice-request
+        arguments:
+          parameters:
+          - name: microservice-name
+            value: "{{workflow.parameters.microservice-name}}"
+          - name: language
+            value: "{{workflow.parameters.language}}"
+          - name: database
+            value: "{{workflow.parameters.database}}"
+          - name: cache
+            value: "{{workflow.parameters.cache}}"
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+          - name: github-org
+            value: "{{workflow.parameters.github-org}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
+    - - name: notify-validated
+        templateRef:
+          name: slack-notifications
+          template: send-slack-progress
+        arguments:
+          parameters:
+          - name: workflow-type
+            value: "microservice"
+          - name: resource-name
+            value: "{{workflow.parameters.microservice-name}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
+          - name: status
+            value: "validated"
+          - name: step-name
+            value: "✅ Microservice parameters validated - setting up development environment..."
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+        when: "{{steps.validate-request.status}} == Succeeded"
+    - - name: create-appcontainer-for-microservice
+        templateRef:
+          name: appcontainer-mapping-layer
+          template: create-appcontainer-for-microservice
+        arguments:
+          parameters:
+          - name: microservice-name
+            value: "{{workflow.parameters.microservice-name}}"
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+          - name: language
+            value: "{{workflow.parameters.language}}"
+          - name: database
+            value: "{{workflow.parameters.database}}"
+          - name: cache
+            value: "{{workflow.parameters.cache}}"
+          - name: description
+            value: "{{workflow.parameters.description}}"
+          - name: github-org
+            value: "{{workflow.parameters.github-org}}"
+          - name: docker-registry
+            value: "{{workflow.parameters.docker-registry}}"
+          - name: observability
+            value: "{{workflow.parameters.observability}}"
+          - name: security
+            value: "{{workflow.parameters.security}}"
+          - name: target-vcluster
+            value: "{{workflow.parameters.target-vcluster}}"
+          - name: auto-create-vcluster
+            value: "{{workflow.parameters.auto-create-vcluster}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
+          - name: slack-channel
+            value: "{{workflow.parameters.slack-channel}}"
+          - name: slack-user-id
+            value: "{{workflow.parameters.slack-user-id}}"
+        when: "{{steps.validate-request.status}} == Succeeded"
+    - - name: notify-appcontainer-ready
+        templateRef:
+          name: slack-notifications
+          template: send-slack-progress
+        arguments:
+          parameters:
+          - name: workflow-type
+            value: "microservice"
+          - name: resource-name
+            value: "{{workflow.parameters.microservice-name}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
+          - name: status
+            value: "appcontainer-ready"
+          - name: step-name
+            value: "✅ Application container ready - creating microservice structure..."
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+        when: "{{steps.create-appcontainer-for-microservice.status}} == Succeeded"
+    - - name: create-microservice-claim
+        template: create-microservice-claim
+        when: "{{steps.create-appcontainer-for-microservice.status}} == Succeeded"
+    - - name: notify-microservice-creating
+        templateRef:
+          name: slack-notifications
+          template: send-slack-progress
+        arguments:
+          parameters:
+          - name: workflow-type
+            value: "microservice"
+          - name: resource-name
+            value: "{{workflow.parameters.microservice-name}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
+          - name: status
+            value: "creating"
+          - name: step-name
+            value: "🔧 Creating microservice with CLAUDE.md structure and CI/CD..."
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+        when: "{{steps.create-microservice-claim.status}} == Succeeded"
+    - - name: wait-for-microservice
+        template: wait-for-microservice-ready
+        when: "{{steps.create-microservice-claim.status}} == Succeeded"
+    - - name: setup-ci-cd
+        template: setup-microservice-cicd
+        when: "{{steps.wait-for-microservice.status}} == Succeeded"
+    - - name: extract-microservice-info
+        template: extract-microservice-info
+        when: "{{steps.setup-ci-cd.status}} == Succeeded"
+    - - name: notify-success
+        templateRef:
+          name: slack-notifications
+          template: notify-microservice-success
+        arguments:
+          parameters:
+          - name: microservice-name
+            value: "{{workflow.parameters.microservice-name}}"
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
+          - name: language
+            value: "{{workflow.parameters.language}}"
+          - name: database
+            value: "{{workflow.parameters.database}}"
+          - name: cache
+            value: "{{workflow.parameters.cache}}"
+          - name: github-org
+            value: "{{workflow.parameters.github-org}}"
+          - name: target-vcluster
+            value: "{{workflow.parameters.target-vcluster}}"
+          - name: repository-name
+            value: "{{workflow.parameters.microservice-name}}"
+          - name: endpoints
+            value: "{{steps.extract-microservice-info.outputs.parameters.endpoints-summary}}"
+        when: "{{steps.setup-ci-cd.status}} == Succeeded"
+    - - name: notify-failure
+        templateRef:
+          name: slack-notifications
+          template: notify-microservice-failure
+        arguments:
+          parameters:
+          - name: microservice-name
+            value: "{{workflow.parameters.microservice-name}}"
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
+          - name: error-message
+            value: "Microservice creation failed - check workflow logs for details"
+          - name: failed-step
+            value: "Workflow step failed - check logs"
+        when: "{{steps.validate-request.status}} != Succeeded or {{steps.create-appcontainer-for-microservice.status}} != Succeeded or {{steps.create-microservice-claim.status}} != Succeeded or {{steps.wait-for-microservice.status}} != Succeeded or {{steps.setup-ci-cd.status}} != Succeeded"
+
+  # =============================================================================
+  # MICROSERVICE-SPECIFIC TEMPLATES (reuse from original)
+  # =============================================================================
+  - name: validate-microservice-request
+    inputs:
+      parameters:
+      - name: microservice-name
+      - name: language  
+      - name: database
+      - name: cache
+      - name: namespace
+      - name: github-org
+      - name: user
+    script:
+      image: alpine:3.18
+      command: [sh]
+      source: |
+        echo "Validating Microservice request..."
+        echo "Name: {{inputs.parameters.microservice-name}}"
+        echo "Language: {{inputs.parameters.language}}"
+        echo "Database: {{inputs.parameters.database}}"
+        echo "Cache: {{inputs.parameters.cache}}"
+        echo "Namespace: {{inputs.parameters.namespace}}"
+        echo "GitHub Org: {{inputs.parameters.github-org}}"
+        echo "User: {{inputs.parameters.user}}"
+        
+        # Basic validation
+        if [ -z "{{inputs.parameters.microservice-name}}" ]; then
+          echo "Microservice name is required"
+          exit 1
+        fi
+        
+        # Validate name format (lowercase, alphanumeric, hyphens)
+        if ! echo "{{inputs.parameters.microservice-name}}" | grep -E '^[a-z0-9][a-z0-9-]*[a-z0-9]$'; then
+          echo "Invalid microservice name format (must be DNS-1123 compliant)"
+          exit 1
+        fi
+        
+        # Validate language
+        case "{{inputs.parameters.language}}" in
+          python|java|fastapi|springboot)
+            echo "✅ Supported language: {{inputs.parameters.language}}"
+            ;;
+          *)
+            echo "❌ Unsupported language: {{inputs.parameters.language}}"
+            echo "Supported: python, java, fastapi, springboot"
+            exit 1
+            ;;
+        esac
+        
+        # Validate database
+        case "{{inputs.parameters.database}}" in
+          none|postgresql|postgres)
+            echo "✅ Supported database: {{inputs.parameters.database}}"
+            ;;
+          *)
+            echo "❌ Unsupported database: {{inputs.parameters.database}}"
+            echo "Supported: none, postgresql, postgres"
+            exit 1
+            ;;
+        esac
+        
+        # Validate cache
+        case "{{inputs.parameters.cache}}" in
+          none|redis)
+            echo "✅ Supported cache: {{inputs.parameters.cache}}"
+            ;;
+          *)
+            echo "❌ Unsupported cache: {{inputs.parameters.cache}}"
+            echo "Supported: none, redis"
+            exit 1
+            ;;
+        esac
+        
+        # Validate GitHub organization
+        if [ -z "{{inputs.parameters.github-org}}" ]; then
+          echo "GitHub organization is required"
+          exit 1
+        fi
+        
+        echo "✅ Validation successful"
+
+  - name: create-microservice-claim
+    script:
+      image: bitnami/kubectl:1.28
+      command: [sh]
+      source: |
+        echo "Creating ApplicationClaim..."
+        
+        # Parse boolean parameters
+        OBSERVABILITY=$([ "{{workflow.parameters.observability}}" = "true" ] && echo "true" || echo "false")
+        SECURITY=$([ "{{workflow.parameters.security}}" = "true" ] && echo "true" || echo "false")
+        AUTO_CREATE_VCLUSTER=$([ "{{workflow.parameters.auto-create-vcluster}}" = "true" ] && echo "true" || echo "false")
+        
+        # Determine repository name (remove -service suffix)
+        REPO_NAME="{{workflow.parameters.microservice-name}}"
+        if echo "$REPO_NAME" | grep -q -- "-service$"; then
+          REPO_NAME=$(echo "$REPO_NAME" | sed 's/-service$//')
+        fi
+        
+        # Determine target vCluster name
+        TARGET_VCLUSTER="{{workflow.parameters.target-vcluster}}"
+        if [ -z "$TARGET_VCLUSTER" ] || [ "$TARGET_VCLUSTER" = "" ]; then
+          TARGET_VCLUSTER="${REPO_NAME}-vcluster"
+        fi
+        
+        # Map workflow parameters to ApplicationClaim schema
+        FRAMEWORK="{{workflow.parameters.language}}"
+        if [ "$FRAMEWORK" = "python" ]; then
+          FRAMEWORK="fastapi"
+        elif [ "$FRAMEWORK" = "java" ]; then
+          FRAMEWORK="springboot"
+        fi
+        
+        # Normalize database parameter
+        DATABASE="{{workflow.parameters.database}}"
+        if [ "$DATABASE" = "postgresql" ]; then
+          DATABASE="postgres"
+        fi
+        
+        # Sanitize slack channel for label
+        SLACK_CHANNEL_LABEL=$(echo "{{workflow.parameters.slack-channel}}" | sed 's/#//g' | tr '[:upper:]' '[:lower:]')
+        
+        # Create ApplicationClaim manifest
+        cat <<EOF | kubectl apply -f -
+        apiVersion: platform.example.org/v1alpha1
+        kind: ApplicationClaim
+        metadata:
+          name: {{workflow.parameters.microservice-name}}
+          namespace: {{workflow.parameters.namespace}}
+          labels:
+            created-by: parameter-mapping-layer-v2
+            requested-by: "{{workflow.parameters.user}}"
+            slack-channel: "$SLACK_CHANNEL_LABEL"
+            microservice-language: "{{workflow.parameters.language}}"
+            microservice-database: "{{workflow.parameters.database}}"
+            microservice-cache: "{{workflow.parameters.cache}}"
+            target-vcluster: "$TARGET_VCLUSTER"
+        spec:
+          name: {{workflow.parameters.microservice-name}}
+          language: "{{workflow.parameters.language}}"
+          framework: "$FRAMEWORK"
+          database: "$DATABASE"
+          cache: "{{workflow.parameters.cache}}"
+          exposeApi: false
+        EOF
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ ApplicationClaim created successfully"
+          echo "Crossplane will now create:"
+          echo "  🚀 Knative service: {{workflow.parameters.microservice-name}}"
+          echo "  📦 Docker image repository: {{workflow.parameters.docker-registry}}/{{workflow.parameters.microservice-name}}"
+          echo "  🔧 Database: $DATABASE (if enabled)"
+          echo "  💾 Cache: {{workflow.parameters.cache}} (if enabled)"
+          echo "  📁 Repository structure: microservices/{{workflow.parameters.microservice-name}}/"
+          exit 0
+        else
+          echo "❌ Failed to create ApplicationClaim"
+          exit 1
+        fi
+
+  - name: wait-for-microservice-ready
+    script:
+      image: bitnami/kubectl:1.28
+      command: [sh]
+      source: |
+        echo "Waiting for ApplicationClaim to be ready by Crossplane..."
+        
+        # Wait for the ApplicationClaim to be ready and have proper status
+        TIMEOUT=600
+        ELAPSED=0
+        
+        while [ $ELAPSED -lt $TIMEOUT ]; do
+          echo "Checking ApplicationClaim status... (${ELAPSED}s/${TIMEOUT}s)"
+          
+          # Check ApplicationClaim status using the correct schema
+          READY=$(kubectl get applicationclaim {{workflow.parameters.microservice-name}} -n {{workflow.parameters.namespace}} -o jsonpath='{.status.ready}' 2>/dev/null || echo "false")
+          REPOSITORY_URL=$(kubectl get applicationclaim {{workflow.parameters.microservice-name}} -n {{workflow.parameters.namespace}} -o jsonpath='{.status.repository.url}' 2>/dev/null || echo "")
+          KNATIVE_SERVICE=$(kubectl get applicationclaim {{workflow.parameters.microservice-name}} -n {{workflow.parameters.namespace}} -o jsonpath='{.status.application.knativeService}' 2>/dev/null || echo "")
+          
+          if [ "$READY" = "true" ] && [ ! -z "$REPOSITORY_URL" ]; then
+            echo "✅ ApplicationClaim ready!"
+            echo "Repository: $REPOSITORY_URL"
+            echo "Knative Service: $KNATIVE_SERVICE"
+            echo "CLAUDE.md-compliant structure: Ready"
+            exit 0
+          fi
+          
+          # Show current status for debugging
+          echo "  Ready: $READY"
+          echo "  Repository: $REPOSITORY_URL"
+          echo "  Knative Service: $KNATIVE_SERVICE"
+          
+          sleep 15
+          ELAPSED=$((ELAPSED + 15))
+        done
+        
+        echo "❌ Timeout waiting for ApplicationClaim to be ready"
+        exit 1
+
+  - name: setup-microservice-cicd
+    script:
+      image: bitnami/kubectl:1.28
+      command: [sh]
+      source: |
+        echo "✅ CI/CD setup complete - using ApplicationClaim automated CI/CD"
+        echo "The ApplicationClaim automatically configures:"
+        echo "  📦 GitHub Actions workflows for build and deploy"
+        echo "  🔄 GitOps integration with ArgoCD"
+        echo "  🚀 Knative service deployment"
+        echo "  🔧 OAM application definitions"
+        exit 0
+
+  - name: extract-microservice-info
+    outputs:
+      parameters:
+      - name: endpoints-summary
+        valueFrom:
+          path: /tmp/endpoints.txt
+    script:
+      image: bitnami/kubectl:1.28
+      command: [sh]
+      source: |
+        echo "🔍 Extracting Microservice connection information..."
+        
+        # Determine repository and vCluster names
+        REPO_NAME="{{workflow.parameters.microservice-name}}"
+        if echo "$REPO_NAME" | grep -q -- "-service$"; then
+          REPO_NAME=$(echo "$REPO_NAME" | sed 's/-service$//')
+        fi
+        
+        TARGET_VCLUSTER="{{workflow.parameters.target-vcluster}}"
+        if [ -z "$TARGET_VCLUSTER" ] || [ "$TARGET_VCLUSTER" = "" ]; then
+          TARGET_VCLUSTER="${REPO_NAME}-vcluster"
+        fi
+        
+        echo "🔍 Extracting endpoints for microservice: {{workflow.parameters.microservice-name}}"
+        echo "Repository name: $REPO_NAME"
+        echo "Target VCluster: $TARGET_VCLUSTER"
+        
+        # Build endpoints summary
+        ENDPOINTS_SUMMARY=""
+        
+        # GitHub repositories
+        SOURCE_URL="https://github.com/{{workflow.parameters.github-org}}/$REPO_NAME"
+        GITOPS_URL="https://github.com/{{workflow.parameters.github-org}}/$REPO_NAME-gitops"
+        ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}📚 Source Repository: $SOURCE_URL\\\\n"
+        ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}🔄 GitOps Repository: $GITOPS_URL\\\\n"
+        
+        # ArgoCD endpoint (from vCluster)
+        ARGOCD_URL="http://${TARGET_VCLUSTER}-argocd.{{workflow.parameters.namespace}}.local"
+        ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}🔄 ArgoCD (GitOps): $ARGOCD_URL\\\\n"
+        
+        # Microservice endpoint (will be available after deployment)
+        SERVICE_URL="http://{{workflow.parameters.microservice-name}}.{{workflow.parameters.namespace}}.local"
+        ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}🚀 Microservice Endpoint: $SERVICE_URL\\\\n"
+        
+        # Write output to file
+        echo -e "$ENDPOINTS_SUMMARY" > /tmp/endpoints.txt
+        
+        echo "✅ Microservice connection information extracted"
+        echo "Endpoints: $ENDPOINTS_SUMMARY"

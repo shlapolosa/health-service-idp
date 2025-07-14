@@ -1,0 +1,332 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: appcontainer-mapping-layer
+  namespace: argo
+  annotations:
+    description: "Parameter mapping layer for AppContainer templates - provides clean separation between contexts"
+spec:
+  templates:
+
+  # =============================================================================
+  # STANDALONE APPCONTAINER INTERFACE
+  # =============================================================================
+  - name: create-standalone-appcontainer
+    inputs:
+      parameters:
+      - name: appcontainer-name
+      - name: namespace
+        default: "default"
+      - name: description
+        default: "CLAUDE.md-compliant application container"
+      - name: github-org
+        default: "socrates12345"
+      - name: docker-registry
+        default: "docker.io/socrates12345"
+      - name: observability
+        default: "true"
+      - name: security
+        default: "true"
+      - name: vcluster-name
+        default: ""
+      - name: auto-create-vcluster
+        default: "true"
+      - name: user
+        default: "unknown"
+      - name: slack-channel
+        default: "unknown"
+      - name: slack-user-id
+        default: "unknown"
+    steps:
+    - - name: execute-appcontainer-core
+        templateRef:
+          name: appcontainer-core-templates
+          template: appcontainer-core-workflow
+        arguments:
+          parameters:
+          - name: appcontainer-name
+            value: "{{inputs.parameters.appcontainer-name}}"
+          - name: namespace
+            value: "{{inputs.parameters.namespace}}"
+          - name: description
+            value: "{{inputs.parameters.description}}"
+          - name: github-org
+            value: "{{inputs.parameters.github-org}}"
+          - name: docker-registry
+            value: "{{inputs.parameters.docker-registry}}"
+          - name: observability
+            value: "{{inputs.parameters.observability}}"
+          - name: security
+            value: "{{inputs.parameters.security}}"
+          - name: vcluster-name
+            value: "{{inputs.parameters.vcluster-name}}"
+          - name: auto-create-vcluster
+            value: "{{inputs.parameters.auto-create-vcluster}}"
+          - name: user
+            value: "{{inputs.parameters.user}}"
+          - name: slack-channel
+            value: "{{inputs.parameters.slack-channel}}"
+          - name: slack-user-id
+            value: "{{inputs.parameters.slack-user-id}}"
+
+  # =============================================================================
+  # MICROSERVICE COMPOSITION INTERFACE
+  # =============================================================================
+  - name: create-appcontainer-for-microservice
+    inputs:
+      parameters:
+      # Microservice context parameters
+      - name: microservice-name
+      - name: namespace
+      - name: language
+      - name: database
+      - name: cache
+      - name: description
+      - name: github-org
+      - name: docker-registry
+      - name: observability
+      - name: security
+      - name: target-vcluster
+      - name: auto-create-vcluster
+      - name: user
+      - name: slack-channel
+      - name: slack-user-id
+    steps:
+    - - name: map-microservice-to-appcontainer
+        template: microservice-to-appcontainer-mapper
+        arguments:
+          parameters:
+          - name: microservice-name
+            value: "{{inputs.parameters.microservice-name}}"
+          - name: namespace
+            value: "{{inputs.parameters.namespace}}"
+          - name: language
+            value: "{{inputs.parameters.language}}"
+          - name: database
+            value: "{{inputs.parameters.database}}"
+          - name: cache
+            value: "{{inputs.parameters.cache}}"
+          - name: description
+            value: "{{inputs.parameters.description}}"
+          - name: github-org
+            value: "{{inputs.parameters.github-org}}"
+          - name: docker-registry
+            value: "{{inputs.parameters.docker-registry}}"
+          - name: observability
+            value: "{{inputs.parameters.observability}}"
+          - name: security
+            value: "{{inputs.parameters.security}}"
+          - name: target-vcluster
+            value: "{{inputs.parameters.target-vcluster}}"
+          - name: auto-create-vcluster
+            value: "{{inputs.parameters.auto-create-vcluster}}"
+          - name: user
+            value: "{{inputs.parameters.user}}"
+          - name: slack-channel
+            value: "{{inputs.parameters.slack-channel}}"
+          - name: slack-user-id
+            value: "{{inputs.parameters.slack-user-id}}"
+    - - name: execute-appcontainer-core
+        templateRef:
+          name: appcontainer-core-templates
+          template: appcontainer-core-workflow
+        arguments:
+          parameters:
+          - name: appcontainer-name
+            value: "{{steps.map-microservice-to-appcontainer.outputs.parameters.appcontainer-name}}"
+          - name: namespace
+            value: "{{steps.map-microservice-to-appcontainer.outputs.parameters.namespace}}"
+          - name: description
+            value: "{{steps.map-microservice-to-appcontainer.outputs.parameters.description}}"
+          - name: github-org
+            value: "{{steps.map-microservice-to-appcontainer.outputs.parameters.github-org}}"
+          - name: docker-registry
+            value: "{{steps.map-microservice-to-appcontainer.outputs.parameters.docker-registry}}"
+          - name: observability
+            value: "{{steps.map-microservice-to-appcontainer.outputs.parameters.observability}}"
+          - name: security
+            value: "{{steps.map-microservice-to-appcontainer.outputs.parameters.security}}"
+          - name: vcluster-name
+            value: "{{steps.map-microservice-to-appcontainer.outputs.parameters.vcluster-name}}"
+          - name: auto-create-vcluster
+            value: "{{steps.map-microservice-to-appcontainer.outputs.parameters.auto-create-vcluster}}"
+          - name: user
+            value: "{{steps.map-microservice-to-appcontainer.outputs.parameters.user}}"
+          - name: slack-channel
+            value: "{{steps.map-microservice-to-appcontainer.outputs.parameters.slack-channel}}"
+          - name: slack-user-id
+            value: "{{steps.map-microservice-to-appcontainer.outputs.parameters.slack-user-id}}"
+
+  # =============================================================================
+  # PARAMETER MAPPING TEMPLATES
+  # =============================================================================
+  - name: microservice-to-appcontainer-mapper
+    inputs:
+      parameters:
+      - name: microservice-name
+      - name: namespace
+      - name: language
+      - name: database
+      - name: cache
+      - name: description
+      - name: github-org
+      - name: docker-registry
+      - name: observability
+      - name: security
+      - name: target-vcluster
+      - name: auto-create-vcluster
+      - name: user
+      - name: slack-channel
+      - name: slack-user-id
+    outputs:
+      parameters:
+      - name: appcontainer-name
+        valueFrom:
+          path: /tmp/appcontainer-name
+      - name: namespace
+        valueFrom:
+          path: /tmp/namespace
+      - name: description
+        valueFrom:
+          path: /tmp/description
+      - name: github-org
+        valueFrom:
+          path: /tmp/github-org
+      - name: docker-registry
+        valueFrom:
+          path: /tmp/docker-registry
+      - name: observability
+        valueFrom:
+          path: /tmp/observability
+      - name: security
+        valueFrom:
+          path: /tmp/security
+      - name: vcluster-name
+        valueFrom:
+          path: /tmp/vcluster-name
+      - name: auto-create-vcluster
+        valueFrom:
+          path: /tmp/auto-create-vcluster
+      - name: user
+        valueFrom:
+          path: /tmp/user
+      - name: slack-channel
+        valueFrom:
+          path: /tmp/slack-channel
+      - name: slack-user-id
+        valueFrom:
+          path: /tmp/slack-user-id
+    script:
+      image: alpine:3.18
+      command: [sh]
+      source: |
+        echo "🔄 Mapping microservice parameters to AppContainer context..."
+        
+        # Map microservice-name to appcontainer-name
+        APPCONTAINER_NAME="{{inputs.parameters.microservice-name}}"
+        echo "Mapped microservice '{{inputs.parameters.microservice-name}}' to appcontainer '$APPCONTAINER_NAME'"
+        
+        # Build enhanced description with microservice context
+        ENHANCED_DESC="{{inputs.parameters.description}} - Application container for {{inputs.parameters.language}} microservice"
+        if [ "{{inputs.parameters.database}}" != "none" ]; then
+          ENHANCED_DESC="$ENHANCED_DESC with {{inputs.parameters.database}} database"
+        fi
+        if [ "{{inputs.parameters.cache}}" != "none" ]; then
+          ENHANCED_DESC="$ENHANCED_DESC and {{inputs.parameters.cache}} cache"
+        fi
+        
+        # Determine vCluster name from target-vcluster or derive from microservice name
+        VCLUSTER_NAME="{{inputs.parameters.target-vcluster}}"
+        if [ -z "$VCLUSTER_NAME" ] || [ "$VCLUSTER_NAME" = "" ]; then
+          # Remove -service suffix if present and add -vcluster
+          BASE_NAME=$(echo "{{inputs.parameters.microservice-name}}" | sed 's/-service$//')
+          VCLUSTER_NAME="${BASE_NAME}-vcluster"
+        fi
+        
+        # Output mapped parameters
+        echo "$APPCONTAINER_NAME" > /tmp/appcontainer-name
+        echo "{{inputs.parameters.namespace}}" > /tmp/namespace
+        echo "$ENHANCED_DESC" > /tmp/description
+        echo "{{inputs.parameters.github-org}}" > /tmp/github-org
+        echo "{{inputs.parameters.docker-registry}}" > /tmp/docker-registry
+        echo "{{inputs.parameters.observability}}" > /tmp/observability
+        echo "{{inputs.parameters.security}}" > /tmp/security
+        echo "$VCLUSTER_NAME" > /tmp/vcluster-name
+        echo "{{inputs.parameters.auto-create-vcluster}}" > /tmp/auto-create-vcluster
+        echo "{{inputs.parameters.user}}" > /tmp/user
+        echo "{{inputs.parameters.slack-channel}}" > /tmp/slack-channel
+        echo "{{inputs.parameters.slack-user-id}}" > /tmp/slack-user-id
+        
+        echo "✅ Parameter mapping completed successfully"
+        echo "AppContainer: $APPCONTAINER_NAME"
+        echo "VCluster: $VCLUSTER_NAME"
+        echo "Description: $ENHANCED_DESC"
+
+  # =============================================================================
+  # VCLUSTER PARAMETER MAPPING
+  # =============================================================================
+  - name: appcontainer-to-vcluster-mapper
+    inputs:
+      parameters:
+      - name: appcontainer-name
+      - name: vcluster-name
+      - name: namespace
+      - name: security
+      - name: user
+      - name: slack-channel
+      - name: slack-user-id
+      - name: auto-create-vcluster
+    outputs:
+      parameters:
+      - name: vcluster-name
+        valueFrom:
+          path: /tmp/vcluster-name
+      - name: namespace
+        valueFrom:
+          path: /tmp/namespace
+      - name: size
+        valueFrom:
+          path: /tmp/size
+      - name: capabilities
+        valueFrom:
+          path: /tmp/capabilities
+      - name: user
+        valueFrom:
+          path: /tmp/user
+      - name: slack-channel
+        valueFrom:
+          path: /tmp/slack-channel
+      - name: slack-user-id
+        valueFrom:
+          path: /tmp/slack-user-id
+    script:
+      image: alpine:3.18
+      command: [sh]
+      source: |
+        echo "🔄 Mapping AppContainer parameters to VCluster context..."
+        
+        # Use provided vCluster name or derive from appcontainer name
+        FINAL_VCLUSTER_NAME="{{inputs.parameters.vcluster-name}}"
+        if [ -z "$FINAL_VCLUSTER_NAME" ] || [ "$FINAL_VCLUSTER_NAME" = "" ]; then
+          FINAL_VCLUSTER_NAME="{{inputs.parameters.appcontainer-name}}-vcluster"
+        fi
+        
+        # Determine VCluster size based on context (medium for AppContainer)
+        VCLUSTER_SIZE="medium"
+        
+        # Build capabilities JSON for AppContainer requirements
+        CAPABILITIES="{\"observability\":\"true\",\"security\":\"{{inputs.parameters.security}}\",\"gitops\":\"true\",\"logging\":\"true\",\"networking\":\"true\",\"autoscaling\":\"false\",\"backup\":\"false\"}"
+        
+        # Output mapped parameters
+        echo "$FINAL_VCLUSTER_NAME" > /tmp/vcluster-name
+        echo "{{inputs.parameters.namespace}}" > /tmp/namespace
+        echo "$VCLUSTER_SIZE" > /tmp/size
+        echo "$CAPABILITIES" > /tmp/capabilities
+        echo "{{inputs.parameters.user}}" > /tmp/user
+        echo "{{inputs.parameters.slack-channel}}" > /tmp/slack-channel
+        echo "{{inputs.parameters.slack-user-id}}" > /tmp/slack-user-id
+        
+        echo "✅ VCluster parameter mapping completed"
+        echo "VCluster Name: $FINAL_VCLUSTER_NAME"
+        echo "Size: $VCLUSTER_SIZE"
+        echo "Capabilities: $CAPABILITIES"
