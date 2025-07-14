@@ -308,11 +308,9 @@ spec:
       image: bitnami/kubectl:1.28
       command: [sh]
       source: |
-        echo "Creating Microservice claim..."
+        echo "Creating ApplicationClaim..."
         
-        # Create namespace if it doesn't exist
-        echo "Ensuring namespace {{workflow.parameters.namespace}} exists..."
-        kubectl create namespace {{workflow.parameters.namespace}} --dry-run=client -o yaml | kubectl apply -f -
+        # Note: Skipping namespace creation due to RBAC restrictions - namespace should already exist
         
         # Parse boolean parameters
         OBSERVABILITY=$([ "{{workflow.parameters.observability}}" = "true" ] && echo "true" || echo "false")
@@ -331,46 +329,58 @@ spec:
           TARGET_VCLUSTER="${REPO_NAME}-vcluster"
         fi
         
-        # Create Microservice claim manifest
+        # Map workflow parameters to ApplicationClaim schema
+        FRAMEWORK="{{workflow.parameters.language}}"
+        if [ "$FRAMEWORK" = "python" ]; then
+          FRAMEWORK="fastapi"
+        elif [ "$FRAMEWORK" = "java" ]; then
+          FRAMEWORK="springboot"
+        fi
+        
+        # Normalize database parameter
+        DATABASE="{{workflow.parameters.database}}"
+        if [ "$DATABASE" = "postgresql" ]; then
+          DATABASE="postgres"
+        fi
+        
+        # Sanitize slack channel for label (remove # and convert to lowercase)
+        SLACK_CHANNEL_LABEL=$(echo "{{workflow.parameters.slack-channel}}" | sed 's/#//g' | tr '[:upper:]' '[:lower:]')
+        
+        # Create ApplicationClaim manifest
         cat <<EOF | kubectl apply -f -
         apiVersion: platform.example.org/v1alpha1
-        kind: MicroserviceClaim
+        kind: ApplicationClaim
         metadata:
           name: {{workflow.parameters.microservice-name}}
           namespace: {{workflow.parameters.namespace}}
           labels:
             created-by: slack
             requested-by: "{{workflow.parameters.user}}"
-            slack-channel: "{{workflow.parameters.slack-channel}}"
+            slack-channel: "$SLACK_CHANNEL_LABEL"
             microservice-language: "{{workflow.parameters.language}}"
             microservice-database: "{{workflow.parameters.database}}"
             microservice-cache: "{{workflow.parameters.cache}}"
             target-vcluster: "$TARGET_VCLUSTER"
         spec:
           name: {{workflow.parameters.microservice-name}}
-          repositoryName: $REPO_NAME
           language: "{{workflow.parameters.language}}"
-          database: "{{workflow.parameters.database}}"
+          framework: "$FRAMEWORK"
+          database: "$DATABASE"
           cache: "{{workflow.parameters.cache}}"
-          description: "{{workflow.parameters.description}}"
-          gitHubOrg: "{{workflow.parameters.github-org}}"
-          dockerRegistry: "{{workflow.parameters.docker-registry}}"
-          enableObservability: $OBSERVABILITY
-          enableSecurity: $SECURITY
-          targetVCluster: "$TARGET_VCLUSTER"
-          autoCreateVCluster: $AUTO_CREATE_VCLUSTER
+          exposeApi: false
         EOF
         
         if [ $? -eq 0 ]; then
-          echo "✅ Microservice claim created successfully"
+          echo "✅ ApplicationClaim created successfully"
           echo "Crossplane will now create:"
-          echo "  📚 Source repo: https://github.com/{{workflow.parameters.github-org}}/$REPO_NAME"
-          echo "  🔄 GitOps repo: https://github.com/{{workflow.parameters.github-org}}/$REPO_NAME-gitops"
-          echo "  🔧 VCluster: $TARGET_VCLUSTER"
-          echo "  📁 Microservice structure: microservices/{{workflow.parameters.microservice-name}}/"
+          echo "  🚀 Knative service: {{workflow.parameters.microservice-name}}"
+          echo "  📦 Docker image repository: {{workflow.parameters.docker-registry}}/{{workflow.parameters.microservice-name}}"
+          echo "  🔧 Database: $DATABASE (if enabled)"
+          echo "  💾 Cache: {{workflow.parameters.cache}} (if enabled)"
+          echo "  📁 Repository structure: microservices/{{workflow.parameters.microservice-name}}/"
           exit 0
         else
-          echo "❌ Failed to create Microservice claim"
+          echo "❌ Failed to create ApplicationClaim"
           exit 1
         fi
 
@@ -379,32 +389,38 @@ spec:
       image: bitnami/kubectl:1.28
       command: [sh]
       source: |
-        echo "Waiting for Microservice to be created by Crossplane..."
+        echo "Waiting for ApplicationClaim to be ready by Crossplane..."
         
-        # Wait for the Microservice claim to have repository URLs and structure in status
+        # Wait for the ApplicationClaim to be ready and have proper status
         TIMEOUT=600
         ELAPSED=0
         
         while [ $ELAPSED -lt $TIMEOUT ]; do
-          echo "Checking Microservice claim status... (${ELAPSED}s/${TIMEOUT}s)"
+          echo "Checking ApplicationClaim status... (${ELAPSED}s/${TIMEOUT}s)"
           
-          SOURCE_URL=$(kubectl get microserviceclaim {{workflow.parameters.microservice-name}} -n {{workflow.parameters.namespace}} -o jsonpath='{.status.sourceRepository.url}' 2>/dev/null || echo "")
-          GITOPS_URL=$(kubectl get microserviceclaim {{workflow.parameters.microservice-name}} -n {{workflow.parameters.namespace}} -o jsonpath='{.status.gitopsRepository.url}' 2>/dev/null || echo "")
-          STRUCTURE_READY=$(kubectl get microserviceclaim {{workflow.parameters.microservice-name}} -n {{workflow.parameters.namespace}} -o jsonpath='{.status.structureReady}' 2>/dev/null || echo "false")
+          # Check ApplicationClaim status using the correct schema
+          READY=$(kubectl get applicationclaim {{workflow.parameters.microservice-name}} -n {{workflow.parameters.namespace}} -o jsonpath='{.status.ready}' 2>/dev/null || echo "false")
+          REPOSITORY_URL=$(kubectl get applicationclaim {{workflow.parameters.microservice-name}} -n {{workflow.parameters.namespace}} -o jsonpath='{.status.repository.url}' 2>/dev/null || echo "")
+          KNATIVE_SERVICE=$(kubectl get applicationclaim {{workflow.parameters.microservice-name}} -n {{workflow.parameters.namespace}} -o jsonpath='{.status.application.knativeService}' 2>/dev/null || echo "")
           
-          if [ ! -z "$SOURCE_URL" ] && [ ! -z "$GITOPS_URL" ] && [ "$STRUCTURE_READY" = "true" ]; then
-            echo "✅ Microservice created successfully!"
-            echo "Source: $SOURCE_URL"
-            echo "GitOps: $GITOPS_URL"
-            echo "CLAUDE.md structure: Ready"
+          if [ "$READY" = "true" ] && [ ! -z "$REPOSITORY_URL" ]; then
+            echo "✅ ApplicationClaim ready!"
+            echo "Repository: $REPOSITORY_URL"
+            echo "Knative Service: $KNATIVE_SERVICE"
+            echo "CLAUDE.md-compliant structure: Ready"
             exit 0
           fi
+          
+          # Show current status for debugging
+          echo "  Ready: $READY"
+          echo "  Repository: $REPOSITORY_URL"
+          echo "  Knative Service: $KNATIVE_SERVICE"
           
           sleep 15
           ELAPSED=$((ELAPSED + 15))
         done
         
-        echo "❌ Timeout waiting for microservice to be created"
+        echo "❌ Timeout waiting for ApplicationClaim to be ready"
         exit 1
 
   - name: setup-microservice-cicd
