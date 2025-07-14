@@ -406,12 +406,12 @@ spec:
         esac
         
         case "{{inputs.parameters.microservice-database}}" in
-          none|postgres|mysql|mongodb|cassandra)
+          none|postgres|postgresql|mysql|mongodb|cassandra)
             echo "✅ Valid microservice-database: {{inputs.parameters.microservice-database}}"
             ;;
           *)
             echo "❌ Invalid microservice-database: {{inputs.parameters.microservice-database}}"
-            echo "Must be one of: none, postgres, mysql, mongodb, cassandra"
+            echo "Must be one of: none, postgres, postgresql, mysql, mongodb, cassandra"
             exit 1
             ;;
         esac
