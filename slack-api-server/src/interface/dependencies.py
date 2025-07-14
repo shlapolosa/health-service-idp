@@ -8,6 +8,7 @@ from functools import lru_cache
 from typing import Optional
 
 from ..application.use_cases import (CreateAppContainerUseCase,
+                                     CreateMicroserviceUseCase,
                                      CreateVClusterUseCase,
                                      ProcessSlackCommandUseCase,
                                      VerifySlackRequestUseCase)
@@ -113,11 +114,21 @@ def get_create_appcontainer_use_case() -> CreateAppContainerUseCase:
     )
 
 
+def get_create_microservice_use_case() -> CreateMicroserviceUseCase:
+    """Get create Microservice use case with dependencies."""
+    return CreateMicroserviceUseCase(
+        parser=get_nlp_parser(),
+        vcluster_dispatcher=get_vcluster_dispatcher(),
+        response_builder=get_slack_response_builder_service(),
+    )
+
+
 def get_process_slack_command_use_case() -> ProcessSlackCommandUseCase:
     """Get process Slack command use case with dependencies."""
     return ProcessSlackCommandUseCase(
         create_vcluster_use_case=get_create_vcluster_use_case(),
         create_appcontainer_use_case=get_create_appcontainer_use_case(),
+        create_microservice_use_case=get_create_microservice_use_case(),
         response_builder=get_slack_response_builder_service(),
     )
 
