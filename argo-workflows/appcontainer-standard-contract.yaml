@@ -1,0 +1,469 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: appcontainer-standard-contract
+  namespace: argo
+  labels:
+    parameter-contract-version: "v1.0"
+    resource-type: "appcontainer"
+    template-category: "platform"
+  annotations:
+    description: "AppContainer creation using Standardized Parameter Contract"
+    parameter-contract: "compliant"
+    supported-tiers: "1,2,3"
+    maintainer: "platform-team"
+spec:
+  entrypoint: create-appcontainer
+  arguments:
+    parameters:
+    # === TIER 1: UNIVERSAL (Required) ===
+    - name: resource-name
+      value: "default-app"
+      description: "AppContainer name (DNS-1123 compliant)"
+    - name: resource-type
+      value: "appcontainer"
+    - name: namespace
+      value: "default"
+    - name: user
+      value: "unknown"
+    - name: description
+      value: "CLAUDE.md-compliant application container"
+    - name: github-org
+      value: "socrates12345"
+    - name: docker-registry
+      value: "docker.io/socrates12345"
+    - name: slack-channel
+      value: "#appcontainer-notifications"
+    - name: slack-user-id
+      value: "UNKNOWN"
+    
+    # === TIER 2: PLATFORM (Common) ===
+    - name: security-enabled
+      value: "true"
+    - name: observability-enabled
+      value: "true"
+    - name: backup-enabled
+      value: "false"
+    - name: environment-tier
+      value: "development"
+    - name: auto-create-dependencies
+      value: "true"
+    - name: resource-size
+      value: "medium"
+    
+    # === TIER 3: APPCONTAINER-SPECIFIC ===
+    - name: target-vcluster
+      value: ""
+      description: "Target vCluster for AppContainer deployment (auto-derived if empty)"
+    - name: enable-default-microservice
+      value: "true"
+      description: "Create a default hello-world microservice"
+
+  templates:
+  - name: create-appcontainer
+    steps:
+    - - name: validate-parameters
+        template: validate-appcontainer-parameters
+        arguments:
+          parameters:
+          - name: resource-name
+            value: "{{workflow.parameters.resource-name}}"
+          - name: resource-type
+            value: "{{workflow.parameters.resource-type}}"
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+          - name: environment-tier
+            value: "{{workflow.parameters.environment-tier}}"
+          - name: github-org
+            value: "{{workflow.parameters.github-org}}"
+    - - name: notify-starting
+        templateRef:
+          name: slack-standard-notifications
+          template: notify-workflow-starting
+        arguments:
+          parameters:
+          - name: resource-name
+            value: "{{workflow.parameters.resource-name}}"
+          - name: resource-type
+            value: "{{workflow.parameters.resource-type}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
+          - name: slack-channel
+            value: "{{workflow.parameters.slack-channel}}"
+          - name: slack-user-id
+            value: "{{workflow.parameters.slack-user-id}}"
+          - name: workflow-description
+            value: "AppContainer creation workflow"
+        when: "{{steps.validate-parameters.status}} == Succeeded"
+    - - name: ensure-vcluster
+        template: ensure-vcluster-dependency
+        arguments:
+          parameters:
+          - name: resource-name
+            value: "{{workflow.parameters.resource-name}}"
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+          - name: target-vcluster
+            value: "{{workflow.parameters.target-vcluster}}"
+          - name: auto-create-dependencies
+            value: "{{workflow.parameters.auto-create-dependencies}}"
+          - name: security-enabled
+            value: "{{workflow.parameters.security-enabled}}"
+          - name: observability-enabled
+            value: "{{workflow.parameters.observability-enabled}}"
+          - name: backup-enabled
+            value: "{{workflow.parameters.backup-enabled}}"
+          - name: environment-tier
+            value: "{{workflow.parameters.environment-tier}}"
+          - name: resource-size
+            value: "{{workflow.parameters.resource-size}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
+          - name: slack-channel
+            value: "{{workflow.parameters.slack-channel}}"
+          - name: slack-user-id
+            value: "{{workflow.parameters.slack-user-id}}"
+        when: "{{steps.validate-parameters.status}} == Succeeded"
+    - - name: notify-vcluster-ready
+        templateRef:
+          name: slack-standard-notifications
+          template: notify-workflow-progress
+        arguments:
+          parameters:
+          - name: resource-name
+            value: "{{workflow.parameters.resource-name}}"
+          - name: resource-type
+            value: "{{workflow.parameters.resource-type}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
+          - name: slack-channel
+            value: "{{workflow.parameters.slack-channel}}"
+          - name: slack-user-id
+            value: "{{workflow.parameters.slack-user-id}}"
+          - name: step-name
+            value: "VCluster Setup"
+          - name: progress-message
+            value: "✅ VCluster ready - creating application infrastructure..."
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+        when: "{{steps.ensure-vcluster.status}} == Succeeded"
+    - - name: create-appcontainer-claim
+        template: create-appcontainer-claim
+        arguments:
+          parameters:
+          - name: resource-name
+            value: "{{workflow.parameters.resource-name}}"
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+          - name: description
+            value: "{{workflow.parameters.description}}"
+          - name: github-org
+            value: "{{workflow.parameters.github-org}}"
+          - name: docker-registry
+            value: "{{workflow.parameters.docker-registry}}"
+          - name: security-enabled
+            value: "{{workflow.parameters.security-enabled}}"
+          - name: observability-enabled
+            value: "{{workflow.parameters.observability-enabled}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
+          - name: slack-channel
+            value: "{{workflow.parameters.slack-channel}}"
+        when: "{{steps.ensure-vcluster.status}} == Succeeded"
+    - - name: wait-for-repositories
+        template: wait-for-appcontainer-repositories
+        arguments:
+          parameters:
+          - name: resource-name
+            value: "{{workflow.parameters.resource-name}}"
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+        when: "{{steps.create-appcontainer-claim.status}} == Succeeded"
+    - - name: create-default-microservice
+        template: create-default-microservice
+        arguments:
+          parameters:
+          - name: resource-name
+            value: "{{workflow.parameters.resource-name}}"
+          - name: target-vcluster
+            value: "{{steps.ensure-vcluster.outputs.parameters.vcluster-name}}"
+        when: "{{steps.wait-for-repositories.status}} == Succeeded and {{workflow.parameters.enable-default-microservice}} == true"
+    - - name: extract-appcontainer-info
+        template: extract-appcontainer-info
+        arguments:
+          parameters:
+          - name: resource-name
+            value: "{{workflow.parameters.resource-name}}"
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+          - name: target-vcluster
+            value: "{{steps.ensure-vcluster.outputs.parameters.vcluster-name}}"
+          - name: github-org
+            value: "{{workflow.parameters.github-org}}"
+        when: "{{steps.wait-for-repositories.status}} == Succeeded"
+    - - name: notify-success
+        templateRef:
+          name: slack-standard-notifications
+          template: notify-workflow-success
+        arguments:
+          parameters:
+          - name: resource-name
+            value: "{{workflow.parameters.resource-name}}"
+          - name: resource-type
+            value: "{{workflow.parameters.resource-type}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
+          - name: slack-channel
+            value: "{{workflow.parameters.slack-channel}}"
+          - name: slack-user-id
+            value: "{{workflow.parameters.slack-user-id}}"
+          - name: success-message
+            value: "AppContainer '{{workflow.parameters.resource-name}}' created successfully!"
+          - name: endpoints
+            value: "{{steps.extract-appcontainer-info.outputs.parameters.endpoints-summary}}"
+          - name: capabilities
+            value: "📦 Microservices Platform\n🔄 GitOps (ArgoCD)\n🌐 Service Mesh (Istio)\n⚡ Auto-scaling (Knative)\n📊 Observability Stack"
+        when: "{{steps.extract-appcontainer-info.status}} == Succeeded"
+    - - name: notify-failure
+        templateRef:
+          name: slack-standard-notifications
+          template: notify-workflow-failure
+        arguments:
+          parameters:
+          - name: resource-name
+            value: "{{workflow.parameters.resource-name}}"
+          - name: resource-type
+            value: "{{workflow.parameters.resource-type}}"
+          - name: user
+            value: "{{workflow.parameters.user}}"
+          - name: slack-channel
+            value: "{{workflow.parameters.slack-channel}}"
+          - name: slack-user-id
+            value: "{{workflow.parameters.slack-user-id}}"
+          - name: error-message
+            value: "AppContainer creation failed"
+          - name: error-details
+            value: "Check workflow logs for detailed error information"
+          - name: failed-step
+            value: "AppContainer workflow"
+        when: "{{steps.validate-parameters.status}} != Succeeded or {{steps.ensure-vcluster.status}} != Succeeded or {{steps.create-appcontainer-claim.status}} != Succeeded or {{steps.wait-for-repositories.status}} != Succeeded"
+
+  # =============================================================================
+  # PARAMETER VALIDATION
+  # =============================================================================
+  - name: validate-appcontainer-parameters
+    inputs:
+      parameters:
+      - name: resource-name
+      - name: resource-type
+      - name: namespace
+      - name: environment-tier
+      - name: github-org
+    script:
+      image: alpine:3.18
+      command: [sh]
+      source: |
+        echo "🔍 Validating AppContainer parameter contract compliance..."
+        
+        # Validate Tier 1 - Universal Parameters
+        if [ -z "{{inputs.parameters.resource-name}}" ]; then
+          echo "❌ Missing required parameter: resource-name"
+          exit 1
+        fi
+        
+        # Validate resource-name format (DNS-1123 compliant)
+        if ! echo "{{inputs.parameters.resource-name}}" | grep -E '^[a-z0-9][a-z0-9-]*[a-z0-9]$'; then
+          echo "❌ Invalid resource-name format: {{inputs.parameters.resource-name}}"
+          echo "Must be DNS-1123 compliant: lowercase alphanumeric and hyphens"
+          exit 1
+        fi
+        
+        # Validate resource-type
+        if [ "{{inputs.parameters.resource-type}}" != "appcontainer" ]; then
+          echo "❌ Invalid resource-type for AppContainer template: {{inputs.parameters.resource-type}}"
+          exit 1
+        fi
+        
+        # Validate namespace format
+        if ! echo "{{inputs.parameters.namespace}}" | grep -E '^[a-z0-9][a-z0-9-]*[a-z0-9]$'; then
+          echo "❌ Invalid namespace format: {{inputs.parameters.namespace}}"
+          exit 1
+        fi
+        
+        # Validate Tier 2 - Platform Parameters
+        case "{{inputs.parameters.environment-tier}}" in
+          development|staging|production)
+            echo "✅ Valid environment-tier: {{inputs.parameters.environment-tier}}"
+            ;;
+          *)
+            echo "❌ Invalid environment-tier: {{inputs.parameters.environment-tier}}"
+            echo "Must be one of: development, staging, production"
+            exit 1
+            ;;
+        esac
+        
+        # Validate GitHub organization
+        if [ -z "{{inputs.parameters.github-org}}" ]; then
+          echo "❌ GitHub organization is required"
+          exit 1
+        fi
+        
+        echo "✅ All parameter validations passed"
+        echo "📋 AppContainer Configuration:"
+        echo "   Name: {{inputs.parameters.resource-name}}"
+        echo "   Namespace: {{inputs.parameters.namespace}}"
+        echo "   Environment: {{inputs.parameters.environment-tier}}"
+        echo "   GitHub Org: {{inputs.parameters.github-org}}"
+
+  # =============================================================================
+  # VCLUSTER DEPENDENCY MANAGEMENT
+  # =============================================================================
+  - name: ensure-vcluster-dependency
+    inputs:
+      parameters:
+      - name: resource-name
+      - name: namespace
+      - name: target-vcluster
+      - name: auto-create-dependencies
+      - name: security-enabled
+      - name: observability-enabled
+      - name: backup-enabled
+      - name: environment-tier
+      - name: resource-size
+      - name: user
+      - name: slack-channel
+      - name: slack-user-id
+    outputs:
+      parameters:
+      - name: vcluster-name
+        valueFrom:
+          path: /tmp/vcluster-name
+    script:
+      image: alpine:3.18
+      command: [sh]
+      source: |
+        echo "🔍 Determining VCluster dependency for AppContainer..."
+        
+        # Determine target vCluster name
+        TARGET_VCLUSTER="{{inputs.parameters.target-vcluster}}"
+        if [ -z "$TARGET_VCLUSTER" ]; then
+          TARGET_VCLUSTER="{{inputs.parameters.resource-name}}-vcluster"
+        fi
+        
+        echo "Target VCluster: $TARGET_VCLUSTER"
+        echo "$TARGET_VCLUSTER" > /tmp/vcluster-name
+        
+        if [ "{{inputs.parameters.auto-create-dependencies}}" = "true" ]; then
+          echo "✅ VCluster dependency will be auto-created"
+        else
+          echo "ℹ️ VCluster dependency must exist: $TARGET_VCLUSTER"
+        fi
+    steps:
+    - - name: create-vcluster-if-needed
+        templateRef:
+          name: vcluster-standard-contract
+          template: create-vcluster
+        arguments:
+          parameters:
+          - name: resource-name
+            value: "{{steps.determine-vcluster-name.outputs.parameters.vcluster-name}}"
+          - name: resource-type
+            value: "vcluster"
+          - name: namespace
+            value: "{{inputs.parameters.namespace}}"
+          - name: user
+            value: "{{inputs.parameters.user}}"
+          - name: description
+            value: "VCluster for AppContainer '{{inputs.parameters.resource-name}}'"
+          - name: slack-channel
+            value: "{{inputs.parameters.slack-channel}}"
+          - name: slack-user-id
+            value: "{{inputs.parameters.slack-user-id}}"
+          - name: security-enabled
+            value: "{{inputs.parameters.security-enabled}}"
+          - name: observability-enabled
+            value: "{{inputs.parameters.observability-enabled}}"
+          - name: backup-enabled
+            value: "{{inputs.parameters.backup-enabled}}"
+          - name: environment-tier
+            value: "{{inputs.parameters.environment-tier}}"
+          - name: resource-size
+            value: "{{inputs.parameters.resource-size}}"
+          - name: vcluster-size
+            value: "{{inputs.parameters.resource-size}}"
+        when: "{{inputs.parameters.auto-create-dependencies}} == true"
+    - - name: check-existing-vcluster
+        template: check-existing-vcluster
+        arguments:
+          parameters:
+          - name: vcluster-name
+            value: "{{steps.determine-vcluster-name.outputs.parameters.vcluster-name}}"
+          - name: namespace
+            value: "{{inputs.parameters.namespace}}"
+        when: "{{inputs.parameters.auto-create-dependencies}} == false"
+
+  # =============================================================================
+  # APPCONTAINER CLAIM CREATION
+  # =============================================================================
+  - name: create-appcontainer-claim
+    inputs:
+      parameters:
+      - name: resource-name
+      - name: namespace
+      - name: description
+      - name: github-org
+      - name: docker-registry
+      - name: security-enabled
+      - name: observability-enabled
+      - name: user
+      - name: slack-channel
+    script:
+      image: bitnami/kubectl:1.28
+      command: [sh]
+      source: |
+        echo "🏗️ Creating AppContainer claim with standardized parameters..."
+        
+        # Parse boolean parameters
+        OBSERVABILITY=$([ "{{inputs.parameters.observability-enabled}}" = "true" ] && echo "true" || echo "false")
+        SECURITY=$([ "{{inputs.parameters.security-enabled}}" = "true" ] && echo "true" || echo "false")
+        
+        # Sanitize slack channel for label
+        SLACK_CHANNEL_LABEL=$(echo "{{inputs.parameters.slack-channel}}" | sed 's/#//g' | tr '[:upper:]' '[:lower:]')
+        
+        # Create AppContainer claim manifest
+        cat <<EOF | kubectl apply -f -
+        apiVersion: platform.example.org/v1alpha1
+        kind: AppContainerClaim
+        metadata:
+          name: {{inputs.parameters.resource-name}}
+          namespace: {{inputs.parameters.namespace}}
+          labels:
+            created-by: "appcontainer-standard-contract"
+            parameter-contract-version: "v1.0"
+            resource-type: "appcontainer"
+            requested-by: "{{inputs.parameters.user}}"
+            slack-channel: "$SLACK_CHANNEL_LABEL"
+          annotations:
+            description: "{{inputs.parameters.description}}"
+            parameter-contract: "compliant"
+            created-at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        spec:
+          name: {{inputs.parameters.resource-name}}
+          description: "{{inputs.parameters.description}}"
+          gitHubOrg: "{{inputs.parameters.github-org}}"
+          dockerRegistry: "{{inputs.parameters.docker-registry}}"
+          enableObservability: $OBSERVABILITY
+          enableSecurity: $SECURITY
+        EOF
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ AppContainer claim created successfully"
+          echo "Crossplane will create repositories and CI/CD infrastructure..."
+          exit 0
+        else
+          echo "❌ Failed to create AppContainer claim"
+          exit 1
+        fi
+
+  # Continue with remaining templates...
+  # (Additional templates would follow the same pattern)

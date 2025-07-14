@@ -1,0 +1,522 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: vcluster-standard-contract
+  namespace: argo
+  labels:
+    parameter-contract-version: "v1.0"
+    resource-type: "vcluster"
+    template-category: "infrastructure"
+  annotations:
+    description: "VCluster creation using Standardized Parameter Contract"
+    parameter-contract: "compliant"
+    supported-tiers: "1,2,3"
+    maintainer: "platform-team"
+spec:
+  templates:
+
+  # =============================================================================
+  # MAIN VCLUSTER CREATION WORKFLOW
+  # =============================================================================
+  - name: create-vcluster
+    inputs:
+      parameters:
+      # === TIER 1: UNIVERSAL (Required) ===
+      - name: resource-name
+        description: "VCluster name (DNS-1123 compliant)"
+      - name: resource-type
+        default: "vcluster"
+      - name: namespace
+        default: "default"
+        description: "Kubernetes namespace for VCluster deployment"
+      - name: user
+        default: "system"
+        description: "User requesting VCluster creation"
+      - name: description
+        default: "VCluster created via standardized parameter contract"
+      - name: github-org
+        default: "socrates12345"
+      - name: docker-registry
+        default: "docker.io/socrates12345"
+      - name: slack-channel
+        default: "#vcluster-notifications"
+      - name: slack-user-id
+        default: "UNKNOWN"
+      
+      # === TIER 2: PLATFORM (Common) ===
+      - name: security-enabled
+        default: "true"
+        description: "Enable security features"
+      - name: observability-enabled
+        default: "true"
+        description: "Enable observability stack"
+      - name: backup-enabled
+        default: "false"
+        description: "Enable backup functionality"
+      - name: environment-tier
+        default: "development"
+        description: "Environment tier (development/staging/production)"
+      - name: auto-create-dependencies
+        default: "true"
+        description: "Automatically create required dependencies"
+      - name: resource-size
+        default: "medium"
+        description: "VCluster resource allocation size"
+      
+      # === TIER 3: VCLUSTER-SPECIFIC ===
+      - name: vcluster-size
+        default: "medium"
+        description: "VCluster-specific sizing (overrides resource-size if provided)"
+      - name: vcluster-capabilities
+        default: '{"observability":"true","security":"true","gitops":"true","logging":"true","networking":"true","autoscaling":"false","backup":"false"}'
+        description: "VCluster feature capabilities as JSON"
+
+    steps:
+    - - name: validate-parameters
+        template: validate-vcluster-parameters
+        arguments:
+          parameters:
+          - name: resource-name
+            value: "{{inputs.parameters.resource-name}}"
+          - name: resource-type
+            value: "{{inputs.parameters.resource-type}}"
+          - name: namespace
+            value: "{{inputs.parameters.namespace}}"
+          - name: environment-tier
+            value: "{{inputs.parameters.environment-tier}}"
+          - name: vcluster-size
+            value: "{{inputs.parameters.vcluster-size}}"
+          - name: vcluster-capabilities
+            value: "{{inputs.parameters.vcluster-capabilities}}"
+    - - name: notify-starting
+        templateRef:
+          name: slack-standard-notifications
+          template: send-notification
+        arguments:
+          parameters:
+          - name: resource-name
+            value: "{{inputs.parameters.resource-name}}"
+          - name: resource-type
+            value: "{{inputs.parameters.resource-type}}"
+          - name: user
+            value: "{{inputs.parameters.user}}"
+          - name: slack-channel
+            value: "{{inputs.parameters.slack-channel}}"
+          - name: slack-user-id
+            value: "{{inputs.parameters.slack-user-id}}"
+          - name: notification-type
+            value: "starting"
+          - name: message
+            value: "🚀 Creating VCluster '{{inputs.parameters.resource-name}}' in {{inputs.parameters.environment-tier}} environment..."
+        when: "{{steps.validate-parameters.status}} == Succeeded"
+    - - name: create-vcluster-claim
+        template: create-vcluster-claim
+        arguments:
+          parameters:
+          - name: resource-name
+            value: "{{inputs.parameters.resource-name}}"
+          - name: namespace
+            value: "{{inputs.parameters.namespace}}"
+          - name: description
+            value: "{{inputs.parameters.description}}"
+          - name: user
+            value: "{{inputs.parameters.user}}"
+          - name: security-enabled
+            value: "{{inputs.parameters.security-enabled}}"
+          - name: observability-enabled
+            value: "{{inputs.parameters.observability-enabled}}"
+          - name: backup-enabled
+            value: "{{inputs.parameters.backup-enabled}}"
+          - name: environment-tier
+            value: "{{inputs.parameters.environment-tier}}"
+          - name: vcluster-size
+            value: "{{inputs.parameters.vcluster-size}}"
+          - name: vcluster-capabilities
+            value: "{{inputs.parameters.vcluster-capabilities}}"
+          - name: slack-channel
+            value: "{{inputs.parameters.slack-channel}}"
+        when: "{{steps.validate-parameters.status}} == Succeeded"
+    - - name: wait-for-vcluster-ready
+        template: wait-for-vcluster-ready
+        arguments:
+          parameters:
+          - name: resource-name
+            value: "{{inputs.parameters.resource-name}}"
+          - name: namespace
+            value: "{{inputs.parameters.namespace}}"
+        when: "{{steps.create-vcluster-claim.status}} == Succeeded"
+    - - name: configure-vcluster-access
+        template: configure-vcluster-access
+        arguments:
+          parameters:
+          - name: resource-name
+            value: "{{inputs.parameters.resource-name}}"
+          - name: namespace
+            value: "{{inputs.parameters.namespace}}"
+          - name: user
+            value: "{{inputs.parameters.user}}"
+          - name: security-enabled
+            value: "{{inputs.parameters.security-enabled}}"
+        when: "{{steps.wait-for-vcluster-ready.status}} == Succeeded"
+    - - name: notify-success
+        templateRef:
+          name: slack-standard-notifications
+          template: send-notification
+        arguments:
+          parameters:
+          - name: resource-name
+            value: "{{inputs.parameters.resource-name}}"
+          - name: resource-type
+            value: "{{inputs.parameters.resource-type}}"
+          - name: user
+            value: "{{inputs.parameters.user}}"
+          - name: slack-channel
+            value: "{{inputs.parameters.slack-channel}}"
+          - name: slack-user-id
+            value: "{{inputs.parameters.slack-user-id}}"
+          - name: notification-type
+            value: "success"
+          - name: message
+            value: "✅ VCluster '{{inputs.parameters.resource-name}}' created successfully! Access via kubectl or VCluster CLI."
+        when: "{{steps.configure-vcluster-access.status}} == Succeeded"
+    - - name: notify-failure
+        templateRef:
+          name: slack-standard-notifications
+          template: send-notification
+        arguments:
+          parameters:
+          - name: resource-name
+            value: "{{inputs.parameters.resource-name}}"
+          - name: resource-type
+            value: "{{inputs.parameters.resource-type}}"
+          - name: user
+            value: "{{inputs.parameters.user}}"
+          - name: slack-channel
+            value: "{{inputs.parameters.slack-channel}}"
+          - name: slack-user-id
+            value: "{{inputs.parameters.slack-user-id}}"
+          - name: notification-type
+            value: "failure"
+          - name: message
+            value: "❌ VCluster '{{inputs.parameters.resource-name}}' creation failed. Check workflow logs for details."
+        when: "{{steps.validate-parameters.status}} != Succeeded or {{steps.create-vcluster-claim.status}} != Succeeded or {{steps.wait-for-vcluster-ready.status}} != Succeeded or {{steps.configure-vcluster-access.status}} != Succeeded"
+
+  # =============================================================================
+  # PARAMETER VALIDATION
+  # =============================================================================
+  - name: validate-vcluster-parameters
+    inputs:
+      parameters:
+      - name: resource-name
+      - name: resource-type
+      - name: namespace
+      - name: environment-tier
+      - name: vcluster-size
+      - name: vcluster-capabilities
+    script:
+      image: alpine:3.18
+      command: [sh]
+      source: |
+        echo "🔍 Validating VCluster parameter contract compliance..."
+        
+        # Validate Tier 1 - Universal Parameters
+        if [ -z "{{inputs.parameters.resource-name}}" ]; then
+          echo "❌ Missing required parameter: resource-name"
+          exit 1
+        fi
+        
+        # Validate resource-name format (DNS-1123 compliant)
+        if ! echo "{{inputs.parameters.resource-name}}" | grep -E '^[a-z0-9][a-z0-9-]*[a-z0-9]$'; then
+          echo "❌ Invalid resource-name format: {{inputs.parameters.resource-name}}"
+          echo "Must be DNS-1123 compliant: lowercase alphanumeric and hyphens"
+          exit 1
+        fi
+        
+        # Validate resource-type
+        if [ "{{inputs.parameters.resource-type}}" != "vcluster" ]; then
+          echo "❌ Invalid resource-type for VCluster template: {{inputs.parameters.resource-type}}"
+          exit 1
+        fi
+        
+        # Validate namespace format
+        if ! echo "{{inputs.parameters.namespace}}" | grep -E '^[a-z0-9][a-z0-9-]*[a-z0-9]$'; then
+          echo "❌ Invalid namespace format: {{inputs.parameters.namespace}}"
+          exit 1
+        fi
+        
+        # Validate Tier 2 - Platform Parameters
+        case "{{inputs.parameters.environment-tier}}" in
+          development|staging|production)
+            echo "✅ Valid environment-tier: {{inputs.parameters.environment-tier}}"
+            ;;
+          *)
+            echo "❌ Invalid environment-tier: {{inputs.parameters.environment-tier}}"
+            echo "Must be one of: development, staging, production"
+            exit 1
+            ;;
+        esac
+        
+        # Validate Tier 3 - VCluster-specific Parameters
+        case "{{inputs.parameters.vcluster-size}}" in
+          small|medium|large|xlarge)
+            echo "✅ Valid vcluster-size: {{inputs.parameters.vcluster-size}}"
+            ;;
+          *)
+            echo "❌ Invalid vcluster-size: {{inputs.parameters.vcluster-size}}"
+            echo "Must be one of: small, medium, large, xlarge"
+            exit 1
+            ;;
+        esac
+        
+        # Validate capabilities JSON format
+        echo "{{inputs.parameters.vcluster-capabilities}}" | jq . > /dev/null 2>&1
+        if [ $? -ne 0 ]; then
+          echo "❌ Invalid vcluster-capabilities JSON format"
+          exit 1
+        fi
+        
+        echo "✅ All parameter validations passed"
+        echo "📋 VCluster Configuration:"
+        echo "   Name: {{inputs.parameters.resource-name}}"
+        echo "   Namespace: {{inputs.parameters.namespace}}"
+        echo "   Environment: {{inputs.parameters.environment-tier}}"
+        echo "   Size: {{inputs.parameters.vcluster-size}}"
+        echo "   Capabilities: {{inputs.parameters.vcluster-capabilities}}"
+
+  # =============================================================================
+  # VCLUSTER CLAIM CREATION
+  # =============================================================================
+  - name: create-vcluster-claim
+    inputs:
+      parameters:
+      - name: resource-name
+      - name: namespace
+      - name: description
+      - name: user
+      - name: security-enabled
+      - name: observability-enabled
+      - name: backup-enabled
+      - name: environment-tier
+      - name: vcluster-size
+      - name: vcluster-capabilities
+      - name: slack-channel
+    script:
+      image: bitnami/kubectl:1.28
+      command: [sh]
+      source: |
+        echo "🏗️ Creating VCluster claim with standardized parameters..."
+        
+        # Parse and enhance capabilities JSON
+        CAPABILITIES='{{inputs.parameters.vcluster-capabilities}}'
+        
+        # Override capabilities based on parameter contract settings
+        ENHANCED_CAPABILITIES=$(echo "$CAPABILITIES" | jq \
+          --argjson security "{{inputs.parameters.security-enabled}}" \
+          --argjson observability "{{inputs.parameters.observability-enabled}}" \
+          --argjson backup "{{inputs.parameters.backup-enabled}}" \
+          '.security = ($security | tostring) | .observability = ($observability | tostring) | .backup = ($backup | tostring)')
+        
+        # Determine resource specifications based on size and environment
+        case "{{inputs.parameters.vcluster-size}}" in
+          small)
+            CPU_REQUEST="500m"
+            CPU_LIMIT="1000m"
+            MEMORY_REQUEST="1Gi"
+            MEMORY_LIMIT="2Gi"
+            STORAGE="10Gi"
+            ;;
+          medium)
+            CPU_REQUEST="1000m"
+            CPU_LIMIT="2000m"
+            MEMORY_REQUEST="2Gi"
+            MEMORY_LIMIT="4Gi"
+            STORAGE="20Gi"
+            ;;
+          large)
+            CPU_REQUEST="2000m"
+            CPU_LIMIT="4000m"
+            MEMORY_REQUEST="4Gi"
+            MEMORY_LIMIT="8Gi"
+            STORAGE="50Gi"
+            ;;
+          xlarge)
+            CPU_REQUEST="4000m"
+            CPU_LIMIT="8000m"
+            MEMORY_REQUEST="8Gi"
+            MEMORY_LIMIT="16Gi"
+            STORAGE="100Gi"
+            ;;
+        esac
+        
+        # Sanitize slack channel for label
+        SLACK_CHANNEL_LABEL=$(echo "{{inputs.parameters.slack-channel}}" | sed 's/#//g' | tr '[:upper:]' '[:lower:]')
+        
+        # Create VClusterEnvironmentClaim with standardized parameters
+        cat <<EOF | kubectl apply -f -
+        apiVersion: platform.example.org/v1alpha1
+        kind: VClusterEnvironmentClaim
+        metadata:
+          name: {{inputs.parameters.resource-name}}
+          namespace: {{inputs.parameters.namespace}}
+          labels:
+            created-by: "vcluster-standard-contract"
+            parameter-contract-version: "v1.0"
+            resource-type: "vcluster"
+            environment-tier: "{{inputs.parameters.environment-tier}}"
+            vcluster-size: "{{inputs.parameters.vcluster-size}}"
+            requested-by: "{{inputs.parameters.user}}"
+            slack-channel: "$SLACK_CHANNEL_LABEL"
+          annotations:
+            description: "{{inputs.parameters.description}}"
+            parameter-contract: "compliant"
+            created-at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        spec:
+          name: {{inputs.parameters.resource-name}}
+          description: "{{inputs.parameters.description}}"
+          size: {{inputs.parameters.vcluster-size}}
+          environment: {{inputs.parameters.environment-tier}}
+          resources:
+            requests:
+              cpu: "$CPU_REQUEST"
+              memory: "$MEMORY_REQUEST"
+              storage: "$STORAGE"
+            limits:
+              cpu: "$CPU_LIMIT" 
+              memory: "$MEMORY_LIMIT"
+          components:
+            argoCD: true
+            istio: true
+            knativeServing: true
+            prometheus: $(echo "$ENHANCED_CAPABILITIES" | jq -r '.observability')
+            grafana: $(echo "$ENHANCED_CAPABILITIES" | jq -r '.observability')
+            jaeger: $(echo "$ENHANCED_CAPABILITIES" | jq -r '.observability')
+            loki: $(echo "$ENHANCED_CAPABILITIES" | jq -r '.logging')
+            networkPolicies: $(echo "$ENHANCED_CAPABILITIES" | jq -r '.security')
+            podSecurityPolicies: $(echo "$ENHANCED_CAPABILITIES" | jq -r '.security')
+            backupOperator: $(echo "$ENHANCED_CAPABILITIES" | jq -r '.backup')
+            autoscaling: $(echo "$ENHANCED_CAPABILITIES" | jq -r '.autoscaling')
+        EOF
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ VClusterEnvironmentClaim created successfully"
+          echo "📊 Resource Allocation:"
+          echo "   CPU: $CPU_REQUEST - $CPU_LIMIT"
+          echo "   Memory: $MEMORY_REQUEST - $MEMORY_LIMIT"
+          echo "   Storage: $STORAGE"
+          echo "🔧 Capabilities: $ENHANCED_CAPABILITIES"
+          exit 0
+        else
+          echo "❌ Failed to create VClusterEnvironmentClaim"
+          exit 1
+        fi
+
+  # =============================================================================
+  # WAIT FOR VCLUSTER READY
+  # =============================================================================
+  - name: wait-for-vcluster-ready
+    inputs:
+      parameters:
+      - name: resource-name
+      - name: namespace
+    script:
+      image: bitnami/kubectl:1.28
+      command: [sh]
+      source: |
+        echo "⏳ Waiting for VCluster '{{inputs.parameters.resource-name}}' to be ready..."
+        
+        TIMEOUT=900  # 15 minutes
+        ELAPSED=0
+        
+        while [ $ELAPSED -lt $TIMEOUT ]; do
+          echo "Checking VCluster status... (${ELAPSED}s/${TIMEOUT}s)"
+          
+          # Check VCluster claim status
+          READY=$(kubectl get vclusterenvironmentclaim {{inputs.parameters.resource-name}} -n {{inputs.parameters.namespace}} -o jsonpath='{.status.ready}' 2>/dev/null || echo "false")
+          PHASE=$(kubectl get vclusterenvironmentclaim {{inputs.parameters.resource-name}} -n {{inputs.parameters.namespace}} -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+          
+          echo "  Ready: $READY"
+          echo "  Phase: $PHASE"
+          
+          if [ "$READY" = "true" ] && [ "$PHASE" = "Ready" ]; then
+            echo "✅ VCluster is ready!"
+            
+            # Get connection information
+            KUBECONFIG_SECRET=$(kubectl get vclusterenvironmentclaim {{inputs.parameters.resource-name}} -n {{inputs.parameters.namespace}} -o jsonpath='{.status.kubeconfig.secretName}' 2>/dev/null || echo "")
+            CLUSTER_ENDPOINT=$(kubectl get vclusterenvironmentclaim {{inputs.parameters.resource-name}} -n {{inputs.parameters.namespace}} -o jsonpath='{.status.endpoint}' 2>/dev/null || echo "")
+            
+            echo "📋 Connection Information:"
+            echo "   Kubeconfig Secret: $KUBECONFIG_SECRET"
+            echo "   Cluster Endpoint: $CLUSTER_ENDPOINT"
+            exit 0
+          fi
+          
+          if [ "$PHASE" = "Failed" ]; then
+            echo "❌ VCluster creation failed"
+            kubectl describe vclusterenvironmentclaim {{inputs.parameters.resource-name}} -n {{inputs.parameters.namespace}}
+            exit 1
+          fi
+          
+          sleep 30
+          ELAPSED=$((ELAPSED + 30))
+        done
+        
+        echo "❌ Timeout waiting for VCluster to be ready"
+        kubectl describe vclusterenvironmentclaim {{inputs.parameters.resource-name}} -n {{inputs.parameters.namespace}}
+        exit 1
+
+  # =============================================================================
+  # CONFIGURE VCLUSTER ACCESS
+  # =============================================================================
+  - name: configure-vcluster-access
+    inputs:
+      parameters:
+      - name: resource-name
+      - name: namespace
+      - name: user
+      - name: security-enabled
+    script:
+      image: bitnami/kubectl:1.28
+      command: [sh]
+      source: |
+        echo "🔐 Configuring VCluster access and security..."
+        
+        # Create RBAC for user access
+        if [ "{{inputs.parameters.security-enabled}}" = "true" ]; then
+          echo "Setting up RBAC for user: {{inputs.parameters.user}}"
+          
+          # Create user-specific service account and role binding
+          cat <<EOF | kubectl apply -f -
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: {{inputs.parameters.user}}-vcluster-access
+            namespace: {{inputs.parameters.namespace}}
+            labels:
+              vcluster: {{inputs.parameters.resource-name}}
+              user: {{inputs.parameters.user}}
+          ---
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: RoleBinding
+          metadata:
+            name: {{inputs.parameters.user}}-vcluster-admin
+            namespace: {{inputs.parameters.namespace}}
+          subjects:
+          - kind: ServiceAccount
+            name: {{inputs.parameters.user}}-vcluster-access
+            namespace: {{inputs.parameters.namespace}}
+          roleRef:
+            kind: ClusterRole
+            name: cluster-admin
+            apiGroup: rbac.authorization.k8s.io
+        EOF
+        fi
+        
+        # Generate access instructions
+        echo "✅ VCluster access configured successfully"
+        echo ""
+        echo "🔗 Access Instructions:"
+        echo "   1. Get kubeconfig: kubectl get secret {{inputs.parameters.resource-name}}-kubeconfig -n {{inputs.parameters.namespace}} -o jsonpath='{.data.config}' | base64 -d > vcluster-{{inputs.parameters.resource-name}}.kubeconfig"
+        echo "   2. Use vCluster: export KUBECONFIG=vcluster-{{inputs.parameters.resource-name}}.kubeconfig"
+        echo "   3. Verify access: kubectl get nodes"
+        echo ""
+        echo "📚 Documentation: https://docs.vcluster.com/"

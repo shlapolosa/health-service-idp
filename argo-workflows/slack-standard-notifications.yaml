@@ -1,0 +1,345 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: slack-standard-notifications
+  namespace: argo
+  labels:
+    parameter-contract-version: "v1.0"
+    resource-type: "notification"
+    template-category: "integration"
+  annotations:
+    description: "Slack notifications using Standardized Parameter Contract"
+    parameter-contract: "compliant"
+    supported-tiers: "1,2"
+    maintainer: "platform-team"
+spec:
+  templates:
+
+  # =============================================================================
+  # UNIFIED NOTIFICATION TEMPLATE
+  # =============================================================================
+  - name: send-notification
+    inputs:
+      parameters:
+      # === TIER 1: UNIVERSAL (Required) ===
+      - name: resource-name
+        description: "Resource being processed"
+      - name: resource-type
+        description: "Type of resource (microservice, appcontainer, vcluster)"
+      - name: user
+        default: "system"
+        description: "User who initiated the operation"
+      - name: slack-channel
+        default: "#platform-notifications"
+        description: "Slack channel for notifications"
+      - name: slack-user-id
+        default: "UNKNOWN"
+        description: "Slack user ID for direct notifications"
+      
+      # === NOTIFICATION-SPECIFIC ===
+      - name: notification-type
+        description: "Type of notification (starting, progress, success, failure)"
+      - name: message
+        description: "Notification message content"
+      - name: namespace
+        default: ""
+        description: "Kubernetes namespace (optional)"
+      - name: step-name
+        default: ""
+        description: "Current workflow step (optional)"
+      - name: error-details
+        default: ""
+        description: "Error details for failure notifications (optional)"
+      - name: endpoints
+        default: ""
+        description: "Service endpoints for success notifications (optional)"
+      - name: capabilities
+        default: ""
+        description: "Resource capabilities for success notifications (optional)"
+
+    script:
+      image: curlimages/curl:8.5.0
+      command: [sh]
+      source: |
+        echo "📱 Sending standardized Slack notification..."
+        
+        # Determine notification appearance based on type
+        case "{{inputs.parameters.notification-type}}" in
+          starting)
+            EMOJI="🚀"
+            COLOR="good"
+            PRIORITY="normal"
+            ;;
+          progress)
+            EMOJI="⚡"
+            COLOR="warning"
+            PRIORITY="normal"
+            ;;
+          success)
+            EMOJI="✅"
+            COLOR="good"
+            PRIORITY="high"
+            ;;
+          failure)
+            EMOJI="❌"
+            COLOR="danger"
+            PRIORITY="high"
+            ;;
+          *)
+            EMOJI="ℹ️"
+            COLOR="#439FE0"
+            PRIORITY="normal"
+            ;;
+        esac
+        
+        # Build notification context
+        CONTEXT_INFO=""
+        if [ ! -z "{{inputs.parameters.namespace}}" ]; then
+          CONTEXT_INFO="${CONTEXT_INFO}\n📍 Namespace: {{inputs.parameters.namespace}}"
+        fi
+        if [ ! -z "{{inputs.parameters.step-name}}" ]; then
+          CONTEXT_INFO="${CONTEXT_INFO}\n🔄 Step: {{inputs.parameters.step-name}}"
+        fi
+        
+        # Build resource information
+        RESOURCE_INFO="🏷️ Resource: {{inputs.parameters.resource-name}}\n📋 Type: {{inputs.parameters.resource-type}}\n👤 User: {{inputs.parameters.user}}"
+        
+        # Add success-specific information
+        SUCCESS_INFO=""
+        if [ "{{inputs.parameters.notification-type}}" = "success" ]; then
+          if [ ! -z "{{inputs.parameters.endpoints}}" ]; then
+            SUCCESS_INFO="${SUCCESS_INFO}\n\n🔗 Endpoints:\n{{inputs.parameters.endpoints}}"
+          fi
+          if [ ! -z "{{inputs.parameters.capabilities}}" ]; then
+            SUCCESS_INFO="${SUCCESS_INFO}\n\n⚡ Capabilities:\n{{inputs.parameters.capabilities}}"
+          fi
+        fi
+        
+        # Add failure-specific information
+        FAILURE_INFO=""
+        if [ "{{inputs.parameters.notification-type}}" = "failure" ] && [ ! -z "{{inputs.parameters.error-details}}" ]; then
+          FAILURE_INFO="\n\n🔍 Error Details:\n{{inputs.parameters.error-details}}"
+        fi
+        
+        # Build complete message
+        COMPLETE_MESSAGE="${EMOJI} {{inputs.parameters.message}}\n\n${RESOURCE_INFO}${CONTEXT_INFO}${SUCCESS_INFO}${FAILURE_INFO}"
+        
+        # Determine notification target (channel or direct message)
+        if [ "{{inputs.parameters.slack-user-id}}" != "UNKNOWN" ] && [ "{{inputs.parameters.notification-type}}" = "failure" ]; then
+          # Send direct message for failures
+          echo "📬 Sending direct message to user {{inputs.parameters.slack-user-id}}"
+          TARGET_CHANNEL="@{{inputs.parameters.slack-user-id}}"
+        else
+          # Send to channel
+          TARGET_CHANNEL="{{inputs.parameters.slack-channel}}"
+        fi
+        
+        # Build Slack webhook payload
+        TIMESTAMP=$(date +%s)
+        
+        # Note: This is a placeholder implementation
+        # In production, you would use actual Slack webhook URLs from secrets
+        echo "📤 Slack Notification Details:"
+        echo "   Channel: $TARGET_CHANNEL"
+        echo "   Type: {{inputs.parameters.notification-type}}"
+        echo "   Priority: $PRIORITY"
+        echo "   Color: $COLOR"
+        echo "   Resource: {{inputs.parameters.resource-name}} ({{inputs.parameters.resource-type}})"
+        echo "   User: {{inputs.parameters.user}}"
+        echo "   Message: {{inputs.parameters.message}}"
+        
+        # Create structured notification payload
+        cat <<EOF > /tmp/slack-payload.json
+        {
+          "channel": "$TARGET_CHANNEL",
+          "username": "Platform Bot",
+          "icon_emoji": ":robot_face:",
+          "attachments": [
+            {
+              "color": "$COLOR",
+              "title": "$EMOJI {{inputs.parameters.resource-type}} | {{inputs.parameters.resource-name}}",
+              "text": "$COMPLETE_MESSAGE",
+              "footer": "Platform Notifications",
+              "footer_icon": "https://platform.example.com/icon.png",
+              "ts": $TIMESTAMP,
+              "fields": [
+                {
+                  "title": "Resource Type",
+                  "value": "{{inputs.parameters.resource-type}}",
+                  "short": true
+                },
+                {
+                  "title": "User",
+                  "value": "{{inputs.parameters.user}}",
+                  "short": true
+                }
+              ]
+            }
+          ]
+        }
+        EOF
+        
+        echo "📄 Generated Slack payload:"
+        cat /tmp/slack-payload.json
+        
+        # TODO: Replace with actual Slack webhook call when implementing
+        echo "✅ Notification prepared successfully"
+        echo "🔗 In production, this would be sent to: $TARGET_CHANNEL"
+        
+        # Actual webhook call would be:
+        # curl -X POST -H 'Content-type: application/json' \
+        #   --data @/tmp/slack-payload.json \
+        #   "$SLACK_WEBHOOK_URL"
+
+  # =============================================================================
+  # SPECIALIZED NOTIFICATION TEMPLATES
+  # =============================================================================
+  - name: notify-workflow-starting
+    inputs:
+      parameters:
+      - name: resource-name
+      - name: resource-type
+      - name: user
+      - name: slack-channel
+        default: "#platform-notifications"
+      - name: slack-user-id
+        default: "UNKNOWN"
+      - name: workflow-description
+        default: "Platform resource creation workflow"
+    steps:
+    - - name: send-starting-notification
+        template: send-notification
+        arguments:
+          parameters:
+          - name: resource-name
+            value: "{{inputs.parameters.resource-name}}"
+          - name: resource-type
+            value: "{{inputs.parameters.resource-type}}"
+          - name: user
+            value: "{{inputs.parameters.user}}"
+          - name: slack-channel
+            value: "{{inputs.parameters.slack-channel}}"
+          - name: slack-user-id
+            value: "{{inputs.parameters.slack-user-id}}"
+          - name: notification-type
+            value: "starting"
+          - name: message
+            value: "Starting {{inputs.parameters.workflow-description}} for '{{inputs.parameters.resource-name}}'"
+
+  - name: notify-workflow-success
+    inputs:
+      parameters:
+      - name: resource-name
+      - name: resource-type
+      - name: user
+      - name: slack-channel
+        default: "#platform-notifications"
+      - name: slack-user-id
+        default: "UNKNOWN"
+      - name: endpoints
+        default: ""
+      - name: capabilities
+        default: ""
+      - name: success-message
+        default: "Resource created successfully"
+    steps:
+    - - name: send-success-notification
+        template: send-notification
+        arguments:
+          parameters:
+          - name: resource-name
+            value: "{{inputs.parameters.resource-name}}"
+          - name: resource-type
+            value: "{{inputs.parameters.resource-type}}"
+          - name: user
+            value: "{{inputs.parameters.user}}"
+          - name: slack-channel
+            value: "{{inputs.parameters.slack-channel}}"
+          - name: slack-user-id
+            value: "{{inputs.parameters.slack-user-id}}"
+          - name: notification-type
+            value: "success"
+          - name: message
+            value: "{{inputs.parameters.success-message}}"
+          - name: endpoints
+            value: "{{inputs.parameters.endpoints}}"
+          - name: capabilities
+            value: "{{inputs.parameters.capabilities}}"
+
+  - name: notify-workflow-failure
+    inputs:
+      parameters:
+      - name: resource-name
+      - name: resource-type
+      - name: user
+      - name: slack-channel
+        default: "#platform-notifications"
+      - name: slack-user-id
+        default: "UNKNOWN"
+      - name: error-message
+        default: "Workflow failed"
+      - name: error-details
+        default: ""
+      - name: failed-step
+        default: "Unknown step"
+    steps:
+    - - name: send-failure-notification
+        template: send-notification
+        arguments:
+          parameters:
+          - name: resource-name
+            value: "{{inputs.parameters.resource-name}}"
+          - name: resource-type
+            value: "{{inputs.parameters.resource-type}}"
+          - name: user
+            value: "{{inputs.parameters.user}}"
+          - name: slack-channel
+            value: "{{inputs.parameters.slack-channel}}"
+          - name: slack-user-id
+            value: "{{inputs.parameters.slack-user-id}}"
+          - name: notification-type
+            value: "failure"
+          - name: message
+            value: "{{inputs.parameters.error-message}}"
+          - name: step-name
+            value: "{{inputs.parameters.failed-step}}"
+          - name: error-details
+            value: "{{inputs.parameters.error-details}}"
+
+  - name: notify-workflow-progress
+    inputs:
+      parameters:
+      - name: resource-name
+      - name: resource-type
+      - name: user
+      - name: slack-channel
+        default: "#platform-notifications"
+      - name: slack-user-id
+        default: "UNKNOWN"
+      - name: step-name
+      - name: progress-message
+      - name: namespace
+        default: ""
+    steps:
+    - - name: send-progress-notification
+        template: send-notification
+        arguments:
+          parameters:
+          - name: resource-name
+            value: "{{inputs.parameters.resource-name}}"
+          - name: resource-type
+            value: "{{inputs.parameters.resource-type}}"
+          - name: user
+            value: "{{inputs.parameters.user}}"
+          - name: slack-channel
+            value: "{{inputs.parameters.slack-channel}}"
+          - name: slack-user-id
+            value: "{{inputs.parameters.slack-user-id}}"
+          - name: notification-type
+            value: "progress"
+          - name: message
+            value: "{{inputs.parameters.progress-message}}"
+          - name: step-name
+            value: "{{inputs.parameters.step-name}}"
+          - name: namespace
+            value: "{{inputs.parameters.namespace}}"
