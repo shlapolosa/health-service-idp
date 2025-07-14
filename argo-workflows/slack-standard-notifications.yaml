@@ -182,14 +182,33 @@ spec:
         echo "📄 Generated Slack payload:"
         cat /tmp/slack-payload.json
         
-        # TODO: Replace with actual Slack webhook call when implementing
-        echo "✅ Notification prepared successfully"
-        echo "🔗 In production, this would be sent to: $TARGET_CHANNEL"
+        # Get Slack webhook URL from Kubernetes secret
+        SLACK_WEBHOOK_URL=""
+        if kubectl get secret slack-webhook -n argo >/dev/null 2>&1; then
+          SLACK_WEBHOOK_URL=$(kubectl get secret slack-webhook -n argo -o jsonpath='{.data.webhook-url}' | base64 -d)
+        fi
         
-        # Actual webhook call would be:
-        # curl -X POST -H 'Content-type: application/json' \
-        #   --data @/tmp/slack-payload.json \
-        #   "$SLACK_WEBHOOK_URL"
+        if [ ! -z "$SLACK_WEBHOOK_URL" ]; then
+          echo "📤 Sending Slack notification to webhook..."
+          
+          # Send actual Slack notification
+          RESPONSE=$(curl -s -X POST -H 'Content-type: application/json' \
+            --data @/tmp/slack-payload.json \
+            "$SLACK_WEBHOOK_URL")
+          
+          if [ $? -eq 0 ] && [ "$RESPONSE" = "ok" ]; then
+            echo "✅ Slack notification sent successfully to: $TARGET_CHANNEL"
+          else
+            echo "⚠️ Slack notification failed. Response: $RESPONSE"
+          fi
+        else
+          echo "⚠️ No Slack webhook URL configured (secret 'slack-webhook' not found)"
+          echo "📄 Notification payload prepared:"
+          cat /tmp/slack-payload.json
+          echo ""
+          echo "💡 To enable Slack notifications, create a secret:"
+          echo "kubectl create secret generic slack-webhook -n argo --from-literal=webhook-url='https://hooks.slack.com/services/YOUR/WEBHOOK/URL'"
+        fi
 
   # =============================================================================
   # SPECIALIZED NOTIFICATION TEMPLATES

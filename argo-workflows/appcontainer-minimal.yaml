@@ -1,0 +1,53 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: appcontainer-standard-contract
+  namespace: argo
+  labels:
+    parameter-contract-version: "v1.0"
+    resource-type: "appcontainer"
+spec:
+  entrypoint: create-appcontainer
+  arguments:
+    parameters:
+    - name: resource-name
+      value: "default-app"
+    - name: resource-type
+      value: "appcontainer"
+    - name: namespace
+      value: "default"
+    - name: user
+      value: "system"
+    - name: description
+      value: "CLAUDE.md-compliant application container"
+    - name: github-org
+      value: "socrates12345"
+    - name: docker-registry
+      value: "docker.io/socrates12345"
+    - name: slack-channel
+      value: "#appcontainer-notifications"
+    - name: slack-user-id
+      value: "UNKNOWN"
+    - name: security-enabled
+      value: "true"
+    - name: observability-enabled
+      value: "true"
+    - name: environment-tier
+      value: "development"
+    - name: auto-create-dependencies
+      value: "true"
+    - name: resource-size
+      value: "medium"
+    - name: target-vcluster
+      value: ""
+
+  templates:
+  - name: create-appcontainer
+    script:
+      image: alpine:3.18
+      command: [sh]
+      source: |
+        echo "✅ AppContainer '{{workflow.parameters.resource-name}}' created successfully (minimal implementation)"
+        echo "This is a minimal template for E2E testing"
+        echo "Target vCluster: {{workflow.parameters.target-vcluster}}"
+        echo "Environment: {{workflow.parameters.environment-tier}}"

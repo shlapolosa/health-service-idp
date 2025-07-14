@@ -13,6 +13,49 @@ metadata:
     supported-tiers: "1,2,3"
     maintainer: "platform-team"
 spec:
+  entrypoint: create-vcluster
+  arguments:
+    parameters:
+    # === TIER 1: UNIVERSAL (Required) ===
+    - name: resource-name
+      value: "default-vcluster"
+    - name: resource-type
+      value: "vcluster"
+    - name: namespace
+      value: "default"
+    - name: user
+      value: "system"
+    - name: description
+      value: "VCluster created via standardized parameter contract"
+    - name: github-org
+      value: "socrates12345"
+    - name: docker-registry
+      value: "docker.io/socrates12345"
+    - name: slack-channel
+      value: "#vcluster-notifications"
+    - name: slack-user-id
+      value: "UNKNOWN"
+    
+    # === TIER 2: PLATFORM (Common) ===
+    - name: security-enabled
+      value: "true"
+    - name: observability-enabled
+      value: "true"
+    - name: backup-enabled
+      value: "false"
+    - name: environment-tier
+      value: "development"
+    - name: auto-create-dependencies
+      value: "true"
+    - name: resource-size
+      value: "medium"
+    
+    # === TIER 3: VCLUSTER-SPECIFIC ===
+    - name: vcluster-size
+      value: "medium"
+    - name: vcluster-capabilities
+      value: '{"observability":"true","security":"true","gitops":"true","logging":"true","networking":"true","autoscaling":"false","backup":"false"}'
+
   templates:
 
   # =============================================================================
@@ -214,7 +257,7 @@ spec:
       - name: vcluster-size
       - name: vcluster-capabilities
     script:
-      image: alpine:3.18
+      image: stedolan/jq:latest
       command: [sh]
       source: |
         echo "🔍 Validating VCluster parameter contract compliance..."

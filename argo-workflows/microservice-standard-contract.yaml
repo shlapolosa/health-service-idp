@@ -294,7 +294,7 @@ spec:
       - name: microservice-cache
       - name: github-org
     script:
-      image: alpine/jq:latest
+      image: stedolan/jq:latest
       command: [sh]
       source: |
         echo "🔍 Validating Microservice parameter contract compliance..."
@@ -424,10 +424,10 @@ spec:
       parameters:
       - name: appcontainer-name
         valueFrom:
-          path: /tmp/appcontainer-name
+          parameter: "{{steps.determine-appcontainer-name.outputs.parameters.appcontainer-name}}"
       - name: vcluster-name
         valueFrom:
-          path: /tmp/vcluster-name
+          parameter: "{{steps.determine-appcontainer-name.outputs.parameters.vcluster-name}}"
     steps:
     - - name: determine-appcontainer-name
         template: determine-appcontainer-name
