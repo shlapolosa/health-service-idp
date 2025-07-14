@@ -209,8 +209,8 @@ spec:
         when: "{{steps.validate-parameters.status}} == Succeeded"
     - - name: notify-appcontainer-ready
         templateRef:
-          name: slack-standard-notifications
-          template: notify-workflow-progress
+          name: simple-slack-notifications
+          template: send-notification
         arguments:
           parameters:
           - name: resource-name
@@ -223,12 +223,10 @@ spec:
             value: "{{inputs.parameters.slack-channel}}"
           - name: slack-user-id
             value: "{{inputs.parameters.slack-user-id}}"
-          - name: step-name
-            value: "AppContainer Setup"
-          - name: progress-message
+          - name: message
             value: "✅ Application container ready - creating microservice..."
-          - name: namespace
-            value: "{{inputs.parameters.namespace}}"
+          - name: notification-type
+            value: "progress"
         when: "{{steps.ensure-appcontainer.status}} == Succeeded"
     - - name: create-microservice-claim
         template: create-microservice-claim
@@ -285,8 +283,8 @@ spec:
         when: "{{steps.wait-for-microservice-ready.status}} == Succeeded"
     - - name: notify-success
         templateRef:
-          name: slack-standard-notifications
-          template: notify-workflow-success
+          name: simple-slack-notifications
+          template: send-notification
         arguments:
           parameters:
           - name: resource-name
@@ -299,17 +297,15 @@ spec:
             value: "{{inputs.parameters.slack-channel}}"
           - name: slack-user-id
             value: "{{inputs.parameters.slack-user-id}}"
-          - name: success-message
-            value: "{{inputs.parameters.microservice-language}} microservice '{{inputs.parameters.resource-name}}' created successfully!"
-          - name: endpoints
-            value: "{{steps.extract-microservice-info.outputs.parameters.endpoints-summary}}"
-          - name: capabilities
-            value: "🚀 {{inputs.parameters.microservice-framework}} Service\n📊 {{inputs.parameters.microservice-database}} Database\n💾 {{inputs.parameters.microservice-cache}} Cache\n🔄 GitOps (ArgoCD)\n📦 Knative Deployment"
+          - name: message
+            value: "{{inputs.parameters.microservice-language}} microservice '{{inputs.parameters.resource-name}}' created successfully!\n\n{{steps.extract-microservice-info.outputs.parameters.endpoints-summary}}\n\n🚀 {{inputs.parameters.microservice-framework}} Service\n📊 {{inputs.parameters.microservice-database}} Database\n💾 {{inputs.parameters.microservice-cache}} Cache\n🔄 GitOps (ArgoCD)\n📦 Knative Deployment"
+          - name: notification-type
+            value: "success"
         when: "{{steps.extract-microservice-info.status}} == Succeeded"
     - - name: notify-failure
         templateRef:
-          name: slack-standard-notifications
-          template: notify-workflow-failure
+          name: simple-slack-notifications
+          template: send-notification
         arguments:
           parameters:
           - name: resource-name
@@ -322,12 +318,10 @@ spec:
             value: "{{inputs.parameters.slack-channel}}"
           - name: slack-user-id
             value: "{{inputs.parameters.slack-user-id}}"
-          - name: error-message
-            value: "Microservice creation failed"
-          - name: error-details
-            value: "Check workflow logs for detailed error information"
-          - name: failed-step
-            value: "Microservice workflow"
+          - name: message
+            value: "❌ Microservice creation failed\n\nCheck workflow logs for detailed error information"
+          - name: notification-type
+            value: "error"
         when: "{{steps.validate-parameters.status}} != Succeeded or {{steps.ensure-appcontainer.status}} != Succeeded or {{steps.create-microservice-claim.status}} != Succeeded or {{steps.wait-for-microservice-ready.status}} != Succeeded"
 
   # =============================================================================
