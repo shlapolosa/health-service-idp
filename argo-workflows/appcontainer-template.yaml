@@ -34,23 +34,65 @@ spec:
 
   templates:
   - name: create-appcontainer
+    inputs:
+      parameters:
+      - name: appcontainer-name
+        default: "{{workflow.parameters.appcontainer-name}}"
+      - name: namespace  
+        default: "{{workflow.parameters.namespace}}"
+      - name: description
+        default: "{{workflow.parameters.description}}"
+      - name: github-org
+        default: "{{workflow.parameters.github-org}}"
+      - name: docker-registry
+        default: "{{workflow.parameters.docker-registry}}"
+      - name: observability
+        default: "{{workflow.parameters.observability}}"
+      - name: security
+        default: "{{workflow.parameters.security}}"
+      - name: vcluster-name
+        default: "{{workflow.parameters.vcluster-name}}"
+      - name: auto-create-vcluster
+        default: "{{workflow.parameters.auto-create-vcluster}}"
+      - name: user
+        default: "{{workflow.parameters.user}}"
+      - name: slack-channel
+        default: "{{workflow.parameters.slack-channel}}"
+      - name: slack-user-id
+        default: "{{workflow.parameters.slack-user-id}}"
     steps:
     - - name: notify-starting
         templateRef:
           name: slack-notifications
-          template: notify-appcontainer-starting
+          template: send-slack-progress
+        arguments:
+          parameters:
+          - name: workflow-type
+            value: "appcontainer"
+          - name: resource-name
+            value: "{{inputs.parameters.appcontainer-name}}"
+          - name: user
+            value: "{{inputs.parameters.user}}"
+          - name: status
+            value: "starting"
+          - name: step-name
+            value: "Setting up AppContainer and ensuring VCluster availability..."
+          - name: namespace
+            value: "{{inputs.parameters.namespace}}"
+    - - name: validate-request
+        template: validate-appcontainer-request
         arguments:
           parameters:
           - name: appcontainer-name
-            value: "{{workflow.parameters.appcontainer-name}}"
+            value: "{{inputs.parameters.appcontainer-name}}"
           - name: namespace
-            value: "{{workflow.parameters.namespace}}"
+            value: "{{inputs.parameters.namespace}}"
+          - name: description
+            value: "{{inputs.parameters.description}}"
+          - name: github-org
+            value: "{{inputs.parameters.github-org}}"
           - name: user
-            value: "{{workflow.parameters.user}}"
-          - name: vcluster-name
-            value: "{{workflow.parameters.vcluster-name}}"
-    - - name: validate-request
-        template: validate-appcontainer-request
+            value: "{{inputs.parameters.user}}"
     - - name: notify-validated
         templateRef:
           name: slack-notifications
@@ -60,15 +102,15 @@ spec:
           - name: workflow-type
             value: "appcontainer"
           - name: resource-name
-            value: "{{workflow.parameters.appcontainer-name}}"
+            value: "{{inputs.parameters.appcontainer-name}}"
           - name: user
-            value: "{{workflow.parameters.user}}"
+            value: "{{inputs.parameters.user}}"
           - name: status
             value: "validated"
           - name: step-name
             value: "✅ Request validated - setting up VCluster environment..."
           - name: namespace
-            value: "{{workflow.parameters.namespace}}"
+            value: "{{inputs.parameters.namespace}}"
         when: "{{steps.validate-request.status}} == Succeeded"
     - - name: ensure-vcluster
         template: ensure-vcluster-exists
@@ -82,15 +124,15 @@ spec:
           - name: workflow-type
             value: "appcontainer"
           - name: resource-name
-            value: "{{workflow.parameters.appcontainer-name}}"
+            value: "{{inputs.parameters.appcontainer-name}}"
           - name: user
-            value: "{{workflow.parameters.user}}"
+            value: "{{inputs.parameters.user}}"
           - name: status
             value: "vcluster-ready"
           - name: step-name
             value: "✅ VCluster ready - creating application resources..."
           - name: namespace
-            value: "{{workflow.parameters.namespace}}"
+            value: "{{inputs.parameters.namespace}}"
         when: "{{steps.ensure-vcluster.status}} == Succeeded"
     - - name: create-appcontainer-claim
         template: create-claim
@@ -98,15 +140,21 @@ spec:
     - - name: notify-repositories
         templateRef:
           name: slack-notifications
-          template: notify-appcontainer-repositories
+          template: send-slack-progress
         arguments:
           parameters:
-          - name: appcontainer-name
-            value: "{{workflow.parameters.appcontainer-name}}"
-          - name: namespace
-            value: "{{workflow.parameters.namespace}}"
+          - name: workflow-type
+            value: "appcontainer"
+          - name: resource-name
+            value: "{{inputs.parameters.appcontainer-name}}"
           - name: user
-            value: "{{workflow.parameters.user}}"
+            value: "{{inputs.parameters.user}}"
+          - name: status
+            value: "repositories"
+          - name: step-name
+            value: "Creating source and GitOps repositories..."
+          - name: namespace
+            value: "{{inputs.parameters.namespace}}"
         when: "{{steps.create-appcontainer-claim.status}} == Succeeded"
     - - name: wait-for-repositories
         template: wait-for-repositories
@@ -120,15 +168,15 @@ spec:
           - name: workflow-type
             value: "appcontainer"
           - name: resource-name
-            value: "{{workflow.parameters.appcontainer-name}}"
+            value: "{{inputs.parameters.appcontainer-name}}"
           - name: user
-            value: "{{workflow.parameters.user}}"
+            value: "{{inputs.parameters.user}}"
           - name: status
             value: "microservices"
           - name: step-name
             value: "🚀 Creating default microservice template..."
           - name: namespace
-            value: "{{workflow.parameters.namespace}}"
+            value: "{{inputs.parameters.namespace}}"
         when: "{{steps.wait-for-repositories.status}} == Succeeded"
     - - name: create-default-microservice
         template: create-default-microservice
@@ -142,15 +190,15 @@ spec:
           - name: workflow-type
             value: "appcontainer"
           - name: resource-name
-            value: "{{workflow.parameters.appcontainer-name}}"
+            value: "{{inputs.parameters.appcontainer-name}}"
           - name: user
-            value: "{{workflow.parameters.user}}"
+            value: "{{inputs.parameters.user}}"
           - name: status
             value: "exposing"
           - name: step-name
             value: "🌐 Configuring service mesh and exposing endpoints..."
           - name: namespace
-            value: "{{workflow.parameters.namespace}}"
+            value: "{{inputs.parameters.namespace}}"
         when: "{{steps.create-default-microservice.status}} == Succeeded"
     - - name: expose-vcluster-services
         template: expose-vcluster-services
@@ -161,34 +209,36 @@ spec:
     - - name: notify-success
         templateRef:
           name: slack-notifications
-          template: notify-appcontainer-success
+          template: send-slack-success
         arguments:
           parameters:
-          - name: appcontainer-name
-            value: "{{workflow.parameters.appcontainer-name}}"
-          - name: namespace
-            value: "{{workflow.parameters.namespace}}"
+          - name: workflow-type
+            value: "appcontainer"
+          - name: resource-name
+            value: "{{inputs.parameters.appcontainer-name}}"
           - name: user
-            value: "{{workflow.parameters.user}}"
-          - name: github-org
-            value: "{{workflow.parameters.github-org}}"
-          - name: vcluster-name
-            value: "{{workflow.parameters.vcluster-name}}"
+            value: "{{inputs.parameters.user}}"
+          - name: namespace
+            value: "{{inputs.parameters.namespace}}"
+          - name: capabilities
+            value: "📦 Microservices Platform\\n🔄 GitOps (ArgoCD)\\n🌐 Service Mesh (Istio)\\n⚡ Auto-scaling (Knative)\\n📊 Observability Stack"
           - name: endpoints
             value: "{{steps.extract-appcontainer-info.outputs.parameters.endpoints-summary}}"
         when: "{{steps.expose-vcluster-services.status}} == Succeeded"
     - - name: notify-failure
         templateRef:
           name: slack-notifications
-          template: notify-appcontainer-failure
+          template: send-slack-failure
         arguments:
           parameters:
-          - name: appcontainer-name
-            value: "{{workflow.parameters.appcontainer-name}}"
-          - name: namespace
-            value: "{{workflow.parameters.namespace}}"
+          - name: workflow-type
+            value: "appcontainer"
+          - name: resource-name
+            value: "{{inputs.parameters.appcontainer-name}}"
           - name: user
-            value: "{{workflow.parameters.user}}"
+            value: "{{inputs.parameters.user}}"
+          - name: namespace
+            value: "{{inputs.parameters.namespace}}"
           - name: error-message
             value: "AppContainer creation failed - check workflow logs for details"
           - name: failed-step
@@ -196,31 +246,43 @@ spec:
         when: "{{steps.validate-request.status}} != Succeeded or {{steps.ensure-vcluster.status}} != Succeeded or {{steps.create-appcontainer-claim.status}} != Succeeded or {{steps.wait-for-repositories.status}} != Succeeded or {{steps.create-default-microservice.status}} != Succeeded or {{steps.expose-vcluster-services.status}} != Succeeded"
 
   - name: validate-appcontainer-request
+    inputs:
+      parameters:
+      - name: appcontainer-name
+        default: "{{workflow.parameters.appcontainer-name}}"
+      - name: namespace
+        default: "{{workflow.parameters.namespace}}"
+      - name: description
+        default: "{{workflow.parameters.description}}"
+      - name: github-org
+        default: "{{workflow.parameters.github-org}}"
+      - name: user
+        default: "{{workflow.parameters.user}}"
     script:
       image: alpine:3.18
       command: [sh]
       source: |
         echo "Validating AppContainer request..."
-        echo "Name: {{workflow.parameters.appcontainer-name}}"
-        echo "Namespace: {{workflow.parameters.namespace}}"
-        echo "Description: {{workflow.parameters.description}}"
-        echo "GitHub Org: {{workflow.parameters.github-org}}"
-        echo "User: {{workflow.parameters.user}}"
+        echo "Name: {{inputs.parameters.appcontainer-name}}"
+        echo "Namespace: {{inputs.parameters.namespace}}"
+        echo "Description: {{inputs.parameters.description}}"
+        echo "GitHub Org: {{inputs.parameters.github-org}}"
+        echo "User: {{inputs.parameters.user}}"
         
         # Basic validation
-        if [ -z "{{workflow.parameters.appcontainer-name}}" ]; then
+        if [ -z "{{inputs.parameters.appcontainer-name}}" ]; then
           echo "AppContainer name is required"
           exit 1
         fi
         
         # Validate name format (lowercase, alphanumeric, hyphens)
-        if ! echo "{{workflow.parameters.appcontainer-name}}" | grep -E '^[a-z0-9][a-z0-9-]*[a-z0-9]$'; then
+        if ! echo "{{inputs.parameters.appcontainer-name}}" | grep -E '^[a-z0-9][a-z0-9-]*[a-z0-9]$'; then
           echo "Invalid AppContainer name format (must be DNS-1123 compliant)"
           exit 1
         fi
         
         # Validate GitHub organization
-        if [ -z "{{workflow.parameters.github-org}}" ]; then
+        if [ -z "{{inputs.parameters.github-org}}" ]; then
           echo "GitHub organization is required"
           exit 1
         fi
