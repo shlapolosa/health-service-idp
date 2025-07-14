@@ -293,11 +293,16 @@ class MicroserviceRequest:
 
     def to_argo_payload(self) -> Dict:
         """Convert to Argo Workflows parameters."""
+        # Map database values to workflow-compatible names
+        database_value = self.database.value
+        if database_value == "postgresql":
+            database_value = "postgres"
+            
         return {
             "microservice-name": self.name,
             "namespace": self.namespace,
             "language": self.language.value,
-            "database": self.database.value,
+            "database": database_value,
             "cache": self.cache.value,
             "description": self.description,
             "github-org": self.github_org,
