@@ -9,7 +9,10 @@ import pytest
 from src.domain.models import (AppContainerRequest, Capability, CapabilitySet,
                                InvalidAppContainerRequestError,
                                InvalidSlackCommandError,
-                               InvalidVClusterRequestError, ParsedCommand,
+                               InvalidVClusterRequestError, 
+                               MicroserviceRequest, MicroserviceLanguage, 
+                               MicroserviceDatabase, MicroserviceCache,
+                               ParsedCommand,
                                ResourceSpec, SlackCommand, VClusterRequest,
                                VClusterSize)
 
@@ -358,3 +361,249 @@ class TestAppContainerRequest:
         }
 
         assert payload == expected_payload
+
+
+class TestMicroserviceRequest:
+    """Test MicroserviceRequest domain entity."""
+
+    def test_valid_microservice_request(self):
+        """Test creating a valid MicroserviceRequest."""
+        request = MicroserviceRequest(
+            name="user-service",
+            namespace="production",
+            user="alice",
+            slack_channel="C789",
+            language=MicroserviceLanguage.PYTHON,
+            database=MicroserviceDatabase.POSTGRESQL,
+            cache=MicroserviceCache.REDIS,
+            description="User management service",
+            github_org="mycompany",
+            docker_registry="registry.example.com/mycompany",
+            enable_observability=True,
+            enable_security=False,
+            target_vcluster="prod-cluster",
+            auto_create_vcluster=False,
+            original_text="create user-service with python and postgres"
+        )
+
+        assert request.name == "user-service"
+        assert request.namespace == "production"
+        assert request.user == "alice"
+        assert request.slack_channel == "C789"
+        assert request.language == MicroserviceLanguage.PYTHON
+        assert request.database == MicroserviceDatabase.POSTGRESQL
+        assert request.cache == MicroserviceCache.REDIS
+        assert request.description == "User management service"
+        assert request.github_org == "mycompany"
+        assert request.docker_registry == "registry.example.com/mycompany"
+        assert request.enable_observability is True
+        assert request.enable_security is False
+        assert request.target_vcluster == "prod-cluster"
+        assert request.auto_create_vcluster is False
+        assert request.original_text == "create user-service with python and postgres"
+        assert isinstance(request.created_at, datetime)
+
+    def test_microservice_request_defaults(self):
+        """Test MicroserviceRequest with default values."""
+        request = MicroserviceRequest(
+            name="api-service",
+            namespace="default",
+            user="testuser",
+            slack_channel="C123"
+        )
+
+        assert request.name == "api-service"
+        assert request.language == MicroserviceLanguage.PYTHON
+        assert request.database == MicroserviceDatabase.NONE
+        assert request.cache == MicroserviceCache.NONE
+        assert request.description == "CLAUDE.md-compliant microservice"
+        assert request.github_org == "socrates12345"
+        assert request.docker_registry == "docker.io/socrates12345"
+        assert request.enable_observability is True
+        assert request.enable_security is True
+        assert request.target_vcluster is None
+        assert request.auto_create_vcluster is True
+
+    def test_language_alias_normalization(self):
+        """Test that language aliases are normalized properly."""
+        # Test FASTAPI -> PYTHON
+        request = MicroserviceRequest(
+            name="api-service",
+            namespace="default",
+            user="testuser",
+            slack_channel="C123",
+            language=MicroserviceLanguage.FASTAPI
+        )
+        assert request.language == MicroserviceLanguage.PYTHON
+
+        # Test SPRINGBOOT -> JAVA
+        request = MicroserviceRequest(
+            name="api-service",
+            namespace="default",
+            user="testuser",
+            slack_channel="C123",
+            language=MicroserviceLanguage.SPRINGBOOT
+        )
+        assert request.language == MicroserviceLanguage.JAVA
+
+    def test_database_alias_normalization(self):
+        """Test that database aliases are normalized properly."""
+        # Test POSTGRES -> POSTGRESQL
+        request = MicroserviceRequest(
+            name="api-service",
+            namespace="default",
+            user="testuser",
+            slack_channel="C123",
+            database=MicroserviceDatabase.POSTGRES
+        )
+        assert request.database == MicroserviceDatabase.POSTGRESQL
+
+    def test_invalid_microservice_name(self):
+        """Test MicroserviceRequest with invalid name."""
+        with pytest.raises(ValueError, match="name cannot be empty"):
+            MicroserviceRequest(
+                name="",
+                namespace="default",
+                user="testuser",
+                slack_channel="C123"
+            )
+
+    def test_invalid_kubernetes_microservice_name(self):
+        """Test MicroserviceRequest with invalid Kubernetes name."""
+        with pytest.raises(ValueError, match="name must start and end with alphanumeric characters"):
+            MicroserviceRequest(
+                name="-invalid-service-",
+                namespace="default",
+                user="testuser",
+                slack_channel="C123"
+            )
+
+    def test_microservice_to_argo_payload(self):
+        """Test converting MicroserviceRequest to Argo payload."""
+        request = MicroserviceRequest(
+            name="order-service",
+            namespace="production",
+            user="bob",
+            slack_channel="C456",
+            language=MicroserviceLanguage.JAVA,
+            database=MicroserviceDatabase.POSTGRESQL,
+            cache=MicroserviceCache.REDIS,
+            description="Order processing service",
+            github_org="ecommerce",
+            docker_registry="registry.ecommerce.com/services",
+            enable_observability=False,
+            enable_security=True,
+            target_vcluster="prod-cluster",
+            auto_create_vcluster=False
+        )
+
+        payload = request.to_argo_payload()
+
+        expected_payload = {
+            "microservice-name": "order-service",
+            "namespace": "production",
+            "language": "java",
+            "database": "postgres",  # Note: postgresql -> postgres mapping
+            "cache": "redis",
+            "description": "Order processing service",
+            "github-org": "ecommerce",
+            "docker-registry": "registry.ecommerce.com/services",
+            "observability": "false",
+            "security": "true",
+            "target-vcluster": "prod-cluster",
+            "auto-create-vcluster": "false",
+            "user": "bob",
+            "slack-channel": "C456",
+            "slack-user-id": "bob",
+        }
+
+        assert payload == expected_payload
+
+    def test_microservice_to_argo_payload_database_mapping(self):
+        """Test that database value mapping works correctly in Argo payload."""
+        # Test postgresql -> postgres mapping
+        request = MicroserviceRequest(
+            name="test-service",
+            namespace="default",
+            user="testuser",
+            slack_channel="C123",
+            database=MicroserviceDatabase.POSTGRESQL
+        )
+        
+        payload = request.to_argo_payload()
+        assert payload["database"] == "postgres"
+
+        # Test none remains none
+        request = MicroserviceRequest(
+            name="test-service",
+            namespace="default",
+            user="testuser",
+            slack_channel="C123",
+            database=MicroserviceDatabase.NONE
+        )
+        
+        payload = request.to_argo_payload()
+        assert payload["database"] == "none"
+
+    def test_get_repository_name(self):
+        """Test repository name generation."""
+        # Test with -service suffix
+        request = MicroserviceRequest(
+            name="user-service",
+            namespace="default",
+            user="testuser",
+            slack_channel="C123"
+        )
+        assert request.get_repository_name() == "user"
+
+        # Test without -service suffix
+        request = MicroserviceRequest(
+            name="api",
+            namespace="default",
+            user="testuser",
+            slack_channel="C123"
+        )
+        assert request.get_repository_name() == "api"
+
+    def test_get_vcluster_name(self):
+        """Test vCluster name generation."""
+        # Test with target_vcluster specified
+        request = MicroserviceRequest(
+            name="user-service",
+            namespace="default",
+            user="testuser",
+            slack_channel="C123",
+            target_vcluster="my-cluster"
+        )
+        assert request.get_vcluster_name() == "my-cluster"
+
+        # Test without target_vcluster (auto-generate)
+        request = MicroserviceRequest(
+            name="user-service",
+            namespace="default",
+            user="testuser",
+            slack_channel="C123"
+        )
+        assert request.get_vcluster_name() == "user-vcluster"
+
+
+class TestMicroserviceEnums:
+    """Test microservice-related enum definitions."""
+
+    def test_microservice_language_enum(self):
+        """Test MicroserviceLanguage enum."""
+        assert MicroserviceLanguage.PYTHON.value == "python"
+        assert MicroserviceLanguage.JAVA.value == "java"
+        assert MicroserviceLanguage.SPRINGBOOT.value == "springboot"
+        assert MicroserviceLanguage.FASTAPI.value == "fastapi"
+
+    def test_microservice_database_enum(self):
+        """Test MicroserviceDatabase enum."""
+        assert MicroserviceDatabase.NONE.value == "none"
+        assert MicroserviceDatabase.POSTGRESQL.value == "postgresql"
+        assert MicroserviceDatabase.POSTGRES.value == "postgres"
+
+    def test_microservice_cache_enum(self):
+        """Test MicroserviceCache enum."""
+        assert MicroserviceCache.NONE.value == "none"
+        assert MicroserviceCache.REDIS.value == "redis"

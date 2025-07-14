@@ -79,6 +79,13 @@ class GitHubApiClient(VClusterDispatcherInterface):
         logger.warning("AppContainer creation not supported via GitHub dispatcher")
         return False, "AppContainer creation not supported via GitHub dispatcher. Use Argo workflows dispatcher."
 
+    def trigger_microservice_creation(self, payload: Dict) -> Tuple[bool, str]:
+        """Trigger Microservice creation via GitHub repository dispatch."""
+        # GitHub client doesn't support Microservice creation directly
+        # This is handled by the Argo Workflows dispatcher
+        logger.warning("Microservice creation not supported via GitHub dispatcher")
+        return False, "Microservice creation not supported via GitHub dispatcher. Use Argo workflows dispatcher."
+
     def validate_configuration(self) -> Tuple[bool, str]:
         """Validate GitHub client configuration."""
         if not self.token:

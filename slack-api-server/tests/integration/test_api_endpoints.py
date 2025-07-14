@@ -181,6 +181,176 @@ class TestAPIEndpoints:
         assert "blocks" in data
 
     @patch("src.infrastructure.argo_client.requests.post")
+    def test_microservice_create_success(self, mock_post):
+        """Test successful Microservice create command."""
+        # Mock successful Argo API response
+        mock_response = Mock()
+        mock_response.status_code = 201
+        mock_response.json.return_value = {"metadata": {"name": "microservice-creation-def456"}}
+        mock_post.return_value = mock_response
+
+        form_data = {
+            "command": "/microservice",
+            "text": "create user-service",
+            "user_id": "U123456", 
+            "user_name": "testuser",
+            "channel_id": "C123456",
+            "channel_name": "general",
+            "team_id": "T123456",
+            "team_domain": "testteam",
+        }
+
+        response = self.client.post("/slack/command", data=form_data)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["response_type"] == "in_channel"
+        assert "Microservice" in data["text"]
+        assert "creation started" in data["text"]
+        assert "blocks" in data
+
+    @patch("src.infrastructure.argo_client.requests.post")
+    def test_microservice_create_with_database_and_cache(self, mock_post):
+        """Test Microservice create command with database and cache."""
+        # Mock successful Argo API response
+        mock_response = Mock()
+        mock_response.status_code = 201
+        mock_response.json.return_value = {"metadata": {"name": "microservice-creation-ghi789"}}
+        mock_post.return_value = mock_response
+
+        form_data = {
+            "command": "/microservice",
+            "text": "create order-service with java and postgres and redis",
+            "user_id": "U456789", 
+            "user_name": "alice",
+            "channel_id": "C456789",
+            "channel_name": "backend",
+            "team_id": "T123456",
+            "team_domain": "testteam",
+        }
+
+        response = self.client.post("/slack/command", data=form_data)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["response_type"] == "in_channel"
+        assert "Microservice" in data["text"]
+        assert "creation started" in data["text"]
+        assert "order-service" in data["text"]
+
+    def test_slack_command_microservice_help(self):
+        """Test Microservice help command."""
+        form_data = {
+            "command": "/microservice",
+            "text": "help",
+            "user_id": "U123456",
+            "user_name": "testuser",
+            "channel_id": "C123456",
+            "channel_name": "general",
+            "team_id": "T123456",
+            "team_domain": "testteam",
+        }
+
+        response = self.client.post("/slack/command", data=form_data)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["response_type"] == "ephemeral"
+        assert "Microservice Management Commands" in data["text"]
+
+    def test_service_alias_command(self):
+        """Test /service alias for microservice command."""
+        form_data = {
+            "command": "/service",
+            "text": "help",
+            "user_id": "U123456",
+            "user_name": "testuser",
+            "channel_id": "C123456",
+            "channel_name": "general",
+            "team_id": "T123456",
+            "team_domain": "testteam",
+        }
+
+        response = self.client.post("/slack/command", data=form_data)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["response_type"] == "ephemeral"
+        assert "Microservice Management Commands" in data["text"]
+
+    @patch("src.infrastructure.argo_client.requests.post")
+    def test_microservice_create_failure(self, mock_post):
+        """Test Microservice create command with Argo API failure."""
+        # Mock failed Argo API response
+        mock_response = Mock()
+        mock_response.status_code = 500
+        mock_response.text = "Internal Server Error"
+        mock_post.return_value = mock_response
+
+        form_data = {
+            "command": "/microservice",
+            "text": "create test-service",
+            "user_id": "U123456",
+            "user_name": "testuser",
+            "channel_id": "C123456",
+            "channel_name": "general",
+            "team_id": "T123456",
+            "team_domain": "testteam",
+        }
+
+        response = self.client.post("/slack/command", data=form_data)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["response_type"] == "ephemeral"
+        assert "❌" in data["text"]
+        assert "Failed to trigger creation" in data["text"]
+
+    def test_microservice_create_invalid_name(self):
+        """Test Microservice create command with invalid name."""
+        form_data = {
+            "command": "/microservice",
+            "text": "create -invalid-service-",  # Invalid: starts and ends with dash
+            "user_id": "U123456",
+            "user_name": "testuser",
+            "channel_id": "C123456",
+            "channel_name": "general",
+            "team_id": "T123456",
+            "team_domain": "testteam",
+        }
+
+        response = self.client.post("/slack/command", data=form_data)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["response_type"] == "ephemeral"
+        assert "❌" in data["text"]
+        # Should get validation error for invalid name
+        assert "unexpected error" in data["text"] or "Failed to trigger creation" in data["text"]
+
+    def test_microservice_missing_name(self):
+        """Test Microservice create command without name."""
+        form_data = {
+            "command": "/microservice",
+            "text": "create",  # Missing service name
+            "user_id": "U123456",
+            "user_name": "testuser",
+            "channel_id": "C123456",
+            "channel_name": "general",
+            "team_id": "T123456",
+            "team_domain": "testteam",
+        }
+
+        response = self.client.post("/slack/command", data=form_data)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["response_type"] == "ephemeral"
+        assert "❌" in data["text"]
+        assert ("Microservice name is required" in data["text"] or 
+               "unexpected error" in data["text"])
+
+    @patch("src.infrastructure.argo_client.requests.post")
     def test_slack_command_create_success(self, mock_post):
         """Test successful Slack create command."""
         # Mock successful Argo API response

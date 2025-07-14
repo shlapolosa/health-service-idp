@@ -7,12 +7,16 @@ from unittest.mock import Mock, patch
 import pytest
 
 from src.application.use_cases import (CreateAppContainerUseCase,
+                                       CreateMicroserviceUseCase,
                                        CreateVClusterUseCase,
                                        HealthCheckUseCase,
                                        ProcessSlackCommandUseCase,
                                        VerifySlackRequestUseCase)
 from src.domain.models import (AppContainerRequest, Capability, CapabilitySet,
-                               InvalidVClusterRequestError, ParsedCommand,
+                               InvalidVClusterRequestError, 
+                               MicroserviceRequest, MicroserviceLanguage, 
+                               MicroserviceDatabase, MicroserviceCache,
+                               ParsedCommand,
                                ResourceSpec, SlackCommand, VClusterRequest,
                                VClusterSize)
 
@@ -227,11 +231,13 @@ class TestProcessSlackCommandUseCase:
         """Set up test fixtures."""
         self.mock_create_use_case = Mock()
         self.mock_create_appcontainer_use_case = Mock()
+        self.mock_create_microservice_use_case = Mock()
         self.mock_response_builder = Mock()
 
         self.use_case = ProcessSlackCommandUseCase(
             create_vcluster_use_case=self.mock_create_use_case,
             create_appcontainer_use_case=self.mock_create_appcontainer_use_case,
+            create_microservice_use_case=self.mock_create_microservice_use_case,
             response_builder=self.mock_response_builder,
         )
 
@@ -372,6 +378,81 @@ class TestProcessSlackCommandUseCase:
         assert result == appcontainer_response
         self.mock_create_appcontainer_use_case.execute.assert_called_once_with(command)
         self.mock_create_use_case.execute.assert_not_called()
+
+    def test_execute_microservice_command(self):
+        """Test executing Microservice command."""
+        command = SlackCommand(
+            command="/microservice",
+            text="create user-service",
+            user_id="U123",
+            user_name="testuser",
+            channel_id="C123",
+            channel_name="general",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        microservice_response = {"response_type": "in_channel", "text": "Creating Microservice..."}
+        self.mock_create_microservice_use_case.execute.return_value = microservice_response
+
+        result = self.use_case.execute(command)
+
+        assert result == microservice_response
+        self.mock_create_microservice_use_case.execute.assert_called_once_with(command)
+        self.mock_create_use_case.execute.assert_not_called()
+        self.mock_create_appcontainer_use_case.execute.assert_not_called()
+
+    def test_execute_service_alias_command(self):
+        """Test executing /service alias command."""
+        command = SlackCommand(
+            command="/service",
+            text="create api-service",
+            user_id="U456",
+            user_name="alice",
+            channel_id="C456",
+            channel_name="backend",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        microservice_response = {"response_type": "in_channel", "text": "Creating Microservice..."}
+        self.mock_create_microservice_use_case.execute.return_value = microservice_response
+
+        result = self.use_case.execute(command)
+
+        assert result == microservice_response
+        self.mock_create_microservice_use_case.execute.assert_called_once_with(command)
+        self.mock_create_use_case.execute.assert_not_called()
+        self.mock_create_appcontainer_use_case.execute.assert_not_called()
+
+    def test_execute_microservice_without_use_case(self):
+        """Test executing microservice command when use case is not enabled."""
+        # Create use case without microservice use case
+        use_case_without_microservice = ProcessSlackCommandUseCase(
+            create_vcluster_use_case=self.mock_create_use_case,
+            create_appcontainer_use_case=self.mock_create_appcontainer_use_case,
+            create_microservice_use_case=None,  # Not provided
+            response_builder=self.mock_response_builder,
+        )
+
+        command = SlackCommand(
+            command="/microservice",
+            text="create test-service",
+            user_id="U123",
+            user_name="testuser",
+            channel_id="C123",
+            channel_name="general",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        error_response = {"response_type": "ephemeral", "text": "Microservice functionality is not enabled"}
+        self.mock_response_builder.build_error_response.return_value = error_response
+
+        result = use_case_without_microservice.execute(command)
+
+        assert result == error_response
+        self.mock_response_builder.build_error_response.assert_called_once()
 
 
 class TestVerifySlackRequestUseCase:
@@ -626,6 +707,191 @@ class TestCreateAppContainerUseCase:
         # Should not call the dispatcher
         self.mock_vcluster_dispatcher.trigger_appcontainer_creation.assert_not_called()
 
+
+class TestCreateMicroserviceUseCase:
+    """Test CreateMicroserviceUseCase application service."""
+
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.mock_parser = Mock()
+        self.mock_vcluster_dispatcher = Mock()
+        self.mock_response_builder = Mock()
+        
+        self.use_case = CreateMicroserviceUseCase(
+            parser=self.mock_parser,
+            vcluster_dispatcher=self.mock_vcluster_dispatcher,
+        )
+        # Inject the mock response builder
+        self.use_case.response_builder = self.mock_response_builder
+
+    def test_execute_success(self):
+        """Test successful Microservice creation."""
+        command = SlackCommand(
+            command="/microservice",
+            text="create user-service",
+            user_id="U123",
+            user_name="testuser",
+            channel_id="C123",
+            channel_name="general",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        parsed = ParsedCommand(
+            action="create",
+            command_type="microservice",
+            microservice_name="user-service",
+            namespace="default",
+            description="CLAUDE.md-compliant microservice",
+            github_org="socrates12345",
+            enable_observability=True,
+            enable_security=True,
+            microservice_language=MicroserviceLanguage.PYTHON,
+            microservice_database=MicroserviceDatabase.NONE,
+            microservice_cache=MicroserviceCache.NONE,
+        )
+
+        success_response = {"response_type": "in_channel", "text": "Microservice created"}
+        
+        self.mock_parser.parse_command.return_value = parsed
+        self.mock_vcluster_dispatcher.trigger_microservice_creation.return_value = (
+            True,
+            "Microservice creation workflow started: microservice-creation-abc123",
+        )
+        self.mock_response_builder.build_microservice_success_response.return_value = success_response
+
+        result = self.use_case.execute(command)
+
+        assert result == success_response
+        
+        self.mock_parser.parse_command.assert_called_once_with(command)
+        self.mock_vcluster_dispatcher.trigger_microservice_creation.assert_called_once()
+        self.mock_response_builder.build_microservice_success_response.assert_called_once()
+
+        # Verify payload structure matches 4-tier standardized contract
+        call_args = self.mock_vcluster_dispatcher.trigger_microservice_creation.call_args[0][0]
+        assert call_args["microservice-name"] == "user-service"
+        assert call_args["namespace"] == "default"
+        assert call_args["language"] == "python"
+        assert call_args["database"] == "none"
+        assert call_args["cache"] == "none"
+        assert call_args["user"] == "testuser"
+        assert call_args["slack-channel"] == "C123"
+
+    def test_execute_with_database_and_cache(self):
+        """Test Microservice creation with PostgreSQL database and Redis cache."""
+        command = SlackCommand(
+            command="/microservice",
+            text='create order-service with java and postgres and redis',
+            user_id="U456",
+            user_name="alice",
+            channel_id="C456",
+            channel_name="backend",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        parsed = ParsedCommand(
+            action="create",
+            command_type="microservice",
+            microservice_name="order-service",
+            namespace="production",
+            description="Order processing microservice",
+            github_org="ecommerce",
+            docker_registry="docker.io/ecommerce",
+            enable_observability=True,
+            enable_security=True,
+            microservice_language=MicroserviceLanguage.JAVA,
+            microservice_database=MicroserviceDatabase.POSTGRESQL,
+            microservice_cache=MicroserviceCache.REDIS,
+            target_vcluster="prod-cluster",
+            auto_create_vcluster=False,
+        )
+
+        success_response = {"response_type": "in_channel", "text": "Microservice created"}
+        
+        self.mock_parser.parse_command.return_value = parsed
+        self.mock_vcluster_dispatcher.trigger_microservice_creation.return_value = (
+            True,
+            "Microservice creation workflow started: microservice-creation-def456",
+        )
+        self.mock_response_builder.build_microservice_success_response.return_value = success_response
+
+        result = self.use_case.execute(command)
+
+        assert result == success_response
+        
+        # Verify payload with custom parameters and database mapping
+        call_args = self.mock_vcluster_dispatcher.trigger_microservice_creation.call_args[0][0]
+        assert call_args["microservice-name"] == "order-service"
+        assert call_args["namespace"] == "production"
+        assert call_args["language"] == "java"
+        assert call_args["database"] == "postgres"  # postgresql -> postgres mapping
+        assert call_args["cache"] == "redis"
+        assert call_args["description"] == "Order processing microservice"
+        assert call_args["github-org"] == "ecommerce"
+        assert call_args["docker-registry"] == "docker.io/ecommerce"
+        assert call_args["target-vcluster"] == "prod-cluster"
+        assert call_args["auto-create-vcluster"] == "false"
+
+    def test_execute_help_command(self):
+        """Test Microservice help command."""
+        command = SlackCommand(
+            command="/microservice",
+            text="help",
+            user_id="U123",
+            user_name="testuser",
+            channel_id="C123",
+            channel_name="general",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        parsed = ParsedCommand(action="help")
+        help_response = {"response_type": "ephemeral", "text": "Microservice help"}
+
+        self.mock_parser.parse_command.return_value = parsed
+        self.mock_response_builder.build_microservice_help_response.return_value = help_response
+
+        result = self.use_case.execute(command)
+
+        assert result == help_response
+        self.mock_parser.parse_command.assert_called_once_with(command)
+        self.mock_response_builder.build_microservice_help_response.assert_called_once()
+        self.mock_vcluster_dispatcher.trigger_microservice_creation.assert_not_called()
+
+    def test_execute_missing_microservice_name(self):
+        """Test Microservice creation without microservice name."""
+        command = SlackCommand(
+            command="/microservice",
+            text="create",
+            user_id="U123",
+            user_name="testuser",
+            channel_id="C123",
+            channel_name="general",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        parsed = ParsedCommand(
+            action="create",
+            command_type="microservice",
+            microservice_name=None,  # Missing name
+        )
+
+        error_response = {"response_type": "ephemeral", "text": "Microservice name is required"}
+        
+        self.mock_parser.parse_command.return_value = parsed
+        self.mock_response_builder.build_error_response.return_value = error_response
+
+        result = self.use_case.execute(command)
+
+        assert result == error_response
+        self.mock_response_builder.build_error_response.assert_called_once()
+        
+        # Should not call the dispatcher
+        self.mock_vcluster_dispatcher.trigger_microservice_creation.assert_not_called()
+
     def test_execute_parsing_exception(self):
         """Test AppContainer creation with parsing exception."""
         command = SlackCommand(
@@ -680,3 +946,188 @@ class TestCreateAppContainerUseCase:
         
         # Should not call the dispatcher
         self.mock_vcluster_dispatcher.trigger_appcontainer_creation.assert_not_called()
+
+
+class TestCreateMicroserviceUseCase:
+    """Test CreateMicroserviceUseCase application service."""
+
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.mock_parser = Mock()
+        self.mock_vcluster_dispatcher = Mock()
+        self.mock_response_builder = Mock()
+        
+        self.use_case = CreateMicroserviceUseCase(
+            parser=self.mock_parser,
+            vcluster_dispatcher=self.mock_vcluster_dispatcher,
+        )
+        # Inject the mock response builder
+        self.use_case.response_builder = self.mock_response_builder
+
+    def test_execute_success(self):
+        """Test successful Microservice creation."""
+        command = SlackCommand(
+            command="/microservice",
+            text="create user-service",
+            user_id="U123",
+            user_name="testuser",
+            channel_id="C123",
+            channel_name="general",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        parsed = ParsedCommand(
+            action="create",
+            command_type="microservice",
+            microservice_name="user-service",
+            namespace="default",
+            description="CLAUDE.md-compliant microservice",
+            github_org="socrates12345",
+            enable_observability=True,
+            enable_security=True,
+            microservice_language=MicroserviceLanguage.PYTHON,
+            microservice_database=MicroserviceDatabase.NONE,
+            microservice_cache=MicroserviceCache.NONE,
+        )
+
+        success_response = {"response_type": "in_channel", "text": "Microservice created"}
+        
+        self.mock_parser.parse_command.return_value = parsed
+        self.mock_vcluster_dispatcher.trigger_microservice_creation.return_value = (
+            True,
+            "Microservice creation workflow started: microservice-creation-abc123",
+        )
+        self.mock_response_builder.build_microservice_success_response.return_value = success_response
+
+        result = self.use_case.execute(command)
+
+        assert result == success_response
+        
+        self.mock_parser.parse_command.assert_called_once_with(command)
+        self.mock_vcluster_dispatcher.trigger_microservice_creation.assert_called_once()
+        self.mock_response_builder.build_microservice_success_response.assert_called_once()
+
+        # Verify payload structure matches 4-tier standardized contract
+        call_args = self.mock_vcluster_dispatcher.trigger_microservice_creation.call_args[0][0]
+        assert call_args["microservice-name"] == "user-service"
+        assert call_args["namespace"] == "default"
+        assert call_args["language"] == "python"
+        assert call_args["database"] == "none"
+        assert call_args["cache"] == "none"
+        assert call_args["user"] == "testuser"
+        assert call_args["slack-channel"] == "C123"
+
+    def test_execute_with_database_and_cache(self):
+        """Test Microservice creation with PostgreSQL database and Redis cache."""
+        command = SlackCommand(
+            command="/microservice",
+            text='create order-service with java and postgres and redis',
+            user_id="U456",
+            user_name="alice",
+            channel_id="C456",
+            channel_name="backend",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        parsed = ParsedCommand(
+            action="create",
+            command_type="microservice",
+            microservice_name="order-service",
+            namespace="production",
+            description="Order processing microservice",
+            github_org="ecommerce",
+            docker_registry="docker.io/ecommerce",
+            enable_observability=True,
+            enable_security=True,
+            microservice_language=MicroserviceLanguage.JAVA,
+            microservice_database=MicroserviceDatabase.POSTGRESQL,
+            microservice_cache=MicroserviceCache.REDIS,
+            target_vcluster="prod-cluster",
+            auto_create_vcluster=False,
+        )
+
+        success_response = {"response_type": "in_channel", "text": "Microservice created"}
+        
+        self.mock_parser.parse_command.return_value = parsed
+        self.mock_vcluster_dispatcher.trigger_microservice_creation.return_value = (
+            True,
+            "Microservice creation workflow started: microservice-creation-def456",
+        )
+        self.mock_response_builder.build_microservice_success_response.return_value = success_response
+
+        result = self.use_case.execute(command)
+
+        assert result == success_response
+        
+        # Verify payload with custom parameters and database mapping
+        call_args = self.mock_vcluster_dispatcher.trigger_microservice_creation.call_args[0][0]
+        assert call_args["microservice-name"] == "order-service"
+        assert call_args["namespace"] == "production"
+        assert call_args["language"] == "java"
+        assert call_args["database"] == "postgres"  # postgresql -> postgres mapping
+        assert call_args["cache"] == "redis"
+        assert call_args["description"] == "Order processing microservice"
+        assert call_args["github-org"] == "ecommerce"
+        assert call_args["docker-registry"] == "docker.io/ecommerce"
+        assert call_args["target-vcluster"] == "prod-cluster"
+        assert call_args["auto-create-vcluster"] == "false"
+
+    def test_execute_help_command(self):
+        """Test Microservice help command."""
+        command = SlackCommand(
+            command="/microservice",
+            text="help",
+            user_id="U123",
+            user_name="testuser",
+            channel_id="C123",
+            channel_name="general",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        parsed = ParsedCommand(action="help")
+        help_response = {"response_type": "ephemeral", "text": "Microservice help"}
+
+        self.mock_parser.parse_command.return_value = parsed
+        self.mock_response_builder.build_microservice_help_response.return_value = help_response
+
+        result = self.use_case.execute(command)
+
+        assert result == help_response
+        self.mock_parser.parse_command.assert_called_once_with(command)
+        self.mock_response_builder.build_microservice_help_response.assert_called_once()
+        self.mock_vcluster_dispatcher.trigger_microservice_creation.assert_not_called()
+
+    def test_execute_missing_microservice_name(self):
+        """Test Microservice creation without microservice name."""
+        command = SlackCommand(
+            command="/microservice",
+            text="create",
+            user_id="U123",
+            user_name="testuser",
+            channel_id="C123",
+            channel_name="general",
+            team_id="T123",
+            team_domain="testteam",
+        )
+
+        parsed = ParsedCommand(
+            action="create",
+            command_type="microservice",
+            microservice_name=None,  # Missing name
+        )
+
+        error_response = {"response_type": "ephemeral", "text": "Microservice name is required"}
+        
+        self.mock_parser.parse_command.return_value = parsed
+        self.mock_response_builder.build_error_response.return_value = error_response
+
+        result = self.use_case.execute(command)
+
+        assert result == error_response
+        self.mock_response_builder.build_error_response.assert_called_once()
+        
+        # Should not call the dispatcher
+        self.mock_vcluster_dispatcher.trigger_microservice_creation.assert_not_called()
