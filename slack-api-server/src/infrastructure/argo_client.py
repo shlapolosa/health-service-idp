@@ -249,25 +249,37 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
                 },
                 "spec": {
                     "workflowTemplateRef": {
-                        "name": "microservice-creation"
+                        "name": "microservice-standard-contract"
                     },
                     "arguments": {
                         "parameters": [
-                            {"name": "microservice-name", "value": payload.get("microservice-name", "")},
+                            # TIER 1: Universal Parameters
+                            {"name": "resource-name", "value": payload.get("microservice-name", "")},
+                            {"name": "resource-type", "value": "microservice"},
                             {"name": "namespace", "value": payload.get("namespace", "default")},
-                            {"name": "language", "value": payload.get("language", "python")},
-                            {"name": "database", "value": payload.get("database", "none")},
-                            {"name": "cache", "value": payload.get("cache", "none")},
+                            {"name": "user", "value": payload.get("user", "unknown")},
                             {"name": "description", "value": payload.get("description", "CLAUDE.md-compliant microservice")},
                             {"name": "github-org", "value": payload.get("github-org", "socrates12345")},
                             {"name": "docker-registry", "value": payload.get("docker-registry", "docker.io/socrates12345")},
-                            {"name": "observability", "value": payload.get("observability", "true")},
-                            {"name": "security", "value": payload.get("security", "true")},
-                            {"name": "target-vcluster", "value": payload.get("target-vcluster", "")},
-                            {"name": "auto-create-vcluster", "value": payload.get("auto-create-vcluster", "true")},
-                            {"name": "user", "value": payload.get("user", "unknown")},
                             {"name": "slack-channel", "value": payload.get("slack-channel", "unknown")},
                             {"name": "slack-user-id", "value": payload.get("slack-user-id", "unknown")},
+                            
+                            # TIER 2: Platform Parameters
+                            {"name": "security-enabled", "value": payload.get("security", "true")},
+                            {"name": "observability-enabled", "value": payload.get("observability", "true")},
+                            {"name": "backup-enabled", "value": "false"},
+                            {"name": "environment-tier", "value": "development"},
+                            {"name": "auto-create-dependencies", "value": payload.get("auto-create-vcluster", "true")},
+                            {"name": "resource-size", "value": "medium"},
+                            
+                            # TIER 3: Microservice-Specific Parameters
+                            {"name": "microservice-language", "value": payload.get("language", "python")},
+                            {"name": "microservice-framework", "value": "auto"},
+                            {"name": "microservice-database", "value": payload.get("database", "none")},
+                            {"name": "microservice-cache", "value": payload.get("cache", "none")},
+                            {"name": "microservice-expose-api", "value": "false"},
+                            {"name": "target-vcluster", "value": payload.get("target-vcluster", "")},
+                            {"name": "parent-appcontainer", "value": ""},
                         ]
                     }
                 }
