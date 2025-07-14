@@ -76,84 +76,136 @@ spec:
 
   templates:
   - name: create-microservice
+    inputs:
+      parameters:
+      # === TIER 1: UNIVERSAL (Required) ===
+      - name: resource-name
+      - name: resource-type
+        default: "microservice"
+      - name: namespace
+        default: "default"
+      - name: user
+        default: "system"
+      - name: description
+        default: "CLAUDE.md-compliant microservice"
+      - name: github-org
+        default: "socrates12345"
+      - name: docker-registry
+        default: "docker.io/socrates12345"
+      - name: slack-channel
+        default: "#microservice-notifications"
+      - name: slack-user-id
+        default: "UNKNOWN"
+      
+      # === TIER 2: PLATFORM (Common) ===
+      - name: security-enabled
+        default: "true"
+      - name: observability-enabled
+        default: "true"
+      - name: backup-enabled
+        default: "false"
+      - name: environment-tier
+        default: "development"
+      - name: auto-create-dependencies
+        default: "true"
+      - name: resource-size
+        default: "medium"
+      
+      # === TIER 3: MICROSERVICE-SPECIFIC ===
+      - name: microservice-language
+        default: "python"
+      - name: microservice-framework
+        default: "fastapi"
+      - name: microservice-database
+        default: "none"
+      - name: microservice-cache
+        default: "none"
+      - name: microservice-expose-api
+        default: "false"
+      - name: target-vcluster
+        default: ""
+      - name: parent-appcontainer
+        default: ""
     steps:
     - - name: validate-parameters
         template: validate-microservice-parameters
         arguments:
           parameters:
           - name: resource-name
-            value: "{{workflow.parameters.resource-name}}"
+            value: "{{inputs.parameters.resource-name}}"
           - name: resource-type
-            value: "{{workflow.parameters.resource-type}}"
+            value: "{{inputs.parameters.resource-type}}"
           - name: namespace
-            value: "{{workflow.parameters.namespace}}"
+            value: "{{inputs.parameters.namespace}}"
           - name: environment-tier
-            value: "{{workflow.parameters.environment-tier}}"
+            value: "{{inputs.parameters.environment-tier}}"
           - name: microservice-language
-            value: "{{workflow.parameters.microservice-language}}"
+            value: "{{inputs.parameters.microservice-language}}"
           - name: microservice-framework
-            value: "{{workflow.parameters.microservice-framework}}"
+            value: "{{inputs.parameters.microservice-framework}}"
           - name: microservice-database
-            value: "{{workflow.parameters.microservice-database}}"
+            value: "{{inputs.parameters.microservice-database}}"
           - name: microservice-cache
-            value: "{{workflow.parameters.microservice-cache}}"
+            value: "{{inputs.parameters.microservice-cache}}"
           - name: github-org
-            value: "{{workflow.parameters.github-org}}"
+            value: "{{inputs.parameters.github-org}}"
     - - name: notify-starting
         templateRef:
-          name: slack-standard-notifications
-          template: notify-workflow-starting
+          name: simple-slack-notifications
+          template: send-notification
         arguments:
           parameters:
           - name: resource-name
-            value: "{{workflow.parameters.resource-name}}"
+            value: "{{inputs.parameters.resource-name}}"
           - name: resource-type
-            value: "{{workflow.parameters.resource-type}}"
+            value: "{{inputs.parameters.resource-type}}"
           - name: user
-            value: "{{workflow.parameters.user}}"
+            value: "{{inputs.parameters.user}}"
           - name: slack-channel
-            value: "{{workflow.parameters.slack-channel}}"
+            value: "{{inputs.parameters.slack-channel}}"
           - name: slack-user-id
-            value: "{{workflow.parameters.slack-user-id}}"
-          - name: workflow-description
-            value: "{{workflow.parameters.microservice-language}} microservice creation workflow"
+            value: "{{inputs.parameters.slack-user-id}}"
+          - name: message
+            value: "Starting {{inputs.parameters.microservice-language}} microservice creation workflow"
+          - name: notification-type
+            value: "starting"
         when: "{{steps.validate-parameters.status}} == Succeeded"
     - - name: ensure-appcontainer
         template: ensure-appcontainer-dependency
         arguments:
           parameters:
           - name: resource-name
-            value: "{{workflow.parameters.resource-name}}"
+            value: "{{inputs.parameters.resource-name}}"
           - name: namespace
-            value: "{{workflow.parameters.namespace}}"
+            value: "{{inputs.parameters.namespace}}"
           - name: parent-appcontainer
-            value: "{{workflow.parameters.parent-appcontainer}}"
+            value: "{{inputs.parameters.parent-appcontainer}}"
           - name: target-vcluster
-            value: "{{workflow.parameters.target-vcluster}}"
+            value: "{{inputs.parameters.target-vcluster}}"
           - name: auto-create-dependencies
-            value: "{{workflow.parameters.auto-create-dependencies}}"
+            value: "{{inputs.parameters.auto-create-dependencies}}"
           - name: description
-            value: "{{workflow.parameters.description}}"
+            value: "{{inputs.parameters.description}}"
           - name: github-org
-            value: "{{workflow.parameters.github-org}}"
+            value: "{{inputs.parameters.github-org}}"
           - name: docker-registry
-            value: "{{workflow.parameters.docker-registry}}"
+            value: "{{inputs.parameters.docker-registry}}"
           - name: security-enabled
-            value: "{{workflow.parameters.security-enabled}}"
+            value: "{{inputs.parameters.security-enabled}}"
           - name: observability-enabled
-            value: "{{workflow.parameters.observability-enabled}}"
+            value: "{{inputs.parameters.observability-enabled}}"
           - name: backup-enabled
-            value: "{{workflow.parameters.backup-enabled}}"
+            value: "{{inputs.parameters.backup-enabled}}"
           - name: environment-tier
-            value: "{{workflow.parameters.environment-tier}}"
+            value: "{{inputs.parameters.environment-tier}}"
           - name: resource-size
-            value: "{{workflow.parameters.resource-size}}"
+            value: "{{inputs.parameters.resource-size}}"
           - name: user
-            value: "{{workflow.parameters.user}}"
+            value: "{{inputs.parameters.user}}"
           - name: slack-channel
-            value: "{{workflow.parameters.slack-channel}}"
+            value: "{{inputs.parameters.slack-channel}}"
           - name: slack-user-id
-            value: "{{workflow.parameters.slack-user-id}}"
+            value: "{{inputs.parameters.slack-user-id}}"
         when: "{{steps.validate-parameters.status}} == Succeeded"
     - - name: notify-appcontainer-ready
         templateRef:
@@ -162,74 +214,74 @@ spec:
         arguments:
           parameters:
           - name: resource-name
-            value: "{{workflow.parameters.resource-name}}"
+            value: "{{inputs.parameters.resource-name}}"
           - name: resource-type
-            value: "{{workflow.parameters.resource-type}}"
+            value: "{{inputs.parameters.resource-type}}"
           - name: user
-            value: "{{workflow.parameters.user}}"
+            value: "{{inputs.parameters.user}}"
           - name: slack-channel
-            value: "{{workflow.parameters.slack-channel}}"
+            value: "{{inputs.parameters.slack-channel}}"
           - name: slack-user-id
-            value: "{{workflow.parameters.slack-user-id}}"
+            value: "{{inputs.parameters.slack-user-id}}"
           - name: step-name
             value: "AppContainer Setup"
           - name: progress-message
             value: "✅ Application container ready - creating microservice..."
           - name: namespace
-            value: "{{workflow.parameters.namespace}}"
+            value: "{{inputs.parameters.namespace}}"
         when: "{{steps.ensure-appcontainer.status}} == Succeeded"
     - - name: create-microservice-claim
         template: create-microservice-claim
         arguments:
           parameters:
           - name: resource-name
-            value: "{{workflow.parameters.resource-name}}"
+            value: "{{inputs.parameters.resource-name}}"
           - name: namespace
-            value: "{{workflow.parameters.namespace}}"
+            value: "{{inputs.parameters.namespace}}"
           - name: description
-            value: "{{workflow.parameters.description}}"
+            value: "{{inputs.parameters.description}}"
           - name: microservice-language
-            value: "{{workflow.parameters.microservice-language}}"
+            value: "{{inputs.parameters.microservice-language}}"
           - name: microservice-framework
-            value: "{{workflow.parameters.microservice-framework}}"
+            value: "{{inputs.parameters.microservice-framework}}"
           - name: microservice-database
-            value: "{{workflow.parameters.microservice-database}}"
+            value: "{{inputs.parameters.microservice-database}}"
           - name: microservice-cache
-            value: "{{workflow.parameters.microservice-cache}}"
+            value: "{{inputs.parameters.microservice-cache}}"
           - name: microservice-expose-api
-            value: "{{workflow.parameters.microservice-expose-api}}"
+            value: "{{inputs.parameters.microservice-expose-api}}"
           - name: user
-            value: "{{workflow.parameters.user}}"
+            value: "{{inputs.parameters.user}}"
           - name: slack-channel
-            value: "{{workflow.parameters.slack-channel}}"
+            value: "{{inputs.parameters.slack-channel}}"
         when: "{{steps.ensure-appcontainer.status}} == Succeeded"
     - - name: wait-for-microservice-ready
         template: wait-for-microservice-ready
         arguments:
           parameters:
           - name: resource-name
-            value: "{{workflow.parameters.resource-name}}"
+            value: "{{inputs.parameters.resource-name}}"
           - name: namespace
-            value: "{{workflow.parameters.namespace}}"
+            value: "{{inputs.parameters.namespace}}"
         when: "{{steps.create-microservice-claim.status}} == Succeeded"
     - - name: extract-microservice-info
         template: extract-microservice-info
         arguments:
           parameters:
           - name: resource-name
-            value: "{{workflow.parameters.resource-name}}"
+            value: "{{inputs.parameters.resource-name}}"
           - name: namespace
-            value: "{{workflow.parameters.namespace}}"
+            value: "{{inputs.parameters.namespace}}"
           - name: target-vcluster
             value: "{{steps.ensure-appcontainer.outputs.parameters.vcluster-name}}"
           - name: github-org
-            value: "{{workflow.parameters.github-org}}"
+            value: "{{inputs.parameters.github-org}}"
           - name: microservice-language
-            value: "{{workflow.parameters.microservice-language}}"
+            value: "{{inputs.parameters.microservice-language}}"
           - name: microservice-database
-            value: "{{workflow.parameters.microservice-database}}"
+            value: "{{inputs.parameters.microservice-database}}"
           - name: microservice-cache
-            value: "{{workflow.parameters.microservice-cache}}"
+            value: "{{inputs.parameters.microservice-cache}}"
         when: "{{steps.wait-for-microservice-ready.status}} == Succeeded"
     - - name: notify-success
         templateRef:
@@ -238,21 +290,21 @@ spec:
         arguments:
           parameters:
           - name: resource-name
-            value: "{{workflow.parameters.resource-name}}"
+            value: "{{inputs.parameters.resource-name}}"
           - name: resource-type
-            value: "{{workflow.parameters.resource-type}}"
+            value: "{{inputs.parameters.resource-type}}"
           - name: user
-            value: "{{workflow.parameters.user}}"
+            value: "{{inputs.parameters.user}}"
           - name: slack-channel
-            value: "{{workflow.parameters.slack-channel}}"
+            value: "{{inputs.parameters.slack-channel}}"
           - name: slack-user-id
-            value: "{{workflow.parameters.slack-user-id}}"
+            value: "{{inputs.parameters.slack-user-id}}"
           - name: success-message
-            value: "{{workflow.parameters.microservice-language}} microservice '{{workflow.parameters.resource-name}}' created successfully!"
+            value: "{{inputs.parameters.microservice-language}} microservice '{{inputs.parameters.resource-name}}' created successfully!"
           - name: endpoints
             value: "{{steps.extract-microservice-info.outputs.parameters.endpoints-summary}}"
           - name: capabilities
-            value: "🚀 {{workflow.parameters.microservice-framework}} Service\n📊 {{workflow.parameters.microservice-database}} Database\n💾 {{workflow.parameters.microservice-cache}} Cache\n🔄 GitOps (ArgoCD)\n📦 Knative Deployment"
+            value: "🚀 {{inputs.parameters.microservice-framework}} Service\n📊 {{inputs.parameters.microservice-database}} Database\n💾 {{inputs.parameters.microservice-cache}} Cache\n🔄 GitOps (ArgoCD)\n📦 Knative Deployment"
         when: "{{steps.extract-microservice-info.status}} == Succeeded"
     - - name: notify-failure
         templateRef:
@@ -261,15 +313,15 @@ spec:
         arguments:
           parameters:
           - name: resource-name
-            value: "{{workflow.parameters.resource-name}}"
+            value: "{{inputs.parameters.resource-name}}"
           - name: resource-type
-            value: "{{workflow.parameters.resource-type}}"
+            value: "{{inputs.parameters.resource-type}}"
           - name: user
-            value: "{{workflow.parameters.user}}"
+            value: "{{inputs.parameters.user}}"
           - name: slack-channel
-            value: "{{workflow.parameters.slack-channel}}"
+            value: "{{inputs.parameters.slack-channel}}"
           - name: slack-user-id
-            value: "{{workflow.parameters.slack-user-id}}"
+            value: "{{inputs.parameters.slack-user-id}}"
           - name: error-message
             value: "Microservice creation failed"
           - name: error-details

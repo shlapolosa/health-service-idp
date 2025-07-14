@@ -133,7 +133,7 @@ spec:
             value: "{{inputs.parameters.vcluster-capabilities}}"
     - - name: notify-starting
         templateRef:
-          name: slack-standard-notifications
+          name: simple-slack-notifications
           template: send-notification
         arguments:
           parameters:
@@ -203,7 +203,7 @@ spec:
         when: "{{steps.wait-for-vcluster-ready.status}} == Succeeded"
     - - name: notify-success
         templateRef:
-          name: slack-standard-notifications
+          name: simple-slack-notifications
           template: send-notification
         arguments:
           parameters:
@@ -224,7 +224,7 @@ spec:
         when: "{{steps.configure-vcluster-access.status}} == Succeeded"
     - - name: notify-failure
         templateRef:
-          name: slack-standard-notifications
+          name: simple-slack-notifications
           template: send-notification
         arguments:
           parameters:
@@ -312,9 +312,10 @@ spec:
         esac
         
         # Validate capabilities JSON format
-        echo "{{inputs.parameters.vcluster-capabilities}}" | jq . > /dev/null 2>&1
+        CAPABILITIES='{{inputs.parameters.vcluster-capabilities}}'
+        echo "$CAPABILITIES" | jq . > /dev/null 2>&1
         if [ $? -ne 0 ]; then
-          echo "❌ Invalid vcluster-capabilities JSON format"
+          echo "❌ Invalid vcluster-capabilities JSON format: $CAPABILITIES"
           exit 1
         fi
         
@@ -415,17 +416,6 @@ spec:
             created-at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
         spec:
           name: {{inputs.parameters.resource-name}}
-          description: "{{inputs.parameters.description}}"
-          size: {{inputs.parameters.vcluster-size}}
-          environment: {{inputs.parameters.environment-tier}}
-          resources:
-            requests:
-              cpu: "$CPU_REQUEST"
-              memory: "$MEMORY_REQUEST"
-              storage: "$STORAGE"
-            limits:
-              cpu: "$CPU_LIMIT" 
-              memory: "$MEMORY_LIMIT"
           components:
             argoCD: true
             istio: true
@@ -433,11 +423,7 @@ spec:
             prometheus: $(echo "$ENHANCED_CAPABILITIES" | jq -r '.observability')
             grafana: $(echo "$ENHANCED_CAPABILITIES" | jq -r '.observability')
             jaeger: $(echo "$ENHANCED_CAPABILITIES" | jq -r '.observability')
-            loki: $(echo "$ENHANCED_CAPABILITIES" | jq -r '.logging')
-            networkPolicies: $(echo "$ENHANCED_CAPABILITIES" | jq -r '.security')
-            podSecurityPolicies: $(echo "$ENHANCED_CAPABILITIES" | jq -r '.security')
-            backupOperator: $(echo "$ENHANCED_CAPABILITIES" | jq -r '.backup')
-            autoscaling: $(echo "$ENHANCED_CAPABILITIES" | jq -r '.autoscaling')
+            kiali: $(echo "$ENHANCED_CAPABILITIES" | jq -r '.observability')
         EOF
         
         if [ $? -eq 0 ]; then
