@@ -114,6 +114,24 @@ spec:
         when: "{{steps.validate-request.status}} == Succeeded"
     - - name: ensure-vcluster
         template: ensure-vcluster-exists
+        arguments:
+          parameters:
+          - name: appcontainer-name
+            value: "{{inputs.parameters.appcontainer-name}}"
+          - name: vcluster-name
+            value: "{{inputs.parameters.vcluster-name}}"
+          - name: namespace
+            value: "{{inputs.parameters.namespace}}"
+          - name: security
+            value: "{{inputs.parameters.security}}"
+          - name: user
+            value: "{{inputs.parameters.user}}"
+          - name: slack-channel
+            value: "{{inputs.parameters.slack-channel}}"
+          - name: slack-user-id
+            value: "{{inputs.parameters.slack-user-id}}"
+          - name: auto-create-vcluster
+            value: "{{inputs.parameters.auto-create-vcluster}}"
         when: "{{steps.validate-request.status}} == Succeeded"
     - - name: notify-vcluster-ready
         templateRef:
@@ -136,6 +154,26 @@ spec:
         when: "{{steps.ensure-vcluster.status}} == Succeeded"
     - - name: create-appcontainer-claim
         template: create-claim
+        arguments:
+          parameters:
+          - name: appcontainer-name
+            value: "{{inputs.parameters.appcontainer-name}}"
+          - name: namespace
+            value: "{{inputs.parameters.namespace}}"
+          - name: description
+            value: "{{inputs.parameters.description}}"
+          - name: github-org
+            value: "{{inputs.parameters.github-org}}"
+          - name: docker-registry
+            value: "{{inputs.parameters.docker-registry}}"
+          - name: observability
+            value: "{{inputs.parameters.observability}}"
+          - name: security
+            value: "{{inputs.parameters.security}}"
+          - name: user
+            value: "{{inputs.parameters.user}}"
+          - name: slack-channel
+            value: "{{inputs.parameters.slack-channel}}"
         when: "{{steps.ensure-vcluster.status}} == Succeeded"
     - - name: notify-repositories
         templateRef:
@@ -158,6 +196,12 @@ spec:
         when: "{{steps.create-appcontainer-claim.status}} == Succeeded"
     - - name: wait-for-repositories
         template: wait-for-repositories
+        arguments:
+          parameters:
+          - name: appcontainer-name
+            value: "{{inputs.parameters.appcontainer-name}}"
+          - name: namespace
+            value: "{{inputs.parameters.namespace}}"
         when: "{{steps.create-appcontainer-claim.status}} == Succeeded"
     - - name: notify-microservices
         templateRef:
@@ -180,6 +224,12 @@ spec:
         when: "{{steps.wait-for-repositories.status}} == Succeeded"
     - - name: create-default-microservice
         template: create-default-microservice
+        arguments:
+          parameters:
+          - name: appcontainer-name
+            value: "{{inputs.parameters.appcontainer-name}}"
+          - name: vcluster-name
+            value: "{{inputs.parameters.vcluster-name}}"
         when: "{{steps.wait-for-repositories.status}} == Succeeded"
     - - name: notify-exposing
         templateRef:
@@ -202,9 +252,25 @@ spec:
         when: "{{steps.create-default-microservice.status}} == Succeeded"
     - - name: expose-vcluster-services
         template: expose-vcluster-services
+        arguments:
+          parameters:
+          - name: appcontainer-name
+            value: "{{inputs.parameters.appcontainer-name}}"
+          - name: vcluster-name
+            value: "{{inputs.parameters.vcluster-name}}"
+          - name: namespace
+            value: "{{inputs.parameters.namespace}}"
         when: "{{steps.create-default-microservice.status}} == Succeeded"
     - - name: extract-appcontainer-info
         template: extract-appcontainer-info
+        arguments:
+          parameters:
+          - name: appcontainer-name
+            value: "{{inputs.parameters.appcontainer-name}}"
+          - name: vcluster-name
+            value: "{{inputs.parameters.vcluster-name}}"
+          - name: namespace
+            value: "{{inputs.parameters.namespace}}"
         when: "{{steps.expose-vcluster-services.status}} == Succeeded"
     - - name: notify-success
         templateRef:
@@ -290,6 +356,24 @@ spec:
         echo "Validation successful"
 
   - name: ensure-vcluster-exists
+    inputs:
+      parameters:
+      - name: appcontainer-name
+        default: "{{workflow.parameters.appcontainer-name}}"
+      - name: vcluster-name
+        default: "{{workflow.parameters.vcluster-name}}"
+      - name: namespace
+        default: "{{workflow.parameters.namespace}}"
+      - name: security
+        default: "{{workflow.parameters.security}}"
+      - name: user
+        default: "{{workflow.parameters.user}}"
+      - name: slack-channel
+        default: "{{workflow.parameters.slack-channel}}"
+      - name: slack-user-id
+        default: "{{workflow.parameters.slack-user-id}}"
+      - name: auto-create-vcluster
+        default: "{{workflow.parameters.auto-create-vcluster}}"
     steps:
     - - name: create-vcluster-for-appcontainer
         templateRef:
@@ -298,25 +382,41 @@ spec:
         arguments:
           parameters:
           - name: vcluster-name
-            value: "{{workflow.parameters.vcluster-name}}"
+            value: "{{inputs.parameters.vcluster-name}}"
           - name: namespace
-            value: "{{workflow.parameters.namespace}}"
+            value: "{{inputs.parameters.namespace}}"
           - name: size
             value: "medium"
           - name: capabilities
-            value: '{"observability":"true","security":"{{workflow.parameters.security}}","gitops":"true","logging":"true","networking":"true","autoscaling":"false","backup":"false"}'
+            value: '{"observability":"true","security":"{{inputs.parameters.security}}","gitops":"true","logging":"true","networking":"true","autoscaling":"false","backup":"false"}'
           - name: user
-            value: "{{workflow.parameters.user}}"
+            value: "{{inputs.parameters.user}}"
           - name: slack-channel
-            value: "{{workflow.parameters.slack-channel}}"
+            value: "{{inputs.parameters.slack-channel}}"
           - name: slack-user-id
-            value: "{{workflow.parameters.slack-user-id}}"
-        when: "{{workflow.parameters.auto-create-vcluster}} == true"
+            value: "{{inputs.parameters.slack-user-id}}"
+        when: "{{inputs.parameters.auto-create-vcluster}} == true"
     - - name: check-existing-vcluster
         template: check-existing-vcluster
-        when: "{{workflow.parameters.auto-create-vcluster}} == false"
+        arguments:
+          parameters:
+          - name: vcluster-name
+            value: "{{inputs.parameters.vcluster-name}}"
+          - name: namespace
+            value: "{{inputs.parameters.namespace}}"
+          - name: appcontainer-name
+            value: "{{inputs.parameters.appcontainer-name}}"
+        when: "{{inputs.parameters.auto-create-vcluster}} == false"
 
   - name: check-existing-vcluster
+    inputs:
+      parameters:
+      - name: vcluster-name
+        default: "{{workflow.parameters.vcluster-name}}"
+      - name: namespace
+        default: "{{workflow.parameters.namespace}}"
+      - name: appcontainer-name
+        default: "{{workflow.parameters.appcontainer-name}}"
     script:
       image: bitnami/kubectl:1.28
       command: [sh]
@@ -324,24 +424,24 @@ spec:
         echo "Checking existing vCluster for AppContainer deployment..."
         
         # Use provided vCluster name or derive from appcontainer name
-        TARGET_VCLUSTER="{{workflow.parameters.vcluster-name}}"
+        TARGET_VCLUSTER="{{inputs.parameters.vcluster-name}}"
         if [ -z "$TARGET_VCLUSTER" ]; then
-          TARGET_VCLUSTER="{{workflow.parameters.appcontainer-name}}-vcluster"
+          TARGET_VCLUSTER="{{inputs.parameters.appcontainer-name}}-vcluster"
         fi
         
         echo "🔍 Checking vCluster: $TARGET_VCLUSTER"
         
         # Check if vCluster exists
-        if ! kubectl get vclusterenvironmentclaim $TARGET_VCLUSTER -n {{workflow.parameters.namespace}} >/dev/null 2>&1; then
+        if ! kubectl get vclusterenvironmentclaim $TARGET_VCLUSTER -n {{inputs.parameters.namespace}} >/dev/null 2>&1; then
           echo "❌ VCluster $TARGET_VCLUSTER does not exist"
           echo "💡 Enable auto-create-vcluster or create the vCluster first"
           exit 1
         fi
         
         # Check required components
-        ARGOCD=$(kubectl get vclusterenvironmentclaim $TARGET_VCLUSTER -n {{workflow.parameters.namespace}} -o jsonpath='{.spec.components.argoCD}' 2>/dev/null || echo "false")
-        ISTIO=$(kubectl get vclusterenvironmentclaim $TARGET_VCLUSTER -n {{workflow.parameters.namespace}} -o jsonpath='{.spec.components.istio}' 2>/dev/null || echo "false")
-        KNATIVE=$(kubectl get vclusterenvironmentclaim $TARGET_VCLUSTER -n {{workflow.parameters.namespace}} -o jsonpath='{.spec.components.knativeServing}' 2>/dev/null || echo "false")
+        ARGOCD=$(kubectl get vclusterenvironmentclaim $TARGET_VCLUSTER -n {{inputs.parameters.namespace}} -o jsonpath='{.spec.components.argoCD}' 2>/dev/null || echo "false")
+        ISTIO=$(kubectl get vclusterenvironmentclaim $TARGET_VCLUSTER -n {{inputs.parameters.namespace}} -o jsonpath='{.spec.components.istio}' 2>/dev/null || echo "false")
+        KNATIVE=$(kubectl get vclusterenvironmentclaim $TARGET_VCLUSTER -n {{inputs.parameters.namespace}} -o jsonpath='{.spec.components.knativeServing}' 2>/dev/null || echo "false")
         
         echo "🔍 VCluster components:"
         echo "  ArgoCD: $ARGOCD"
@@ -358,6 +458,26 @@ spec:
         fi
 
   - name: create-claim
+    inputs:
+      parameters:
+      - name: appcontainer-name
+        default: "{{workflow.parameters.appcontainer-name}}"
+      - name: namespace
+        default: "{{workflow.parameters.namespace}}"
+      - name: description
+        default: "{{workflow.parameters.description}}"
+      - name: github-org
+        default: "{{workflow.parameters.github-org}}"
+      - name: docker-registry
+        default: "{{workflow.parameters.docker-registry}}"
+      - name: observability
+        default: "{{workflow.parameters.observability}}"
+      - name: security
+        default: "{{workflow.parameters.security}}"
+      - name: user
+        default: "{{workflow.parameters.user}}"
+      - name: slack-channel
+        default: "{{workflow.parameters.slack-channel}}"
     script:
       image: bitnami/kubectl:1.28
       command: [sh]
@@ -365,29 +485,29 @@ spec:
         echo "Creating AppContainer claim..."
         
         # Create namespace if it doesn't exist
-        echo "Ensuring namespace {{workflow.parameters.namespace}} exists..."
-        kubectl create namespace {{workflow.parameters.namespace}} --dry-run=client -o yaml | kubectl apply -f -
+        echo "Ensuring namespace {{inputs.parameters.namespace}} exists..."
+        kubectl create namespace {{inputs.parameters.namespace}} --dry-run=client -o yaml | kubectl apply -f -
         
         # Parse boolean parameters
-        OBSERVABILITY=$([ "{{workflow.parameters.observability}}" = "true" ] && echo "true" || echo "false")
-        SECURITY=$([ "{{workflow.parameters.security}}" = "true" ] && echo "true" || echo "false")
+        OBSERVABILITY=$([ "{{inputs.parameters.observability}}" = "true" ] && echo "true" || echo "false")
+        SECURITY=$([ "{{inputs.parameters.security}}" = "true" ] && echo "true" || echo "false")
         
         # Create AppContainer claim manifest
         cat <<EOF | kubectl apply -f -
         apiVersion: platform.example.org/v1alpha1
         kind: AppContainerClaim
         metadata:
-          name: {{workflow.parameters.appcontainer-name}}
-          namespace: {{workflow.parameters.namespace}}
+          name: {{inputs.parameters.appcontainer-name}}
+          namespace: {{inputs.parameters.namespace}}
           labels:
             created-by: slack
-            requested-by: "{{workflow.parameters.user}}"
-            slack-channel: "{{workflow.parameters.slack-channel}}"
+            requested-by: "{{inputs.parameters.user}}"
+            slack-channel: "{{inputs.parameters.slack-channel}}"
         spec:
-          name: {{workflow.parameters.appcontainer-name}}
-          description: "{{workflow.parameters.description}}"
-          gitHubOrg: "{{workflow.parameters.github-org}}"
-          dockerRegistry: "{{workflow.parameters.docker-registry}}"
+          name: {{inputs.parameters.appcontainer-name}}
+          description: "{{inputs.parameters.description}}"
+          gitHubOrg: "{{inputs.parameters.github-org}}"
+          dockerRegistry: "{{inputs.parameters.docker-registry}}"
           enableObservability: $OBSERVABILITY
           enableSecurity: $SECURITY
         EOF
@@ -395,8 +515,8 @@ spec:
         if [ $? -eq 0 ]; then
           echo "AppContainer claim created successfully"
           echo "Crossplane will now create repositories and CI/CD infrastructure..."
-          echo "Source repo: https://github.com/{{workflow.parameters.github-org}}/{{workflow.parameters.appcontainer-name}}"
-          echo "GitOps repo: https://github.com/{{workflow.parameters.github-org}}/{{workflow.parameters.appcontainer-name}}-gitops"
+          echo "Source repo: https://github.com/{{inputs.parameters.github-org}}/{{inputs.parameters.appcontainer-name}}"
+          echo "GitOps repo: https://github.com/{{inputs.parameters.github-org}}/{{inputs.parameters.appcontainer-name}}-gitops"
           exit 0
         else
           echo "Failed to create AppContainer claim"
@@ -404,6 +524,12 @@ spec:
         fi
 
   - name: wait-for-repositories
+    inputs:
+      parameters:
+      - name: appcontainer-name
+        default: "{{workflow.parameters.appcontainer-name}}"
+      - name: namespace
+        default: "{{workflow.parameters.namespace}}"
     script:
       image: bitnami/kubectl:1.28
       command: [sh]
@@ -417,8 +543,8 @@ spec:
         while [ $ELAPSED -lt $TIMEOUT ]; do
           echo "Checking AppContainer claim status... (${ELAPSED}s/${TIMEOUT}s)"
           
-          SOURCE_URL=$(kubectl get appcontainerclaim {{workflow.parameters.appcontainer-name}} -n {{workflow.parameters.namespace}} -o jsonpath='{.status.sourceRepository.url}' 2>/dev/null || echo "")
-          GITOPS_URL=$(kubectl get appcontainerclaim {{workflow.parameters.appcontainer-name}} -n {{workflow.parameters.namespace}} -o jsonpath='{.status.gitopsRepository.url}' 2>/dev/null || echo "")
+          SOURCE_URL=$(kubectl get appcontainerclaim {{inputs.parameters.appcontainer-name}} -n {{inputs.parameters.namespace}} -o jsonpath='{.status.sourceRepository.url}' 2>/dev/null || echo "")
+          GITOPS_URL=$(kubectl get appcontainerclaim {{inputs.parameters.appcontainer-name}} -n {{inputs.parameters.namespace}} -o jsonpath='{.status.gitopsRepository.url}' 2>/dev/null || echo "")
           
           if [ ! -z "$SOURCE_URL" ] && [ ! -z "$GITOPS_URL" ]; then
             echo "✅ Repositories created successfully!"
@@ -435,16 +561,22 @@ spec:
         exit 1
 
   - name: create-default-microservice
+    inputs:
+      parameters:
+      - name: appcontainer-name
+        default: "{{workflow.parameters.appcontainer-name}}"
+      - name: vcluster-name
+        default: "{{workflow.parameters.vcluster-name}}"
     script:
       image: bitnami/kubectl:1.28
       command: [sh]
       source: |
-        echo "Creating default microservice for AppContainer {{workflow.parameters.appcontainer-name}}..."
+        echo "Creating default microservice for AppContainer {{inputs.parameters.appcontainer-name}}..."
         
         # Determine target vCluster name  
-        TARGET_VCLUSTER="{{workflow.parameters.vcluster-name}}"
+        TARGET_VCLUSTER="{{inputs.parameters.vcluster-name}}"
         if [ -z "$TARGET_VCLUSTER" ] || [ "$TARGET_VCLUSTER" = "" ]; then
-          TARGET_VCLUSTER="{{workflow.parameters.appcontainer-name}}-vcluster"
+          TARGET_VCLUSTER="{{inputs.parameters.appcontainer-name}}-vcluster"
         fi
         
         echo "🚀 Creating default microservice in vCluster: $TARGET_VCLUSTER"
@@ -455,15 +587,15 @@ spec:
         apiVersion: platform.example.org/v1alpha1
         kind: ApplicationClaim
         metadata:
-          name: {{workflow.parameters.appcontainer-name}}-hello-world
+          name: {{inputs.parameters.appcontainer-name}}-hello-world
           namespace: $TARGET_VCLUSTER
           labels:
             created-by: appcontainer-workflow
-            app-container: "{{workflow.parameters.appcontainer-name}}"
+            app-container: "{{inputs.parameters.appcontainer-name}}"
             microservice-type: default
             target-vcluster: $TARGET_VCLUSTER
         spec:
-          appContainer: "{{workflow.parameters.appcontainer-name}}"
+          appContainer: "{{inputs.parameters.appcontainer-name}}"
           name: hello-world
           language: python
           framework: fastapi
@@ -481,16 +613,24 @@ spec:
         fi
 
   - name: expose-vcluster-services
+    inputs:
+      parameters:
+      - name: appcontainer-name
+        default: "{{workflow.parameters.appcontainer-name}}"
+      - name: vcluster-name
+        default: "{{workflow.parameters.vcluster-name}}"
+      - name: namespace
+        default: "{{workflow.parameters.namespace}}"
     script:
       image: bitnami/kubectl:1.28
       command: [sh]
       source: |
-        echo "Exposing vCluster services for AppContainer {{workflow.parameters.appcontainer-name}}..."
+        echo "Exposing vCluster services for AppContainer {{inputs.parameters.appcontainer-name}}..."
         
         # Use provided vCluster name or derive from appcontainer name
-        TARGET_VCLUSTER="{{workflow.parameters.vcluster-name}}"
+        TARGET_VCLUSTER="{{inputs.parameters.vcluster-name}}"
         if [ -z "$TARGET_VCLUSTER" ]; then
-          TARGET_VCLUSTER="{{workflow.parameters.appcontainer-name}}-vcluster"
+          TARGET_VCLUSTER="{{inputs.parameters.appcontainer-name}}-vcluster"
         fi
         
         echo "🌐 Setting up ingress for vCluster: $TARGET_VCLUSTER"
@@ -503,7 +643,7 @@ spec:
           name: ${TARGET_VCLUSTER}-argocd-gateway
           namespace: $TARGET_VCLUSTER
           labels:
-            app-container: "{{workflow.parameters.appcontainer-name}}"
+            app-container: "{{inputs.parameters.appcontainer-name}}"
             service-type: argocd
         spec:
           selector:
@@ -514,7 +654,7 @@ spec:
               name: http
               protocol: HTTP
             hosts:
-            - "${TARGET_VCLUSTER}-argocd.{{workflow.parameters.namespace}}.local"
+            - "${TARGET_VCLUSTER}-argocd.{{inputs.parameters.namespace}}.local"
             - "${TARGET_VCLUSTER}-argocd.*"
           - port:
               number: 443
@@ -523,7 +663,7 @@ spec:
             tls:
               mode: SIMPLE
             hosts:
-            - "${TARGET_VCLUSTER}-argocd.{{workflow.parameters.namespace}}.local"
+            - "${TARGET_VCLUSTER}-argocd.{{inputs.parameters.namespace}}.local"
             - "${TARGET_VCLUSTER}-argocd.*"
         EOF
         
@@ -535,11 +675,11 @@ spec:
           name: ${TARGET_VCLUSTER}-argocd-vs
           namespace: $TARGET_VCLUSTER
           labels:
-            app-container: "{{workflow.parameters.appcontainer-name}}"
+            app-container: "{{inputs.parameters.appcontainer-name}}"
             service-type: argocd
         spec:
           hosts:
-          - "${TARGET_VCLUSTER}-argocd.{{workflow.parameters.namespace}}.local"
+          - "${TARGET_VCLUSTER}-argocd.{{inputs.parameters.namespace}}.local"
           - "${TARGET_VCLUSTER}-argocd.*"
           gateways:
           - ${TARGET_VCLUSTER}-argocd-gateway
@@ -566,7 +706,7 @@ spec:
           name: ${TARGET_VCLUSTER}-apps-gateway
           namespace: $TARGET_VCLUSTER
           labels:
-            app-container: "{{workflow.parameters.appcontainer-name}}"
+            app-container: "{{inputs.parameters.appcontainer-name}}"
             service-type: applications
         spec:
           selector:
@@ -577,8 +717,8 @@ spec:
               name: http
               protocol: HTTP
             hosts:
-            - "*.{{workflow.parameters.appcontainer-name}}.{{workflow.parameters.namespace}}.local"
-            - "*.{{workflow.parameters.appcontainer-name}}.*"
+            - "*.{{inputs.parameters.appcontainer-name}}.{{inputs.parameters.namespace}}.local"
+            - "*.{{inputs.parameters.appcontainer-name}}.*"
           - port:
               number: 443
               name: https
@@ -586,8 +726,8 @@ spec:
             tls:
               mode: SIMPLE
             hosts:
-            - "*.{{workflow.parameters.appcontainer-name}}.{{workflow.parameters.namespace}}.local"
-            - "*.{{workflow.parameters.appcontainer-name}}.*"
+            - "*.{{inputs.parameters.appcontainer-name}}.{{inputs.parameters.namespace}}.local"
+            - "*.{{inputs.parameters.appcontainer-name}}.*"
         EOF
         
         # Create VirtualService for hello-world microservice
@@ -596,15 +736,15 @@ spec:
         kind: VirtualService
         metadata:
           name: hello-world-vs
-          namespace: {{workflow.parameters.namespace}}
+          namespace: {{inputs.parameters.namespace}}
           labels:
-            app-container: "{{workflow.parameters.appcontainer-name}}"
+            app-container: "{{inputs.parameters.appcontainer-name}}"
             service-type: microservice
             microservice: hello-world
         spec:
           hosts:
-          - "hello-world.{{workflow.parameters.appcontainer-name}}.{{workflow.parameters.namespace}}.local"
-          - "hello-world.{{workflow.parameters.appcontainer-name}}.*"
+          - "hello-world.{{inputs.parameters.appcontainer-name}}.{{inputs.parameters.namespace}}.local"
+          - "hello-world.{{inputs.parameters.appcontainer-name}}.*"
           gateways:
           - ${TARGET_VCLUSTER}-apps-gateway
           http:
@@ -613,14 +753,14 @@ spec:
                 prefix: /
             route:
             - destination:
-                host: hello-world.{{workflow.parameters.namespace}}.svc.cluster.local
+                host: hello-world.{{inputs.parameters.namespace}}.svc.cluster.local
                 port:
                   number: 80
         EOF
         
         # Get ingress details
-        ARGOCD_URL="http://${TARGET_VCLUSTER}-argocd.{{workflow.parameters.namespace}}.local"
-        HELLO_WORLD_URL="http://hello-world.{{workflow.parameters.appcontainer-name}}.{{workflow.parameters.namespace}}.local"
+        ARGOCD_URL="http://${TARGET_VCLUSTER}-argocd.{{inputs.parameters.namespace}}.local"
+        HELLO_WORLD_URL="http://hello-world.{{inputs.parameters.appcontainer-name}}.{{inputs.parameters.namespace}}.local"
         
         echo "✅ Services exposed successfully!"
         echo ""
@@ -637,6 +777,14 @@ spec:
         exit 0
 
   - name: extract-appcontainer-info
+    inputs:
+      parameters:
+      - name: appcontainer-name
+        default: "{{workflow.parameters.appcontainer-name}}"
+      - name: vcluster-name
+        default: "{{workflow.parameters.vcluster-name}}"
+      - name: namespace
+        default: "{{workflow.parameters.namespace}}"
     outputs:
       parameters:
       - name: endpoints-summary
@@ -649,33 +797,33 @@ spec:
         echo "🔍 Extracting AppContainer connection information..."
         
         # Use provided vCluster name or derive from appcontainer name
-        TARGET_VCLUSTER="{{workflow.parameters.vcluster-name}}"
+        TARGET_VCLUSTER="{{inputs.parameters.vcluster-name}}"
         if [ -z "$TARGET_VCLUSTER" ]; then
-          TARGET_VCLUSTER="{{workflow.parameters.appcontainer-name}}-vcluster"
+          TARGET_VCLUSTER="{{inputs.parameters.appcontainer-name}}-vcluster"
         fi
         
-        echo "🔍 Extracting endpoints for AppContainer: {{workflow.parameters.appcontainer-name}}"
+        echo "🔍 Extracting endpoints for AppContainer: {{inputs.parameters.appcontainer-name}}"
         echo "Target VCluster: $TARGET_VCLUSTER"
         
         # Build endpoints summary
         ENDPOINTS_SUMMARY=""
         
         # ArgoCD endpoint
-        ARGOCD_URL="http://${TARGET_VCLUSTER}-argocd.{{workflow.parameters.namespace}}.local"
+        ARGOCD_URL="http://${TARGET_VCLUSTER}-argocd.{{inputs.parameters.namespace}}.local"
         ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}🔄 ArgoCD: $ARGOCD_URL\\n"
         
         # Hello World microservice endpoint
-        HELLO_WORLD_URL="http://hello-world.{{workflow.parameters.appcontainer-name}}.{{workflow.parameters.namespace}}.local"
+        HELLO_WORLD_URL="http://hello-world.{{inputs.parameters.appcontainer-name}}.{{inputs.parameters.namespace}}.local"
         ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}🚀 Hello World Service: $HELLO_WORLD_URL\\n"
         
         # Check if Grafana is available (from VCluster observability)
-        GRAFANA_URL=$(kubectl get vclusterenvironmentclaim $TARGET_VCLUSTER -n {{workflow.parameters.namespace}} -o jsonpath='{.status.observability.grafana.url}' 2>/dev/null || echo "")
+        GRAFANA_URL=$(kubectl get vclusterenvironmentclaim $TARGET_VCLUSTER -n {{inputs.parameters.namespace}} -o jsonpath='{.status.observability.grafana.url}' 2>/dev/null || echo "")
         if [ -n "$GRAFANA_URL" ]; then
           ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}📊 Grafana: $GRAFANA_URL\\n"
         fi
         
         # Check if Jaeger is available
-        JAEGER_URL=$(kubectl get vclusterenvironmentclaim $TARGET_VCLUSTER -n {{workflow.parameters.namespace}} -o jsonpath='{.status.observability.jaeger.url}' 2>/dev/null || echo "")
+        JAEGER_URL=$(kubectl get vclusterenvironmentclaim $TARGET_VCLUSTER -n {{inputs.parameters.namespace}} -o jsonpath='{.status.observability.jaeger.url}' 2>/dev/null || echo "")
         if [ -n "$JAEGER_URL" ]; then
           ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}🔍 Jaeger: $JAEGER_URL\\n"
         fi
