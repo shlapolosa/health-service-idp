@@ -174,9 +174,9 @@ spec:
       policy:
         fromFieldPath: Optional
     
-    # Update cluster endpoint status
+    # Update cluster endpoint status (fixed format string)  
     - type: ToCompositeFieldPath
-      fromFieldPath: spec.forProvider.namespace
+      fromFieldPath: spec.name
       toFieldPath: status.clusterEndpoint.direct
       transforms:
       - type: string
