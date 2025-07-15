@@ -216,7 +216,7 @@ spec:
               kind: Job
               metadata:
                 name: placeholder
-                namespace: crossplane-system
+                namespace: placeholder
               spec:
                 template:
                   spec:
@@ -307,6 +307,9 @@ spec:
         - type: FromCompositeFieldPath
           fromFieldPath: spec.name
           toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[1].value
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.name
+          toFieldPath: spec.forProvider.manifest.metadata.namespace
         - type: FromCompositeFieldPath
           fromFieldPath: spec.name
           toFieldPath: metadata.name
