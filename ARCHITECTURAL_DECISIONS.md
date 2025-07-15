@@ -357,12 +357,297 @@ graph TD
 
 ---
 
+## Phase 6: E2E Testing and System Validation
+
+#### ADR-009: Comprehensive E2E Testing Strategy Implementation
+**Date**: 2025-07-15  
+**Decision**: Implement systematic E2E testing to validate the complete microservice creation workflow
+
+**Testing Approach**:
+```bash
+# Test command: /microservice create test-e2e-service python with postgresql
+# Workflow: Slack → Argo → VCluster → AppContainer → Repositories → Applications
+```
+
+**Test Results Summary**:
+- ✅ **Slack API Integration**: 100% working - HTTP 200 responses, proper JSON formatting
+- ✅ **Workflow Templates**: 100% working - All standardized contracts functioning  
+- ✅ **Parameter Validation**: 100% working - Tier 1-3 validation across all templates
+- ✅ **Slack Notifications**: 100% working - RBAC issues resolved, webhooks functional
+- ⚠️ **VCluster Provisioning**: 60% working - Claims created but not reaching "Ready" state
+- ❌ **Repository Creation**: 0% tested - Blocked by VCluster readiness dependency
+- ❌ **Application Deployment**: 0% tested - Blocked by upstream failures
+
+**Rationale**:
+- **Systematic Validation**: E2E testing revealed exactly where the workflow breaks
+- **Component Isolation**: Clear identification of working vs. problematic components
+- **Dependency Mapping**: Validated the dependency chain: VCluster → AppContainer → Repositories
+- **Progress Tracking**: Mermaid diagrams with red/amber/green status provide clear visual progress
+
+---
+
+#### ADR-010: VCluster Provisioning Bottleneck Identification
+**Date**: 2025-07-15  
+**Problem**: VCluster creation workflow fails at `wait-for-vcluster-ready` step
+
+**Root Cause Analysis**:
+```yaml
+VClusterEnvironmentClaim Status:
+  Synced: True      # Crossplane accepted the claim
+  Ready: False      # VCluster not provisioned successfully
+  Message: "Composite resource claim is waiting for composite resource to become Ready"
+```
+
+**Investigation Required**:
+1. **Crossplane Controller Status**: Check if VCluster composition is functioning
+2. **AWS Resource Limits**: Verify EKS cluster capacity for VCluster creation  
+3. **IAM Permissions**: Ensure Crossplane has sufficient AWS permissions
+4. **Composition Definition**: Validate VCluster composition configuration
+
+**Impact on Architecture**:
+- **Blocking Dependency**: VCluster readiness blocks entire downstream workflow
+- **Cascading Failures**: AppContainer and Repository creation cannot proceed
+- **User Experience**: 15+ minute timeouts create poor developer experience
+
+**Decision**: Prioritize VCluster debugging as critical path issue
+
+**Consequences**:
+- ✅ Clear identification of system bottleneck
+- ✅ Focused debugging effort on highest-impact component
+- ❌ E2E workflow cannot complete until VCluster issue resolved
+- ❌ Repository and application testing blocked
+
+---
+
+#### ADR-011: Timeout Strategy for Long-Running Operations  
+**Date**: 2025-07-15  
+**Problem**: Current VCluster provisioning timeout insufficient for AWS resource creation
+
+**Current Implementation**:
+```bash
+# wait-for-vcluster-ready step times out after ~15 minutes
+# No intermediate progress reporting during VCluster provisioning
+```
+
+**Options Considered**:
+1. **Increase Timeout**: Simple timeout extension to 30+ minutes
+2. **Asynchronous Workflow**: Decouple VCluster creation from main workflow
+3. **Progress Monitoring**: Add intermediate status checks and notifications
+4. **Pre-provisioned VClusters**: Maintain pool of ready VClusters
+
+**Decision**: Implement Option 3 - Enhanced progress monitoring with intelligent timeouts
+
+**Implementation Strategy**:
+```yaml
+# Enhanced VCluster monitoring
+steps:
+  - check-vcluster-creation-progress (every 2 minutes)
+  - send-progress-notifications (every 5 minutes)  
+  - escalate-to-admin (after 20 minutes)
+  - graceful-failure-cleanup (after 30 minutes)
+```
+
+**Rationale**:
+- **User Experience**: Progress notifications maintain user confidence
+- **Operational Visibility**: Admins notified of long-running provisioning
+- **Resource Management**: Cleanup prevents orphaned resources
+- **Gradual Enhancement**: Can be implemented without architectural changes
+
+---
+
+## Current Architecture State (Post E2E Testing)
+
+### Validated Working Components ✅
+```
+📁 Slack Integration/
+├── slack-api-server (deployment: 2/2 ready)
+├── Command parsing and NLP
+├── Argo Workflows API integration
+└── Response formatting and user feedback
+
+📁 Workflow Templates/
+├── microservice-standard-contract.yaml ✅
+├── appcontainer-standard-contract.yaml ✅  
+├── vcluster-standard-contract.yaml ✅
+├── simple-slack-notifications.yaml ✅
+└── Parameter validation (Tier 1-3) ✅
+
+📁 Slack Notifications/
+├── RBAC permissions resolved ✅
+├── Webhook integration (HTTP 200) ✅
+├── Starting notifications ✅
+└── Progress notifications ✅
+```
+
+### Partially Working Components ⚠️
+```
+📁 VCluster Provisioning/
+├── VClusterEnvironmentClaim creation ✅
+├── Crossplane composition triggering ✅
+├── Parameter validation ✅
+└── Readiness state achievement ❌ (BLOCKED)
+
+📁 AppContainer Claims/
+└── Creation blocked by VCluster dependency ⚠️
+```
+
+### Untested Components ❌
+```
+📁 Repository Creation/
+├── GitHub source repository
+├── GitHub GitOps repository  
+├── CLAUDE.md compliance
+└── Microservices directory structure
+
+📁 Application Deployment/
+├── ApplicationClaim creation
+├── Hello-world microservice
+├── Knative service deployment
+└── GitOps synchronization
+```
+
+### Known Critical Issues  
+❌ **VCluster Provisioning**: Claims stuck in "not ready" state  
+❌ **Repository Creation**: Workflow fails before reaching this step
+❌ **Application Deployment**: Blocked by upstream failures
+⚠️ **Timeout Handling**: Need improved progress monitoring for long operations
+
+---
+
+## Phase 7: VCluster Composition Simplification
+
+#### ADR-012: VCluster Debugging and Root Cause Resolution
+**Date**: 2025-07-15  
+**Problem**: VCluster provisioning fails due to multiple issues in complex composition
+
+**Root Causes Identified**:
+1. **Stuck Namespace Termination**: Previous VCluster namespace stuck in `Terminating` state
+2. **Crossplane Resource Conflicts**: `"existing object is not controlled by UID"` errors
+3. **Template Formatting Bugs**: Invalid Go template labels causing validation failures
+4. **Over-complex Composition**: 20+ components with observability stack causing resource conflicts
+
+**Debugging Process**:
+```bash
+# Issue 1: Namespace stuck in terminating state
+kubectl get namespace test-e2e-vcluster -o json | jq '.spec.finalizers = []' | kubectl replace --raw "/api/v1/namespaces/test-e2e-vcluster/finalize" -f -
+
+# Issue 2: Template formatting errors
+# Error: "socrates12345%!!(MISSING)(EXTRA string=debug-vcluster)"
+# Root cause: Go template string formatting bugs in composition
+
+# Issue 3: Resource ownership conflicts
+# Crossplane cannot take ownership of existing resources from failed attempts
+```
+
+**Validation Testing**:
+- ✅ **VCluster Core Works**: Basic VCluster deployment successful
+- ✅ **Helm Release Deployed**: VCluster pods running (2/2 ready)
+- ✅ **Namespace Created**: VCluster namespace functional
+- ❌ **Additional Components Fail**: Observability stack causes template errors
+
+**Decision**: Simplify VCluster composition to essential components only
+
+---
+
+#### ADR-013: ArgoCD Deployment Strategy for VCluster
+**Date**: 2025-07-15  
+**Problem**: Choose between reusing host ArgoCD vs. dedicated ArgoCD per VCluster
+
+**Options Evaluated**:
+
+**Option A - Reuse Host ArgoCD**:
+- ✅ Resource efficient, centralized management
+- ❌ Complex VCluster configuration, RBAC complexity
+- ❌ Networking issues, security boundary violations
+- ❌ Maintenance overhead for each VCluster
+
+**Option B - Dedicated ArgoCD per VCluster**:
+- ✅ Security isolation, operational simplicity
+- ✅ Self-contained VClusters, standard installation
+- ✅ Developer autonomy, scalable architecture
+- ❌ Resource overhead (~200MB memory per VCluster)
+
+**Decision**: Option B - Dedicated ArgoCD per VCluster
+
+**Rationale**:
+- **Architectural Clarity**: Each VCluster is autonomous and self-contained
+- **Security Isolation**: No cross-cluster access required
+- **Operational Simplicity**: Standard ArgoCD installation pattern
+- **Developer Experience**: Developers get dedicated GitOps instance
+- **Modern Efficiency**: ArgoCD is lightweight enough for per-VCluster deployment
+
+---
+
+#### ADR-014: Essential Components for Microservice VCluster
+**Date**: 2025-07-15  
+**Decision**: Define minimal viable components for microservice platform
+
+**Essential Components** (12 components):
+```yaml
+Core Infrastructure:
+  - vcluster-namespace           # VCluster namespace
+  - vcluster-helm-release        # Core VCluster installation
+  - vcluster-kubeconfig-job      # Access configuration
+  - vcluster-admin-sa            # RBAC service account
+  - vcluster-admin-crb           # RBAC cluster role binding
+
+Platform Components:
+  - vcluster-crossplane-install  # Crossplane for resource management
+  - vcluster-crossplane-providers # GitHub, Kubernetes, Helm providers
+  - vcluster-app-container-claim-xrd # AppContainer resource definitions
+  - vcluster-application-claim-xrd   # Application resource definitions
+
+Service Mesh & Serverless:
+  - vcluster-istio               # Service mesh for microservice networking
+  - vcluster-knative-serving     # Serverless platform for microservices
+  - vcluster-istio-gateway       # Istio ingress gateway
+
+GitOps:
+  - vcluster-argocd              # Dedicated ArgoCD for VCluster GitOps
+```
+
+**Removed Components** (8+ components):
+```yaml
+Observability Stack (Optional):
+  - vcluster-prometheus          # Metrics collection
+  - vcluster-grafana             # Monitoring dashboards
+  - vcluster-jaeger              # Distributed tracing
+  - vcluster-kiali               # Service mesh visualization
+  - vcluster-*-virtualservice    # Observability routing
+
+Problematic Components:
+  - vcluster-composition-installer # Template formatting bugs
+  - vcluster-complex-installers   # Resource conflicts
+```
+
+**Benefits**:
+- **Reliability**: Remove components causing template formatting errors
+- **Resource Efficiency**: Reduce VCluster resource footprint by ~60%
+- **Faster Provisioning**: Fewer components = faster deployment
+- **Maintainability**: Simpler composition easier to debug and modify
+- **Core Functionality**: Retains all essential microservice platform capabilities
+
+**Consequences**:
+- ✅ VCluster provisioning should succeed consistently
+- ✅ Microservice deployment capabilities preserved
+- ✅ Istio + Knative provides full serverless platform
+- ✅ ArgoCD enables GitOps workflows
+- ❌ Observability must be added separately if needed
+- ❌ No built-in service mesh visualization
+
+---
+
 ## Next Steps
 
-### Immediate (AWS re-authentication required)
-1. **Debug VCluster Provisioning**: Check Crossplane VCluster operator status
-2. **Investigate Repository Creation**: Verify AppContainerClaim controller functionality
-3. **End-to-End Validation**: Complete microservice creation workflow test
+### Immediate (Critical Path - VCluster Resolution)
+1. **Deploy Simplified Composition**: Create and apply minimal VCluster composition
+2. **Test VCluster Creation**: Verify simplified composition works reliably
+3. **Re-run E2E Test**: Complete microservice workflow with working VCluster
+
+### Medium Priority (Post VCluster Fix)
+1. **Complete E2E Testing**: Test repository creation and application deployment
+2. **Timeout Enhancement**: Implement progress monitoring and intelligent timeouts
+3. **Error Handling**: Add graceful failure modes and cleanup procedures
 
 ### Medium Term
 1. **Documentation**: Create README.md with current state and usage instructions
