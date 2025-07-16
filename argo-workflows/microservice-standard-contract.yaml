@@ -477,8 +477,8 @@ spec:
             value: "{{inputs.parameters.resource-name}}"
           - name: parent-appcontainer
             value: "{{inputs.parameters.parent-appcontainer}}"
-    - - name: create-or-update-repositories
-        template: create-or-update-repositories
+    - - name: create-or-update-appcontainer
+        template: create-or-update-appcontainer
         arguments:
           parameters:
           - name: repository-name
@@ -541,7 +541,13 @@ spec:
         # Sanitize slack channel for label
         SLACK_CHANNEL_LABEL=$(echo "{{inputs.parameters.slack-channel}}" | sed 's/#//g' | tr '[:upper:]' '[:lower:]')
         
-        # Create ApplicationClaim manifest using standardized schema
+        # Determine repository name (remove -service suffix)
+        REPO_NAME="{{inputs.parameters.resource-name}}"
+        if echo "$REPO_NAME" | grep -q -- "-service$"; then
+          REPO_NAME=$(echo "$REPO_NAME" | sed 's/-service$//')
+        fi
+        
+        # Create ApplicationClaim manifest that references the AppContainer
         cat <<EOF | kubectl apply -f -
         apiVersion: platform.example.org/v1alpha1
         kind: ApplicationClaim
@@ -558,6 +564,7 @@ spec:
             microservice-cache: "{{inputs.parameters.microservice-cache}}"
             requested-by: "{{inputs.parameters.user}}"
             slack-channel: "$SLACK_CHANNEL_LABEL"
+            parent-appcontainer: "$REPO_NAME"
           annotations:
             description: "{{inputs.parameters.description}}"
             parameter-contract: "compliant"
@@ -569,6 +576,8 @@ spec:
           database: "{{inputs.parameters.microservice-database}}"
           cache: "{{inputs.parameters.microservice-cache}}"
           exposeApi: $EXPOSE_API
+          parentAppContainer: "$REPO_NAME"
+          microserviceFolder: "microservices/{{inputs.parameters.resource-name}}"
         EOF
         
         if [ $? -eq 0 ]; then
@@ -741,7 +750,7 @@ spec:
         echo "$REPOSITORY_NAME" > /tmp/repository-name
         echo "$VCLUSTER_NAME" > /tmp/vcluster-name
 
-  - name: create-or-update-repositories
+  - name: create-or-update-appcontainer
     inputs:
       parameters:
       - name: repository-name
@@ -757,94 +766,40 @@ spec:
       image: bitnami/kubectl:1.28
       command: [sh]
       source: |
-        echo "🏗️ Creating or updating repositories for microservice..."
+        echo "🏗️ Creating or updating AppContainer for microservice repositories..."
         
         # Sanitize slack channel for label
         SLACK_CHANNEL_LABEL=$(echo "{{inputs.parameters.slack-channel}}" | sed 's/#//g' | tr '[:upper:]' '[:lower:]')
         
-        # Check if repositories already exist
-        SOURCE_REPO_EXISTS="false"
-        GITOPS_REPO_EXISTS="false"
-        
-        if kubectl get repositoryclaim {{inputs.parameters.repository-name}} -n {{inputs.parameters.namespace}} >/dev/null 2>&1; then
-          echo "✅ Source repository claim already exists"
-          SOURCE_REPO_EXISTS="true"
-        fi
-        
-        if kubectl get repositoryclaim {{inputs.parameters.repository-name}}-gitops -n {{inputs.parameters.namespace}} >/dev/null 2>&1; then
-          echo "✅ GitOps repository claim already exists"
-          GITOPS_REPO_EXISTS="true"
-        fi
-        
-        # Create source repository if it doesn't exist
-        if [ "$SOURCE_REPO_EXISTS" = "false" ]; then
-          echo "🔧 Creating source repository claim..."
+        # Check if AppContainer already exists
+        if kubectl get appcontainerclaim {{inputs.parameters.repository-name}} -n {{inputs.parameters.namespace}} >/dev/null 2>&1; then
+          echo "✅ AppContainer {{inputs.parameters.repository-name}} already exists"
+          echo "📦 Repositories already created - will add microservice to existing structure"
+        else
+          echo "🔧 Creating AppContainer claim for repositories..."
           cat <<EOF | kubectl apply -f -
         apiVersion: platform.example.org/v1alpha1
-        kind: RepositoryClaim
+        kind: AppContainerClaim
         metadata:
           name: {{inputs.parameters.repository-name}}
           namespace: {{inputs.parameters.namespace}}
           labels:
             created-by: "microservice-standard-contract"
-            resource-type: "source-repository"
+            resource-type: "appcontainer"
             requested-by: "{{inputs.parameters.user}}"
             slack-channel: "$SLACK_CHANNEL_LABEL"
+            context: "repository-management"
         spec:
           name: {{inputs.parameters.repository-name}}
-          description: "Source repository for {{inputs.parameters.description}}"
+          description: "AppContainer for {{inputs.parameters.description}}"
           gitHubOrg: "{{inputs.parameters.github-org}}"
-          repositoryType: "source"
-          enableMicroserviceStructure: true
-        EOF
-        fi
-        
-        # Create GitOps repository if it doesn't exist
-        if [ "$GITOPS_REPO_EXISTS" = "false" ]; then
-          echo "🔧 Creating GitOps repository claim..."
-          cat <<EOF | kubectl apply -f -
-        apiVersion: platform.example.org/v1alpha1
-        kind: RepositoryClaim
-        metadata:
-          name: {{inputs.parameters.repository-name}}-gitops
-          namespace: {{inputs.parameters.namespace}}
-          labels:
-            created-by: "microservice-standard-contract"
-            resource-type: "gitops-repository"
-            requested-by: "{{inputs.parameters.user}}"
-            slack-channel: "$SLACK_CHANNEL_LABEL"
-        spec:
-          name: {{inputs.parameters.repository-name}}-gitops
-          description: "GitOps repository for {{inputs.parameters.description}}"
-          gitHubOrg: "{{inputs.parameters.github-org}}"
-          repositoryType: "gitops"
-          enableArgocdIntegration: true
-        EOF
-        fi
-        
-        # Always create or update microservice entry
-        echo "📁 Creating microservice entry in repository structure..."
-        cat <<EOF | kubectl apply -f -
-        apiVersion: platform.example.org/v1alpha1
-        kind: MicroserviceEntry
-        metadata:
-          name: {{inputs.parameters.microservice-name}}
-          namespace: {{inputs.parameters.namespace}}
-          labels:
-            created-by: "microservice-standard-contract"
-            parent-repository: "{{inputs.parameters.repository-name}}"
-            requested-by: "{{inputs.parameters.user}}"
-            slack-channel: "$SLACK_CHANNEL_LABEL"
-        spec:
-          name: {{inputs.parameters.microservice-name}}
-          description: "{{inputs.parameters.description}}"
-          parentRepository: {{inputs.parameters.repository-name}}
           dockerRegistry: "{{inputs.parameters.docker-registry}}"
-          microserviceFolder: "microservices/{{inputs.parameters.microservice-name}}"
+          enableObservability: true
+          enableSecurity: true
         EOF
+        fi
         
-        echo "✅ Repository management completed successfully"
-        echo "📦 Source repository: {{inputs.parameters.repository-name}}"
-        echo "🔄 GitOps repository: {{inputs.parameters.repository-name}}-gitops"
-        echo "📁 Microservice folder: microservices/{{inputs.parameters.microservice-name}}"
+        echo "✅ AppContainer management completed successfully"
+        echo "📦 AppContainer will create both source and GitOps repositories"
+        echo "📁 Microservice will be added to microservices/ folder structure"
 
