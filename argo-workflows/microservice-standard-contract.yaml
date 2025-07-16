@@ -170,8 +170,8 @@ spec:
           - name: notification-type
             value: "starting"
         when: "{{steps.validate-parameters.status}} == Succeeded"
-    - - name: ensure-appcontainer
-        template: ensure-appcontainer-dependency
+    - - name: ensure-repositories
+        template: ensure-repositories
         arguments:
           parameters:
           - name: resource-name
@@ -180,10 +180,6 @@ spec:
             value: "{{inputs.parameters.namespace}}"
           - name: parent-appcontainer
             value: "{{inputs.parameters.parent-appcontainer}}"
-          - name: target-vcluster
-            value: "{{inputs.parameters.target-vcluster}}"
-          - name: auto-create-dependencies
-            value: "{{inputs.parameters.auto-create-dependencies}}"
           - name: description
             value: "{{inputs.parameters.description}}"
           - name: github-org
@@ -224,10 +220,10 @@ spec:
           - name: slack-user-id
             value: "{{inputs.parameters.slack-user-id}}"
           - name: message
-            value: "✅ Repository structure ready - creating microservice..."
+            value: "✅ Repositories created/updated - adding microservice structure..."
           - name: notification-type
             value: "progress"
-        when: "{{steps.ensure-appcontainer.status}} == Succeeded"
+        when: "{{steps.ensure-repositories.status}} == Succeeded"
     - - name: create-microservice-claim
         template: create-microservice-claim
         arguments:
@@ -252,7 +248,7 @@ spec:
             value: "{{inputs.parameters.user}}"
           - name: slack-channel
             value: "{{inputs.parameters.slack-channel}}"
-        when: "{{steps.ensure-appcontainer.status}} == Succeeded"
+        when: "{{steps.ensure-repositories.status}} == Succeeded"
     - - name: wait-for-microservice-ready
         template: wait-for-microservice-ready
         arguments:
@@ -271,7 +267,7 @@ spec:
           - name: namespace
             value: "{{inputs.parameters.namespace}}"
           - name: target-vcluster
-            value: "{{steps.ensure-appcontainer.outputs.parameters.vcluster-name}}"
+            value: "{{steps.ensure-repositories.outputs.parameters.vcluster-name}}"
           - name: github-org
             value: "{{inputs.parameters.github-org}}"
           - name: microservice-language
@@ -322,7 +318,7 @@ spec:
             value: "❌ Microservice creation failed\n\nCheck workflow logs for detailed error information"
           - name: notification-type
             value: "error"
-        when: "{{steps.validate-parameters.status}} != Succeeded or {{steps.ensure-appcontainer.status}} != Succeeded or {{steps.create-microservice-claim.status}} != Succeeded or {{steps.wait-for-microservice-ready.status}} != Succeeded"
+        when: "{{steps.validate-parameters.status}} != Succeeded or {{steps.ensure-repositories.status}} != Succeeded or {{steps.create-microservice-claim.status}} != Succeeded or {{steps.wait-for-microservice-ready.status}} != Succeeded"
 
   # =============================================================================
   # PARAMETER VALIDATION
@@ -445,16 +441,14 @@ spec:
         echo "   GitHub Org: {{inputs.parameters.github-org}}"
 
   # =============================================================================
-  # APPCONTAINER DEPENDENCY MANAGEMENT
+  # REPOSITORY MANAGEMENT
   # =============================================================================
-  - name: ensure-appcontainer-dependency
+  - name: ensure-repositories
     inputs:
       parameters:
       - name: resource-name
       - name: namespace
       - name: parent-appcontainer
-      - name: target-vcluster
-      - name: auto-create-dependencies
       - name: description
       - name: github-org
       - name: docker-registry
@@ -468,65 +462,43 @@ spec:
       - name: slack-user-id
     outputs:
       parameters:
-      - name: appcontainer-name
+      - name: repository-name
         valueFrom:
-          parameter: "{{steps.determine-appcontainer-name.outputs.parameters.appcontainer-name}}"
+          parameter: "{{steps.determine-repository-name.outputs.parameters.repository-name}}"
       - name: vcluster-name
         valueFrom:
-          parameter: "{{steps.determine-appcontainer-name.outputs.parameters.vcluster-name}}"
+          parameter: "{{steps.determine-repository-name.outputs.parameters.vcluster-name}}"
     steps:
-    - - name: determine-appcontainer-name
-        template: determine-appcontainer-name
+    - - name: determine-repository-name
+        template: determine-repository-name
         arguments:
           parameters:
           - name: resource-name
             value: "{{inputs.parameters.resource-name}}"
           - name: parent-appcontainer
             value: "{{inputs.parameters.parent-appcontainer}}"
-          - name: target-vcluster
-            value: "{{inputs.parameters.target-vcluster}}"
-          - name: auto-create-dependencies
-            value: "{{inputs.parameters.auto-create-dependencies}}"
-    - - name: create-repository-if-needed
-        template: create-repository-if-needed
+    - - name: create-or-update-repositories
+        template: create-or-update-repositories
         arguments:
           parameters:
-          - name: appcontainer-name
-            value: "{{steps.determine-appcontainer-name.outputs.parameters.appcontainer-name}}"
+          - name: repository-name
+            value: "{{steps.determine-repository-name.outputs.parameters.repository-name}}"
+          - name: microservice-name
+            value: "{{inputs.parameters.resource-name}}"
           - name: namespace
             value: "{{inputs.parameters.namespace}}"
-          - name: user
-            value: "{{inputs.parameters.user}}"
           - name: description
-            value: "AppContainer for microservice '{{inputs.parameters.resource-name}}' - {{inputs.parameters.description}}"
+            value: "{{inputs.parameters.description}}"
           - name: github-org
             value: "{{inputs.parameters.github-org}}"
           - name: docker-registry
             value: "{{inputs.parameters.docker-registry}}"
+          - name: user
+            value: "{{inputs.parameters.user}}"
           - name: slack-channel
             value: "{{inputs.parameters.slack-channel}}"
           - name: slack-user-id
             value: "{{inputs.parameters.slack-user-id}}"
-          - name: security-enabled
-            value: "{{inputs.parameters.security-enabled}}"
-          - name: observability-enabled
-            value: "{{inputs.parameters.observability-enabled}}"
-          - name: backup-enabled
-            value: "{{inputs.parameters.backup-enabled}}"
-          - name: environment-tier
-            value: "{{inputs.parameters.environment-tier}}"
-          - name: resource-size
-            value: "{{inputs.parameters.resource-size}}"
-        when: "{{inputs.parameters.auto-create-dependencies}} == true"
-    - - name: check-existing-appcontainer
-        template: check-existing-appcontainer
-        arguments:
-          parameters:
-          - name: appcontainer-name
-            value: "{{steps.determine-appcontainer-name.outputs.parameters.appcontainer-name}}"
-          - name: namespace
-            value: "{{inputs.parameters.namespace}}"
-        when: "{{inputs.parameters.auto-create-dependencies}} == false"
 
   # =============================================================================
   # MICROSERVICE CLAIM CREATION
@@ -734,103 +706,16 @@ spec:
         echo "Cache: {{inputs.parameters.microservice-cache}}"
         echo "Endpoints: $ENDPOINTS_SUMMARY"
 
-  - name: check-existing-appcontainer
-    inputs:
-      parameters:
-      - name: appcontainer-name
-      - name: namespace
-    script:
-      image: bitnami/kubectl:1.28
-      command: [sh]
-      source: |
-        echo "🔍 Checking existing AppContainer for microservice deployment..."
-        
-        if ! kubectl get appcontainerclaim {{inputs.parameters.appcontainer-name}} -n {{inputs.parameters.namespace}} >/dev/null 2>&1; then
-          echo "❌ AppContainer {{inputs.parameters.appcontainer-name}} does not exist"
-          echo "💡 Enable auto-create-dependencies or create the AppContainer first"
-          exit 1
-        fi
-        
-        echo "✅ AppContainer {{inputs.parameters.appcontainer-name}} exists and is ready for microservice deployment"
-
-  - name: create-repository-if-needed
-    inputs:
-      parameters:
-      - name: appcontainer-name
-      - name: namespace
-      - name: user
-      - name: description
-      - name: github-org
-      - name: docker-registry
-      - name: slack-channel
-      - name: slack-user-id
-      - name: security-enabled
-      - name: observability-enabled
-      - name: backup-enabled
-      - name: environment-tier
-      - name: resource-size
-    script:
-      image: bitnami/kubectl:1.28
-      command: [sh]
-      source: |
-        echo "🏗️ Creating AppContainer repository and source code structure..."
-        
-        # Parse boolean parameters
-        OBSERVABILITY=$([ "{{inputs.parameters.observability-enabled}}" = "true" ] && echo "true" || echo "false")
-        SECURITY=$([ "{{inputs.parameters.security-enabled}}" = "true" ] && echo "true" || echo "false")
-        
-        # Sanitize slack channel for label
-        SLACK_CHANNEL_LABEL=$(echo "{{inputs.parameters.slack-channel}}" | sed 's/#//g' | tr '[:upper:]' '[:lower:]')
-        
-        # Create AppContainer claim manifest (repository-focused)
-        cat <<EOF | kubectl apply -f -
-        apiVersion: platform.example.org/v1alpha1
-        kind: AppContainerClaim
-        metadata:
-          name: {{inputs.parameters.appcontainer-name}}
-          namespace: {{inputs.parameters.namespace}}
-          labels:
-            created-by: "microservice-standard-contract"
-            parameter-contract-version: "v1.0"
-            resource-type: "appcontainer"
-            requested-by: "{{inputs.parameters.user}}"
-            slack-channel: "$SLACK_CHANNEL_LABEL"
-            deployment-context: "repository-only"
-          annotations:
-            description: "{{inputs.parameters.description}}"
-            parameter-contract: "compliant"
-            created-at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-        spec:
-          name: {{inputs.parameters.appcontainer-name}}
-          description: "{{inputs.parameters.description}}"
-          gitHubOrg: "{{inputs.parameters.github-org}}"
-          dockerRegistry: "{{inputs.parameters.docker-registry}}"
-          enableObservability: $OBSERVABILITY
-          enableSecurity: $SECURITY
-        EOF
-        
-        if [ $? -eq 0 ]; then
-          echo "✅ AppContainer repository claim created successfully"
-          echo "📦 Repository and source code structure will be created by Crossplane"
-          echo "🔄 VCluster deployment will be handled separately via /vcluster command"
-          exit 0
-        else
-          echo "❌ Failed to create AppContainer repository claim"
-          exit 1
-        fi
-
-  - name: determine-appcontainer-name
+  - name: determine-repository-name
     inputs:
       parameters:
       - name: resource-name
       - name: parent-appcontainer
-      - name: target-vcluster
-      - name: auto-create-dependencies
     outputs:
       parameters:
-      - name: appcontainer-name
+      - name: repository-name
         valueFrom:
-          path: /tmp/appcontainer-name
+          path: /tmp/repository-name
       - name: vcluster-name
         valueFrom:
           path: /tmp/vcluster-name
@@ -838,31 +723,128 @@ spec:
       image: alpine:3.18
       command: [sh]
       source: |
-        echo "🔍 Determining AppContainer dependency for Microservice..."
+        echo "🔍 Determining repository name for microservice..."
         
-        # Determine parent AppContainer name
-        PARENT_APPCONTAINER="{{inputs.parameters.parent-appcontainer}}"
-        if [ -z "$PARENT_APPCONTAINER" ]; then
-          # Remove -service suffix if present
-          BASE_NAME=$(echo "{{inputs.parameters.resource-name}}" | sed 's/-service$//')
-          PARENT_APPCONTAINER="${BASE_NAME}-app"
+        # Remove -service suffix if present to get base name
+        BASE_NAME=$(echo "{{inputs.parameters.resource-name}}" | sed 's/-service$//')
+        
+        # Determine repository name (same as base name)
+        REPOSITORY_NAME="$BASE_NAME"
+        
+        # Determine vCluster name for reference (but not used in creation)
+        VCLUSTER_NAME="${BASE_NAME}-vcluster"
+        
+        echo "Microservice: {{inputs.parameters.resource-name}}"
+        echo "Repository: $REPOSITORY_NAME"
+        echo "VCluster reference: $VCLUSTER_NAME"
+        
+        echo "$REPOSITORY_NAME" > /tmp/repository-name
+        echo "$VCLUSTER_NAME" > /tmp/vcluster-name
+
+  - name: create-or-update-repositories
+    inputs:
+      parameters:
+      - name: repository-name
+      - name: microservice-name
+      - name: namespace
+      - name: description
+      - name: github-org
+      - name: docker-registry
+      - name: user
+      - name: slack-channel
+      - name: slack-user-id
+    script:
+      image: bitnami/kubectl:1.28
+      command: [sh]
+      source: |
+        echo "🏗️ Creating or updating repositories for microservice..."
+        
+        # Sanitize slack channel for label
+        SLACK_CHANNEL_LABEL=$(echo "{{inputs.parameters.slack-channel}}" | sed 's/#//g' | tr '[:upper:]' '[:lower:]')
+        
+        # Check if repositories already exist
+        SOURCE_REPO_EXISTS="false"
+        GITOPS_REPO_EXISTS="false"
+        
+        if kubectl get repositoryclaim {{inputs.parameters.repository-name}} -n {{inputs.parameters.namespace}} >/dev/null 2>&1; then
+          echo "✅ Source repository claim already exists"
+          SOURCE_REPO_EXISTS="true"
         fi
         
-        # Determine target vCluster name
-        TARGET_VCLUSTER="{{inputs.parameters.target-vcluster}}"
-        if [ -z "$TARGET_VCLUSTER" ]; then
-          # Remove -service suffix if present and add -vcluster
-          BASE_NAME=$(echo "{{inputs.parameters.resource-name}}" | sed 's/-service$//')
-          TARGET_VCLUSTER="${BASE_NAME}-vcluster"
+        if kubectl get repositoryclaim {{inputs.parameters.repository-name}}-gitops -n {{inputs.parameters.namespace}} >/dev/null 2>&1; then
+          echo "✅ GitOps repository claim already exists"
+          GITOPS_REPO_EXISTS="true"
         fi
         
-        echo "Parent AppContainer: $PARENT_APPCONTAINER"
-        echo "Target VCluster: $TARGET_VCLUSTER"
-        echo "$PARENT_APPCONTAINER" > /tmp/appcontainer-name
-        echo "$TARGET_VCLUSTER" > /tmp/vcluster-name
-        
-        if [ "{{inputs.parameters.auto-create-dependencies}}" = "true" ]; then
-          echo "✅ AppContainer dependency will be auto-created"
-        else
-          echo "ℹ️ AppContainer dependency must exist: $PARENT_APPCONTAINER"
+        # Create source repository if it doesn't exist
+        if [ "$SOURCE_REPO_EXISTS" = "false" ]; then
+          echo "🔧 Creating source repository claim..."
+          cat <<EOF | kubectl apply -f -
+        apiVersion: platform.example.org/v1alpha1
+        kind: RepositoryClaim
+        metadata:
+          name: {{inputs.parameters.repository-name}}
+          namespace: {{inputs.parameters.namespace}}
+          labels:
+            created-by: "microservice-standard-contract"
+            resource-type: "source-repository"
+            requested-by: "{{inputs.parameters.user}}"
+            slack-channel: "$SLACK_CHANNEL_LABEL"
+        spec:
+          name: {{inputs.parameters.repository-name}}
+          description: "Source repository for {{inputs.parameters.description}}"
+          gitHubOrg: "{{inputs.parameters.github-org}}"
+          repositoryType: "source"
+          enableMicroserviceStructure: true
+        EOF
         fi
+        
+        # Create GitOps repository if it doesn't exist
+        if [ "$GITOPS_REPO_EXISTS" = "false" ]; then
+          echo "🔧 Creating GitOps repository claim..."
+          cat <<EOF | kubectl apply -f -
+        apiVersion: platform.example.org/v1alpha1
+        kind: RepositoryClaim
+        metadata:
+          name: {{inputs.parameters.repository-name}}-gitops
+          namespace: {{inputs.parameters.namespace}}
+          labels:
+            created-by: "microservice-standard-contract"
+            resource-type: "gitops-repository"
+            requested-by: "{{inputs.parameters.user}}"
+            slack-channel: "$SLACK_CHANNEL_LABEL"
+        spec:
+          name: {{inputs.parameters.repository-name}}-gitops
+          description: "GitOps repository for {{inputs.parameters.description}}"
+          gitHubOrg: "{{inputs.parameters.github-org}}"
+          repositoryType: "gitops"
+          enableArgocdIntegration: true
+        EOF
+        fi
+        
+        # Always create or update microservice entry
+        echo "📁 Creating microservice entry in repository structure..."
+        cat <<EOF | kubectl apply -f -
+        apiVersion: platform.example.org/v1alpha1
+        kind: MicroserviceEntry
+        metadata:
+          name: {{inputs.parameters.microservice-name}}
+          namespace: {{inputs.parameters.namespace}}
+          labels:
+            created-by: "microservice-standard-contract"
+            parent-repository: "{{inputs.parameters.repository-name}}"
+            requested-by: "{{inputs.parameters.user}}"
+            slack-channel: "$SLACK_CHANNEL_LABEL"
+        spec:
+          name: {{inputs.parameters.microservice-name}}
+          description: "{{inputs.parameters.description}}"
+          parentRepository: {{inputs.parameters.repository-name}}
+          dockerRegistry: "{{inputs.parameters.docker-registry}}"
+          microserviceFolder: "microservices/{{inputs.parameters.microservice-name}}"
+        EOF
+        
+        echo "✅ Repository management completed successfully"
+        echo "📦 Source repository: {{inputs.parameters.repository-name}}"
+        echo "🔄 GitOps repository: {{inputs.parameters.repository-name}}-gitops"
+        echo "📁 Microservice folder: microservices/{{inputs.parameters.microservice-name}}"
+
