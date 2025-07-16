@@ -73,6 +73,9 @@ spec:
     - name: parent-appcontainer
       value: ""
       description: "Parent AppContainer (auto-derived if empty)"
+    - name: repository-name
+      value: ""
+      description: "Repository name for the microservice (auto-derived if empty)"
 
   templates:
   - name: create-microservice
@@ -125,6 +128,8 @@ spec:
       - name: target-vcluster
         default: ""
       - name: parent-appcontainer
+        default: ""
+      - name: repository-name
         default: ""
     steps:
     - - name: validate-parameters
@@ -477,6 +482,8 @@ spec:
             value: "{{inputs.parameters.resource-name}}"
           - name: parent-appcontainer
             value: "{{inputs.parameters.parent-appcontainer}}"
+          - name: repository-name
+            value: "{{inputs.parameters.repository-name}}"
     - - name: create-or-update-appcontainer
         template: create-or-update-appcontainer
         arguments:
@@ -720,6 +727,7 @@ spec:
       parameters:
       - name: resource-name
       - name: parent-appcontainer
+      - name: repository-name
     outputs:
       parameters:
       - name: repository-name
@@ -734,14 +742,19 @@ spec:
       source: |
         echo "🔍 Determining repository name for microservice..."
         
-        # Remove -service suffix if present to get base name
-        BASE_NAME=$(echo "{{inputs.parameters.resource-name}}" | sed 's/-service$//')
-        
-        # Determine repository name (same as base name)
-        REPOSITORY_NAME="$BASE_NAME"
+        # Use provided repository name or derive from microservice name
+        if [ -n "{{inputs.parameters.repository-name}}" ] && [ "{{inputs.parameters.repository-name}}" != "" ]; then
+          REPOSITORY_NAME="{{inputs.parameters.repository-name}}"
+          echo "✅ Using provided repository name: $REPOSITORY_NAME"
+        else
+          # Remove -service suffix if present to get base name
+          BASE_NAME=$(echo "{{inputs.parameters.resource-name}}" | sed 's/-service$//')
+          REPOSITORY_NAME="$BASE_NAME"
+          echo "✅ Auto-derived repository name: $REPOSITORY_NAME"
+        fi
         
         # Determine vCluster name for reference (but not used in creation)
-        VCLUSTER_NAME="${BASE_NAME}-vcluster"
+        VCLUSTER_NAME="${REPOSITORY_NAME}-vcluster"
         
         echo "Microservice: {{inputs.parameters.resource-name}}"
         echo "Repository: $REPOSITORY_NAME"
