@@ -224,7 +224,7 @@ spec:
           - name: slack-user-id
             value: "{{inputs.parameters.slack-user-id}}"
           - name: message
-            value: "✅ Application container ready - creating microservice..."
+            value: "✅ Repository structure ready - creating microservice..."
           - name: notification-type
             value: "progress"
         when: "{{steps.ensure-appcontainer.status}} == Succeeded"
@@ -487,16 +487,12 @@ spec:
             value: "{{inputs.parameters.target-vcluster}}"
           - name: auto-create-dependencies
             value: "{{inputs.parameters.auto-create-dependencies}}"
-    - - name: create-appcontainer-if-needed
-        templateRef:
-          name: appcontainer-standard-contract
-          template: create-appcontainer
+    - - name: create-repository-if-needed
+        template: create-repository-if-needed
         arguments:
           parameters:
-          - name: resource-name
+          - name: appcontainer-name
             value: "{{steps.determine-appcontainer-name.outputs.parameters.appcontainer-name}}"
-          - name: resource-type
-            value: "appcontainer"
           - name: namespace
             value: "{{inputs.parameters.namespace}}"
           - name: user
@@ -521,8 +517,6 @@ spec:
             value: "{{inputs.parameters.environment-tier}}"
           - name: resource-size
             value: "{{inputs.parameters.resource-size}}"
-          - name: target-vcluster
-            value: "{{steps.determine-appcontainer-name.outputs.parameters.vcluster-name}}"
         when: "{{inputs.parameters.auto-create-dependencies}} == true"
     - - name: check-existing-appcontainer
         template: check-existing-appcontainer
@@ -758,6 +752,72 @@ spec:
         fi
         
         echo "✅ AppContainer {{inputs.parameters.appcontainer-name}} exists and is ready for microservice deployment"
+
+  - name: create-repository-if-needed
+    inputs:
+      parameters:
+      - name: appcontainer-name
+      - name: namespace
+      - name: user
+      - name: description
+      - name: github-org
+      - name: docker-registry
+      - name: slack-channel
+      - name: slack-user-id
+      - name: security-enabled
+      - name: observability-enabled
+      - name: backup-enabled
+      - name: environment-tier
+      - name: resource-size
+    script:
+      image: bitnami/kubectl:1.28
+      command: [sh]
+      source: |
+        echo "🏗️ Creating AppContainer repository and source code structure..."
+        
+        # Parse boolean parameters
+        OBSERVABILITY=$([ "{{inputs.parameters.observability-enabled}}" = "true" ] && echo "true" || echo "false")
+        SECURITY=$([ "{{inputs.parameters.security-enabled}}" = "true" ] && echo "true" || echo "false")
+        
+        # Sanitize slack channel for label
+        SLACK_CHANNEL_LABEL=$(echo "{{inputs.parameters.slack-channel}}" | sed 's/#//g' | tr '[:upper:]' '[:lower:]')
+        
+        # Create AppContainer claim manifest (repository-focused)
+        cat <<EOF | kubectl apply -f -
+        apiVersion: platform.example.org/v1alpha1
+        kind: AppContainerClaim
+        metadata:
+          name: {{inputs.parameters.appcontainer-name}}
+          namespace: {{inputs.parameters.namespace}}
+          labels:
+            created-by: "microservice-standard-contract"
+            parameter-contract-version: "v1.0"
+            resource-type: "appcontainer"
+            requested-by: "{{inputs.parameters.user}}"
+            slack-channel: "$SLACK_CHANNEL_LABEL"
+            deployment-context: "repository-only"
+          annotations:
+            description: "{{inputs.parameters.description}}"
+            parameter-contract: "compliant"
+            created-at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        spec:
+          name: {{inputs.parameters.appcontainer-name}}
+          description: "{{inputs.parameters.description}}"
+          gitHubOrg: "{{inputs.parameters.github-org}}"
+          dockerRegistry: "{{inputs.parameters.docker-registry}}"
+          enableObservability: $OBSERVABILITY
+          enableSecurity: $SECURITY
+        EOF
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ AppContainer repository claim created successfully"
+          echo "📦 Repository and source code structure will be created by Crossplane"
+          echo "🔄 VCluster deployment will be handled separately via /vcluster command"
+          exit 0
+        else
+          echo "❌ Failed to create AppContainer repository claim"
+          exit 1
+        fi
 
   - name: determine-appcontainer-name
     inputs:

@@ -137,8 +137,8 @@ spec:
           - name: notification-type
             value: "starting"
         when: "{{steps.validate-parameters.status}} == Succeeded"
-    - - name: ensure-vcluster
-        template: ensure-vcluster-dependency
+    - - name: check-target-vcluster
+        template: check-target-vcluster
         arguments:
           parameters:
           - name: resource-name
@@ -183,10 +183,10 @@ spec:
           - name: slack-user-id
             value: "{{inputs.parameters.slack-user-id}}"
           - name: message
-            value: "✅ VCluster ready - creating application infrastructure..."
+            value: "✅ VCluster validated - creating application infrastructure..."
           - name: notification-type
             value: "progress"
-        when: "{{steps.ensure-vcluster.status}} == Succeeded"
+        when: "{{steps.check-target-vcluster.status}} == Succeeded"
     - - name: create-appcontainer-claim
         template: create-appcontainer-claim
         arguments:
@@ -209,7 +209,7 @@ spec:
             value: "{{inputs.parameters.user}}"
           - name: slack-channel
             value: "{{inputs.parameters.slack-channel}}"
-        when: "{{steps.ensure-vcluster.status}} == Succeeded"
+        when: "{{steps.check-target-vcluster.status}} == Succeeded"
     - - name: wait-for-repositories
         template: wait-for-appcontainer-repositories
         arguments:
@@ -226,7 +226,7 @@ spec:
           - name: resource-name
             value: "{{inputs.parameters.resource-name}}"
           - name: target-vcluster
-            value: "{{steps.ensure-vcluster.outputs.parameters.vcluster-name}}"
+            value: "{{steps.check-target-vcluster.outputs.parameters.vcluster-name}}"
         when: "{{steps.wait-for-repositories.status}} == Succeeded and {{inputs.parameters.enable-default-microservice}} == true"
     - - name: extract-appcontainer-info
         template: extract-appcontainer-info
@@ -237,7 +237,7 @@ spec:
           - name: namespace
             value: "{{inputs.parameters.namespace}}"
           - name: target-vcluster
-            value: "{{steps.ensure-vcluster.outputs.parameters.vcluster-name}}"
+            value: "{{steps.check-target-vcluster.outputs.parameters.vcluster-name}}"
           - name: github-org
             value: "{{inputs.parameters.github-org}}"
         when: "{{steps.wait-for-repositories.status}} == Succeeded"
@@ -282,7 +282,7 @@ spec:
             value: "❌ AppContainer creation failed - check workflow logs for details"
           - name: notification-type
             value: "failure"
-        when: "{{steps.validate-parameters.status}} != Succeeded or {{steps.ensure-vcluster.status}} != Succeeded or {{steps.create-appcontainer-claim.status}} != Succeeded or {{steps.wait-for-repositories.status}} != Succeeded"
+        when: "{{steps.validate-parameters.status}} != Succeeded or {{steps.check-target-vcluster.status}} != Succeeded or {{steps.create-appcontainer-claim.status}} != Succeeded or {{steps.wait-for-repositories.status}} != Succeeded"
 
   # =============================================================================
   # PARAMETER VALIDATION
@@ -352,9 +352,9 @@ spec:
         echo "   GitHub Org: {{inputs.parameters.github-org}}"
 
   # =============================================================================
-  # VCLUSTER DEPENDENCY MANAGEMENT
+  # VCLUSTER VALIDATION (NO CREATION)
   # =============================================================================
-  - name: ensure-vcluster-dependency
+  - name: check-target-vcluster
     inputs:
       parameters:
       - name: resource-name
@@ -385,50 +385,14 @@ spec:
             value: "{{inputs.parameters.target-vcluster}}"
           - name: auto-create-dependencies
             value: "{{inputs.parameters.auto-create-dependencies}}"
-    - - name: create-vcluster-if-needed
-        templateRef:
-          name: vcluster-standard-contract
-          template: create-vcluster
-        arguments:
-          parameters:
-          - name: resource-name
-            value: "{{steps.determine-vcluster-name.outputs.parameters.vcluster-name}}"
-          - name: resource-type
-            value: "vcluster"
-          - name: namespace
-            value: "{{inputs.parameters.namespace}}"
-          - name: user
-            value: "{{inputs.parameters.user}}"
-          - name: description
-            value: "VCluster for AppContainer '{{inputs.parameters.resource-name}}'"
-          - name: slack-channel
-            value: "{{inputs.parameters.slack-channel}}"
-          - name: slack-user-id
-            value: "{{inputs.parameters.slack-user-id}}"
-          - name: security-enabled
-            value: "{{inputs.parameters.security-enabled}}"
-          - name: observability-enabled
-            value: "{{inputs.parameters.observability-enabled}}"
-          - name: backup-enabled
-            value: "{{inputs.parameters.backup-enabled}}"
-          - name: environment-tier
-            value: "{{inputs.parameters.environment-tier}}"
-          - name: resource-size
-            value: "{{inputs.parameters.resource-size}}"
-          - name: vcluster-size
-            value: "{{inputs.parameters.resource-size}}"
-          - name: vcluster-capabilities
-            value: '{"observability":"true","security":"true","gitops":"true","logging":"true","networking":"true","autoscaling":"false","backup":"false"}'
-        when: "{{inputs.parameters.auto-create-dependencies}} == true"
-    - - name: check-existing-vcluster
-        template: check-existing-vcluster
+    - - name: validate-existing-vcluster
+        template: validate-existing-vcluster
         arguments:
           parameters:
           - name: vcluster-name
             value: "{{steps.determine-vcluster-name.outputs.parameters.vcluster-name}}"
           - name: namespace
             value: "{{inputs.parameters.namespace}}"
-        when: "{{inputs.parameters.auto-create-dependencies}} == false"
 
   - name: determine-vcluster-name
     inputs:
@@ -462,7 +426,7 @@ spec:
           echo "ℹ️ VCluster dependency must exist: $TARGET_VCLUSTER"
         fi
 
-  - name: check-existing-vcluster
+  - name: validate-existing-vcluster
     inputs:
       parameters:
       - name: vcluster-name
@@ -471,11 +435,11 @@ spec:
       image: bitnami/kubectl:1.28
       command: [sh]
       source: |
-        echo "🔍 Checking existing VCluster for AppContainer deployment..."
+        echo "🔍 Validating existing VCluster for AppContainer deployment..."
         
         if ! kubectl get vclusterenvironmentclaim {{inputs.parameters.vcluster-name}} -n {{inputs.parameters.namespace}} >/dev/null 2>&1; then
           echo "❌ VCluster {{inputs.parameters.vcluster-name}} does not exist"
-          echo "💡 Enable auto-create-dependencies or create the VCluster first"
+          echo "💡 Use /vcluster command to create VCluster first, or specify an existing VCluster"
           exit 1
         fi
         
