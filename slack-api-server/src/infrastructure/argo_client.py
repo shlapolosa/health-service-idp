@@ -280,6 +280,7 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
                             {"name": "microservice-expose-api", "value": "false"},
                             {"name": "target-vcluster", "value": payload.get("target-vcluster", "")},
                             {"name": "parent-appcontainer", "value": ""},
+                            {"name": "repository-name", "value": payload.get("repository-name", "")},
                         ]
                     }
                 }

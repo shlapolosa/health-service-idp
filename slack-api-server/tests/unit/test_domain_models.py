@@ -512,6 +512,7 @@ class TestMicroserviceRequest:
             "security": "true",
             "target-vcluster": "prod-cluster",
             "auto-create-vcluster": "false",
+            "repository-name": "",
             "user": "bob",
             "slack-channel": "C456",
             "slack-user-id": "bob",
