@@ -331,6 +331,7 @@ class CreateMicroserviceUseCase:
                 enable_security=parsed_command.enable_security,
                 target_vcluster=parsed_command.target_vcluster,
                 auto_create_vcluster=parsed_command.auto_create_vcluster,
+                repository=parsed_command.repository,
                 original_text=command.text,
             )
 

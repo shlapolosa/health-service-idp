@@ -242,6 +242,20 @@ class EnhancedNLPParser(CommandParserInterface):
         ]
         self.matcher.add("MICROSERVICE_CACHE", cache_patterns)
 
+        # Repository patterns
+        repository_patterns = [
+            [
+                {"LOWER": {"IN": ["repository", "repo", "app"]}},
+                {"TEXT": {"REGEX": r"[a-z0-9-]+"}},
+            ],
+            [
+                {"LOWER": {"IN": ["in", "to", "under"]}},
+                {"LOWER": {"IN": ["repository", "repo", "app"]}},
+                {"TEXT": {"REGEX": r"[a-z0-9-]+"}},
+            ],
+        ]
+        self.matcher.add("MICROSERVICE_REPOSITORY", repository_patterns)
+
     def parse_command(self, command: SlackCommand) -> ParsedCommand:
         """Parse a Slack command into a structured format."""
         try:
@@ -496,6 +510,7 @@ class EnhancedNLPParser(CommandParserInterface):
             enable_security=parsed.get("enable_security", True),
             target_vcluster=parsed.get("target_vcluster"),
             auto_create_vcluster=parsed.get("auto_create_vcluster", True),
+            repository=parsed.get("repository"),
             microservice_language=parsed.get("microservice_language", MicroserviceLanguage.PYTHON),
             microservice_database=parsed.get("microservice_database", MicroserviceDatabase.NONE),
             microservice_cache=parsed.get("microservice_cache", MicroserviceCache.NONE),
@@ -520,6 +535,7 @@ class EnhancedNLPParser(CommandParserInterface):
             "enable_security": True,
             "target_vcluster": None,
             "auto_create_vcluster": True,
+            "repository": None,
             "microservice_language": MicroserviceLanguage.PYTHON,
             "microservice_database": MicroserviceDatabase.NONE,
             "microservice_cache": MicroserviceCache.NONE,
@@ -586,6 +602,9 @@ class EnhancedNLPParser(CommandParserInterface):
                     elif action_word == "with" and cache_text == "cache":
                         extracted["microservice_cache"] = MicroserviceCache.REDIS
 
+            elif label == "MICROSERVICE_REPOSITORY" and len(span) > 1:
+                extracted["repository"] = span[-1].text.lower()
+
         # Fallback to regex for anything missed
         text_lower = text.lower()
         
@@ -610,6 +629,7 @@ class EnhancedNLPParser(CommandParserInterface):
             "enable_security": True,
             "target_vcluster": None,
             "auto_create_vcluster": True,
+            "repository": None,
             "microservice_language": MicroserviceLanguage.PYTHON,
             "microservice_database": MicroserviceDatabase.NONE,
             "microservice_cache": MicroserviceCache.NONE,
@@ -691,6 +711,11 @@ class EnhancedNLPParser(CommandParserInterface):
             extracted["microservice_cache"] = MicroserviceCache.NONE
         elif "redis" in text or "with cache" in text:
             extracted["microservice_cache"] = MicroserviceCache.REDIS
+            
+        # Extract repository
+        repo_match = re.search(r"(?:repository|repo|app)\s+([a-z0-9-]+)", text)
+        if repo_match:
+            extracted["repository"] = repo_match.group(1)
             
         # Extract observability setting - same as AppContainer
         if any(phrase in text for phrase in ["no-observability", "disable-observability", "without observability"]):

@@ -256,6 +256,7 @@ class MicroserviceRequest:
     enable_security: bool = True
     target_vcluster: Optional[str] = None
     auto_create_vcluster: bool = True
+    repository: Optional[str] = None
     original_text: Optional[str] = None
     created_at: datetime = None
 
@@ -311,6 +312,7 @@ class MicroserviceRequest:
             "security": str(self.enable_security).lower(),
             "target-vcluster": self.target_vcluster or "",
             "auto-create-vcluster": str(self.auto_create_vcluster).lower(),
+            "repository-name": self.repository or "",
             "user": self.user,
             "slack-channel": self.slack_channel,
             "slack-user-id": self.user,
