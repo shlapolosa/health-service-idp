@@ -27,7 +27,7 @@ The project evolved from simple workflow templates to a sophisticated, standardi
 **Rationale**:
 - DRY principle: Eliminate parameter duplication across 15+ workflow templates
 - Consistency: Ensure all workflows use same parameter names and validation
-- Composability: Enable template composition (Microservice → AppContainer → VCluster)
+- Composability: Enable template composition (Microservice → AppContainer, VCluster as separate workflow)
 - Maintainability: Centralized parameter definitions reduce maintenance burden
 - Testability: Standardized contracts enable systematic testing
 
@@ -93,12 +93,14 @@ The project evolved from simple workflow templates to a sophisticated, standardi
 **Composition Chain**:
 ```
 Microservice Template
-    ↓ (calls via templateRef)
+    ↓ (repository management)
 AppContainer Template  
-    ↓ (calls via templateRef)
-VCluster Template
     ↓ (creates)
-Crossplane Resources
+Crossplane Resources (AppContainerClaim, ApplicationClaim)
+
+VCluster Template (separate workflow)
+    ↓ (creates)
+Crossplane Resources (VClusterEnvironmentClaim)
 ```
 
 **Rationale**:
@@ -634,6 +636,52 @@ Problematic Components:
 - ✅ ArgoCD enables GitOps workflows
 - ❌ Observability must be added separately if needed
 - ❌ No built-in service mesh visualization
+
+---
+
+#### ADR-015: Microservice and VCluster Workflow Separation
+**Date**: 2025-07-16  
+**Decision**: Separate microservice creation from VCluster provisioning into independent workflows
+
+**Problem**: The original design created tight coupling between microservice creation and VCluster provisioning, causing:
+- Microservice creation blocked by VCluster provisioning failures
+- Complex dependency chains difficult to debug
+- Inability to add microservices to existing VClusters
+- Repository management mixed with infrastructure concerns
+
+**Solution**: Implement workflow separation:
+```
+/microservice command:
+1. Creates or updates AppContainer (repositories)
+2. Adds microservice to microservices/ folder
+3. Creates ApplicationClaim
+4. Updates GitOps definitions
+5. NO VCluster creation/validation
+
+/vcluster command:
+1. Creates VCluster environment
+2. Installs components (Istio, Knative, ArgoCD)
+3. Sets up RBAC and networking
+4. Independent of microservice creation
+```
+
+**Implementation Changes**:
+- Updated Slack API server to support `repository-name` parameter
+- Modified microservice workflow to focus on repository management
+- Separated VCluster validation from microservice creation
+- Added repository parameter extraction in NLP parser
+
+**Benefits**:
+- ✅ Microservices can be added to existing repositories
+- ✅ VCluster creation independent of application development
+- ✅ Faster microservice iteration (no infrastructure blocking)
+- ✅ Clear separation of concerns
+- ✅ Better error isolation and debugging
+
+**Consequences**:
+- ❌ Users must create VClusters separately before deployment
+- ❌ Additional command to learn (`/vcluster create`)
+- ❌ Documentation updates required across codebase
 
 ---
 

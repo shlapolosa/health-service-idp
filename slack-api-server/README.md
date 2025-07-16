@@ -5,10 +5,10 @@ A FastAPI-based microservice for handling Slack slash commands and triggering VC
 ## Overview
 
 This service implements the Onion Architecture pattern and provides:
-- Slack slash command handling (`/vcluster` and `/appcontainer`)
+- Slack slash command handling (`/vcluster`, `/appcontainer`, and `/microservice`)
 - Advanced natural language processing with spaCy
-- GitHub repository dispatch integration
-- VCluster provisioning automation
+- Argo Workflows integration for GitOps automation
+- Repository-focused microservice provisioning
 - Comprehensive error handling and logging
 
 ## Features
@@ -131,6 +131,37 @@ Creates a new VCluster with specified configuration.
 
 ### `/vcluster help`
 Shows available commands and usage examples.
+
+### `/microservice create`
+Creates a new microservice and adds it to an existing or new repository structure.
+
+**Examples**:
+```
+/microservice create order-service
+/microservice create order-service with python and redis
+/microservice create order-service repository myapp
+/microservice create payment-service repo ecommerce with java and postgres
+/microservice create user-service in repo users with python and redis
+```
+
+**Parameters**:
+- `name` - Microservice name (required)
+- `repository` - Target repository name (auto-derived from microservice name if not provided)
+- `language` - Programming language: `python`, `java`, `fastapi`, `springboot` (default: `python`)
+- `database` - Database type: `none`, `postgres`, `postgresql` (default: `none`)
+- `cache` - Cache type: `none`, `redis` (default: `none`)
+- `namespace` - Kubernetes namespace (default: `default`)
+
+**Flow**:
+1. Creates or updates AppContainer with repositories (source + GitOps)
+2. Adds microservice to `microservices/{name}/` folder
+3. Creates ApplicationClaim for Knative deployment
+4. Updates ArgoCD and OAM definitions
+
+**Important**: VCluster creation is separate. Use `/vcluster create` first if needed.
+
+### `/microservice help`
+Shows available microservice commands and usage examples.
 
 ## Deployment
 

@@ -2,38 +2,44 @@
 
 ## Overview
 
-This document outlines the comprehensive end-to-end testing strategy for the microservice slash command functionality in the health-service-idp platform. The E2E test validates the complete flow from Slack command input to fully provisioned microservice environment with repositories, VCluster, and GitOps infrastructure.
+This document outlines the comprehensive end-to-end testing strategy for the microservice slash command functionality in the health-service-idp platform. The E2E test validates the complete flow from Slack command input to microservice added to existing repository structure with GitOps integration.
 
 ## Test Objective
 
-**Primary Goal**: Verify that a Slack slash command `/microservice create <name> <language> with <database>` successfully creates:
-1. A running Argo workflow
-2. A VCluster environment
-3. An AppContainer with repositories
-4. Source code repository with CLAUDE.md-compliant structure
-5. GitOps repository with ArgoCD and OAM applications
-6. Hello-world microservice in the microservices folder
+**Primary Goal**: Verify that a Slack slash command `/microservice create <name> <language> with <database> [repository <repo>]` successfully creates:
+1. A running Argo workflow (microservice-standard-contract)
+2. An AppContainer with repositories (if they don't exist)
+3. Source code repository with CLAUDE.md-compliant structure
+4. GitOps repository with ArgoCD and OAM applications
+5. Microservice added to the microservices/ folder
+6. ApplicationClaim for the microservice
 7. Slack notifications throughout the process
+
+**Important**: VCluster creation is now separate and handled by the `/vcluster` command. The `/microservice` command focuses purely on repository and source code management.
 
 ## Architecture Overview
 
 ```mermaid
 graph TD
-    A[Slack /microservice command] --> B[Slack API Server]
+    A[Slack /microservice command with repository] --> B[Slack API Server]
     B --> C[CreateMicroserviceUseCase]
     C --> D[Argo Workflows API]
     D --> E[microservice-standard-contract]
-    E --> F[appcontainer-standard-contract]
-    F --> G[vcluster-standard-contract]
-    G --> H[Crossplane VClusterEnvironmentClaim]
-    F --> I[Crossplane AppContainerClaim]
-    I --> J[GitHub Repositories]
-    I --> K[GitOps Structure]
+    E --> F[Check/Create AppContainer]
+    F --> G[Crossplane AppContainerClaim]
+    G --> H[GitHub Repositories]
+    G --> I[GitOps Structure]
+    E --> J[Create ApplicationClaim]
+    J --> K[Add to microservices/ folder]
     E --> L[Slack Notifications]
     
-    H --> M[VCluster Instance]
-    J --> N[Source Repo with microservices/]
-    K --> O[GitOps Repo with argocd/ and oam/]
+    H --> M[Source Repo with microservices/]
+    I --> N[GitOps Repo with argocd/ and oam/]
+    K --> O[Microservice in microservices/name/]
+    
+    %% Separate VCluster flow (not part of microservice command)
+    P[/vcluster command] --> Q[vcluster-standard-contract]
+    Q --> R[VCluster Environment]
     
     %% Test Results Legend:
     %% ✅ Green = Working correctly
@@ -43,10 +49,12 @@ graph TD
     classDef green fill:#d4edda,stroke:#28a745,stroke-width:2px
     classDef amber fill:#fff3cd,stroke:#ffc107,stroke-width:2px
     classDef red fill:#f8d7da,stroke:#dc3545,stroke-width:2px
+    classDef separate fill:#e2e3e5,stroke:#6c757d,stroke-width:1px,stroke-dasharray: 5 5
     
     class A,B,C,D,E,F,G,L green
-    class H,I amber
-    class J,K,M,N,O red
+    class H,I,J amber
+    class M,N,O,K red
+    class P,Q,R separate
 ```
 
 ## Components Under Test

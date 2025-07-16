@@ -29,12 +29,16 @@ We have successfully implemented a **standardized parameter contract system** th
 📦 Microservice Creation Request
     ↓
 🔧 microservice-standard-contract.yaml
-    ↓ (templateRef)
-📦 appcontainer-standard-contract.yaml  
-    ↓ (templateRef)
+    ↓ (repository management)
+📦 AppContainer (creates/updates repositories)
+    ↓ (kubectl apply)
+☸️  Crossplane Resources (AppContainerClaim, ApplicationClaim)
+
+📦 VCluster Creation Request (separate workflow)
+    ↓
 🏢 vcluster-standard-contract.yaml
     ↓ (kubectl apply)
-☸️  Crossplane Resources (VClusterEnvironmentClaim, AppContainerClaim)
+☸️  Crossplane Resources (VClusterEnvironmentClaim)
 ```
 
 ### Parameter Contract Tiers
