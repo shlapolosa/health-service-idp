@@ -44,8 +44,8 @@ spec:
                       mkdir -p $TEMP_DIR
                       cd $TEMP_DIR
                       
-                      # Clone the AppContainer repository
-                      git clone https://github.com/socrates12345/$APP_CONTAINER.git .
+                      # Clone the AppContainer repository using GitHub token
+                      git clone https://$GITHUB_TOKEN@github.com/socrates12345/$APP_CONTAINER.git .
                       
                       # Create microservice directory
                       mkdir -p microservices/$SERVICE_NAME
@@ -338,6 +338,11 @@ spec:
                       value: placeholder
                     - name: FRAMEWORK
                       value: placeholder
+                    - name: GITHUB_TOKEN
+                      valueFrom:
+                        secretKeyRef:
+                          name: github-credentials
+                          key: token
         providerConfigRef:
           name: kubernetes-provider
     patches:
@@ -400,8 +405,8 @@ spec:
                       mkdir -p $TEMP_DIR
                       cd $TEMP_DIR
                       
-                      # Clone the GitOps repository
-                      git clone https://github.com/socrates12345/$APP_CONTAINER-gitops.git .
+                      # Clone the GitOps repository using GitHub token
+                      git clone https://$GITHUB_TOKEN@github.com/socrates12345/$APP_CONTAINER-gitops.git .
                       
                       # Create manifests directory for the service
                       mkdir -p manifests/$SERVICE_NAME
@@ -590,6 +595,11 @@ spec:
                       value: placeholder
                     - name: CACHE
                       value: placeholder
+                    - name: GITHUB_TOKEN
+                      valueFrom:
+                        secretKeyRef:
+                          name: github-credentials
+                          key: token
         providerConfigRef:
           name: kubernetes-provider
     patches:
@@ -841,14 +851,14 @@ spec:
               name: placeholder
               namespace: placeholder
             type: Opaque
-            data:
-              # Base64 encoded values (in production, use External Secrets)
-              DATABASE_URL: placeholder
-              DB_HOST: placeholder
-              DB_PORT: NTQzMg==  # 5432
-              DB_NAME: placeholder
-              DB_USER: placeholder
-              DB_PASSWORD: placeholder
+            stringData:
+              # Plain text values - Kubernetes will base64 encode automatically
+              DATABASE_URL: ""
+              DB_HOST: ""
+              DB_PORT: "5432"
+              DB_NAME: ""
+              DB_USER: ""
+              DB_PASSWORD: ""
         providerConfigRef:
           name: kubernetes-provider
     patches:
@@ -878,6 +888,37 @@ spec:
         map:
           "postgres": "true"
           "none": "false"
+    # Patch secret values with plain text (Kubernetes will base64 encode)
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.stringData.DB_HOST
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-postgresql.%s.svc.cluster.local"
+          type: Format
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.stringData.DB_NAME
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.stringData.DB_USER
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.stringData.DB_PASSWORD
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-user-pass"
+          type: Format
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.stringData.DATABASE_URL
+      transforms:
+      - type: string
+        string:
+          fmt: "postgresql://%s:%s-user-pass@claims-postgresql.claims.svc.cluster.local:5432/%s"
+          type: Format
 
   # Cache Secret (Redis credentials)
   - name: redis-secret
@@ -893,12 +934,12 @@ spec:
               name: placeholder
               namespace: placeholder
             type: Opaque
-            data:
-              # Base64 encoded values (in production, use External Secrets)
-              REDIS_URL: placeholder
-              REDIS_HOST: placeholder
-              REDIS_PORT: NjM3OQ==  # 6379
-              REDIS_PASSWORD: placeholder
+            stringData:
+              # Plain text values - Kubernetes will base64 encode automatically
+              REDIS_URL: ""
+              REDIS_HOST: ""
+              REDIS_PORT: "6379"
+              REDIS_PASSWORD: ""
         providerConfigRef:
           name: kubernetes-provider
     patches:
@@ -928,3 +969,28 @@ spec:
         map:
           "redis": "true"
           "none": "false"
+    # Patch Redis secret values
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.stringData.REDIS_HOST
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-redis-master.%s.svc.cluster.local"
+          type: Format
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.stringData.REDIS_PASSWORD
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-redis-pass"
+          type: Format
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.stringData.REDIS_URL
+      transforms:
+      - type: string
+        string:
+          fmt: "redis://:%s-redis-pass@claims-redis-master.claims.svc.cluster.local:6379/0"
+          type: Format

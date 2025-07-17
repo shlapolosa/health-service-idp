@@ -31,11 +31,17 @@ spec:
           value: "INFO"
         - name: ENVIRONMENT
           value: "production"
-        - name: PERSONAL_ACCESS_TOKEN
+        - name: GITHUB_TOKEN
           valueFrom:
             secretKeyRef:
               name: github-credentials
-              key: personal-access-token
+              key: token
+              optional: false
+        - name: GITHUB_USER
+          valueFrom:
+            secretKeyRef:
+              name: github-credentials
+              key: user
               optional: false
         - name: GITHUB_REPOSITORY
           value: "shlapolosa/health-service-idp"

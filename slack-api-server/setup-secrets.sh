@@ -74,8 +74,8 @@ fi
 log_success "Kubernetes connectivity verified"
 
 # Check if we're in the right directory
-if [ ! -f "rbac.yaml" ] || [ ! -f "manual-secrets.yaml" ]; then
-    log_error "rbac.yaml or manual-secrets.yaml not found. Please run this script from the slack-api-server directory"
+if [ ! -f "rbac.yaml" ] || [ ! -f "../manual-secrets.yaml" ]; then
+    log_error "rbac.yaml or ../manual-secrets.yaml not found. Please run this script from the slack-api-server directory"
     exit 1
 fi
 
@@ -93,7 +93,7 @@ kubectl apply -f rbac.yaml
 # Apply manual secrets with environment variable substitution
 sed -e "s|\${PERSONAL_ACCESS_TOKEN}|${PERSONAL_ACCESS_TOKEN}|g" \
     -e "s|\${SLACK_SIGNING_SECRET}|${SLACK_SIGNING_SECRET}|g" \
-    manual-secrets.yaml | kubectl apply -f -
+    ../manual-secrets.yaml | kubectl apply -f -
 
 log_success "Secrets applied successfully!"
 
