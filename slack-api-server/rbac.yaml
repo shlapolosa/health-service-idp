@@ -46,27 +46,3 @@ subjects:
 - kind: ServiceAccount
   name: slack-api-server
   namespace: default
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: github-credentials
-  namespace: default
-  labels:
-    app: slack-api-server
-    service-type: api-server
-type: Opaque
-stringData:
-  personal-access-token: "${PERSONAL_ACCESS_TOKEN}"
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: slack-credentials
-  namespace: default
-  labels:
-    app: slack-api-server
-    service-type: api-server
-type: Opaque
-stringData:
-  signing-secret: "${SLACK_SIGNING_SECRET}"
