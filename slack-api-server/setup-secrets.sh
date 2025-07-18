@@ -43,6 +43,24 @@ if [ -z "$PERSONAL_ACCESS_TOKEN" ]; then
     exit 1
 fi
 
+if [ -z "$GITHUB_USERNAME" ]; then
+    log_error "GITHUB_USERNAME environment variable is not set"
+    echo ""
+    echo "Please set it with:"
+    echo "export GITHUB_USERNAME='your_github_username_here'"
+    echo ""
+    exit 1
+fi
+
+if [ -z "$DOCKER_USERNAME" ]; then
+    log_error "DOCKER_USERNAME environment variable is not set"
+    echo ""
+    echo "Please set it with:"
+    echo "export DOCKER_USERNAME='your_docker_username_here'"
+    echo ""
+    exit 1
+fi
+
 if [ -z "$SLACK_SIGNING_SECRET" ]; then
     log_error "SLACK_SIGNING_SECRET environment variable is not set"
     echo ""
@@ -81,6 +99,8 @@ fi
 
 log_info "Environment variables validated:"
 echo "  PERSONAL_ACCESS_TOKEN: ${PERSONAL_ACCESS_TOKEN:0:10}..."
+echo "  GITHUB_USERNAME: ${GITHUB_USERNAME}"
+echo "  DOCKER_USERNAME: ${DOCKER_USERNAME}"
 echo "  SLACK_SIGNING_SECRET: ${SLACK_SIGNING_SECRET:0:10}..."
 echo ""
 
@@ -92,6 +112,8 @@ kubectl apply -f rbac.yaml
 
 # Apply manual secrets with environment variable substitution
 sed -e "s|\${PERSONAL_ACCESS_TOKEN}|${PERSONAL_ACCESS_TOKEN}|g" \
+    -e "s|\${GITHUB_USERNAME}|${GITHUB_USERNAME}|g" \
+    -e "s|\${DOCKER_USERNAME}|${DOCKER_USERNAME}|g" \
     -e "s|\${SLACK_SIGNING_SECRET}|${SLACK_SIGNING_SECRET}|g" \
     ../manual-secrets.yaml | kubectl apply -f -
 
@@ -104,6 +126,12 @@ if kubectl get secret github-credentials -n default &>/dev/null; then
     log_success "✅ github-credentials secret exists"
 else
     log_error "❌ github-credentials secret not found"
+fi
+
+if kubectl get secret docker-credentials -n default &>/dev/null; then
+    log_success "✅ docker-credentials secret exists"
+else
+    log_error "❌ docker-credentials secret not found"
 fi
 
 if kubectl get secret slack-credentials -n default &>/dev/null; then

@@ -45,7 +45,7 @@ spec:
                       cd $TEMP_DIR
                       
                       # Clone the AppContainer repository using GitHub token
-                      git clone https://$GITHUB_TOKEN@github.com/socrates12345/$APP_CONTAINER.git .
+                      git clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/$APP_CONTAINER.git .
                       
                       # Create microservice directory
                       mkdir -p microservices/$SERVICE_NAME
@@ -343,6 +343,21 @@ spec:
                         secretKeyRef:
                           name: github-credentials
                           key: token
+                    - name: GITHUB_USER
+                      valueFrom:
+                        secretKeyRef:
+                          name: github-credentials
+                          key: user
+                    - name: DOCKER_REGISTRY
+                      valueFrom:
+                        secretKeyRef:
+                          name: docker-credentials
+                          key: registry
+                    - name: DOCKER_USER
+                      valueFrom:
+                        secretKeyRef:
+                          name: docker-credentials
+                          key: username
         providerConfigRef:
           name: kubernetes-provider
     patches:
@@ -406,7 +421,7 @@ spec:
                       cd $TEMP_DIR
                       
                       # Clone the GitOps repository using GitHub token
-                      git clone https://$GITHUB_TOKEN@github.com/socrates12345/$APP_CONTAINER-gitops.git .
+                      git clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/$APP_CONTAINER-gitops.git .
                       
                       # Create manifests directory for the service
                       mkdir -p manifests/$SERVICE_NAME
@@ -449,7 +464,7 @@ spec:
                             # Shorter timeout for cost optimization
                             timeoutSeconds: 300
                             containers:
-                            - image: docker.io/socrates12345/$SERVICE_NAME:latest
+                            - image: $DOCKER_REGISTRY/$DOCKER_USER/$SERVICE_NAME:latest
                               ports:
                               - containerPort: 8080
                                 name: http1
@@ -556,7 +571,7 @@ spec:
                               spec:
                                 containers:
                                 - name: $SERVICE_NAME
-                                  image: docker.io/socrates12345/$SERVICE_NAME:latest
+                                  image: $DOCKER_REGISTRY/$DOCKER_USER/$SERVICE_NAME:latest
                                   ports:
                                   - containerPort: 8080
                                   env:
@@ -600,6 +615,21 @@ spec:
                         secretKeyRef:
                           name: github-credentials
                           key: token
+                    - name: GITHUB_USER
+                      valueFrom:
+                        secretKeyRef:
+                          name: github-credentials
+                          key: user
+                    - name: DOCKER_REGISTRY
+                      valueFrom:
+                        secretKeyRef:
+                          name: docker-credentials
+                          key: registry
+                    - name: DOCKER_USER
+                      valueFrom:
+                        secretKeyRef:
+                          name: docker-credentials
+                          key: username
         providerConfigRef:
           name: kubernetes-provider
     patches:
