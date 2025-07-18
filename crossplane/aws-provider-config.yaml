@@ -1,7 +1,19 @@
-apiVersion: aws.crossplane.io/v1beta1
+---
+# Main AWS Provider ProviderConfig using IRSA
+apiVersion: aws.upbound.io/v1beta1
 kind: ProviderConfig
 metadata:
   name: default
 spec:
   credentials:
-    source: InjectedIdentity
+    source: IRSA  # Uses IAM Roles for Service Accounts
+
+---
+# AWS Provider ProviderConfig for cross-account access if needed
+apiVersion: aws.upbound.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: aws-default
+spec:
+  credentials:
+    source: IRSA  # Uses IAM Roles for Service Accounts
