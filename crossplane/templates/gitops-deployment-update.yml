@@ -1,0 +1,150 @@
+name: GitOps Deployment Update
+
+on:
+  repository_dispatch:
+    types: [update-deployments, simple-update]
+
+permissions:
+  contents: write
+
+jobs:
+  update-manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout GitOps repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update deployment manifests
+        run: |
+          echo "🚀 Processing GitOps deployment update..."
+          
+          # Extract dispatch payload
+          SERVICES="${{ github.event.client_payload.services }}"
+          VERSION_INFO="${{ github.event.client_payload.version_info }}"
+          SOURCE_COMMIT="${{ github.event.client_payload.source_commit }}"
+          REGISTRY="${{ github.event.client_payload.registry }}"
+          WORKFLOW_RUN="${{ github.event.client_payload.workflow_run }}"
+          
+          echo "Services to update: $SERVICES"
+          echo "Version info: $VERSION_INFO" 
+          echo "Source commit: $SOURCE_COMMIT"
+          echo "Registry: $REGISTRY"
+          
+          # Handle different event types
+          if [ "${{ github.event.action }}" = "simple-update" ]; then
+            echo "📋 Processing simple-update event"
+            COMMIT_SHA="${{ github.event.client_payload.commit_sha }}"
+          else
+            echo "📋 Processing update-deployments event"
+            # Parse deployments from payload
+            DEPLOYMENTS='${{ toJson(github.event.client_payload.deployments) }}'
+            echo "Deployments: $DEPLOYMENTS"
+          fi
+          
+          # Update each service's manifest
+          IFS=',' read -ra SERVICE_ARRAY <<< "$SERVICES"
+          
+          for service in "${SERVICE_ARRAY[@]}"; do
+            echo "🔄 Updating $service manifest..."
+            
+            if [ "${{ github.event.action }}" = "simple-update" ]; then
+              # Simple update: construct image from registry and commit
+              NEW_IMAGE="${REGISTRY}/$service:$COMMIT_SHA"
+            else
+              # Complex update: extract from deployments JSON
+              echo "🔍 Parsing deployments JSON for service: $service"
+              echo "Raw deployments: $DEPLOYMENTS"
+              
+              # Parse the JSON string (it comes as a string, not object)
+              DEPLOYMENTS_PARSED=$(echo "$DEPLOYMENTS" | jq -r '. // empty')
+              if [ "$DEPLOYMENTS_PARSED" = "null" ] || [ -z "$DEPLOYMENTS_PARSED" ]; then
+                # Try parsing as raw string
+                DEPLOYMENTS_PARSED="$DEPLOYMENTS"
+              fi
+              
+              NEW_IMAGE=$(echo "$DEPLOYMENTS_PARSED" | jq -r ".\"$service\".image // empty")
+              COMMIT_SHA=$(echo "$DEPLOYMENTS_PARSED" | jq -r ".\"$service\".commit // empty")
+              
+              echo "Extracted - Image: $NEW_IMAGE, Commit: $COMMIT_SHA"
+              
+              if [ -z "$NEW_IMAGE" ] || [ "$NEW_IMAGE" = "null" ]; then
+                echo "⚠️ No image found for service $service in deployments payload"
+                echo "Available keys in deployments:"
+                echo "$DEPLOYMENTS_PARSED" | jq -r 'keys[]?' 2>/dev/null || echo "Failed to parse keys"
+                continue
+              fi
+            fi
+            
+            echo "📝 Updating $service to image: $NEW_IMAGE"
+            
+            # Find OAM application file - project-specific path
+            OAM_FILE="oam/applications/${service}.yaml"
+            if [ ! -f "$OAM_FILE" ]; then
+              # Try other possible locations specific to this project
+              OAM_FILE=$(find oam -name "*${service}*.yaml" | head -1)
+            fi
+            
+            if [ -f "$OAM_FILE" ]; then
+              echo "📄 Updating manifest: $OAM_FILE"
+              
+              # Update the image in the OAM file
+              sed -i "s|image: .*/$service:.*|image: $NEW_IMAGE|g" "$OAM_FILE"
+              
+              # Update version labels if they exist
+              if [ ! -z "$COMMIT_SHA" ]; then
+                sed -i "s|version: .*|version: $COMMIT_SHA|g" "$OAM_FILE"
+              fi
+              
+              echo "✅ Updated $service manifest successfully"
+            else
+              echo "⚠️ Warning: Could not find OAM file for $service"
+              echo "Available OAM files:"
+              find oam -name "*.yaml" -type f 2>/dev/null || echo "No OAM files found"
+            fi
+          done
+
+      - name: Commit and push changes
+        run: |
+          # Configure git
+          git config user.name "GitOps Bot"
+          git config user.email "gitops-bot@github.com"
+          
+          # Check if there are changes
+          if git diff --quiet; then
+            echo "ℹ️ No changes detected in GitOps manifests"
+          else
+            echo "📋 Changes detected:"
+            git diff --name-only
+            
+            # Show what changed
+            echo "📝 Detailed changes:"
+            git diff
+            
+            # Commit changes
+            git add .
+            git commit -m "chore: update service deployments from source commit ${{ github.event.client_payload.source_commit }}
+
+            Services updated: ${{ github.event.client_payload.services }}
+            Source workflow: ${{ github.event.client_payload.workflow_run }}
+            Triggered by: repository_dispatch
+            
+            Updated images:
+            $(echo '${{ toJson(github.event.client_payload.deployments) }}' | jq -r 'to_entries[] | "- \(.key): \(.value.image)"' 2>/dev/null || echo "- Services: ${{ github.event.client_payload.services }}")"
+            
+            git push
+            
+            echo "✅ GitOps manifests updated and pushed successfully!"
+            echo "🔄 ArgoCD will now detect and deploy the changes"
+          fi
+
+      - name: Summary
+        run: |
+          echo "## 🎯 GitOps Deployment Update Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Services Updated:** ${{ github.event.client_payload.services }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Source Commit:** \`${{ github.event.client_payload.source_commit }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Registry:** ${{ github.event.client_payload.registry }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🚀 **Next Steps:** ArgoCD will detect manifest changes and deploy to cluster" >> $GITHUB_STEP_SUMMARY

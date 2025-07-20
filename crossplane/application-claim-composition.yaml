@@ -62,7 +62,7 @@ spec:
                       
                       if [ "$LANGUAGE" = "python" ] && [ "$FRAMEWORK" = "fastapi" ]; then
                         # Python FastAPI microservice with CLAUDE.md structure
-                        cat > pyproject.toml << 'EOF'
+                        cat > pyproject.toml << EOF
                       [tool.poetry]
                       name = "$SERVICE_NAME"
                       version = "0.1.0"
@@ -89,7 +89,7 @@ spec:
                       EOF
                       
                         # Domain layer
-                        cat > src/domain/models.py << 'EOF'
+                        cat > src/domain/models.py << EOF
                       """Domain models following CLAUDE.md Onion Architecture"""
                       from abc import ABC, abstractmethod
                       from typing import Optional
@@ -105,7 +105,7 @@ spec:
                       EOF
                       
                         # Application layer
-                        cat > src/application/use_cases.py << 'EOF'
+                        cat > src/application/use_cases.py << EOF
                       """Application use cases following CLAUDE.md principles"""
                       from abc import ABC, abstractmethod
                       from typing import Generic, TypeVar
@@ -121,7 +121,7 @@ spec:
                       EOF
                       
                         # Infrastructure layer
-                        cat > src/infrastructure/repositories.py << 'EOF'
+                        cat > src/infrastructure/repositories.py << EOF
                       """Infrastructure repositories with dependency injection"""
                       from abc import ABC, abstractmethod
                       from typing import List, Optional
@@ -132,7 +132,7 @@ spec:
                       EOF
                       
                         # Interface layer (FastAPI)
-                        cat > src/interface/api.py << 'EOF'
+                        cat > src/interface/api.py << EOF
                       """FastAPI interface layer following CLAUDE.md 12-factor principles"""
                       import os
                       from fastapi import FastAPI, Depends
@@ -169,7 +169,7 @@ spec:
                       EOF
                       
                         # Main application entry point
-                        cat > src/main.py << 'EOF'
+                        cat > src/main.py << EOF
                       """Main application entry point following 12-factor principles"""
                       import os
                       import uvicorn
@@ -181,23 +181,30 @@ spec:
                           uvicorn.run(app, host="0.0.0.0", port=port)
                       EOF
                       
-                        # Multi-stage Dockerfile
-                        cat > Dockerfile << 'EOF'
+                        # Multi-stage Dockerfile optimized for microservices build context
+                        cat > Dockerfile << EOF
                       # Multi-stage build for production
                       FROM python:3.11-slim as builder
                       
-                      # Install Poetry
+                      # Install Poetry and basic build tools
+                      RUN apt-get update && apt-get install -y curl gcc && rm -rf /var/lib/apt/lists/*
                       RUN pip install poetry
                       
-                      # Copy dependency files
-                      COPY pyproject.toml poetry.lock* ./
+                      # Set working directory for build
+                      WORKDIR /build
                       
-                      # Configure poetry and install dependencies
+                      # Copy dependency files
+                      COPY pyproject.toml ./
+                      
+                      # Configure poetry and install dependencies without dev packages (no-root to skip project install)
                       RUN poetry config virtualenvs.create false \
-                          && poetry install --no-dev --no-interaction --no-ansi
+                          && poetry install --only=main --no-root --no-interaction --no-ansi
                       
                       # Production stage
                       FROM python:3.11-slim as production
+                      
+                      # Install curl for health checks
+                      RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
                       
                       # Create non-root user (security best practice)
                       RUN useradd --create-home --shell /bin/bash app
@@ -218,8 +225,8 @@ spec:
                       # 12-Factor: Port binding
                       EXPOSE 8080
                       
-                      # Health check
-                      HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+                      # Health check with better error handling
+                      HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
                         CMD curl -f http://localhost:8080/health || exit 1
                       
                       # Start application
@@ -227,7 +234,7 @@ spec:
                       EOF
                       
                         # TDD Tests
-                        cat > tests/test_main.py << 'EOF'
+                        cat > tests/test_main.py << EOF
                       """TDD tests following CLAUDE.md principles"""
                       import pytest
                       from fastapi.testclient import TestClient
@@ -261,7 +268,7 @@ spec:
                       fi
                       
                       # Create service README
-                      cat > README.md << 'EOF'
+                      cat > README.md << EOF
                       # $SERVICE_NAME
                       
                       CLAUDE.md-compliant microservice with Onion Architecture and 12-Factor principles.

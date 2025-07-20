@@ -1355,7 +1355,7 @@ spec:
                                 - CreateNamespace=true
                       EOF
                       
-                      # Create GitOps update workflow
+                      # Create GitOps update workflow from template
                       cat > .github/workflows/deployment-update.yml << 'EOF'
                       name: GitOps Deployment Update
                       
@@ -1438,10 +1438,10 @@ spec:
                                   
                                   echo "📝 Updating $service to image: $NEW_IMAGE"
                                   
-                                  # Find OAM application file
+                                  # Find OAM application file - project-specific path
                                   OAM_FILE="oam/applications/${service}.yaml"
                                   if [ ! -f "$OAM_FILE" ]; then
-                                    # Try other possible locations
+                                    # Try other possible locations specific to this project
                                     OAM_FILE=$(find oam -name "*${service}*.yaml" | head -1)
                                   fi
                                   
@@ -1506,8 +1506,9 @@ spec:
                                 echo "**Source Commit:** \`${{ github.event.client_payload.source_commit }}\`" >> $GITHUB_STEP_SUMMARY
                                 echo "**Registry:** ${{ github.event.client_payload.registry }}" >> $GITHUB_STEP_SUMMARY
                                 echo "" >> $GITHUB_STEP_SUMMARY
-                                echo "🚀 **Next Steps:** ArgoCD will detect manifest changes and deploy to cluster"
-                      EOF                      
+                                echo "🚀 **Next Steps:** ArgoCD will detect manifest changes and deploy to cluster" >> $GITHUB_STEP_SUMMARY
+                      EOF
+                      
                       # Create README
                       cat > README.md << 'EOF'
                       # $APP_NAME GitOps Repository
