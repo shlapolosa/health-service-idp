@@ -196,6 +196,7 @@ spec:
       policy:
         fromFieldPath: Optional
   
+
   # Install Crossplane in vCluster
   - name: vcluster-crossplane-install
     base:
@@ -229,7 +230,7 @@ spec:
               - --enable-composition-revisions
               - --enable-environment-configs
         providerConfigRef:
-          name: vcluster-provider  # This will be created separately for each vCluster
+          name: default  # Use host cluster to install Crossplane in vCluster
     patches:
     - type: FromCompositeFieldPath
       fromFieldPath: spec.name
@@ -332,7 +333,7 @@ spec:
                                 type: string
                                 description: Git clone URL
         providerConfigRef:
-          name: vcluster-provider
+          name: default  # Use host cluster to install XRD in vCluster
     patches:
     - type: FromCompositeFieldPath
       fromFieldPath: spec.name
@@ -449,7 +450,7 @@ spec:
                                 type: string
                                 description: AWS API Gateway endpoint if exposeApi is true
         providerConfigRef:
-          name: vcluster-provider
+          name: default  # Use host cluster to install XRD in vCluster
     patches:
     - type: FromCompositeFieldPath
       fromFieldPath: spec.name
@@ -929,6 +930,43 @@ spec:
       - type: string
         string:
           fmt: "%s-kubeconfig-job"
+
+  # Create ProviderConfig for vCluster access (after kubeconfig is ready)
+  - name: vcluster-provider-config
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: kubernetes.crossplane.io/v1alpha1
+            kind: ProviderConfig
+            metadata:
+              name: vcluster-provider
+            spec:
+              credentials:
+                source: Secret
+                secretRef:
+                  namespace: crossplane-system
+                  name: placeholder-connection-secret
+                  key: kubeconfig
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-provider-config"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.spec.credentials.secretRef.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-vcluster-connection"
 
   # Optional Components - Istio Service Mesh
   - name: vcluster-istio
@@ -1721,7 +1759,7 @@ spec:
           name: kubeconfig
           type: Raw
         providerConfigRef:
-          name: vcluster-provider-config
+          name: vcluster-provider
     patches:
     - type: FromCompositeFieldPath
       fromFieldPath: spec.name
@@ -1795,7 +1833,7 @@ spec:
           name: kubeconfig
           type: Raw
         providerConfigRef:
-          name: vcluster-provider-config
+          name: vcluster-provider
     patches:
     - type: FromCompositeFieldPath
       fromFieldPath: spec.name
@@ -1844,7 +1882,7 @@ spec:
           name: kubeconfig
           type: Raw
         providerConfigRef:
-          name: vcluster-provider-config
+          name: vcluster-provider
     patches:
     - type: FromCompositeFieldPath
       fromFieldPath: spec.name
@@ -2056,7 +2094,7 @@ spec:
           name: kubeconfig
           type: Raw
         providerConfigRef:
-          name: vcluster-provider-config
+          name: vcluster-provider
     patches:
     - type: FromCompositeFieldPath
       fromFieldPath: spec.name

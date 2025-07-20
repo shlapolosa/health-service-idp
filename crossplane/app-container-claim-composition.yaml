@@ -618,7 +618,7 @@ spec:
                                 echo "Deployments payload: {$DEPLOYMENTS}"
                                 
                                 # Set up GitHub CLI authentication
-                                export GH_TOKEN="${{ secrets.PERSONAL_ACCESS_TOKEN }}"
+                                export GH_TOKEN="${{ github.token }}"
                                 
                                 echo "📤 Sending dispatch event using GitHub CLI..."
                                 

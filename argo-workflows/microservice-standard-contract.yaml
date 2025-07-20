@@ -207,6 +207,8 @@ spec:
             value: "{{inputs.parameters.slack-channel}}"
           - name: slack-user-id
             value: "{{inputs.parameters.slack-user-id}}"
+          - name: repository-name
+            value: "{{inputs.parameters.repository-name}}"
         when: "{{steps.validate-parameters.status}} == Succeeded"
     - - name: notify-appcontainer-ready
         templateRef:
@@ -465,6 +467,7 @@ spec:
       - name: user
       - name: slack-channel
       - name: slack-user-id
+      - name: repository-name
     outputs:
       parameters:
       - name: repository-name
@@ -583,8 +586,7 @@ spec:
           database: "{{inputs.parameters.microservice-database}}"
           cache: "{{inputs.parameters.microservice-cache}}"
           exposeApi: $EXPOSE_API
-          parentAppContainer: "$REPO_NAME"
-          microserviceFolder: "microservices/{{inputs.parameters.resource-name}}"
+          appContainer: "$REPO_NAME"
         EOF
         
         if [ $? -eq 0 ]; then

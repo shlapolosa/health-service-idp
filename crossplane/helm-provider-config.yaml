@@ -5,3 +5,11 @@ metadata:
 spec:
   credentials:
     source: InjectedIdentity
+---
+apiVersion: helm.crossplane.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: kubernetes-provider
+spec:
+  credentials:
+    source: InjectedIdentity

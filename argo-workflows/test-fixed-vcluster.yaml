@@ -1,0 +1,27 @@
+apiVersion: platform.example.org/v1alpha1
+kind: VClusterEnvironmentClaim
+metadata:
+  name: test-fixed-vcluster
+  namespace: default
+  annotations:
+    created-at: "2025-07-15T09:58:00Z"
+    description: "Test VCluster with fixed kubeconfig job"
+    parameter-contract: "compliant"
+  labels:
+    created-by: "kubeconfig-fix-test"
+    environment-tier: "development"
+    parameter-contract-version: "v1.0"
+    requested-by: "test.user"
+    resource-type: "vcluster"
+    vcluster-size: "medium"
+spec:
+  name: test-fixed-vcluster
+  components:
+    apiGateway: false
+    argoCD: true
+    grafana: false
+    istio: true
+    jaeger: false
+    kiali: false
+    knativeServing: true
+    prometheus: false

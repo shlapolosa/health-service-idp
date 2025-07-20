@@ -323,7 +323,7 @@ spec:
             type: Ready
             status: "True"
 
-    # 6. VCluster Provider Configuration
+    # 6. VCluster Provider Configuration (Kubernetes)
     - name: vcluster-provider-config
       base:
         apiVersion: kubernetes.crossplane.io/v1alpha1
@@ -356,7 +356,40 @@ spec:
             type: Ready
             status: "True"
 
-    # 7. Istio Installation
+    # 7. VCluster Helm Provider Configuration
+    - name: vcluster-helm-provider-config
+      base:
+        apiVersion: helm.crossplane.io/v1beta1
+        kind: ProviderConfig
+        spec:
+          credentials:
+            source: Secret
+            secretRef:
+              name: placeholder
+              namespace: crossplane-system
+              key: kubeconfig
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.name
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "%s-vcluster"
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.name
+          toFieldPath: spec.credentials.secretRef.name
+          transforms:
+            - type: string
+              string:
+                fmt: "%s-vcluster-connection"
+      readinessChecks:
+        - type: MatchCondition
+          matchCondition:
+            type: Ready
+            status: "True"
+
+    # 8. Istio Installation
     - name: vcluster-istio
       base:
         apiVersion: kubernetes.crossplane.io/v1alpha1
@@ -431,7 +464,7 @@ spec:
             type: Ready
             status: "True"
 
-    # 8. Knative Serving Installation
+    # 9. Knative Serving Installation
     - name: vcluster-knative-serving
       base:
         apiVersion: kubernetes.crossplane.io/v1alpha1
@@ -513,7 +546,7 @@ spec:
             type: Ready
             status: "True"
 
-    # 9. ArgoCD Installation
+    # 10. ArgoCD Installation
     - name: vcluster-argocd
       base:
         apiVersion: helm.crossplane.io/v1beta1
