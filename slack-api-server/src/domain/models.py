@@ -165,7 +165,7 @@ class AppContainerRequest:
     user: str
     slack_channel: str
     description: str = "CLAUDE.md-compliant application container"
-    github_org: str = "socrates12345"
+    github_org: str = "shlapolosa"
     docker_registry: str = "docker.io/socrates12345"
     enable_observability: bool = True
     enable_security: bool = True
@@ -250,7 +250,7 @@ class MicroserviceRequest:
     database: MicroserviceDatabase = MicroserviceDatabase.NONE
     cache: MicroserviceCache = MicroserviceCache.NONE
     description: str = "CLAUDE.md-compliant microservice"
-    github_org: str = "socrates12345"
+    github_org: str = "shlapolosa"
     docker_registry: str = "docker.io/socrates12345"
     enable_observability: bool = True
     enable_security: bool = True
@@ -350,7 +350,7 @@ class ParsedCommand:
     disabled_capabilities: List[Capability] = None
     # AppContainer specific fields
     description: Optional[str] = None
-    github_org: str = "socrates12345"
+    github_org: str = "shlapolosa"
     docker_registry: str = "docker.io/socrates12345"
     enable_observability: bool = True
     enable_security: bool = True
