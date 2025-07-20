@@ -289,7 +289,7 @@ spec:
                       echo "1.1" > .version
                       
                       # Copy the comprehensive GitOps workflow
-                      cat > .github/workflows/comprehensive-gitops.yml << 'EOF'
+                      cat > .github/workflows/comprehensive-gitops.yml << EOF
                       name: Comprehensive GitOps Pipeline
                       
                       on:
@@ -314,7 +314,7 @@ spec:
                       env:
                         REGISTRY: docker.io
                         REGISTRY_USERNAME: socrates12345
-                        GITOPS_REPO: {{APP_NAME}}-gitops
+                        GITOPS_REPO: $APP_NAME-gitops
                         GITOPS_BRANCH: main
                       
                       jobs:
@@ -828,7 +828,6 @@ spec:
                       EOF
                       
                       # Replace placeholders in workflow file
-                      sed -i "s/{{APP_NAME}}/$APP_NAME/g" .github/workflows/comprehensive-gitops.yml
                       
                       # Create shared library structure
                       cat > shared-libs/common/README.md << 'EOF'
