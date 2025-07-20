@@ -216,6 +216,49 @@ kubectl get clusterrole argo-cluster-role -o yaml | grep -A 5 secrets
 #     verbs: ["get", "list"]
 ```
 
+### Secrets Management
+
+The platform uses a `.env` file-based approach for secure secrets management:
+
+#### Setup Process
+```bash
+# 1. Copy the example file
+cp .env.example .env
+
+# 2. Edit .env with your actual values
+# GitHub credentials
+PERSONAL_ACCESS_TOKEN=your_github_token_here
+GITHUB_USERNAME=your_github_username
+
+# Docker Hub credentials  
+DOCKER_USERNAME=your_docker_username
+DOCKER_PASSWORD=your_docker_password
+
+# Slack credentials
+SLACK_SIGNING_SECRET=your_slack_signing_secret
+
+# 3. Apply secrets to cluster
+./setup-secrets.sh
+```
+
+#### Created Secrets
+The script creates three Kubernetes secrets:
+- **github-credentials**: GitHub API access for repository management
+- **docker-credentials**: Docker Hub authentication for container builds  
+- **slack-credentials**: Slack webhook signing secret
+
+#### Security Features
+- ✅ `.env` file is git-ignored to prevent accidental commits
+- ✅ Secrets are annotated to prevent ArgoCD management
+- ✅ Environment variable substitution from `.env` to YAML
+- ✅ Proper secret encryption for GitHub Actions integration
+
+#### GitHub Actions Integration
+Secrets are automatically encrypted and pushed to GitHub repositories:
+- `DOCKER_PASSWORD`: For container registry authentication
+- `PERSONAL_ACCESS_TOKEN`: For GitHub API operations (deprecated, use `github.token`)
+- `GITHUB_TOKEN`: Uses built-in GitHub token for GitOps dispatch
+
 ---
 
 ## 🔍 Current Status Detail

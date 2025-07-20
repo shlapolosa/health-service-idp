@@ -350,7 +350,7 @@ spec:
                                 
                                 if [ ! -z "$CHANGED_FILES" ]; then
                                   # Get service names
-                                  SERVICE_NAMES=$(echo "$CHANGED_FILES" | cut -d'/' -f1-2 | sort -u | grep '^microservices/' | cut -d'/' -f2)
+                                  SERVICE_NAMES=$(echo "$CHANGED_FILES" | cut -d'/' -f1-2 | sort -u | grep '^microservices/' | cut -d'/' -f2 | grep -v '^README' | grep -v '^\.md$')
                                   CHANGED_SERVICES=$(echo "$SERVICE_NAMES" | tr '\n' ',' | sed 's/,$//')
                                   
                                   # Create JSON array for matrix (simpler approach)
