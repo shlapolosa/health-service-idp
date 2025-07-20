@@ -335,9 +335,9 @@ spec:
                               id: changes
                               run: |
                                 # Get list of changed files
-                                if [ "${{ github.event_name }}" = "pull_request" ]; then
-                                  CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | grep -E '^microservices/' || true)
-                                elif [ "${{ github.event_name }}" = "schedule" ]; then
+                                if [ "\${{ github.event_name }}" = "pull_request" ]; then
+                                  CHANGED_FILES=$(git diff --name-only \${{ github.event.pull_request.base.sha }}..\${{ github.event.pull_request.head.sha }} | grep -E '^microservices/' || true)
+                                elif [ "\${{ github.event_name }}" = "schedule" ]; then
                                   # For scheduled runs, scan first few services
                                   CHANGED_FILES=$(find microservices -name "Dockerfile" -type f | head -3)
                                 else
@@ -371,7 +371,7 @@ spec:
                                 
                                 # Determine if we should deploy (only on main branch pushes)
                                 SHOULD_DEPLOY="false"
-                                if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+                                if [ "\${{ github.event_name }}" = "push" ] && [ "\${{ github.ref }}" = "refs/heads/main" ]; then
                                   SHOULD_DEPLOY="true"
                                 fi
                                 
@@ -397,18 +397,18 @@ spec:
                       
                             - name: Build image for scanning
                               run: |
-                                echo "🔍 Building ${{ matrix.service }} for security scanning..."
+                                echo "🔍 Building \${{ matrix.service }} for security scanning..."
                                 
                                 # Determine correct build context and dockerfile
-                                if [[ "${{ matrix.service }}" == "orchestration-service" ]]; then
+                                if [[ "\${{ matrix.service }}" == "orchestration-service" ]]; then
                                   BUILD_CONTEXT="./microservices"
                                   DOCKERFILE_PATH="-f orchestration-service/Dockerfile"
                                 else
-                                  BUILD_CONTEXT="./microservices/${{ matrix.service }}"
+                                  BUILD_CONTEXT="./microservices/\${{ matrix.service }}"
                                   DOCKERFILE_PATH=""
                                 fi
                                 
-                                docker build -t local-scan/${{ matrix.service }}:latest $DOCKERFILE_PATH "$BUILD_CONTEXT"
+                                docker build -t local-scan/\${{ matrix.service }}:latest $DOCKERFILE_PATH "$BUILD_CONTEXT"
                       
                             - name: Run Trivy vulnerability scanner
                               uses: aquasecurity/trivy-action@master
@@ -478,7 +478,7 @@ spec:
                                 # Make version manager executable
                                 chmod +x .github/scripts/version-manager.sh
                                 
-                                IFS=',' read -ra SERVICES <<< "${{ needs.detect-changes.outputs.changed-services }}"
+                                IFS=',' read -ra SERVICES <<< "\${{ needs.detect-changes.outputs.changed-services }}"
                                 VERSION_INFO=""
                                 
                                 for service in "${SERVICES[@]}"; do
@@ -487,7 +487,7 @@ spec:
                                     
                                     # Generate semantic version and tags
                                     SEMVER=$(.github/scripts/version-manager.sh version "$service")
-                                    CONTAINER_TAGS=$(.github/scripts/version-manager.sh tags "$service" "${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}")
+                                    CONTAINER_TAGS=$(.github/scripts/version-manager.sh tags "$service" "\${{ env.REGISTRY }}/\${{ env.REGISTRY_USERNAME }}")
                                     
                                     echo "Service: $service, Version: $SEMVER"
                                     echo "Container tags: $CONTAINER_TAGS"
@@ -513,7 +513,7 @@ spec:
                               run: |
                                 chmod +x .github/scripts/version-manager.sh
                                 
-                                IFS=',' read -ra SERVICES <<< "${{ needs.detect-changes.outputs.changed-services }}"
+                                IFS=',' read -ra SERVICES <<< "\${{ needs.detect-changes.outputs.changed-services }}"
                                 
                                 for service in "${SERVICES[@]}"; do
                                   if [ -f "microservices/$service/Dockerfile" ]; then
@@ -521,7 +521,7 @@ spec:
                                     
                                     # Generate semantic version and all tags
                                     SEMVER=$(.github/scripts/version-manager.sh version "$service")
-                                    CONTAINER_TAGS=$(.github/scripts/version-manager.sh tags "$service" "${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}")
+                                    CONTAINER_TAGS=$(.github/scripts/version-manager.sh tags "$service" "\${{ env.REGISTRY }}/\${{ env.REGISTRY_USERNAME }}")
                                     COMMIT_SHA="${GITHUB_SHA:0:7}"
                                     
                                     echo "🏷️ Service: $service"
@@ -529,7 +529,7 @@ spec:
                                     echo "🔖 All Tags: $CONTAINER_TAGS"
                                     
                                     # Build primary image with rich metadata
-                                    PRIMARY_TAG="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/$service:$COMMIT_SHA"
+                                    PRIMARY_TAG="\${{ env.REGISTRY }}/\${{ env.REGISTRY_USERNAME }}/$service:$COMMIT_SHA"
                                     
                                     # Determine correct build context and dockerfile
                                     if [[ "$service" == "orchestration-service" ]]; then
@@ -546,19 +546,19 @@ spec:
                                       --build-arg BUILD_COMMIT="$COMMIT_SHA" \
                                       --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
                                       --label "org.opencontainers.image.version=$SEMVER" \
-                                      --label "org.opencontainers.image.revision=${{ github.sha }}" \
-                                      --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
+                                      --label "org.opencontainers.image.revision=\${{ github.sha }}" \
+                                      --label "org.opencontainers.image.source=\${{ github.server_url }}/\${{ github.repository }}" \
                                       --label "org.opencontainers.image.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
                                       --label "org.opencontainers.image.title=$service" \
                                       --label "org.opencontainers.image.description=AppContainer Service - $service" \
                                       --label "version=$SEMVER" \
-                                      --label "commit=${{ github.sha }}" \
+                                      --label "commit=\${{ github.sha }}" \
                                       --label "commit-short=$COMMIT_SHA" \
-                                      --label "branch=${{ github.ref_name }}" \
+                                      --label "branch=\${{ github.ref_name }}" \
                                       --label "service=$service" \
                                       --label "build-date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-                                      --label "build-number=${{ github.run_number }}" \
-                                      --label "workflow-run=${{ github.run_id }}" \
+                                      --label "build-number=\${{ github.run_number }}" \
+                                      --label "workflow-run=\${{ github.run_id }}" \
                                       "$BUILD_CONTEXT"
                                     
                                     # Create all semantic version tags
@@ -592,9 +592,9 @@ spec:
                                 echo "🚀 Triggering GitOps repository update via dispatch event..."
                                 
                                 # Prepare deployment data
-                                SERVICES="${{ needs.detect-changes.outputs.changed-services }}"
-                                VERSION_INFO="${{ needs.semantic-versioning.outputs.version-info }}"
-                                SOURCE_COMMIT="${{ github.sha }}"
+                                SERVICES="\${{ needs.detect-changes.outputs.changed-services }}"
+                                VERSION_INFO="\${{ needs.semantic-versioning.outputs.version-info }}"
+                                SOURCE_COMMIT="\${{ github.sha }}"
                                 COMMIT_SHA="${GITHUB_SHA:0:7}"
                                 
                                 echo "Services to update: $SERVICES"
@@ -606,7 +606,7 @@ spec:
                                 
                                 DEPLOYMENTS=""
                                 for service in "${SERVICE_ARRAY[@]}"; do
-                                  NEW_IMAGE="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/$service:$COMMIT_SHA"
+                                  NEW_IMAGE="\${{ env.REGISTRY }}/\${{ env.REGISTRY_USERNAME }}/$service:$COMMIT_SHA"
                                   
                                   if [ -z "$DEPLOYMENTS" ]; then
                                     DEPLOYMENTS="\"$service\": {\"image\": \"$NEW_IMAGE\", \"commit\": \"$COMMIT_SHA\"}"
@@ -618,20 +618,20 @@ spec:
                                 echo "Deployments payload: {$DEPLOYMENTS}"
                                 
                                 # Set up GitHub CLI authentication
-                                export GH_TOKEN="${{ github.token }}"
+                                export GH_TOKEN="\${{ github.token }}"
                                 
                                 echo "📤 Sending dispatch event using GitHub CLI..."
                                 
                                 # Trigger repository dispatch using GitHub CLI with proper JSON formatting
-                                if gh api repos/${{ env.REGISTRY_USERNAME }}/${{ env.GITOPS_REPO }}/dispatches \
+                                if gh api repos/\${{ github.repository_owner }}/\${{ env.GITOPS_REPO }}/dispatches \
                                   --method POST \
                                   --field event_type=update-deployments \
                                   --field client_payload[services]="$SERVICES" \
                                   --field client_payload[version_info]="$VERSION_INFO" \
                                   --field client_payload[source_commit]="$SOURCE_COMMIT" \
-                                  --field client_payload[registry]="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}" \
-                                  --field client_payload[branch]="${{ github.ref_name }}" \
-                                  --field client_payload[workflow_run]="${{ github.run_id }}" \
+                                  --field client_payload[registry]="\${{ env.REGISTRY }}/\${{ env.REGISTRY_USERNAME }}" \
+                                  --field client_payload[branch]="\${{ github.ref_name }}" \
+                                  --field client_payload[workflow_run]="\${{ github.run_id }}" \
                                   --raw-field client_payload[deployments]="{$DEPLOYMENTS}"; then
                                   echo "✅ GitOps repository dispatch event sent successfully!"
                                   echo "🔗 GitOps repository will handle the manifest updates"
@@ -640,19 +640,19 @@ spec:
                                   echo "Trying simplified dispatch approach..."
                                   
                                   # Fallback: Simplified dispatch with just essential data
-                                  if gh api repos/${{ env.REGISTRY_USERNAME }}/${{ env.GITOPS_REPO }}/dispatches \
+                                  if gh api repos/\${{ github.repository_owner }}/\${{ env.GITOPS_REPO }}/dispatches \
                                     --method POST \
                                     --field event_type=simple-update \
                                     --field client_payload[services]="$SERVICES" \
                                     --field client_payload[source_commit]="$SOURCE_COMMIT" \
                                     --field client_payload[commit_sha]="${COMMIT_SHA}" \
-                                    --field client_payload[registry]="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}"; then
+                                    --field client_payload[registry]="\${{ env.REGISTRY }}/\${{ env.REGISTRY_USERNAME }}"; then
                                     echo "✅ Simplified dispatch sent successfully!"
                                   else
                                     echo "❌ All dispatch methods failed"
                                     echo "Manual GitOps update required:"
                                     echo "  Services: $SERVICES"
-                                    echo "  Images: ${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/[service]:$COMMIT_SHA"
+                                    echo "  Images: \${{ env.REGISTRY }}/\${{ env.REGISTRY_USERNAME }}/[service]:$COMMIT_SHA"
                                     exit 1
                                   fi
                                 fi
@@ -672,16 +672,16 @@ spec:
                                 echo "- **Dependency Check**: ${{ needs.dependency-check.result }}" >> $GITHUB_STEP_SUMMARY
                                 echo "" >> $GITHUB_STEP_SUMMARY
                                 echo "### 🏗️ Build & Deploy" >> $GITHUB_STEP_SUMMARY
-                                echo "- **Changed Services**: ${{ needs.detect-changes.outputs.changed-services }}" >> $GITHUB_STEP_SUMMARY
+                                echo "- **Changed Services**: \${{ needs.detect-changes.outputs.changed-services }}" >> $GITHUB_STEP_SUMMARY
                                 echo "- **Semantic Versioning**: ${{ needs.semantic-versioning.result }}" >> $GITHUB_STEP_SUMMARY
                                 echo "- **GitOps Update**: ${{ needs.trigger-gitops-update.result }}" >> $GITHUB_STEP_SUMMARY
                                 echo "- **Version Info**: ${{ needs.semantic-versioning.outputs.version-info }}" >> $GITHUB_STEP_SUMMARY
                                 echo "" >> $GITHUB_STEP_SUMMARY
                                 echo "### 📋 Pipeline Details" >> $GITHUB_STEP_SUMMARY
-                                echo "- **Source Commit**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
-                                echo "- **Branch**: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
-                                echo "- **Build Number**: \`${{ github.run_number }}\`" >> $GITHUB_STEP_SUMMARY
-                                echo "- **GitOps Repo**: [${{ env.GITOPS_REPO }}](https://github.com/${{ env.REGISTRY_USERNAME }}/${{ env.GITOPS_REPO }})" >> $GITHUB_STEP_SUMMARY
+                                echo "- **Source Commit**: \`\${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+                                echo "- **Branch**: \`\${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+                                echo "- **Build Number**: \`\${{ github.run_number }}\`" >> $GITHUB_STEP_SUMMARY
+                                echo "- **GitOps Repo**: [\${{ env.GITOPS_REPO }}](https://github.com/\${{ github.repository_owner }}/\${{ env.GITOPS_REPO }})" >> $GITHUB_STEP_SUMMARY
                                 echo "" >> $GITHUB_STEP_SUMMARY
                                 echo "🎯 **Pipeline Status**: Security → Build → GitOps → Complete!"
                       
@@ -749,7 +749,7 @@ spec:
                                                 \"type\": \"plain_text\",
                                                 \"text\": \"GitOps Repository\"
                                               },
-                                              \"url\": \"https://github.com/${{ env.REGISTRY_USERNAME }}/${{ env.GITOPS_REPO }}\"
+                                              \"url\": \"https://github.com/${{ github.repository_owner }}/${{ env.GITOPS_REPO }}\"
                                             }
                                           ]
                                         }
