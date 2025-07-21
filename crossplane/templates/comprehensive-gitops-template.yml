@@ -93,9 +93,11 @@ jobs:
             fi
           fi
           
-          # Determine if we should deploy (only on main branch pushes)
+          # Determine if we should deploy (main branch pushes or manual runs)
           SHOULD_DEPLOY="false"
           if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            SHOULD_DEPLOY="true"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             SHOULD_DEPLOY="true"
           fi
           
