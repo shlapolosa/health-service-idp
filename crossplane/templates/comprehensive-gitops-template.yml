@@ -12,6 +12,8 @@ on:
   schedule:
     # Run security scans daily at 2 AM UTC
     - cron: '0 2 * * *'
+  workflow_dispatch:
+    # Enable manual workflow runs
 
 permissions:
   contents: read
@@ -46,8 +48,11 @@ jobs:
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | grep -E '^microservices/' || true)
           elif [ "${{ github.event_name }}" = "schedule" ]; then
-            # For scheduled runs, scan first few services
+            # For scheduled runs, scan all services with Dockerfiles
             CHANGED_FILES=$(find microservices -name "Dockerfile" -type f | head -3)
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # For manual runs, scan all services
+            CHANGED_FILES=$(find microservices -type d -mindepth 1 -maxdepth 1 ! -name "README*" | head -5)
           else
             # For push events, check if we have previous commits
             COMMIT_COUNT=$(git rev-list --count HEAD)
@@ -55,7 +60,7 @@ jobs:
               CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -E '^microservices/' || true)
             else
               # First commit - check all microservices
-              CHANGED_FILES=$(find microservices -name "Dockerfile" -type f || true)
+              CHANGED_FILES=$(find microservices -type d -mindepth 1 -maxdepth 1 ! -name "README*" || true)
             fi
           fi
           
