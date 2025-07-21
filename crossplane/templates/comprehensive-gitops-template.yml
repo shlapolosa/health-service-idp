@@ -22,7 +22,7 @@ permissions:
 env:
   REGISTRY: docker.io
   REGISTRY_USERNAME: socrates12345
-  GITOPS_REPO: $APP_NAME-gitops
+  GITOPS_REPO: APP_NAME_PLACEHOLDER-gitops
   GITOPS_BRANCH: main
 
 jobs:

@@ -301,7 +301,7 @@ spec:
                       env:
                         REGISTRY: docker.io
                         REGISTRY_USERNAME: socrates12345
-                        GITOPS_REPO: $APP_NAME-gitops
+                        GITOPS_REPO: APP_NAME_PLACEHOLDER-gitops
                       jobs:
                         minimal-deploy:
                           runs-on: ubuntu-latest
@@ -312,8 +312,8 @@ spec:
                       FALLBACK_EOF
                       }
                       
-                      # Substitute app name in the workflow
-                      sed -i "s/\$APP_NAME/$APP_NAME/g" .github/workflows/comprehensive-gitops.yml
+                      # Substitute app name in the workflow  
+                      sed -i "s/APP_NAME_PLACEHOLDER/$APP_NAME/g" .github/workflows/comprehensive-gitops.yml
                       
                       # Replace placeholders in workflow file
                       
