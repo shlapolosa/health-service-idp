@@ -344,7 +344,7 @@ jobs:
           echo "Deployments payload: {$DEPLOYMENTS}"
           
           # Set up GitHub CLI authentication
-          export GH_TOKEN="${{ github.token }}"
+          export GH_TOKEN="${{ secrets.PERSONAL_ACCESS_TOKEN }}"
           
           echo "📤 Sending dispatch event using GitHub CLI..."
           
