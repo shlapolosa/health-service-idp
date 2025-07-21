@@ -49,20 +49,31 @@ jobs:
             # For scheduled runs, scan first few services
             CHANGED_FILES=$(find microservices -name "Dockerfile" -type f | head -3)
           else
-            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -E '^microservices/' || true)
+            # For push events, check if we have previous commits
+            COMMIT_COUNT=$(git rev-list --count HEAD)
+            if [ "$COMMIT_COUNT" -gt 1 ]; then
+              CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -E '^microservices/' || true)
+            else
+              # First commit - check all microservices
+              CHANGED_FILES=$(find microservices -name "Dockerfile" -type f || true)
+            fi
           fi
+          
+          echo "Debug: CHANGED_FILES=$CHANGED_FILES"
           
           # Extract unique service directories
           CHANGED_SERVICES=""
           CHANGED_SERVICES_JSON="[]"
           
           if [ ! -z "$CHANGED_FILES" ]; then
-            # Get service names
-            SERVICE_NAMES=$(echo "$CHANGED_FILES" | cut -d'/' -f1-2 | sort -u | grep '^microservices/' | cut -d'/' -f2 | grep -v '^README' | grep -v '^\.md$')
-            CHANGED_SERVICES=$(echo "$SERVICE_NAMES" | tr '\n' ',' | sed 's/,$//')
+            # Get service names - fix the filtering
+            SERVICE_NAMES=$(echo "$CHANGED_FILES" | sed 's|^microservices/||' | cut -d'/' -f1 | sort -u | grep -v '^README' | grep -v '\.md$' || true)
+            echo "Debug: SERVICE_NAMES=$SERVICE_NAMES"
             
-            # Create JSON array for matrix (simpler approach)
             if [ ! -z "$SERVICE_NAMES" ]; then
+              CHANGED_SERVICES=$(echo "$SERVICE_NAMES" | tr '\n' ',' | sed 's/,$//')
+              
+              # Create JSON array for matrix (simpler approach)
               CHANGED_SERVICES_JSON="["
               FIRST=true
               for service in $SERVICE_NAMES; do
