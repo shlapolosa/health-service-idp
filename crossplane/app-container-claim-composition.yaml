@@ -289,27 +289,27 @@ spec:
                       echo "1.1" > .version
                       
                       # Copy the comprehensive GitOps workflow from template
-                      wget -q -O .github/workflows/comprehensive-gitops.yml https://raw.githubusercontent.com/socrates12345/health-service-idp/main/crossplane/templates/comprehensive-gitops-template.yml || {
+                      wget -q -O .github/workflows/comprehensive-gitops.yml https://raw.githubusercontent.com/shlapolosa/health-service-idp/main/crossplane/templates/comprehensive-gitops-template.yml || {
                         echo "Failed to download workflow template, using fallback..."
                         # Fallback: minimal workflow if template download fails
-                        cat > .github/workflows/comprehensive-gitops.yml << 'EOF'
-name: Comprehensive GitOps Pipeline
-on:
-  push:
-    branches: [ main ]
-    paths: [ 'microservices/**' ]
-env:
-  REGISTRY: docker.io
-  REGISTRY_USERNAME: socrates12345
-  GITOPS_REPO: $APP_NAME-gitops
-jobs:
-  minimal-deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build and deploy
-        run: echo "Minimal deployment pipeline activated"
-EOF
+                        cat > .github/workflows/comprehensive-gitops.yml << 'FALLBACK_EOF'
+                      name: Comprehensive GitOps Pipeline
+                      on:
+                        push:
+                          branches: [ main ]
+                          paths: [ 'microservices/**' ]
+                      env:
+                        REGISTRY: docker.io
+                        REGISTRY_USERNAME: socrates12345
+                        GITOPS_REPO: $APP_NAME-gitops
+                      jobs:
+                        minimal-deploy:
+                          runs-on: ubuntu-latest
+                          steps:
+                            - uses: actions/checkout@v4
+                            - name: Build and deploy
+                              run: echo "Minimal deployment pipeline activated"
+                      FALLBACK_EOF
                       }
                       
                       # Substitute app name in the workflow
