@@ -127,7 +127,7 @@ spec:
                   - name: source-repo-setup
                     image: alpine/git:latest
                     command:
-                    - /bin/bash
+                    - /bin/sh
                     - -c
                     - |
                       set -e
@@ -523,7 +523,7 @@ spec:
                   - name: gitops-repo-setup
                     image: alpine/git:latest
                     command:
-                    - /bin/bash
+                    - /bin/sh
                     - -c
                     - |
                       set -e
@@ -1127,7 +1127,7 @@ spec:
                   - name: setup
                     image: python:3.11-slim
                     command:
-                    - /bin/bash
+                    - /bin/sh
                     - -c
                     - |
                       # Install required packages
