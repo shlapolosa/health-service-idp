@@ -318,7 +318,7 @@ spec:
                       # Replace placeholders in workflow file
                       
                       # Create shared library structure
-                      cat > shared-libs/common/README.md << 'EOF'
+                      cat > shared-libs/common/README.md << EOF
                       # Common Shared Library
                       
                       This directory contains shared code and utilities used across all microservices in this app container.
@@ -330,7 +330,7 @@ spec:
                       EOF
                       
                       # Create microservices README
-                      cat > microservices/README.md << 'EOF'
+                      cat > microservices/README.md << EOF
                       # Microservices
                       
                       This directory contains all microservices for the application container.
@@ -360,7 +360,7 @@ spec:
                       EOF
                       
                       # Create main README
-                      cat > README.md << 'EOF'
+                      cat > README.md << EOF
                       # $APP_NAME Application Container
                       
                       CLAUDE.md-compliant microservices application container with GitOps deployment.
@@ -550,7 +550,7 @@ spec:
                       mkdir -p manifests
                       mkdir -p .github/workflows
                       
-                      # Create blank OAM Application template
+                      # Create minimal working OAM Application template
                       cat > oam/applications/application.yaml << EOF
                       apiVersion: core.oam.dev/v1beta1
                       kind: Application
@@ -559,77 +559,32 @@ spec:
                         namespace: $APP_NAME
                       spec:
                         components: []
-                        # Add your components here using the following types:
-                        # - microservice-with-db: Full-featured microservice with database and cache
-                        # - react-frontend: React TypeScript frontend with Material-UI
-                        # - static-site: Static website hosting
-                        # - kafka-service: Event streaming service
-                        # - data-pipeline: ETL and data processing workflows
+                        # This is a minimal working OAM Application
+                        # Add your components here using standard KubeVela component types:
+                        # - webservice: Basic web service
+                        # - worker: Background worker
+                        # - task: One-time task
                         # 
                         # Example:
                         # components:
                         # - name: api-backend
-                        #   type: microservice-with-db
+                        #   type: webservice
                         #   properties:
-                        #     language: python
-                        #     framework: fastapi
-                        #     database: postgres
-                        #     cache: redis
-                        #     exposeApi: true
-                        # - name: web-frontend
-                        #   type: react-frontend
+                        #     image: docker.io/socrates12345/api-backend:latest
+                        #     ports:
+                        #     - port: 8080
+                        #       expose: true
+                        # - name: web-frontend  
+                        #   type: webservice
                         #   properties:
-                        #     framework: react
-                        #     styling: material-ui
-                        #     apiEndpoint: /api
-                        
-                        # Workflow configuration for proper component ordering
-                        workflow:
-                          steps:
-                          - name: provision-infrastructure
-                            type: create-crossplane-claims
-                            timeout: 15m
-                          - name: wait-for-infrastructure
-                            type: wait-for-claims
-                            timeout: 10m
-                            dependsOn: ["provision-infrastructure"]
-                          - name: deploy-applications
-                            type: create-crossplane-claims
-                            timeout: 10m
-                            dependsOn: ["wait-for-infrastructure"]
-                          - name: validate-deployment
-                            type: wait-for-claims
-                            timeout: 5m
-                            dependsOn: ["deploy-applications"]
-                          
-                          # Failure handling
-                          onFailure:
-                            steps:
-                            - name: cleanup-resources
-                              type: cleanup-failed-claims
-                              timeout: 5m
-                        
-                        # Policies for execution order
-                        policies:
-                        - name: execution-order
-                          type: crossplane-execution-order
-                          properties:
-                            phases: ["infrastructure", "application"]
-                            phaseDelay: "30s"
-                            parallelWithinPhase: true
-                        
-                        # Traits for automatic workflow execution
-                        traits:
-                        - type: crossplane-workflow
-                          properties:
-                            enabled: true
-                            timeout: "30m"
-                            retries: 3
-                            cleanupOnFailure: true
+                        #     image: docker.io/socrates12345/web-frontend:latest
+                        #     ports:
+                        #     - port: 8080
+                        #       expose: true
                       EOF
                       
                       # Create workflow templates directory
-                      cat > oam/workflows/README.md << 'EOF'
+                      cat > oam/workflows/README.md << EOF
                       # OAM Workflows
                       
                       This directory contains KubeVela workflow definitions for managing application lifecycle.
@@ -653,7 +608,7 @@ spec:
                       EOF
                       
                       # Create components directory with examples
-                      cat > oam/components/README.md << 'EOF'
+                      cat > oam/components/README.md << EOF
                       # OAM Components
                       
                       This directory contains generated OAM Component definitions created by ApplicationClaims.
