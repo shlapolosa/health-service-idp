@@ -551,7 +551,7 @@ spec:
                       mkdir -p .github/workflows
                       
                       # Create blank OAM Application template
-                      cat > oam/applications/application.yaml << 'EOF'
+                      cat > oam/applications/application.yaml << EOF
                       apiVersion: core.oam.dev/v1beta1
                       kind: Application
                       metadata:
@@ -702,7 +702,7 @@ spec:
                       EOF
                       
                       # Create OAM Application ArgoCD Application
-                      cat > apps/oam-application.yaml << 'EOF'
+                      cat > apps/oam-application.yaml << EOF
                       apiVersion: argoproj.io/v1alpha1
                       kind: Application
                       metadata:
@@ -744,7 +744,7 @@ spec:
                       EOF
                       
                       # Create ApplicationSet for generated components
-                      cat > apps/oam-components.yaml << 'EOF'
+                      cat > apps/oam-components.yaml << EOF
                       apiVersion: argoproj.io/v1alpha1
                       kind: ApplicationSet
                       metadata:
@@ -782,7 +782,7 @@ spec:
                       EOF
                       
                       # Create App of Apps ArgoCD Application
-                      cat > apps/app-of-apps.yaml << 'EOF'
+                      cat > apps/app-of-apps.yaml << EOF
                       apiVersion: argoproj.io/v1alpha1
                       kind: Application
                       metadata:
@@ -809,7 +809,7 @@ spec:
                       
                       # Create ApplicationSet for microservices
                       mkdir -p apps/environments/production
-                      cat > apps/environments/production/applicationset.yaml << 'EOF'
+                      cat > apps/environments/production/applicationset.yaml << EOF
                       apiVersion: argoproj.io/v1alpha1
                       kind: ApplicationSet
                       metadata:
@@ -843,7 +843,7 @@ spec:
                       EOF
                       
                       # Create GitOps update workflow from template
-                      cat > .github/workflows/deployment-update.yml << 'EOF'
+                      cat > .github/workflows/deployment-update.yml << EOF
                       name: GitOps Deployment Update
                       
                       on:
@@ -997,7 +997,7 @@ spec:
                       EOF
                       
                       # Create README
-                      cat > README.md << 'EOF'
+                      cat > README.md << EOF
                       # $APP_NAME GitOps Repository
                       
                       This repository contains the GitOps deployment manifests for the $APP_NAME application container.
