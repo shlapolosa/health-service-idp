@@ -141,3 +141,113 @@ spec:
           timeout?: *"15m" | string
           retryPolicy?: *"OnFailure" | string
         }
+
+---
+# 2. Wait for Claims WorkflowStepDefinition
+apiVersion: core.oam.dev/v1beta1
+kind: WorkflowStepDefinition
+metadata:
+  name: wait-for-claims
+  namespace: vela-system
+  annotations:
+    definition.oam.dev/description: "Waits for Crossplane Claims to be Ready before proceeding"
+spec:
+  schematic:
+    cue:
+      template: |
+        import (
+          "vela/op"
+          "time"
+        )
+        
+        // Wait for ApplicationClaims to be Ready
+        applicationClaims: op.#List & {
+          resource: {
+            apiVersion: "platform.example.org/v1alpha1"
+            kind: "ApplicationClaim"
+          }
+          filter: {
+            namespace: context.namespace
+            matchingLabels: {
+              "oam.dev/application": context.name
+            }
+          }
+        }
+        
+        // Wait for VClusterEnvironmentClaims to be Ready
+        vclusterClaims: op.#List & {
+          resource: {
+            apiVersion: "platform.example.org/v1alpha1"
+            kind: "VClusterEnvironmentClaim"
+          }
+          filter: {
+            namespace: context.namespace
+            matchingLabels: {
+              "oam.dev/application": context.name
+            }
+          }
+        }
+        
+        // Wait for AppContainerClaims to be Ready
+        appContainerClaims: op.#List & {
+          resource: {
+            apiVersion: "platform.example.org/v1alpha1"
+            kind: "AppContainerClaim"
+          }
+          filter: {
+            namespace: context.namespace
+            matchingLabels: {
+              "oam.dev/application": context.name
+            }
+          }
+        }
+        
+        // Check readiness of ApplicationClaims
+        if applicationClaims.list != _|_ && len(applicationClaims.list.items) > 0 {
+          for i, claim in applicationClaims.list.items {
+            "wait-application-claim-\(i)": op.#ConditionalWait & {
+              continue: claim.status != _|_ && 
+                       claim.status.conditions != _|_ &&
+                       [for cond in claim.status.conditions 
+                        if cond.type == "Ready" { cond.status }][0] == "True"
+            }
+          }
+        }
+        
+        // Check readiness of VClusterEnvironmentClaims
+        if vclusterClaims.list != _|_ && len(vclusterClaims.list.items) > 0 {
+          for i, claim in vclusterClaims.list.items {
+            "wait-vcluster-claim-\(i)": op.#ConditionalWait & {
+              continue: claim.status != _|_ && 
+                       claim.status.conditions != _|_ &&
+                       [for cond in claim.status.conditions 
+                        if cond.type == "Ready" { cond.status }][0] == "True"
+            }
+          }
+        }
+        
+        // Check readiness of AppContainerClaims
+        if appContainerClaims.list != _|_ && len(appContainerClaims.list.items) > 0 {
+          for i, claim in appContainerClaims.list.items {
+            "wait-app-container-claim-\(i)": op.#ConditionalWait & {
+              continue: claim.status != _|_ && 
+                       claim.status.conditions != _|_ &&
+                       [for cond in claim.status.conditions 
+                        if cond.type == "Ready" { cond.status }][0] == "True"
+            }
+          }
+        }
+        
+        // Calculate total claims being waited for
+        totalClaims: len(applicationClaims.list.items) + 
+                    len(vclusterClaims.list.items) + 
+                    len(appContainerClaims.list.items)
+        
+        message: "Waiting for \(totalClaims) Crossplane Claims to be Ready"
+        
+        parameter: {
+          // Wait timeout - how long to wait for claims to be ready
+          timeout?: *"10m" | string
+          // Check interval - how often to check claim status
+          interval?: *"30s" | string
+        }
