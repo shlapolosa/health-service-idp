@@ -1,0 +1,260 @@
+# Policy and Trait Definitions for OAM → Crossplane Orchestration
+# These provide additional orchestration capabilities for workflow management
+
+---
+# 1. Crossplane Execution Order PolicyDefinition
+apiVersion: core.oam.dev/v1beta1
+kind: PolicyDefinition
+metadata:
+  name: crossplane-execution-order
+  namespace: vela-system
+  annotations:
+    definition.oam.dev/description: "Manages execution order and phases for Crossplane resource provisioning"
+spec:
+  schematic:
+    cue:
+      template: |
+        output: {
+          // Apply execution order policies to the workflow
+          apiVersion: "core.oam.dev/v1alpha1"
+          kind: "ExecutionOrderPolicy"
+          spec: {
+            phases: parameter.phases
+            phaseDelay: parameter.phaseDelay
+            parallelWithinPhase: parameter.parallelWithinPhase
+            
+            // Define phase priorities and dependencies
+            phaseConfig: {
+              if "infrastructure" in parameter.phases {
+                infrastructure: {
+                  priority: 100
+                  timeout: "20m"
+                  dependencies: []
+                  parallelExecution: parameter.parallelWithinPhase
+                }
+              }
+              
+              if "application" in parameter.phases {
+                application: {
+                  priority: 50
+                  timeout: "15m" 
+                  dependencies: ["infrastructure"]
+                  parallelExecution: parameter.parallelWithinPhase
+                }
+              }
+              
+              if "configuration" in parameter.phases {
+                configuration: {
+                  priority: 25
+                  timeout: "10m"
+                  dependencies: ["application"]
+                  parallelExecution: parameter.parallelWithinPhase
+                }
+              }
+            }
+            
+            // Failure handling strategy
+            onPhaseFailure: {
+              strategy: "halt"  // halt, continue, or retry
+              retryAttempts: 3
+              retryDelay: parameter.phaseDelay
+              cleanupOnFailure: true
+            }
+          }
+        }
+        
+        parameter: {
+          // List of execution phases in order
+          phases: *["infrastructure", "application"] | [...string]
+          // Delay between phases
+          phaseDelay: *"30s" | string
+          // Allow parallel execution within each phase
+          parallelWithinPhase: *true | bool
+        }
+
+---
+# 2. Health Policy Definition
+apiVersion: core.oam.dev/v1beta1
+kind: PolicyDefinition
+metadata:
+  name: health
+  namespace: vela-system
+  annotations:
+    definition.oam.dev/description: "Advanced health checking policy for Crossplane resources"
+spec:
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "core.oam.dev/v1alpha1"
+          kind: "HealthPolicy"
+          spec: {
+            probeTimeout: parameter.probeTimeout
+            probeInterval: parameter.probeInterval
+            
+            // Health check configurations for different resource types
+            healthChecks: {
+              applicationClaims: {
+                enabled: true
+                conditions: ["Ready"]
+                timeout: "10m"
+                retries: 5
+              }
+              
+              vclusterClaims: {
+                enabled: true
+                conditions: ["Ready", "Available"]
+                timeout: "15m"
+                retries: 3
+              }
+              
+              appContainerClaims: {
+                enabled: true
+                conditions: ["Ready"]
+                timeout: "20m"
+                retries: 2
+              }
+            }
+            
+            // Actions on health check results
+            onHealthy: {
+              continueWorkflow: true
+              logLevel: "info"
+            }
+            
+            onUnhealthy: {
+              action: parameter.unhealthyAction
+              maxUnhealthyDuration: parameter.maxUnhealthyDuration
+              alerting: {
+                enabled: parameter.enableAlerting
+                severity: "warning"
+              }
+            }
+            
+            onFailed: {
+              action: parameter.failedAction
+              cleanup: parameter.cleanupOnFailure
+              alerting: {
+                enabled: parameter.enableAlerting
+                severity: "critical"
+              }
+            }
+          }
+        }
+        
+        parameter: {
+          // Health probe timeout
+          probeTimeout: *10 | int
+          // Health probe interval in seconds
+          probeInterval: *30 | int
+          // Action when resource is unhealthy: wait, retry, fail
+          unhealthyAction: *"wait" | string
+          // Action when resource fails: cleanup, alert, halt
+          failedAction: *"cleanup" | string
+          // Maximum duration to remain unhealthy before failing
+          maxUnhealthyDuration: *"5m" | string
+          // Enable alerting on health issues
+          enableAlerting: *false | bool
+          // Cleanup resources on failure
+          cleanupOnFailure: *true | bool
+        }
+
+---
+# 3. Crossplane Workflow TraitDefinition
+apiVersion: core.oam.dev/v1beta1
+kind: TraitDefinition
+metadata:
+  name: crossplane-workflow
+  namespace: vela-system
+  annotations:
+    definition.oam.dev/description: "Enables workflow orchestration features for OAM Applications with Crossplane"
+spec:
+  workloadRefPath: ""
+  schematic:
+    cue:
+      template: |
+        outputs: workflowTrait: {
+          apiVersion: "core.oam.dev/v1alpha1"
+          kind: "WorkflowTrait"
+          metadata: {
+            name: context.name + "-workflow-trait"
+          }
+          spec: {
+            enabled: parameter.enabled
+            timeout: parameter.timeout
+            retries: parameter.retries
+            cleanupOnFailure: parameter.cleanupOnFailure
+            
+            // Workflow execution mode
+            mode: parameter.mode
+            
+            // Suspend workflow for manual approval if needed
+            suspend: parameter.suspend
+            
+            // Workflow step execution strategy
+            execution: {
+              strategy: parameter.executionStrategy
+              parallelism: parameter.parallelism
+              failureThreshold: parameter.failureThreshold
+            }
+            
+            // Notification settings
+            notifications: {
+              enabled: parameter.enableNotifications
+              onSuccess: parameter.notifyOnSuccess
+              onFailure: parameter.notifyOnFailure
+              channels: parameter.notificationChannels
+            }
+            
+            // Monitoring and observability
+            monitoring: {
+              enabled: parameter.enableMonitoring
+              metricsCollection: true
+              tracingEnabled: parameter.enableTracing
+              logLevel: parameter.logLevel
+            }
+            
+            // Workflow context information
+            context: {
+              application: context.name
+              namespace: context.namespace
+              workflowType: "crossplane-orchestration"
+              version: "v1"
+            }
+          }
+        }
+        
+        parameter: {
+          // Enable workflow orchestration
+          enabled: *true | bool
+          // Workflow execution timeout
+          timeout: *"30m" | string
+          // Number of retries on failure
+          retries: *3 | int
+          // Clean up resources on workflow failure
+          cleanupOnFailure: *true | bool
+          // Workflow execution mode: sequential, parallel, dag
+          mode: *"sequential" | string
+          // Suspend workflow for manual approval
+          suspend: *false | bool
+          // Step execution strategy: fail-fast, continue-on-error
+          executionStrategy: *"fail-fast" | string
+          // Maximum parallel steps
+          parallelism: *5 | int
+          // Failure threshold before stopping workflow
+          failureThreshold: *1 | int
+          // Enable workflow notifications
+          enableNotifications: *false | bool
+          // Notify on successful completion
+          notifyOnSuccess: *false | bool
+          // Notify on workflow failure
+          notifyOnFailure: *true | bool
+          // Notification channels (slack, email, webhook)
+          notificationChannels: *[] | [...string]
+          // Enable workflow monitoring
+          enableMonitoring: *true | bool
+          // Enable distributed tracing
+          enableTracing: *false | bool
+          // Workflow log level
+          logLevel: *"info" | string
+        }
