@@ -558,7 +558,17 @@ spec:
                         name: $APP_NAME
                         namespace: $APP_NAME
                       spec:
-                        components: []
+                        components:
+                        - name: $APP_NAME
+                          type: webservice
+                          properties:
+                            name: $APP_NAME
+                            language: python
+                            framework: fastapi
+                            database: postgres
+                            cache: redis
+                            appContainer: $APP_NAME
+                            exposeApi: true
                         # Add your components here using the following types:
                         # - microservice-with-db: Full-featured microservice with database and cache
                         # - react-frontend: React TypeScript frontend with Material-UI
