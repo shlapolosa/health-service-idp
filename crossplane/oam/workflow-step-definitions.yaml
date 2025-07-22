@@ -1,0 +1,143 @@
+# Custom WorkflowStepDefinitions for OAM → Crossplane Integration
+# These enable declarative orchestration between KubeVela and Crossplane
+
+---
+# 1. Create Crossplane Claims WorkflowStepDefinition
+apiVersion: core.oam.dev/v1beta1
+kind: WorkflowStepDefinition
+metadata:
+  name: create-crossplane-claims
+  namespace: vela-system
+  annotations:
+    definition.oam.dev/description: "Analyzes OAM Application components and creates corresponding Crossplane Claims"
+spec:
+  schematic:
+    cue:
+      template: |
+        import (
+          "vela/op"
+          "encoding/json"
+        )
+        
+        // Read the current OAM Application to analyze components
+        app: op.#Read & {
+          value: {
+            apiVersion: "core.oam.dev/v1beta1"
+            kind: "Application"
+            metadata: {
+              name: context.name
+              namespace: context.namespace
+            }
+          }
+        }
+        
+        // Process each component and create appropriate Crossplane Claims
+        if app.value.spec.components != _|_ {
+          for i, component in app.value.spec.components {
+            
+            // Handle microservice-with-db components
+            if component.type == "microservice-with-db" {
+              "create-application-claim-\(i)": op.#Apply & {
+                value: {
+                  apiVersion: "platform.example.org/v1alpha1"
+                  kind: "ApplicationClaim"
+                  metadata: {
+                    name: component.name
+                    namespace: context.namespace
+                    labels: {
+                      "oam.dev/application": context.name
+                      "oam.dev/component": component.name
+                      "oam.dev/component-type": component.type
+                    }
+                  }
+                  spec: {
+                    name: component.name
+                    if component.properties.language != _|_ {
+                      language: component.properties.language
+                    }
+                    if component.properties.framework != _|_ {
+                      framework: component.properties.framework
+                    }
+                    if component.properties.database != _|_ {
+                      database: component.properties.database
+                    }
+                    if component.properties.cache != _|_ {
+                      cache: component.properties.cache
+                    }
+                    if component.properties.exposeApi != _|_ {
+                      exposeApi: component.properties.exposeApi
+                    }
+                    if component.properties.appContainer != _|_ {
+                      appContainer: component.properties.appContainer
+                    }
+                  }
+                }
+              }
+            }
+            
+            // Handle vcluster components
+            if component.type == "vcluster" {
+              "create-vcluster-claim-\(i)": op.#Apply & {
+                value: {
+                  apiVersion: "platform.example.org/v1alpha1"
+                  kind: "VClusterEnvironmentClaim"
+                  metadata: {
+                    name: component.name
+                    namespace: context.namespace
+                    labels: {
+                      "oam.dev/application": context.name
+                      "oam.dev/component": component.name
+                      "oam.dev/component-type": component.type
+                    }
+                  }
+                  spec: {
+                    name: component.name
+                    if component.properties.domain != _|_ {
+                      domain: component.properties.domain
+                    }
+                    if component.properties.components != _|_ {
+                      components: component.properties.components
+                    }
+                  }
+                }
+              }
+            }
+            
+            // Handle app-container components
+            if component.type == "app-container" {
+              "create-app-container-claim-\(i)": op.#Apply & {
+                value: {
+                  apiVersion: "platform.example.org/v1alpha1"
+                  kind: "AppContainerClaim"
+                  metadata: {
+                    name: component.name
+                    namespace: context.namespace
+                    labels: {
+                      "oam.dev/application": context.name
+                      "oam.dev/component": component.name
+                      "oam.dev/component-type": component.type
+                    }
+                  }
+                  spec: {
+                    name: component.name
+                    if component.properties.description != _|_ {
+                      description: component.properties.description
+                    }
+                    if component.properties.gitHubOrg != _|_ {
+                      gitHubOrg: component.properties.gitHubOrg
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        
+        // Output status information
+        message: "Created Crossplane Claims for \(len(app.value.spec.components)) components"
+        
+        parameter: {
+          // Optional parameters for the workflow step
+          timeout?: *"15m" | string
+          retryPolicy?: *"OnFailure" | string
+        }
