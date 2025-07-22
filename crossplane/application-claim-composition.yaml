@@ -1336,104 +1336,38 @@ spec:
           fmt: "http://%s-lenses-hq.%s.svc.cluster.local:9991"
           type: Format
 
-  # Realtime Platform (Kafka + MQTT + Lenses + Metabase)
-  - name: realtime-platform
+  # Realtime Platform Namespace - Only created when realtime field is specified
+  - name: realtime-namespace
     base:
-      apiVersion: helm.crossplane.io/v1beta1
-      kind: Release
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
       spec:
         forProvider:
-          chart:
-            name: realtime-platform
-            repository: https://charts.bitnami.com/bitnami
-            version: "1.0.0"  # Custom chart for realtime platform
-          namespace: placeholder
-          skipCreateNamespace: false
-          values:
-            # Kafka configuration (using lensesio/fast-data-dev for all-in-one)
-            kafka:
-              enabled: true
-              image:
-                repository: lensesio/fast-data-dev
-                tag: "3.9.0"
-              service:
-                type: ClusterIP
-                ports:
-                  kafka: 9092
-                  schemaRegistry: 8081
-                  kafkaConnect: 8083
-              environment:
-                ADV_HOST: "realtime-kafka"
-                RUNNING_SAMPLEDATA: "0"  # Disable demo data
-                RUNTESTS: "0"
-              persistence:
-                enabled: true
-                size: "10Gi"
-            # MQTT Broker configuration
-            mqtt:
-              enabled: true
-              image:
-                repository: eclipse-mosquitto
-                tag: "latest"
-              service:
-                type: ClusterIP
-                ports:
-                  mqtt: 1883
-                  websockets: 9001
-              auth:
-                enabled: true
-                users:
-                  - username: "realtime-user"
-                    password: "realtime-pass"
-              persistence:
-                enabled: true
-                size: "5Gi"
-            # Lenses HQ configuration
-            lensesHq:
-              enabled: true
-              image:
-                repository: lensting/lenses-hq
-                tag: "6-preview"
-              service:
-                type: ClusterIP
-                port: 9991
-              licenseKey: "license_key_2SFZ0BesCNu6NFv0-EOSIvY22ChSzNWXa5nSds2l4z3y7aBgRPKCVnaeMlS57hHNVboR2kKaQ8Mtv1LFt0MPBBACGhDT5If8PmTraUM5xXLz4MYv"
-            # Lenses Agent configuration  
-            lensesAgent:
-              enabled: true
-              image:
-                repository: lensting/lenses-agent
-                tag: "6-preview"
-              hqUrl: "http://realtime-lenses-hq:9991"
-              heapOpts: "-Xmx1536m -Xms512m"
-            # Metabase configuration
-            metabase:
-              enabled: true
-              image:
-                repository: metabase/metabase
-                tag: "latest"
-              service:
-                type: ClusterIP
-                port: 3000
-              database:
-                type: postgres
-                host: "placeholder-postgres"
-                name: "metabasedb"
-                user: "metabase"
-                password: "metabase-pass"
+          manifest:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: placeholder-realtime
+              labels:
+                app.kubernetes.io/managed-by: crossplane
+                app.kubernetes.io/part-of: realtime-platform
         providerConfigRef:
           name: default
     patches:
     - type: FromCompositeFieldPath
       fromFieldPath: spec.appContainer
-      toFieldPath: spec.forProvider.namespace
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
     - type: FromCompositeFieldPath
       fromFieldPath: spec.name
       toFieldPath: metadata.name
       transforms:
       - type: string
         string:
-          fmt: "%s-realtime-platform"
+          fmt: "%s-realtime-namespace"
     # Only create if realtime parameter is specified
     - type: FromCompositeFieldPath
       fromFieldPath: spec.realtime
@@ -1443,19 +1377,1307 @@ spec:
         map:
           "": "false"
           "*": "true"
-    # Configure platform name
+
+  # PostgreSQL Storage for Realtime Platform
+  - name: realtime-postgres-storage
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: PersistentVolumeClaim
+            metadata:
+              name: postgres-data
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: postgres
+                app.kubernetes.io/component: database
+            spec:
+              accessModes:
+                - ReadWriteOnce
+              storageClassName: gp2
+              resources:
+                requests:
+                  storage: 10Gi
+        providerConfigRef:
+          name: default
+    patches:
     - type: FromCompositeFieldPath
-      fromFieldPath: spec.realtime
-      toFieldPath: spec.forProvider.values.platformName
-    # Connect to existing PostgreSQL database
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.values.metabase.database.host
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
       transforms:
       - type: string
         string:
-          fmt: "%s-postgres.%s.svc.cluster.local"
-          type: Format
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-postgres-storage"
+    # Only create if realtime parameter is specified
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          "": "false"
+          "*": "true"
+
+  # PostgreSQL Secret
+  - name: realtime-postgres-secret
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: postgres-secret
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: postgres
+                app.kubernetes.io/component: database
+            type: Opaque
+            data:
+              POSTGRES_DB: bGVuc2Vz  # 'lenses' base64
+              POSTGRES_USER: bGVuc2Vz  # 'lenses' base64
+              POSTGRES_PASSWORD: bGVuc2Vz  # 'lenses' base64
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-postgres-secret"
+    # Only create if realtime parameter is specified
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          "": "false"
+          "*": "true"
+
+  # PostgreSQL Deployment
+  - name: realtime-postgres
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: postgres
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: postgres
+                app.kubernetes.io/component: database
+            spec:
+              replicas: 1
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: postgres
+              template:
+                metadata:
+                  labels:
+                    app.kubernetes.io/name: postgres
+                    app.kubernetes.io/component: database
+                spec:
+                  containers:
+                  - name: postgres
+                    image: postgres:13
+                    ports:
+                    - containerPort: 5432
+                      name: postgresql
+                    envFrom:
+                    - secretRef:
+                        name: postgres-secret
+                    volumeMounts:
+                    - name: postgres-storage
+                      mountPath: /var/lib/postgresql/data
+                    resources:
+                      requests:
+                        memory: "256Mi"
+                        cpu: "100m"
+                      limits:
+                        memory: "512Mi"
+                        cpu: "500m"
+                    livenessProbe:
+                      exec:
+                        command:
+                        - pg_isready
+                        - -U
+                        - lenses
+                      initialDelaySeconds: 30
+                      periodSeconds: 10
+                    readinessProbe:
+                      exec:
+                        command:
+                        - pg_isready
+                        - -U
+                        - lenses
+                      initialDelaySeconds: 5
+                      periodSeconds: 5
+                  volumes:
+                  - name: postgres-storage
+                    persistentVolumeClaim:
+                      claimName: postgres-data
+                  restartPolicy: Always
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-postgres"
+    # Only create if realtime parameter is specified
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          "": "false"
+          "*": "true"
+
+  # PostgreSQL Service
+  - name: realtime-postgres-service
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: postgres
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: postgres
+                app.kubernetes.io/component: database
+            spec:
+              selector:
+                app.kubernetes.io/name: postgres
+              ports:
+              - port: 5432
+                targetPort: 5432
+                name: postgresql
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-postgres-service"
+    # Only create if realtime parameter is specified
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          "": "false"
+          "*": "true"
+
+  # MQTT Deployment
+  - name: realtime-mqtt
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: mqtt-broker
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: mqtt-broker
+                app.kubernetes.io/component: messaging
+            spec:
+              replicas: 1
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: mqtt-broker
+              template:
+                metadata:
+                  labels:
+                    app.kubernetes.io/name: mqtt-broker
+                    app.kubernetes.io/component: messaging
+                spec:
+                  containers:
+                  - name: mosquitto
+                    image: eclipse-mosquitto
+                    ports:
+                    - containerPort: 1883
+                      name: mqtt
+                    - containerPort: 9001
+                      name: websocket
+                    resources:
+                      requests:
+                        memory: "64Mi"
+                        cpu: "50m"
+                      limits:
+                        memory: "128Mi"
+                        cpu: "100m"
+                  restartPolicy: Always
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-mqtt"
+    # Only create if realtime parameter is specified
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          "": "false"
+          "*": "true"
+
+  # MQTT Service
+  - name: realtime-mqtt-service
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: mqtt-broker
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: mqtt-broker
+                app.kubernetes.io/component: messaging
+            spec:
+              selector:
+                app.kubernetes.io/name: mqtt-broker
+              ports:
+              - port: 1883
+                targetPort: 1883
+                name: mqtt
+              - port: 9001
+                targetPort: 9001
+                name: websocket
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-mqtt-service"
+    # Only create if realtime parameter is specified
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          "": "false"
+          "*": "true"
+
+  # Kafka Deployment
+  - name: realtime-kafka
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: demo-kafka
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: kafka
+                app.kubernetes.io/component: streaming
+            spec:
+              replicas: 1
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: kafka
+              template:
+                metadata:
+                  labels:
+                    app.kubernetes.io/name: kafka
+                    app.kubernetes.io/component: streaming
+                spec:
+                  hostname: demo-kafka
+                  containers:
+                  - name: kafka
+                    image: lensesio/fast-data-dev:3.9.0
+                    ports:
+                    - containerPort: 9092
+                      name: kafka
+                    - containerPort: 19092
+                      name: docker-compose
+                    - containerPort: 8081
+                      name: schema-registry
+                    - containerPort: 8083
+                      name: kafka-connect
+                    - containerPort: 16062
+                      name: controller
+                    env:
+                    - name: ADV_HOST
+                      value: "demo-kafka"
+                    - name: RUNNING_SAMPLEDATA
+                      value: "1"
+                    - name: RUNTESTS
+                      value: "0"
+                    - name: KAFKA_LISTENERS
+                      value: "PLAINTEXT://:9092,DOCKERCOMPOSE://:19092,CONTROLLER://:16062"
+                    - name: KAFKA_ADVERTISED_LISTENERS
+                      value: "PLAINTEXT://demo-kafka:9092,DOCKERCOMPOSE://demo-kafka:19092"
+                    resources:
+                      requests:
+                        memory: "1Gi"
+                        cpu: "500m"
+                      limits:
+                        memory: "2Gi" 
+                        cpu: "1000m"
+                    livenessProbe:
+                      httpGet:
+                        path: /
+                        port: 8081
+                      initialDelaySeconds: 60
+                      periodSeconds: 30
+                    readinessProbe:
+                      httpGet:
+                        path: /
+                        port: 8081
+                      initialDelaySeconds: 30
+                      periodSeconds: 10
+                  restartPolicy: Always
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-kafka"
+    # Only create if realtime parameter is specified
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          "": "false"
+          "*": "true"
+
+  # Kafka Service
+  - name: realtime-kafka-service
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: demo-kafka
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: kafka
+                app.kubernetes.io/component: streaming
+            spec:
+              selector:
+                app.kubernetes.io/name: kafka
+              ports:
+              - port: 9092
+                targetPort: 9092
+                name: kafka
+              - port: 19092
+                targetPort: 19092
+                name: docker-compose
+              - port: 8081
+                targetPort: 8081
+                name: schema-registry
+              - port: 8083
+                targetPort: 8083
+                name: kafka-connect
+              - port: 16062
+                targetPort: 16062
+                name: controller
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-kafka-service"
+    # Only create if realtime parameter is specified
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          "": "false"
+          "*": "true"
+
+  # Lenses HQ Config
+  - name: realtime-lenses-hq-config
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: lenses-hq-config
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: lenses-hq
+                app.kubernetes.io/component: stream-processing
+            data:
+              config.yaml: |
+                lenses:
+                  license:
+                    key: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJldmFsdWF0aW9uIiwiYXVkIjoibGVuc2VzIiwibmJmIjoxNjk5ODI0MDAwLCJpc3MiOiJsZW5zZXMuaW8iLCJleHAiOjE3MzE0NDY0MDAsImlhdCI6MTY5OTgyNDAwMCwianRpIjoiZXZhbHVhdGlvbiIsImZlYXR1cmVzIjpbImFsbCJdfQ.example"
+                    
+                  http:
+                    port: 9991
+                    bind: "0.0.0.0"
+                    
+                  authentication:
+                    default:
+                      enabled: true
+                      username: admin
+                      password: admin
+                      
+                  database:
+                    url: "jdbc:postgresql://postgres:5432/hq"
+                    username: "lenses" 
+                    password: "lenses"
+                    
+                  kafka:
+                    brokers:
+                      - "demo-kafka:9092"
+                    schema-registry:
+                      url: "http://demo-kafka:8081"
+                    connect:
+                      - name: "demo-kafka-connect"
+                        url: "http://demo-kafka:8083"
+                        
+                  security:
+                    enabled: false
+                    
+                  monitoring:
+                    enabled: true
+                    
+                  processors:
+                    enabled: true
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-lenses-hq-config"
+    # Only create if realtime parameter is specified
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          "": "false"
+          "*": "true"
+
+  # Lenses HQ Deployment
+  - name: realtime-lenses-hq
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: lenses-hq
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: lenses-hq
+                app.kubernetes.io/component: stream-processing
+            spec:
+              replicas: 1
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: lenses-hq
+              template:
+                metadata:
+                  labels:
+                    app.kubernetes.io/name: lenses-hq
+                    app.kubernetes.io/component: stream-processing
+                spec:
+                  initContainers:
+                  - name: wait-for-postgres
+                    image: postgres
+                    command:
+                    - sh
+                    - -c
+                    - |
+                      until pg_isready -h postgres -U lenses; do
+                        echo "Waiting for postgres..."
+                        sleep 2
+                      done
+                      echo "PostgreSQL is ready"
+                      
+                      # Create databases if they don't exist
+                      export PGPASSWORD=lenses
+                      psql -h postgres -U lenses -tc "SELECT 1 FROM pg_database WHERE datname = 'hq'" | grep -q 1 || \
+                        psql -h postgres -U lenses -c "CREATE DATABASE hq;"
+                      psql -h postgres -U lenses -tc "SELECT 1 FROM pg_database WHERE datname = 'agent1'" | grep -q 1 || \
+                        psql -h postgres -U lenses -c "CREATE DATABASE agent1;"
+                      psql -h postgres -U lenses -tc "SELECT 1 FROM pg_database WHERE datname = 'metabaseappdb'" | grep -q 1 || \
+                        psql -h postgres -U lenses -c "CREATE DATABASE metabaseappdb;"
+                  containers:
+                  - name: lenses-hq
+                    image: lensting/lenses-hq:6-preview
+                    ports:
+                    - containerPort: 9991
+                      name: http
+                    env:
+                    - name: ACCEPT_EULA
+                      value: "true"
+                    volumeMounts:
+                    - name: lenses-hq-config
+                      mountPath: /opt/lenses/lenses.conf
+                      subPath: config.yaml
+                    resources:
+                      requests:
+                        memory: "512Mi"
+                        cpu: "250m"
+                      limits:
+                        memory: "2Gi"
+                        cpu: "1000m"
+                    livenessProbe:
+                      httpGet:
+                        path: /api/health
+                        port: 9991
+                      initialDelaySeconds: 120
+                      periodSeconds: 30
+                    readinessProbe:
+                      httpGet:
+                        path: /api/health
+                        port: 9991
+                      initialDelaySeconds: 60
+                      periodSeconds: 10
+                  volumes:
+                  - name: lenses-hq-config
+                    configMap:
+                      name: lenses-hq-config
+                  restartPolicy: Always
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-lenses-hq"
+    # Only create if realtime parameter is specified
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          "": "false"
+          "*": "true"
+
+  # Lenses HQ Service
+  - name: realtime-lenses-hq-service
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: lenses-hq
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: lenses-hq
+                app.kubernetes.io/component: stream-processing
+            spec:
+              selector:
+                app.kubernetes.io/name: lenses-hq
+              ports:
+              - port: 9991
+                targetPort: 9991
+                name: http
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-lenses-hq-service"
+    # Only create if realtime parameter is specified
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          "": "false"
+          "*": "true"
+
+  # Lenses Agent Deployment
+  - name: realtime-lenses-agent
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: lenses-agent
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: lenses-agent
+                app.kubernetes.io/component: stream-processing
+            spec:
+              replicas: 1
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: lenses-agent
+              template:
+                metadata:
+                  labels:
+                    app.kubernetes.io/name: lenses-agent
+                    app.kubernetes.io/component: stream-processing
+                spec:
+                  initContainers:
+                  - name: wait-for-lenses-hq
+                    image: curlimages/curl:latest
+                    command:
+                    - sh
+                    - -c
+                    - |
+                      until curl -f http://lenses-hq:9991/api/health; do
+                        echo "Waiting for Lenses HQ..."
+                        sleep 5
+                      done
+                      echo "Lenses HQ is ready"
+                  containers:
+                  - name: lenses-agent
+                    image: lensting/lenses-agent:6-preview
+                    env:
+                    - name: DEMO_HQ_URL
+                      value: "http://lenses-hq:9991"
+                    - name: DEMO_HQ_USER
+                      value: "admin"
+                    - name: DEMO_HQ_PASSWORD
+                      value: "admin"
+                    - name: LENSES_HEAP_OPTS
+                      value: "-Xmx1536m -Xms512m"
+                    - name: ACCEPT_EULA
+                      value: "true"
+                    resources:
+                      requests:
+                        memory: "1Gi"
+                        cpu: "250m"
+                      limits:
+                        memory: "2Gi"
+                        cpu: "500m"
+                    livenessProbe:
+                      exec:
+                        command:
+                        - sh
+                        - -c
+                        - "ps aux | grep -v grep | grep java"
+                      initialDelaySeconds: 60
+                      periodSeconds: 30
+                    readinessProbe:
+                      exec:
+                        command:
+                        - sh
+                        - -c
+                        - "ps aux | grep -v grep | grep java"
+                      initialDelaySeconds: 30
+                      periodSeconds: 10
+                  restartPolicy: Always
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-lenses-agent"
+    # Only create if realtime parameter is specified
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          "": "false"
+          "*": "true"
+
+  # Lenses Agent Service
+  - name: realtime-lenses-agent-service
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: lenses-agent
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: lenses-agent
+                app.kubernetes.io/component: stream-processing
+            spec:
+              selector:
+                app.kubernetes.io/name: lenses-agent
+              ports:
+              - port: 8080
+                targetPort: 8080
+                name: http
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-lenses-agent-service"
+    # Only create if realtime parameter is specified
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          "": "false"
+          "*": "true"
+
+  # Metabase Deployment
+  - name: realtime-metabase
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: metabase
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: metabase
+                app.kubernetes.io/component: analytics
+            spec:
+              replicas: 1
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: metabase
+              template:
+                metadata:
+                  labels:
+                    app.kubernetes.io/name: metabase
+                    app.kubernetes.io/component: analytics
+                spec:
+                  initContainers:
+                  - name: wait-for-postgres
+                    image: postgres
+                    command:
+                    - sh
+                    - -c
+                    - |
+                      until pg_isready -h postgres -U lenses; do
+                        echo "Waiting for postgres..."
+                        sleep 2
+                      done
+                      echo "PostgreSQL is ready"
+                  containers:
+                  - name: metabase
+                    image: metabase/metabase:latest
+                    ports:
+                    - containerPort: 3000
+                      name: http
+                    env:
+                    - name: MB_DB_TYPE
+                      value: "postgres"
+                    - name: MB_DB_DBNAME
+                      value: "metabaseappdb"
+                    - name: MB_DB_PORT
+                      value: "5432"
+                    - name: MB_DB_USER
+                      value: "lenses"
+                    - name: MB_DB_PASS
+                      value: "lenses"
+                    - name: MB_DB_HOST
+                      value: "postgres"
+                    resources:
+                      requests:
+                        memory: "512Mi"
+                        cpu: "250m"
+                      limits:
+                        memory: "1Gi"
+                        cpu: "500m"
+                    livenessProbe:
+                      httpGet:
+                        path: /api/health
+                        port: 3000
+                      initialDelaySeconds: 120
+                      periodSeconds: 30
+                    readinessProbe:
+                      httpGet:
+                        path: /api/health
+                        port: 3000
+                      initialDelaySeconds: 60
+                      periodSeconds: 10
+                  restartPolicy: Always
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-metabase"
+    # Only create if realtime parameter is specified
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          "": "false"
+          "*": "true"
+
+  # Metabase Service
+  - name: realtime-metabase-service
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: metabase
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: metabase
+                app.kubernetes.io/component: analytics
+            spec:
+              selector:
+                app.kubernetes.io/name: metabase
+              ports:
+              - port: 3000
+                targetPort: 3000
+                name: http
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-metabase-service"
+    # Only create if realtime parameter is specified
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          "": "false"
+          "*": "true"
+
+  # Stream Processing Setup Job
+  - name: realtime-stream-processing-queries
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: stream-processing-queries
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: stream-processing
+                app.kubernetes.io/component: configuration
+            data:
+              setup-streams.sql: |
+                -- Blood Pressure Stream Processing
+                INSERT INTO blood_pressure_device_topic
+                STORE KEY AS STRING VALUE AS AVRO
+                SELECT STREAM
+                    _value.deviceId AS _key,
+                    _value.deviceId AS deviceId,
+                    _value.systolic AS systolic,
+                    _value.diastolic AS diastolic,
+                    _value.latitude AS latitude,
+                    _value.longitude AS longitude,
+                    _value.timestamp AS createdTime
+                FROM device_data
+                WHERE _value.deviceId IS NOT NULL;
+
+                -- Heart Rate Stream Processing
+                INSERT INTO heart_rate_device_topic
+                STORE KEY AS STRING VALUE AS AVRO
+                SELECT STREAM
+                    _value.deviceId AS _key,
+                    _value.deviceId AS deviceId,
+                    _value.heartRate AS value,
+                    _value.latitude AS latitude,
+                    _value.longitude AS longitude,
+                    _value.timestamp AS createdTime
+                FROM device_data
+                WHERE _value.deviceId IS NOT NULL;
+
+                -- Health Alert Stream (for critical values)
+                INSERT INTO health_alerts_topic
+                STORE KEY AS STRING VALUE AS AVRO
+                SELECT STREAM
+                    _value.deviceId AS _key,
+                    _value.deviceId AS deviceId,
+                    _value.timestamp AS alertTime,
+                    CASE
+                      WHEN _value.heartRate > 120 THEN 'HIGH_HEART_RATE'
+                      WHEN _value.heartRate < 50 THEN 'LOW_HEART_RATE'
+                      WHEN _value.systolic > 140 THEN 'HIGH_BLOOD_PRESSURE'
+                      WHEN _value.systolic < 90 THEN 'LOW_BLOOD_PRESSURE'
+                      WHEN _value.oxygenSaturation < 95 THEN 'LOW_OXYGEN'
+                      WHEN _value.bodyTemperature > 100.4 THEN 'HIGH_FEVER'
+                      WHEN _value.bodyTemperature < 96.0 THEN 'LOW_TEMPERATURE'
+                      ELSE 'UNKNOWN_ALERT'
+                    END AS alertType,
+                    _value AS rawData
+                FROM device_data
+                WHERE _value.heartRate > 120 OR _value.heartRate < 50
+                   OR _value.systolic > 140 OR _value.systolic < 90  
+                   OR _value.oxygenSaturation < 95
+                   OR _value.bodyTemperature > 100.4 OR _value.bodyTemperature < 96.0;
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-stream-processing-queries"
+    # Only create if realtime parameter is specified
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          "": "false"
+          "*": "true"
+
+  # Stream Processing Setup Job
+  - name: realtime-stream-processing-setup
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: setup-stream-processing
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: stream-processing
+                app.kubernetes.io/component: setup
+            spec:
+              template:
+                spec:
+                  initContainers:
+                  - name: wait-for-lenses-hq
+                    image: curlimages/curl:latest
+                    command:
+                    - sh
+                    - -c
+                    - |
+                      until curl -f http://lenses-hq:9991/api/health; do
+                        echo "Waiting for Lenses HQ to be ready..."
+                        sleep 10
+                      done
+                      echo "Lenses HQ is ready"
+                      
+                      # Wait additional time for Lenses to fully initialize
+                      sleep 30
+                  containers:
+                  - name: setup-processor
+                    image: curlimages/curl:latest
+                    command:
+                    - sh
+                    - -c
+                    - |
+                      echo "Setting up health data stream processing..."
+                      
+                      # Create Kafka topics for health data streams
+                      curl -X POST http://lenses-hq:9991/api/v1/kafka/topics \
+                        -H "Content-Type: application/json" \
+                        -u admin:admin \
+                        -d '{
+                          "name": "device_data",
+                          "partitions": 3,
+                          "replication": 1,
+                          "configs": {
+                            "cleanup.policy": "delete",
+                            "retention.ms": "604800000"
+                          }
+                        }' || echo "device_data topic might already exist"
+
+                      curl -X POST http://lenses-hq:9991/api/v1/kafka/topics \
+                        -H "Content-Type: application/json" \
+                        -u admin:admin \
+                        -d '{
+                          "name": "blood_pressure_device_topic", 
+                          "partitions": 3,
+                          "replication": 1
+                        }' || echo "blood_pressure_device_topic might already exist"
+
+                      curl -X POST http://lenses-hq:9991/api/v1/kafka/topics \
+                        -H "Content-Type: application/json" \
+                        -u admin:admin \
+                        -d '{
+                          "name": "heart_rate_device_topic",
+                          "partitions": 3, 
+                          "replication": 1
+                        }' || echo "heart_rate_device_topic might already exist"
+
+                      curl -X POST http://lenses-hq:9991/api/v1/kafka/topics \
+                        -H "Content-Type: application/json" \
+                        -u admin:admin \
+                        -d '{
+                          "name": "health_alerts_topic",
+                          "partitions": 3,
+                          "replication": 1
+                        }' || echo "health_alerts_topic might already exist"
+
+                      echo "Health data streaming topics created successfully"
+                    volumeMounts:
+                    - name: queries
+                      mountPath: /queries
+                    resources:
+                      requests:
+                        memory: "64Mi"
+                        cpu: "50m"
+                      limits:
+                        memory: "128Mi"
+                        cpu: "100m"
+                  volumes:
+                  - name: queries
+                    configMap:
+                      name: stream-processing-queries
+                  restartPolicy: OnFailure
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-stream-processing-setup"
+    # Only create if realtime parameter is specified
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          "": "false"
+          "*": "true"
 
   # Realtime Platform Secrets
   - name: realtime-mqtt-secret

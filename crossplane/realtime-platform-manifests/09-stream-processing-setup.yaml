@@ -1,0 +1,201 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stream-processing-queries
+  namespace: placeholder-realtime
+  labels:
+    app.kubernetes.io/name: stream-processing
+    app.kubernetes.io/component: configuration
+data:
+  setup-streams.sql: |
+    -- Blood Pressure Stream Processing
+    INSERT INTO blood_pressure_device_topic
+    STORE KEY AS STRING VALUE AS AVRO
+    SELECT STREAM
+        _value.deviceId AS _key,
+        _value.deviceId AS deviceId,
+        _value.systolic AS systolic,
+        _value.diastolic AS diastolic,
+        _value.latitude AS latitude,
+        _value.longitude AS longitude,
+        _value.timestamp AS createdTime
+    FROM device_data
+    WHERE _value.deviceId IS NOT NULL;
+
+    -- Heart Rate Stream Processing
+    INSERT INTO heart_rate_device_topic
+    STORE KEY AS STRING VALUE AS AVRO
+    SELECT STREAM
+        _value.deviceId AS _key,
+        _value.deviceId AS deviceId,
+        _value.heartRate AS value,
+        _value.latitude AS latitude,
+        _value.longitude AS longitude,
+        _value.timestamp AS createdTime
+    FROM device_data
+    WHERE _value.deviceId IS NOT NULL;
+
+    -- Oxygen Saturation Stream Processing
+    INSERT INTO oxygen_saturation_device_topic
+    STORE KEY AS STRING VALUE AS AVRO
+    SELECT STREAM
+        _value.deviceId AS _key,
+        _value.deviceId AS deviceId,
+        _value.oxygenSaturation AS value,
+        _value.latitude AS latitude,
+        _value.longitude AS longitude,
+        _value.timestamp AS createdTime
+    FROM device_data
+    WHERE _value.deviceId IS NOT NULL;
+
+    -- Temperature Stream Processing
+    INSERT INTO temperature_device_topic
+    STORE KEY AS STRING VALUE AS AVRO
+    SELECT STREAM
+        _value.deviceId AS _key,
+        _value.deviceId AS deviceId,
+        _value.bodyTemperature AS value,
+        _value.latitude AS latitude,
+        _value.longitude AS longitude,
+        _value.timestamp AS createdTime
+    FROM device_data
+    WHERE _value.deviceId IS NOT NULL;
+
+    -- Health Alert Stream (for critical values)
+    INSERT INTO health_alerts_topic
+    STORE KEY AS STRING VALUE AS AVRO
+    SELECT STREAM
+        _value.deviceId AS _key,
+        _value.deviceId AS deviceId,
+        _value.timestamp AS alertTime,
+        CASE
+          WHEN _value.heartRate > 120 THEN 'HIGH_HEART_RATE'
+          WHEN _value.heartRate < 50 THEN 'LOW_HEART_RATE'
+          WHEN _value.systolic > 140 THEN 'HIGH_BLOOD_PRESSURE'
+          WHEN _value.systolic < 90 THEN 'LOW_BLOOD_PRESSURE'
+          WHEN _value.oxygenSaturation < 95 THEN 'LOW_OXYGEN'
+          WHEN _value.bodyTemperature > 100.4 THEN 'HIGH_FEVER'
+          WHEN _value.bodyTemperature < 96.0 THEN 'LOW_TEMPERATURE'
+          ELSE 'UNKNOWN_ALERT'
+        END AS alertType,
+        _value AS rawData
+    FROM device_data
+    WHERE _value.heartRate > 120 OR _value.heartRate < 50
+       OR _value.systolic > 140 OR _value.systolic < 90  
+       OR _value.oxygenSaturation < 95
+       OR _value.bodyTemperature > 100.4 OR _value.bodyTemperature < 96.0;
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: setup-stream-processing
+  namespace: placeholder-realtime
+  labels:
+    app.kubernetes.io/name: stream-processing
+    app.kubernetes.io/component: setup
+spec:
+  template:
+    spec:
+      initContainers:
+      - name: wait-for-lenses-hq
+        image: curlimages/curl:latest
+        command:
+        - sh
+        - -c
+        - |
+          until curl -f http://lenses-hq:9991/api/health; do
+            echo "Waiting for Lenses HQ to be ready..."
+            sleep 10
+          done
+          echo "Lenses HQ is ready"
+          
+          # Wait additional time for Lenses to fully initialize
+          sleep 30
+      containers:
+      - name: setup-processor
+        image: curlimages/curl:latest
+        command:
+        - sh
+        - -c
+        - |
+          echo "Setting up health data stream processing..."
+          
+          # Create Kafka topics for health data streams
+          curl -X POST http://lenses-hq:9991/api/v1/kafka/topics \
+            -H "Content-Type: application/json" \
+            -u admin:admin \
+            -d '{
+              "name": "device_data",
+              "partitions": 3,
+              "replication": 1,
+              "configs": {
+                "cleanup.policy": "delete",
+                "retention.ms": "604800000"
+              }
+            }' || echo "device_data topic might already exist"
+
+          curl -X POST http://lenses-hq:9991/api/v1/kafka/topics \
+            -H "Content-Type: application/json" \
+            -u admin:admin \
+            -d '{
+              "name": "blood_pressure_device_topic", 
+              "partitions": 3,
+              "replication": 1
+            }' || echo "blood_pressure_device_topic might already exist"
+
+          curl -X POST http://lenses-hq:9991/api/v1/kafka/topics \
+            -H "Content-Type: application/json" \
+            -u admin:admin \
+            -d '{
+              "name": "heart_rate_device_topic",
+              "partitions": 3, 
+              "replication": 1
+            }' || echo "heart_rate_device_topic might already exist"
+
+          curl -X POST http://lenses-hq:9991/api/v1/kafka/topics \
+            -H "Content-Type: application/json" \
+            -u admin:admin \
+            -d '{
+              "name": "oxygen_saturation_device_topic",
+              "partitions": 3,
+              "replication": 1
+            }' || echo "oxygen_saturation_device_topic might already exist"
+
+          curl -X POST http://lenses-hq:9991/api/v1/kafka/topics \
+            -H "Content-Type: application/json" \
+            -u admin:admin \
+            -d '{
+              "name": "temperature_device_topic",
+              "partitions": 3,
+              "replication": 1  
+            }' || echo "temperature_device_topic might already exist"
+
+          curl -X POST http://lenses-hq:9991/api/v1/kafka/topics \
+            -H "Content-Type: application/json" \
+            -u admin:admin \
+            -d '{
+              "name": "health_alerts_topic",
+              "partitions": 3,
+              "replication": 1
+            }' || echo "health_alerts_topic might already exist"
+
+          echo "Health data streaming topics created successfully"
+          
+          # Note: Stream processing queries would be configured via Lenses UI
+          # The SQL queries are available in the ConfigMap for reference
+        volumeMounts:
+        - name: queries
+          mountPath: /queries
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+      volumes:
+      - name: queries
+        configMap:
+          name: stream-processing-queries
+      restartPolicy: OnFailure

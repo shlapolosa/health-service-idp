@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metabase
+  namespace: placeholder-realtime
+  labels:
+    app.kubernetes.io/name: metabase
+    app.kubernetes.io/component: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: metabase
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: metabase
+        app.kubernetes.io/component: analytics
+    spec:
+      initContainers:
+      - name: wait-for-postgres
+        image: postgres
+        command:
+        - sh
+        - -c
+        - |
+          until pg_isready -h postgres -U lenses; do
+            echo "Waiting for postgres..."
+            sleep 2
+          done
+          echo "PostgreSQL is ready"
+      containers:
+      - name: metabase
+        image: metabase/metabase:latest
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: MB_DB_TYPE
+          value: "postgres"
+        - name: MB_DB_DBNAME
+          value: "metabaseappdb"
+        - name: MB_DB_PORT
+          value: "5432"
+        - name: MB_DB_USER
+          value: "lenses"
+        - name: MB_DB_PASS
+          value: "lenses"
+        - name: MB_DB_HOST
+          value: "postgres"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 120
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 60
+          periodSeconds: 10
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: metabase
+  namespace: placeholder-realtime
+  labels:
+    app.kubernetes.io/name: metabase
+    app.kubernetes.io/component: analytics
+spec:
+  selector:
+    app.kubernetes.io/name: metabase
+  ports:
+  - port: 3000
+    targetPort: 3000
+    name: http

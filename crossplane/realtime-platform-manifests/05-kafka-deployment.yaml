@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-kafka
+  namespace: placeholder-realtime
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/component: streaming
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kafka
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kafka
+        app.kubernetes.io/component: streaming
+    spec:
+      hostname: demo-kafka
+      containers:
+      - name: kafka
+        image: lensesio/fast-data-dev:3.9.0
+        ports:
+        - containerPort: 9092
+          name: kafka
+        - containerPort: 19092
+          name: docker-compose
+        - containerPort: 8081
+          name: schema-registry
+        - containerPort: 8083
+          name: kafka-connect
+        - containerPort: 16062
+          name: controller
+        env:
+        - name: ADV_HOST
+          value: "demo-kafka"
+        - name: RUNNING_SAMPLEDATA
+          value: "1"
+        - name: RUNTESTS
+          value: "0"
+        - name: KAFKA_LISTENERS
+          value: "PLAINTEXT://:9092,DOCKERCOMPOSE://:19092,CONTROLLER://:16062"
+        - name: KAFKA_ADVERTISED_LISTENERS
+          value: "PLAINTEXT://demo-kafka:9092,DOCKERCOMPOSE://demo-kafka:19092"
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi" 
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8081
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-kafka
+  namespace: placeholder-realtime
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/component: streaming
+spec:
+  selector:
+    app.kubernetes.io/name: kafka
+  ports:
+  - port: 9092
+    targetPort: 9092
+    name: kafka
+  - port: 19092
+    targetPort: 19092
+    name: docker-compose
+  - port: 8081
+    targetPort: 8081
+    name: schema-registry
+  - port: 8083
+    targetPort: 8083
+    name: kafka-connect
+  - port: 16062
+    targetPort: 16062
+    name: controller

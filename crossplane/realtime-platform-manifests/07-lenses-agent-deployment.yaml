@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lenses-agent
+  namespace: placeholder-realtime
+  labels:
+    app.kubernetes.io/name: lenses-agent
+    app.kubernetes.io/component: stream-processing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: lenses-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: lenses-agent
+        app.kubernetes.io/component: stream-processing
+    spec:
+      initContainers:
+      - name: wait-for-lenses-hq
+        image: curlimages/curl:latest
+        command:
+        - sh
+        - -c
+        - |
+          until curl -f http://lenses-hq:9991/api/health; do
+            echo "Waiting for Lenses HQ..."
+            sleep 5
+          done
+          echo "Lenses HQ is ready"
+      containers:
+      - name: lenses-agent
+        image: lensting/lenses-agent:6-preview
+        env:
+        - name: DEMO_HQ_URL
+          value: "http://lenses-hq:9991"
+        - name: DEMO_HQ_USER
+          value: "admin"
+        - name: DEMO_HQ_PASSWORD
+          value: "admin"
+        - name: LENSES_HEAP_OPTS
+          value: "-Xmx1536m -Xms512m"
+        - name: ACCEPT_EULA
+          value: "true"
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "500m"
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - "ps aux | grep -v grep | grep java"
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - "ps aux | grep -v grep | grep java"
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lenses-agent
+  namespace: placeholder-realtime
+  labels:
+    app.kubernetes.io/name: lenses-agent
+    app.kubernetes.io/component: stream-processing
+spec:
+  selector:
+    app.kubernetes.io/name: lenses-agent
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http

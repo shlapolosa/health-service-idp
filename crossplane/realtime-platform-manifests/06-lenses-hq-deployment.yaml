@@ -1,0 +1,141 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lenses-hq-config
+  namespace: placeholder-realtime
+  labels:
+    app.kubernetes.io/name: lenses-hq
+    app.kubernetes.io/component: stream-processing
+data:
+  config.yaml: |
+    lenses:
+      license:
+        key: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJldmFsdWF0aW9uIiwiYXVkIjoibGVuc2VzIiwibmJmIjoxNjk5ODI0MDAwLCJpc3MiOiJsZW5zZXMuaW8iLCJleHAiOjE3MzE0NDY0MDAsImlhdCI6MTY5OTgyNDAwMCwianRpIjoiZXZhbHVhdGlvbiIsImZlYXR1cmVzIjpbImFsbCJdfQ.example"
+      
+      http:
+        port: 9991
+        bind: "0.0.0.0"
+        
+      authentication:
+        default:
+          enabled: true
+          username: admin
+          password: admin
+          
+      database:
+        url: "jdbc:postgresql://postgres:5432/hq"
+        username: "lenses" 
+        password: "lenses"
+        
+      kafka:
+        brokers:
+          - "demo-kafka:9092"
+        schema-registry:
+          url: "http://demo-kafka:8081"
+        connect:
+          - name: "demo-kafka-connect"
+            url: "http://demo-kafka:8083"
+            
+      security:
+        enabled: false
+        
+      monitoring:
+        enabled: true
+        
+      processors:
+        enabled: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lenses-hq
+  namespace: placeholder-realtime
+  labels:
+    app.kubernetes.io/name: lenses-hq
+    app.kubernetes.io/component: stream-processing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: lenses-hq
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: lenses-hq
+        app.kubernetes.io/component: stream-processing
+    spec:
+      initContainers:
+      - name: wait-for-postgres
+        image: postgres
+        command:
+        - sh
+        - -c
+        - |
+          until pg_isready -h postgres -U lenses; do
+            echo "Waiting for postgres..."
+            sleep 2
+          done
+          echo "PostgreSQL is ready"
+          
+          # Create databases if they don't exist
+          export PGPASSWORD=lenses
+          psql -h postgres -U lenses -tc "SELECT 1 FROM pg_database WHERE datname = 'hq'" | grep -q 1 || \
+            psql -h postgres -U lenses -c "CREATE DATABASE hq;"
+          psql -h postgres -U lenses -tc "SELECT 1 FROM pg_database WHERE datname = 'agent1'" | grep -q 1 || \
+            psql -h postgres -U lenses -c "CREATE DATABASE agent1;"
+          psql -h postgres -U lenses -tc "SELECT 1 FROM pg_database WHERE datname = 'metabaseappdb'" | grep -q 1 || \
+            psql -h postgres -U lenses -c "CREATE DATABASE metabaseappdb;"
+      containers:
+      - name: lenses-hq
+        image: lensting/lenses-hq:6-preview
+        ports:
+        - containerPort: 9991
+          name: http
+        env:
+        - name: ACCEPT_EULA
+          value: "true"
+        volumeMounts:
+        - name: lenses-hq-config
+          mountPath: /opt/lenses/lenses.conf
+          subPath: config.yaml
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 9991
+          initialDelaySeconds: 120
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 9991
+          initialDelaySeconds: 60
+          periodSeconds: 10
+      volumes:
+      - name: lenses-hq-config
+        configMap:
+          name: lenses-hq-config
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lenses-hq
+  namespace: placeholder-realtime
+  labels:
+    app.kubernetes.io/name: lenses-hq
+    app.kubernetes.io/component: stream-processing
+spec:
+  selector:
+    app.kubernetes.io/name: lenses-hq
+  ports:
+  - port: 9991
+    targetPort: 9991
+    name: http
