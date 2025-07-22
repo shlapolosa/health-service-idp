@@ -251,3 +251,181 @@ spec:
           // Check interval - how often to check claim status
           interval?: *"30s" | string
         }
+
+---
+# 3. Cleanup Failed Claims WorkflowStepDefinition
+apiVersion: core.oam.dev/v1beta1
+kind: WorkflowStepDefinition
+metadata:
+  name: cleanup-failed-claims
+  namespace: vela-system
+  annotations:
+    definition.oam.dev/description: "Cleans up failed or partially created Crossplane Claims for error recovery"
+spec:
+  schematic:
+    cue:
+      template: |
+        import (
+          "vela/op"
+        )
+        
+        // Find all Claims created by this OAM Application
+        applicationClaims: op.#List & {
+          resource: {
+            apiVersion: "platform.example.org/v1alpha1"
+            kind: "ApplicationClaim"
+          }
+          filter: {
+            namespace: context.namespace
+            matchingLabels: {
+              "oam.dev/application": context.name
+            }
+          }
+        }
+        
+        vclusterClaims: op.#List & {
+          resource: {
+            apiVersion: "platform.example.org/v1alpha1"
+            kind: "VClusterEnvironmentClaim"
+          }
+          filter: {
+            namespace: context.namespace
+            matchingLabels: {
+              "oam.dev/application": context.name
+            }
+          }
+        }
+        
+        appContainerClaims: op.#List & {
+          resource: {
+            apiVersion: "platform.example.org/v1alpha1"
+            kind: "AppContainerClaim"
+          }
+          filter: {
+            namespace: context.namespace
+            matchingLabels: {
+              "oam.dev/application": context.name
+            }
+          }
+        }
+        
+        // Delete failed ApplicationClaims
+        if applicationClaims.list != _|_ && len(applicationClaims.list.items) > 0 {
+          for i, claim in applicationClaims.list.items {
+            if claim.status != _|_ && claim.status.conditions != _|_ {
+              // Check if claim has failed condition
+              failedConditions: [for cond in claim.status.conditions 
+                               if cond.type == "Ready" && cond.status == "False" 
+                               { cond }]
+              if len(failedConditions) > 0 {
+                "delete-failed-application-claim-\(i)": op.#Delete & {
+                  value: {
+                    apiVersion: "platform.example.org/v1alpha1"
+                    kind: "ApplicationClaim"
+                    metadata: {
+                      name: claim.metadata.name
+                      namespace: claim.metadata.namespace
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        
+        // Delete failed VClusterEnvironmentClaims
+        if vclusterClaims.list != _|_ && len(vclusterClaims.list.items) > 0 {
+          for i, claim in vclusterClaims.list.items {
+            if claim.status != _|_ && claim.status.conditions != _|_ {
+              failedConditions: [for cond in claim.status.conditions 
+                               if cond.type == "Ready" && cond.status == "False" 
+                               { cond }]
+              if len(failedConditions) > 0 {
+                "delete-failed-vcluster-claim-\(i)": op.#Delete & {
+                  value: {
+                    apiVersion: "platform.example.org/v1alpha1"
+                    kind: "VClusterEnvironmentClaim"
+                    metadata: {
+                      name: claim.metadata.name
+                      namespace: claim.metadata.namespace
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        
+        // Delete failed AppContainerClaims
+        if appContainerClaims.list != _|_ && len(appContainerClaims.list.items) > 0 {
+          for i, claim in appContainerClaims.list.items {
+            if claim.status != _|_ && claim.status.conditions != _|_ {
+              failedConditions: [for cond in claim.status.conditions 
+                               if cond.type == "Ready" && cond.status == "False" 
+                               { cond }]
+              if len(failedConditions) > 0 {
+                "delete-failed-app-container-claim-\(i)": op.#Delete & {
+                  value: {
+                    apiVersion: "platform.example.org/v1alpha1"
+                    kind: "AppContainerClaim"
+                    metadata: {
+                      name: claim.metadata.name
+                      namespace: claim.metadata.namespace
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        
+        // Optional: Clean up all claims regardless of status if forced
+        if parameter.forceCleanup {
+          for i, claim in applicationClaims.list.items {
+            "force-delete-application-claim-\(i)": op.#Delete & {
+              value: {
+                apiVersion: "platform.example.org/v1alpha1"
+                kind: "ApplicationClaim"
+                metadata: {
+                  name: claim.metadata.name
+                  namespace: claim.metadata.namespace
+                }
+              }
+            }
+          }
+          
+          for i, claim in vclusterClaims.list.items {
+            "force-delete-vcluster-claim-\(i)": op.#Delete & {
+              value: {
+                apiVersion: "platform.example.org/v1alpha1"
+                kind: "VClusterEnvironmentClaim"
+                metadata: {
+                  name: claim.metadata.name
+                  namespace: claim.metadata.namespace
+                }
+              }
+            }
+          }
+          
+          for i, claim in appContainerClaims.list.items {
+            "force-delete-app-container-claim-\(i)": op.#Delete & {
+              value: {
+                apiVersion: "platform.example.org/v1alpha1"
+                kind: "AppContainerClaim"
+                metadata: {
+                  name: claim.metadata.name
+                  namespace: claim.metadata.namespace
+                }
+              }
+            }
+          }
+        }
+        
+        message: "Cleanup completed for failed Claims"
+        
+        parameter: {
+          // Force cleanup of all claims regardless of status
+          forceCleanup?: *false | bool
+          // Grace period for deletion
+          gracePeriodSeconds?: *30 | int
+        }
