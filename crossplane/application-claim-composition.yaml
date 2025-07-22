@@ -2911,4 +2911,180 @@ spec:
       - type: string
         string:
           fmt: "http://%s-metabase.%s.svc.cluster.local:3000"
+
+  # Update OAM Application with new webservice component
+  - name: update-oam-application
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: placeholder
+              namespace: default
+            spec:
+              template:
+                spec:
+                  serviceAccountName: crossplane-github-provider
+                  restartPolicy: OnFailure
+                  containers:
+                  - name: oam-updater
+                    image: alpine/git:latest
+                    command:
+                    - /bin/sh
+                    - -c
+                    - |
+                      set -e
+                      echo "Updating OAM Application with webservice component for $SERVICE_NAME..."
+                      
+                      TEMP_DIR="/tmp/oam-update-$APP_CONTAINER"
+                      mkdir -p $TEMP_DIR
+                      cd $TEMP_DIR
+                      
+                      # Clone the GitOps repository
+                      git clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/$APP_CONTAINER-gitops.git .
+                      
+                      # Configure git
+                      git config user.name "ApplicationClaim OAM Updater"
+                      git config user.email "applicationclaim@platform.local"
+                      
+                      # Check if OAM application file exists
+                      if [ ! -f "oam/applications/application.yaml" ]; then
+                        echo "❌ OAM application file not found"
+                        exit 1
+                      fi
+                      
+                      echo "📋 Current OAM Application:"
+                      cat oam/applications/application.yaml
+                      
+                      # Create new component definition
+                      COMPONENT_YAML="
+                        - name: $SERVICE_NAME
+                          type: webservice
+                          properties:
+                            name: $SERVICE_NAME
+                            language: $LANGUAGE
+                            framework: $FRAMEWORK"
+                      
+                      # Add database if specified
+                      if [ "$DATABASE" != "none" ] && [ -n "$DATABASE" ]; then
+                        COMPONENT_YAML="${COMPONENT_YAML}
+                            database: $DATABASE"
+                      fi
+                      
+                      # Add cache if specified
+                      if [ "$CACHE" != "none" ] && [ -n "$CACHE" ]; then
+                        COMPONENT_YAML="${COMPONENT_YAML}
+                            cache: $CACHE"
+                      fi
+                      
+                      # Add AppContainer reference
+                      COMPONENT_YAML="${COMPONENT_YAML}
+                            appContainer: $APP_CONTAINER
+                            exposeApi: true"
+                      
+                      # Check if components array is empty
+                      if grep -q "components: \[\]" oam/applications/application.yaml; then
+                        echo "🔄 Adding first component to empty OAM Application..."
+                        
+                        # Replace empty components array with the new component
+                        sed -i "s/components: \[\]/components:$COMPONENT_YAML/" oam/applications/application.yaml
+                        
+                      elif grep -q "components:" oam/applications/application.yaml; then
+                        echo "🔄 Adding component to existing OAM Application..."
+                        
+                        # Find the line number of components: and add the new component
+                        COMPONENTS_LINE=$(grep -n "components:" oam/applications/application.yaml | cut -d: -f1)
+                        
+                        # Create temp file with the new component added
+                        head -n $COMPONENTS_LINE oam/applications/application.yaml > temp_app.yaml
+                        echo "$COMPONENT_YAML" | sed 's/^/        /' >> temp_app.yaml
+                        tail -n +$((COMPONENTS_LINE + 1)) oam/applications/application.yaml >> temp_app.yaml
+                        
+                        mv temp_app.yaml oam/applications/application.yaml
+                        
+                      else
+                        echo "❌ No components section found in OAM Application"
+                        exit 1
+                      fi
+                      
+                      echo "✅ Updated OAM Application:"
+                      cat oam/applications/application.yaml
+                      
+                      # Commit and push changes
+                      git add oam/applications/application.yaml
+                      git commit -m "Add $SERVICE_NAME webservice component to OAM Application
+
+- Language: $LANGUAGE
+- Framework: $FRAMEWORK
+- Database: $DATABASE
+- Cache: $CACHE
+- AppContainer: $APP_CONTAINER
+
+Generated by ApplicationClaim composition"
+                      
+                      git push
+                      
+                      echo "🎉 Successfully updated OAM Application with $SERVICE_NAME webservice component"
+                    env:
+                    - name: SERVICE_NAME
+                      value: "placeholder"
+                    - name: APP_CONTAINER
+                      value: "placeholder"
+                    - name: LANGUAGE
+                      value: "placeholder"
+                    - name: FRAMEWORK
+                      value: "placeholder"
+                    - name: DATABASE
+                      value: "placeholder"
+                    - name: CACHE
+                      value: "placeholder"
+                    - name: GITHUB_TOKEN
+                      valueFrom:
+                        secretKeyRef:
+                          name: github-credentials
+                          key: token
+                    - name: GITHUB_USER
+                      valueFrom:
+                        secretKeyRef:
+                          name: github-credentials
+                          key: user
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-oam-updater"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-oam-updater"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[0].value
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[1].value
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.language
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[2].value
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.framework
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[3].value
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.database
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[4].value
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.cache
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[5].value
           type: Format
