@@ -1,125 +1,43 @@
 # Task ID: 11
-# Title: Set up Crossplane with Required Providers
+# Title: Implement MQTT Source Connector Configuration
 # Status: pending
-# Dependencies: None
-# Priority: high
-# Description: Install and configure Crossplane with necessary providers (Helm, AWS, GitHub, Kubernetes) in the management cluster to enable infrastructure provisioning via CRDs.
+# Dependencies: 9, 10
+# Priority: medium
+# Description: Configure the MQTT Source Connector that bridges data from the MQTT broker to Kafka topics.
 # Details:
-Install Crossplane v1.14.0+ using Helm chart with the following providers:
-1. provider-helm v0.16.0+ for deploying Helm charts
-2. provider-aws v0.43.0+ for AWS resources (API Gateway, IAM)
-3. provider-github v0.7.0+ for repository operations
-4. provider-kubernetes v0.10.0+ for K8s resource management
-
-Implementation steps:
-```bash
-# Install Crossplane using Helm
-helm repo add crossplane-stable https://charts.crossplane.io/stable
-helm install crossplane crossplane-stable/crossplane --namespace crossplane-system --create-namespace --version 1.14.0
-
-# Install providers
-kubectl apply -f - <<EOF
-apiVersion: pkg.crossplane.io/v1
-kind: Provider
-metadata:
-  name: provider-aws
-spec:
-  package: xpkg.upbound.io/crossplane-contrib/provider-aws:v0.43.0
----
-apiVersion: pkg.crossplane.io/v1
-kind: Provider
-metadata:
-  name: provider-helm
-spec:
-  package: xpkg.upbound.io/crossplane-contrib/provider-helm:v0.16.0
----
-apiVersion: pkg.crossplane.io/v1
-kind: Provider
-metadata:
-  name: provider-github
-spec:
-  package: xpkg.upbound.io/crossplane-contrib/provider-github:v0.7.0
----
-apiVersion: pkg.crossplane.io/v1
-kind: Provider
-metadata:
-  name: provider-kubernetes
-spec:
-  package: xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v0.10.0
-EOF
-```
-
-Configure provider credentials using ProviderConfig resources for each provider. Set up appropriate IAM roles and service accounts with least privilege principles. For AWS, use IRSA (IAM Roles for Service Accounts) to avoid storing credentials.
+In the realtime-compositions.yaml file, implement the configuration for the MQTT Source Connector using the Lenses Stream Reactor connector. Configure the connector with the appropriate settings for connecting to the MQTT broker (connect_mqtt_hosts: tcp://mqtt5:1883) and mapping MQTT topics to Kafka topics (connect_mqtt_kcql: INSERT INTO device_data SELECT * FROM health/device_data WITHKEY(deviceId)). Set up authentication, quality of service, and error handling. Ensure the connector is deployed and managed by the Lenses Agent.
 
 # Test Strategy:
-1. Verify all providers are installed and in 'Healthy' state using `kubectl get providers`
-2. Test each provider with a simple resource creation (e.g., create a test S3 bucket with AWS provider)
-3. Validate provider permissions by attempting operations that should succeed and fail
-4. Create a simple Composition and XRD to verify Crossplane's core functionality
+Deploy the MQTT Source Connector configuration and verify that it is created correctly. Test the connector by publishing messages to the MQTT topic and verifying that they appear in the Kafka topic. Test error handling by simulating connection failures.
 
 # Subtasks:
-## 1. Install Crossplane Core Using Helm [pending]
+## 1. Define MQTT Source Connector Basic Configuration [pending]
 ### Dependencies: None
-### Description: Set up the Crossplane core components in the management cluster using Helm chart version 1.14.0+.
+### Description: Create the initial configuration for the MQTT Source Connector in the realtime-compositions.yaml file, including the connector name, class, and basic settings.
 ### Details:
-1. Add the Crossplane Helm repository
-2. Create a dedicated namespace 'crossplane-system'
-3. Install Crossplane using Helm with version 1.14.0 or newer
-4. Verify the installation by checking that all Crossplane pods are running
-5. Ensure the Crossplane CRDs are properly installed
+Add a new connector configuration section in the realtime-compositions.yaml file under the Lenses Agent component. Define the connector with name 'mqtt-source', class 'com.datamountaineer.streamreactor.connect.mqtt.source.MqttSourceConnector', and set the basic configuration parameters including 'connect.mqtt.hosts: tcp://mqtt5:1883' and 'tasks.max: 1'. Ensure the connector is managed by the Lenses Agent by setting the appropriate deployment settings.
 
-## 2. Install Required Crossplane Providers [pending]
+## 2. Configure MQTT Topic to Kafka Topic Mapping [pending]
 ### Dependencies: 11.1
-### Description: Install the four required Crossplane providers: AWS, Helm, GitHub, and Kubernetes with their specified versions.
+### Description: Implement the KCQL (Kafka Connect Query Language) configuration to map MQTT topics to Kafka topics with appropriate key extraction.
 ### Details:
-Create and apply Provider resources for each required provider with the specified versions:
-1. provider-aws v0.43.0+
-2. provider-helm v0.16.0+
-3. provider-github v0.7.0+
-4. provider-kubernetes v0.10.0+
+Add the 'connect.mqtt.kcql' parameter to the connector configuration with the value 'INSERT INTO device_data SELECT * FROM health/device_data WITHKEY(deviceId)'. This maps the MQTT topic 'health/device_data' to the Kafka topic 'device_data' and uses the 'deviceId' field as the message key. Ensure the Kafka topic exists or is set to be auto-created.
 
-Use the kubectl apply command with the YAML configuration as provided in the task description. Monitor the provider installation status until all providers are healthy.
-
-## 3. Configure AWS Provider with IRSA [pending]
-### Dependencies: 11.2
-### Description: Set up AWS provider credentials using IAM Roles for Service Accounts (IRSA) to avoid storing credentials directly.
+## 3. Implement MQTT Authentication and Security Settings [pending]
+### Dependencies: 11.1
+### Description: Configure the authentication credentials and security settings for connecting to the MQTT broker.
 ### Details:
-1. Create an IAM role with necessary permissions following least privilege principles
-2. Configure IRSA for the Crossplane AWS provider:
-   - Create a service account in the crossplane-system namespace
-   - Annotate the service account with the IAM role ARN
-   - Update the AWS provider deployment to use this service account
-3. Create and apply an AWS ProviderConfig that references the service account
-4. Test the AWS provider configuration with a simple AWS resource creation
+Add authentication parameters to the connector configuration including 'connect.mqtt.username' and 'connect.mqtt.password' with values matching the credentials configured in the MQTT broker (Task 9). Set the 'connect.mqtt.clean.session' to 'true' and configure 'connect.mqtt.connection.timeout' and 'connect.mqtt.keep.alive.interval' with appropriate values (e.g., 30000ms and 60000ms respectively).
 
-## 4. Configure Remaining Providers (Helm, GitHub, Kubernetes) [pending]
-### Dependencies: 11.2
-### Description: Set up credentials and configurations for the Helm, GitHub, and Kubernetes providers.
+## 4. Configure Quality of Service and Error Handling [pending]
+### Dependencies: 11.2, 11.3
+### Description: Set up the quality of service level and error handling mechanisms for the MQTT Source Connector.
 ### Details:
-For each provider:
+Configure 'connect.mqtt.qos' parameter to an appropriate QoS level (0, 1, or 2, with 1 recommended for balanced reliability). Add error handling parameters including 'connect.mqtt.connection.clean': true, 'connect.mqtt.throw.on.error': false, and 'connect.mqtt.retry.backoff.ms': 3000. Set up 'errors.tolerance' to 'all' and 'errors.log.enable' to 'true' to ensure errors are logged but don't stop the connector.
 
-1. Helm Provider:
-   - Create a ProviderConfig that uses in-cluster configuration
-   - Configure any necessary release repositories
-
-2. GitHub Provider:
-   - Create a GitHub personal access token with appropriate permissions
-   - Store the token as a Kubernetes secret
-   - Create a ProviderConfig that references this secret
-
-3. Kubernetes Provider:
-   - Set up a ProviderConfig using in-cluster configuration for same-cluster resources
-   - For multi-cluster management, create kubeconfig secrets and reference them in additional ProviderConfigs
-
-## 5. Implement Least Privilege Security Controls [pending]
-### Dependencies: 11.3, 11.4
-### Description: Review and refine all provider configurations to ensure they follow least privilege principles and implement proper security controls.
+## 5. Implement Connector Monitoring and Validation [pending]
+### Dependencies: 11.4
+### Description: Configure monitoring settings and validate the complete MQTT Source Connector configuration.
 ### Details:
-1. Audit all provider configurations and associated IAM roles/permissions
-2. Restrict AWS IAM role permissions to only what's necessary for the specific resources being managed
-3. Limit GitHub token permissions to only required scopes
-4. For Kubernetes provider, ensure RBAC is properly configured with minimal permissions
-5. Document all security configurations and permissions
-6. Implement proper secret management for any credentials
-7. Set up monitoring for Crossplane components
+Add monitoring parameters to track connector performance, including 'connect.mqtt.kcql.monitoring.enabled': true and appropriate JMX metrics settings. Review the complete connector configuration to ensure all required parameters are set correctly. Add comments in the YAML file to document the purpose of each configuration section. Ensure the connector is properly integrated with the Lenses Agent component defined in Task 10.
 

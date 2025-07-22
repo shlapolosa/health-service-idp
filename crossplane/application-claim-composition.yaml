@@ -1031,3 +1031,662 @@ spec:
         string:
           fmt: "redis://:%s-redis-pass@claims-redis-master.claims.svc.cluster.local:6379/0"
           type: Format
+
+  # Configuration Generator for Realtime Platform
+  - name: realtime-config-generator
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: placeholder
+              namespace: placeholder
+            spec:
+              template:
+                spec:
+                  restartPolicy: OnFailure
+                  containers:
+                  - name: config-generator
+                    image: busybox:latest
+                    command:
+                    - /bin/sh
+                    - -c
+                    - |
+                      set -e
+                      echo "Generating Lenses configuration files..."
+                      
+                      # Create Lenses HQ config.yaml
+                      cat > /tmp/hq-config.yaml << EOF
+                      lenses:
+                        http:
+                          port: 9991
+                          bind: 0.0.0.0
+                        authentication:
+                          default:
+                            enabled: true
+                            username: admin
+                            password: admin
+                        license:
+                          key: "${LENSES_LICENSE_KEY}"
+                        database:
+                          url: "jdbc:postgresql://${POSTGRES_HOST}:5432/${POSTGRES_DB}"
+                          username: "${POSTGRES_USER}"
+                          password: "${POSTGRES_PASSWORD}"
+                        kafka:
+                          brokers:
+                            - "${KAFKA_HOST}:9092"
+                          schema-registry:
+                            url: "http://${KAFKA_HOST}:8081"
+                      EOF
+                      
+                      # Create Lenses Agent lenses.conf
+                      cat > /tmp/agent-config.conf << EOF
+                      lenses.hq.url=${LENSES_HQ_URL}
+                      lenses.hq.user=admin
+                      lenses.hq.password=admin
+                      lenses.heap.opts=-Xmx1536m -Xms512m
+                      EOF
+                      
+                      # Create provisioning.yaml for MQTT/Kafka connectors
+                      cat > /tmp/provisioning.yaml << EOF
+                      connectors:
+                        - name: "mqtt-source-connector"
+                          config:
+                            connector.class: "io.lenses.streamreactor.connect.mqtt.source.MqttSourceConnector"
+                            tasks.max: "1"
+                            connect.mqtt.hosts: "tcp://${MQTT_HOST}:1883"
+                            connect.mqtt.username: "${MQTT_USER}"
+                            connect.mqtt.password: "${MQTT_PASSWORD}"
+                            connect.mqtt.kcql: "INSERT INTO device_data SELECT * FROM health/device_data WITHKEY(deviceId)"
+                            connect.mqtt.service.quality: "1"
+                      EOF
+                      
+                      # Create stream processing queries for data decomposition
+                      cat > /tmp/stream-queries.sql << EOF
+                      -- Blood Pressure Data Decomposition
+                      INSERT INTO blood_pressure_device_topic
+                      STORE KEY AS STRING VALUE AS AVRO
+                      SELECT STREAM
+                          _value.deviceId AS _key,
+                          _value.deviceId AS deviceId,
+                          _value.systolic AS systolic,
+                          _value.diastolic AS diastolic,
+                          _value.latitude AS latitude,
+                          _value.longitude AS longitude,
+                          _value.timestamp AS createdTime
+                      FROM device_data;
+                      
+                      -- Heart Rate Data Decomposition
+                      INSERT INTO heart_rate_device_topic
+                      STORE KEY AS STRING VALUE AS AVRO
+                      SELECT STREAM
+                          _value.deviceId AS _key,
+                          _value.deviceId AS deviceId,
+                          _value.heartRate AS value,
+                          _value.latitude AS latitude,
+                          _value.longitude AS longitude,
+                          _value.timestamp AS createdTime
+                      FROM device_data;
+                      
+                      -- Oxygen Saturation Data Decomposition
+                      INSERT INTO oxygen_saturation_device_topic
+                      STORE KEY AS STRING VALUE AS AVRO
+                      SELECT STREAM
+                          _value.deviceId AS _key,
+                          _value.deviceId AS deviceId,
+                          _value.oxygenSaturation AS value,
+                          _value.latitude AS latitude,
+                          _value.longitude AS longitude,
+                          _value.timestamp AS createdTime
+                      FROM device_data;
+                      
+                      -- Temperature Data Decomposition
+                      INSERT INTO temperature_device_topic
+                      STORE KEY AS STRING VALUE AS AVRO
+                      SELECT STREAM
+                          _value.deviceId AS _key,
+                          _value.deviceId AS deviceId,
+                          _value.bodyTemperature AS value,
+                          _value.latitude AS latitude,
+                          _value.longitude AS longitude,
+                          _value.timestamp AS createdTime
+                      FROM device_data;
+                      EOF
+                      
+                      # Create Avro schema definitions
+                      cat > /tmp/avro-schemas.json << EOF
+                      {
+                        "device_data": {
+                          "type": "record",
+                          "name": "HealthData",
+                          "namespace": "com.health.streaming",
+                          "fields": [
+                            {"name": "deviceId", "type": "string"},
+                            {"name": "timestamp", "type": "long"},
+                            {"name": "heartRate", "type": "int"},
+                            {"name": "systolic", "type": "int"},
+                            {"name": "diastolic", "type": "int"},
+                            {"name": "oxygenSaturation", "type": "int"},
+                            {"name": "bodyTemperature", "type": "double"},
+                            {"name": "latitude", "type": "double"},
+                            {"name": "longitude", "type": "double"}
+                          ]
+                        },
+                        "blood_pressure_device_topic": {
+                          "type": "record",
+                          "name": "BloodPressureData",
+                          "namespace": "com.health.streaming",
+                          "fields": [
+                            {"name": "deviceId", "type": "string"},
+                            {"name": "systolic", "type": "int"},
+                            {"name": "diastolic", "type": "int"},
+                            {"name": "latitude", "type": "double"},
+                            {"name": "longitude", "type": "double"},
+                            {"name": "createdTime", "type": "long"}
+                          ]
+                        },
+                        "heart_rate_device_topic": {
+                          "type": "record",
+                          "name": "HeartRateData",
+                          "namespace": "com.health.streaming",
+                          "fields": [
+                            {"name": "deviceId", "type": "string"},
+                            {"name": "value", "type": "int"},
+                            {"name": "latitude", "type": "double"},
+                            {"name": "longitude", "type": "double"},
+                            {"name": "createdTime", "type": "long"}
+                          ]
+                        }
+                      }
+                      EOF
+                      
+                      # Create ping-pong demo connector configurations
+                      cat > /tmp/ping-pong-connectors.json << EOF
+                      {
+                        "ping-mqtt-source": {
+                          "name": "ping-mqtt-source",
+                          "connector.class": "io.lenses.streamreactor.connect.mqtt.source.MqttSourceConnector",
+                          "tasks.max": "1",
+                          "connect.mqtt.hosts": "tcp://${MQTT_HOST}:1883",
+                          "connect.mqtt.username": "${MQTT_USER}",
+                          "connect.mqtt.password": "${MQTT_PASSWORD}",
+                          "connect.mqtt.kcql": "INSERT INTO ping_topic SELECT messageId, content, timestamp, source FROM ping/messages WITHKEY(messageId)",
+                          "connect.mqtt.service.quality": "1",
+                          "errors.tolerance": "all"
+                        }
+                      }
+                      EOF
+                      
+                      # Create ping-pong stream processing queries
+                      cat > /tmp/ping-pong-queries.sql << EOF
+                      -- Ping to Pong Transformation
+                      INSERT INTO pong_topic
+                      STORE KEY AS STRING VALUE AS AVRO
+                      SELECT STREAM
+                          _value.messageId AS _key,
+                          STRUCT(
+                            messageId := _value.messageId,
+                            originalContent := _value.content,
+                            response := CONCAT('pong: ', _value.content),
+                            pingTimestamp := _value.timestamp,
+                            pongTimestamp := UNIX_TIMESTAMP() * 1000,
+                            processingTimeMs := (UNIX_TIMESTAMP() * 1000) - _value.timestamp
+                          ) AS _value
+                      FROM ping_topic;
+                      
+                      -- Ping Analytics Stream
+                      INSERT INTO ping_analytics_topic
+                      STORE KEY AS STRING VALUE AS AVRO
+                      SELECT STREAM
+                          _value.messageId AS _key,
+                          STRUCT(
+                            messageId := _value.messageId,
+                            processingTimeMs := _value.processingTimeMs,
+                            timestamp := _value.pongTimestamp,
+                            messageCount := COUNT(*) OVER (RANGE INTERVAL '1' MINUTE PRECEDING)
+                          ) AS _value
+                      FROM pong_topic
+                      WHERE _value.processingTimeMs > 0;
+                      EOF
+                      
+                      echo "Configuration files generated successfully"
+                    env:
+                    - name: LENSES_LICENSE_KEY
+                      value: "license_key_2SFZ0BesCNu6NFv0-EOSIvY22ChSzNWXa5nSds2l4z3y7aBgRPKCVnaeMlS57hHNVboR2kKaQ8Mtv1LFt0MPBBACGhDT5If8PmTraUM5xXLz4MYv"
+                    - name: POSTGRES_HOST
+                      value: "placeholder-postgres"
+                    - name: POSTGRES_DB
+                      value: "lenses"
+                    - name: POSTGRES_USER
+                      value: "lenses"
+                    - name: POSTGRES_PASSWORD
+                      value: "lenses"
+                    - name: KAFKA_HOST
+                      value: "placeholder-kafka"
+                    - name: MQTT_HOST
+                      value: "placeholder-mqtt"
+                    - name: MQTT_USER
+                      value: "realtime-user"
+                    - name: MQTT_PASSWORD
+                      value: "realtime-pass"
+                    - name: LENSES_HQ_URL
+                      value: "http://placeholder-lenses-hq:9991"
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-config-generator"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-config-generator"
+    # Only create if realtime parameter is specified
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          "": "false"
+          "*": "true"
+    # Configure environment variables with proper hostnames
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[1].value
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-postgres.%s.svc.cluster.local"
+          type: Format
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[5].value
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-kafka.%s.svc.cluster.local"
+          type: Format
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[6].value
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-mqtt.%s.svc.cluster.local"
+          type: Format
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[9].value
+      transforms:
+      - type: string
+        string:
+          fmt: "http://%s-lenses-hq.%s.svc.cluster.local:9991"
+          type: Format
+
+  # Realtime Platform (Kafka + MQTT + Lenses + Metabase)
+  - name: realtime-platform
+    base:
+      apiVersion: helm.crossplane.io/v1beta1
+      kind: Release
+      spec:
+        forProvider:
+          chart:
+            name: realtime-platform
+            repository: https://charts.bitnami.com/bitnami
+            version: "1.0.0"  # Custom chart for realtime platform
+          namespace: placeholder
+          skipCreateNamespace: false
+          values:
+            # Kafka configuration (using lensesio/fast-data-dev for all-in-one)
+            kafka:
+              enabled: true
+              image:
+                repository: lensesio/fast-data-dev
+                tag: "3.9.0"
+              service:
+                type: ClusterIP
+                ports:
+                  kafka: 9092
+                  schemaRegistry: 8081
+                  kafkaConnect: 8083
+              environment:
+                ADV_HOST: "realtime-kafka"
+                RUNNING_SAMPLEDATA: "0"  # Disable demo data
+                RUNTESTS: "0"
+              persistence:
+                enabled: true
+                size: "10Gi"
+            # MQTT Broker configuration
+            mqtt:
+              enabled: true
+              image:
+                repository: eclipse-mosquitto
+                tag: "latest"
+              service:
+                type: ClusterIP
+                ports:
+                  mqtt: 1883
+                  websockets: 9001
+              auth:
+                enabled: true
+                users:
+                  - username: "realtime-user"
+                    password: "realtime-pass"
+              persistence:
+                enabled: true
+                size: "5Gi"
+            # Lenses HQ configuration
+            lensesHq:
+              enabled: true
+              image:
+                repository: lensting/lenses-hq
+                tag: "6-preview"
+              service:
+                type: ClusterIP
+                port: 9991
+              licenseKey: "license_key_2SFZ0BesCNu6NFv0-EOSIvY22ChSzNWXa5nSds2l4z3y7aBgRPKCVnaeMlS57hHNVboR2kKaQ8Mtv1LFt0MPBBACGhDT5If8PmTraUM5xXLz4MYv"
+            # Lenses Agent configuration  
+            lensesAgent:
+              enabled: true
+              image:
+                repository: lensting/lenses-agent
+                tag: "6-preview"
+              hqUrl: "http://realtime-lenses-hq:9991"
+              heapOpts: "-Xmx1536m -Xms512m"
+            # Metabase configuration
+            metabase:
+              enabled: true
+              image:
+                repository: metabase/metabase
+                tag: "latest"
+              service:
+                type: ClusterIP
+                port: 3000
+              database:
+                type: postgres
+                host: "placeholder-postgres"
+                name: "metabasedb"
+                user: "metabase"
+                password: "metabase-pass"
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-platform"
+    # Only create if realtime parameter is specified
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          "": "false"
+          "*": "true"
+    # Configure platform name
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: spec.forProvider.values.platformName
+    # Connect to existing PostgreSQL database
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.values.metabase.database.host
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-postgres.%s.svc.cluster.local"
+          type: Format
+
+  # Realtime Platform Secrets
+  - name: realtime-mqtt-secret
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: placeholder
+              namespace: placeholder
+            stringData:
+              MQTT_HOST: "placeholder"
+              MQTT_PORT: "1883"
+              MQTT_USER: "realtime-user"
+              MQTT_PASSWORD: "realtime-pass"
+              MQTT_WEBSOCKET_PORT: "9001"
+              MQTT_TOPIC_PREFIX: "health"
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-mqtt-secret"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-mqtt-secret"
+    # Only create if realtime parameter is specified
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          "": "false"
+          "*": "true"
+    # Configure MQTT host
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: spec.forProvider.manifest.stringData.MQTT_HOST
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-mqtt.%s.svc.cluster.local"
+          type: Format
+
+  - name: realtime-kafka-secret
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: placeholder
+              namespace: placeholder
+            stringData:
+              KAFKA_BOOTSTRAP_SERVERS: "placeholder"
+              KAFKA_SCHEMA_REGISTRY_URL: "placeholder"
+              KAFKA_CONNECT_URL: "placeholder"
+              KAFKA_TOPICS: "device_data,blood_pressure_device_topic,heart_rate_device_topic"
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-kafka-secret"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-kafka-secret"
+    # Only create if realtime parameter is specified
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          "": "false"
+          "*": "true"
+    # Configure Kafka endpoints
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: spec.forProvider.manifest.stringData.KAFKA_BOOTSTRAP_SERVERS
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-kafka.%s.svc.cluster.local:9092"
+          type: Format
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: spec.forProvider.manifest.stringData.KAFKA_SCHEMA_REGISTRY_URL
+      transforms:
+      - type: string
+        string:
+          fmt: "http://%s-kafka.%s.svc.cluster.local:8081"
+          type: Format
+
+  - name: realtime-lenses-secret
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: placeholder
+              namespace: placeholder
+            stringData:
+              LENSES_URL: "placeholder"
+              LENSES_USER: "admin"
+              LENSES_PASSWORD: "admin"
+              LENSES_HQ_URL: "placeholder"
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-lenses-secret"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-lenses-secret"
+    # Only create if realtime parameter is specified
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          "": "false"
+          "*": "true"
+    # Configure Lenses endpoints
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: spec.forProvider.manifest.stringData.LENSES_URL
+      transforms:
+      - type: string
+        string:
+          fmt: "http://%s-lenses-hq.%s.svc.cluster.local:9991"
+          type: Format
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: spec.forProvider.manifest.stringData.LENSES_HQ_URL
+      transforms:
+      - type: string
+        string:
+          fmt: "http://%s-lenses-hq.%s.svc.cluster.local:9991"
+          type: Format
+
+  - name: realtime-metabase-secret
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: placeholder
+              namespace: placeholder
+            stringData:
+              METABASE_URL: "placeholder"
+              METABASE_USER: "admin@example.com"
+              METABASE_PASSWORD: "metabase123"
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-metabase-secret"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-metabase-secret"
+    # Only create if realtime parameter is specified
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          "": "false"
+          "*": "true"
+    # Configure Metabase endpoint
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: spec.forProvider.manifest.stringData.METABASE_URL
+      transforms:
+      - type: string
+        string:
+          fmt: "http://%s-metabase.%s.svc.cluster.local:3000"
+          type: Format

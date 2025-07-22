@@ -1,7 +1,7 @@
 [project]
 name = "agent-common"
-version = "0.1.0"
-description = "Shared agent base classes and utilities"
+version = "1.1.0"
+description = "Shared agent base classes and utilities with real-time streaming capabilities"
 authors = [
     {name = "shlapolosa",email = "socrates.hlapolosa@gmail.com"}
 ]
@@ -9,8 +9,21 @@ authors = [
 requires-python = ">=3.10"
 dependencies = [
     "pydantic (>=2.11.7,<3.0.0)",
-    "fastapi (>=0.115.14,<0.116.0)"
+    "fastapi (>=0.115.14,<0.116.0)",
+    # Real-time streaming dependencies
+    "aiokafka (>=0.8.0,<0.9.0)",
+    "asyncio-mqtt (>=0.16.0,<0.17.0)",
+    "aioredis (>=2.0.0,<3.0.0)",
+    "websockets (>=11.0,<12.0)",
+    # Additional utilities
+    "httpx (>=0.25.0,<0.26.0)"
 ]
+
+[project.optional-dependencies]
+# Optional dependencies for specific features
+snowflake = ["snowflake-connector-python[pandas]"]
+monitoring = ["prometheus-client", "opentelemetry-api"]
+testing = ["pytest", "pytest-asyncio", "pytest-mock"]
 
 
 [build-system]

@@ -1,0 +1,450 @@
+# Examples of using the Realtime Platform ComponentDefinitions
+# These show how developers can create realtime applications with minimal configuration
+
+---
+# Example 1: Minimal Realtime Platform
+# Just specify a name - everything else uses sensible defaults
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: simple-realtime-app
+  namespace: default
+  annotations:
+    oam.dev/description: "Simplest possible realtime platform setup"
+spec:
+  components:
+  - name: my-platform
+    type: realtime-platform
+    properties:
+      name: simple-health
+      # All other properties use defaults:
+      # database: postgres (default)
+      # visualization: metabase (default)
+      # iot: true (default)
+
+---
+# Example 2: Health Data Streaming Platform
+# Comprehensive setup for healthcare IoT applications
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: health-streaming-platform
+  namespace: default
+  annotations:
+    oam.dev/description: "Complete health data streaming platform"
+spec:
+  components:
+  
+  # Core realtime platform
+  - name: health-platform
+    type: realtime-platform
+    properties:
+      name: health-data
+      database: postgres
+      visualization: metabase
+      iot: true
+      
+      # Custom Lenses configuration
+      lensesConfig:
+        heapSize: "2048m"
+        enableUI: true
+      
+      # Custom MQTT configuration for health devices
+      mqttConfig:
+        users:
+          - username: health-device
+            password: secure-health-123
+          - username: monitoring-app
+            password: app-access-456
+        persistenceSize: "10Gi"
+        enableWebSockets: true
+        qosLevel: 1
+      
+      # Kafka configuration for health topics
+      kafkaConfig:
+        topics:
+          - "device_data"
+          - "blood_pressure_device_topic"
+          - "heart_rate_device_topic"
+          - "oxygen_saturation_device_topic"
+          - "temperature_device_topic"
+        retention: "7d"
+        partitions: 5
+      
+      # Resource allocation
+      resources:
+        cpu: "4000m"
+        memory: "8Gi"
+      
+      # Auto-scaling configuration
+      scaling:
+        minReplicas: 2
+        maxReplicas: 5
+        targetCPU: 80
+
+  # Health data processing service that uses the platform
+  - name: health-processor
+    type: webservice
+    properties:
+      name: health-data-processor
+      language: python
+      framework: fastapi
+      image: "socrates12345/health-data-processor:latest"
+      realtime: "health-data"  # References the realtime platform above
+      websocket: true
+      streaming:
+        enabled: true
+        topics:
+          - "device_data"
+          - "blood_pressure_device_topic"
+        consumerGroup: "health-processor-group"
+      environment:
+        SERVICE_TYPE: "HEALTH_DATA_PROCESSOR"
+        ALERT_THRESHOLDS: '{"heartRate": 100, "systolic": 140}'
+        WEBSOCKET_ENDPOINT: "/ws/health"
+    traits:
+    - type: ingress
+      properties:
+        domain: health-processor.local
+        path: "/"
+
+---
+# Example 3: IoT Sensor Network
+# Specialized setup for IoT sensor data collection
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: iot-sensor-network
+  namespace: default
+  annotations:
+    oam.dev/description: "IoT sensor data collection and processing"
+spec:
+  components:
+  
+  # IoT-focused MQTT broker
+  - name: sensor-broker
+    type: iot-broker
+    properties:
+      name: sensor-network
+      mqttPort: 1883
+      websocketPort: 9001
+      
+      authentication:
+        enabled: true
+        users:
+          - username: sensor-001
+            password: sensor-secure-001
+          - username: gateway-main
+            password: gateway-secure-main
+      
+      topics:
+        - "sensors/temperature"
+        - "sensors/humidity"
+        - "sensors/pressure"
+        - "sensors/motion"
+      
+      # Automatic Kafka integration
+      connector:
+        enabled: true
+        kafkaTopic: "sensor_data"
+        mqttTopic: "sensors/+"
+        keyField: "sensorId"
+        qos: 1
+        errorPolicy: "RETRY"
+      
+      persistence:
+        enabled: true
+        size: "20Gi"
+
+  # Stream processing for sensor data
+  - name: sensor-processor
+    type: stream-processor
+    properties:
+      name: sensor-analytics
+      
+      # Data transformation queries
+      queries:
+        - name: temperature-alerts
+          sql: |
+            INSERT INTO temperature_alerts
+            SELECT STREAM *
+            FROM sensor_data
+            WHERE _value.type = 'temperature' AND _value.value > 30.0
+        
+        - name: hourly-averages
+          sql: |
+            INSERT INTO hourly_stats
+            SELECT STREAM
+                _value.sensorId,
+                AVG(_value.value) as avg_value,
+                COUNT(*) as message_count,
+                TUMBLE_START(ROWTIME, INTERVAL '1' HOUR) as window_start
+            FROM sensor_data
+            GROUP BY _value.sensorId, TUMBLE(ROWTIME, INTERVAL '1' HOUR)
+      
+      topics:
+        input: ["sensor_data"]
+        output: ["temperature_alerts", "hourly_stats"]
+      
+      errorHandling:
+        policy: "RETRY"
+        retries: 5
+        deadLetterTopic: "sensor_errors"
+      
+      processing:
+        parallelism: 3
+        checkpointInterval: "60s"
+        stateBackend: "rocksdb"
+
+  # Analytics dashboard for sensor data
+  - name: sensor-dashboard
+    type: analytics-dashboard
+    properties:
+      name: sensor-analytics
+      dashboardType: metabase
+      
+      dataSources:
+        - name: sensor-kafka
+          type: kafka
+          connectionString: "kafka://sensor-network-kafka:9092"
+        - name: sensor-db
+          type: postgres
+          secretRef: "sensor-network-db-secret"
+      
+      dashboards:
+        - name: sensor-overview
+          template: "iot-sensors"
+          autoCreate: true
+        - name: temperature-monitoring
+          template: "temperature-alerts"
+          autoCreate: true
+      
+      alerts:
+        enabled: true
+        channels:
+          - type: email
+            config:
+              recipients: ["ops@company.com"]
+          - type: slack
+            config:
+              webhook: "https://hooks.slack.com/..."
+
+---
+# Example 4: Financial Trading Data Stream
+# High-throughput financial data processing
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: trading-data-platform
+  namespace: default
+  annotations:
+    oam.dev/description: "High-frequency trading data processing"
+spec:
+  components:
+  
+  # High-performance realtime platform
+  - name: trading-platform
+    type: realtime-platform
+    properties:
+      name: trading-data
+      database: postgres
+      visualization: grafana  # Using Grafana for financial dashboards
+      iot: false  # No MQTT needed for trading data
+      
+      # High-performance Kafka configuration
+      kafkaConfig:
+        topics:
+          - "market_data"
+          - "trade_executions"
+          - "risk_metrics"
+          - "portfolio_updates"
+        retention: "30d"
+        partitions: 10
+        replicationFactor: 3
+      
+      # Resource allocation for high throughput
+      resources:
+        cpu: "8000m"
+        memory: "16Gi"
+      
+      scaling:
+        minReplicas: 3
+        maxReplicas: 10
+        targetCPU: 60
+
+  # Trading data processor
+  - name: trading-processor
+    type: webservice
+    properties:
+      name: trading-engine
+      language: java
+      framework: springboot
+      image: "company/trading-engine:latest"
+      realtime: "trading-data"
+      
+      streaming:
+        enabled: true
+        topics:
+          - "market_data"
+          - "trade_executions"
+        consumerGroup: "trading-engine"
+        autoOffsetReset: "earliest"
+      
+      environment:
+        SERVICE_TYPE: "TRADING_ENGINE"
+        RISK_LIMITS: "enabled"
+        LATENCY_TARGET: "1ms"
+        
+      # High-performance resources
+      resources:
+        cpu: "4000m"
+        memory: "8Gi"
+
+---
+# Example 5: Multi-Application Shared Platform
+# Multiple applications sharing the same realtime infrastructure
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: shared-realtime-platform
+  namespace: default
+  annotations:
+    oam.dev/description: "Shared realtime platform for multiple applications"
+spec:
+  components:
+  
+  # Shared realtime platform
+  - name: shared-platform
+    type: realtime-platform
+    properties:
+      name: shared-streaming
+      database: postgres
+      visualization: metabase
+      iot: true
+      
+      # Configuration for multiple use cases
+      mqttConfig:
+        users:
+          - username: iot-devices
+            password: iot-secure-pass
+          - username: mobile-apps
+            password: mobile-secure-pass
+          - username: web-apps
+            password: web-secure-pass
+        persistenceSize: "50Gi"
+      
+      kafkaConfig:
+        topics:
+          - "user_events"
+          - "system_metrics"
+          - "notifications"
+          - "analytics_data"
+        retention: "14d"
+        partitions: 8
+      
+      resources:
+        cpu: "6000m"
+        memory: "12Gi"
+
+  # Application 1: User Analytics
+  - name: user-analytics
+    type: webservice
+    properties:
+      name: user-analytics-service
+      language: python
+      framework: fastapi
+      realtime: "shared-streaming"
+      websocket: true
+      streaming:
+        enabled: true
+        topics: ["user_events", "analytics_data"]
+        consumerGroup: "user-analytics"
+      environment:
+        SERVICE_TYPE: "USER_ANALYTICS"
+
+  # Application 2: Notification Service
+  - name: notifications
+    type: webservice
+    properties:
+      name: notification-service
+      language: python
+      framework: fastapi
+      realtime: "shared-streaming"
+      streaming:
+        enabled: true
+        topics: ["notifications"]
+        consumerGroup: "notification-service"
+      environment:
+        SERVICE_TYPE: "NOTIFICATIONS"
+
+  # Application 3: System Monitoring
+  - name: monitoring
+    type: webservice
+    properties:
+      name: system-monitoring
+      language: python
+      framework: fastapi
+      realtime: "shared-streaming"
+      websocket: true
+      streaming:
+        enabled: true
+        topics: ["system_metrics"]
+        consumerGroup: "monitoring-service"
+      environment:
+        SERVICE_TYPE: "SYSTEM_MONITORING"
+
+---
+# Example 6: Development/Testing Environment
+# Lightweight setup for development and testing
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: dev-realtime-platform
+  namespace: development
+  annotations:
+    oam.dev/description: "Development environment for realtime applications"
+spec:
+  components:
+  
+  # Lightweight platform for development
+  - name: dev-platform
+    type: realtime-platform
+    properties:
+      name: dev-streaming
+      database: postgres
+      visualization: metabase
+      iot: true
+      
+      # Minimal resource allocation
+      resources:
+        cpu: "1000m"
+        memory: "2Gi"
+      
+      # Short retention for development
+      kafkaConfig:
+        topics: ["dev_data", "test_messages"]
+        retention: "1h"
+        partitions: 1
+      
+      # Simple MQTT setup
+      mqttConfig:
+        users:
+          - username: dev-user
+            password: dev-pass
+        persistenceSize: "1Gi"
+
+  # Test application
+  - name: test-app
+    type: webservice
+    properties:
+      name: test-realtime-app
+      language: python
+      framework: fastapi
+      realtime: "dev-streaming"
+      websocket: true
+      streaming:
+        enabled: true
+        topics: ["dev_data"]
+      environment:
+        SERVICE_TYPE: "TESTING"
+        LOG_LEVEL: "DEBUG"

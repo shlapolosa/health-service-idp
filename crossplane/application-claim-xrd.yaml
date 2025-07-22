@@ -59,6 +59,40 @@ spec:
                 type: boolean
                 description: Whether to expose the API via AWS API Gateway
                 default: false
+              realtime:
+                type: string
+                description: References a realtime-platform component name for automatic integration
+                pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+                maxLength: 63
+              websocket:
+                type: boolean
+                description: Whether to enable WebSocket endpoints for real-time communication
+                default: false
+              streaming:
+                type: object
+                description: Kafka streaming configuration for real-time data processing
+                properties:
+                  enabled:
+                    type: boolean
+                    description: Enable Kafka streaming capabilities
+                    default: false
+                  topics:
+                    type: array
+                    description: Kafka topics to create and subscribe to
+                    items:
+                      type: string
+                      pattern: '^[a-zA-Z0-9._-]+$'
+                      maxLength: 249
+                  consumerGroup:
+                    type: string
+                    description: Kafka consumer group ID
+                    pattern: '^[a-zA-Z0-9._-]+$'
+                    maxLength: 255
+                  autoOffsetReset:
+                    type: string
+                    description: Kafka consumer auto offset reset strategy
+                    enum: [earliest, latest, none]
+                    default: latest
             required:
             - name
             - language
@@ -118,6 +152,50 @@ spec:
                       credentials:
                         type: string
                         description: Secret name containing cache credentials
+                  realtime:
+                    type: object
+                    description: Real-time platform connection information
+                    properties:
+                      platformName:
+                        type: string
+                        description: Name of the connected realtime-platform component
+                      mqttEndpoint:
+                        type: string
+                        description: MQTT broker endpoint
+                      kafkaEndpoint:
+                        type: string
+                        description: Kafka cluster endpoint
+                      schemaRegistryEndpoint:
+                        type: string
+                        description: Schema registry endpoint
+                      analyticsEndpoint:
+                        type: string
+                        description: Analytics dashboard endpoint (Metabase)
+                      streamingEndpoint:
+                        type: string
+                        description: Stream processing UI endpoint (Lenses)
+                      websocketEndpoint:
+                        type: string
+                        description: WebSocket endpoint if websocket is enabled
+                      credentials:
+                        type: object
+                        description: Secrets containing connection credentials
+                        properties:
+                          mqtt:
+                            type: string
+                            description: Secret name for MQTT credentials
+                          kafka:
+                            type: string
+                            description: Secret name for Kafka credentials
+                          database:
+                            type: string
+                            description: Secret name for database credentials
+                          analytics:
+                            type: string
+                            description: Secret name for analytics credentials
+                          streaming:
+                            type: string
+                            description: Secret name for streaming platform credentials
               cicd:
                 type: object
                 description: CI/CD pipeline information

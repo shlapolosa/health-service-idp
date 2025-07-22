@@ -1,197 +1,43 @@
 # Task ID: 15
-# Title: Implement ApplicationClaim CRD and Composition
+# Title: Implement Secret Generation and Management
 # Status: pending
-# Dependencies: 11, 14
+# Dependencies: 7, 8, 9, 10, 13
 # Priority: high
-# Description: Create the ApplicationClaim CRD and Crossplane Composition to provision application resources including GitHub repo, CI/CD pipeline, Knative service, and dependencies.
+# Description: Implement the generation and management of connection secrets for all components in the real-time platform.
 # Details:
-1. Define the ApplicationClaim CRD with the schema specified in the PRD
-2. Create a Crossplane Composition that provisions:
-   - GitHub repository with appropriate template based on language/framework
-   - GitHub Actions workflow for CI/CD to Docker Hub
-   - Knative Service via OAM components
-   - ArgoCD Application for GitOps
-   - Database and cache if specified
-
-```yaml
-# ApplicationClaim XRD
-apiVersion: apiextensions.crossplane.io/v1
-kind: CompositeResourceDefinition
-metadata:
-  name: xapplicationclaims.platform.example.org
-spec:
-  group: platform.example.org
-  names:
-    kind: XApplicationClaim
-    plural: xapplicationclaims
-  claimNames:
-    kind: ApplicationClaim
-    plural: applicationclaims
-  versions:
-    - name: v1alpha1
-      served: true
-      referenceable: true
-      schema:
-        openAPIV3Schema:
-          type: object
-          properties:
-            spec:
-              type: object
-              properties:
-                name:
-                  type: string
-                language:
-                  type: string
-                  enum: [python, java]
-                framework:
-                  type: string
-                  enum: [fastapi, springboot]
-                hasFrontend:
-                  type: boolean
-                database:
-                  type: string
-                  enum: [postgres, none]
-                cache:
-                  type: string
-                  enum: [redis, none]
-                exposeApi:
-                  type: boolean
-              required: [name, language, framework]
-```
-
-Implement template repositories for each language/framework combination with proper Dockerfile, CI/CD workflow, and application structure. Use GitHub provider to create repositories and configure webhooks. Create OAM Component and Application definitions for Knative services.
+In the realtime-compositions.yaml file, implement the logic for generating and managing connection secrets for all components. Create standardized secret names following the {name}-{service}-secret pattern. Include all necessary connection details (host, port, database, user, password) for each service. Configure the secrets to be exposed in the RealtimePlatformClaim status. Implement integration with External Secrets Operator for Snowflake credentials if the snowflake parameter is enabled.
 
 # Test Strategy:
-1. Apply the ApplicationClaim CRD and verify it's accepted
-2. Create a test claim for each language/framework combination
-3. Verify GitHub repository is created with correct template
-4. Test CI/CD pipeline by making a code change
-5. Verify Knative service is deployed and accessible
-6. Test database and cache provisioning if specified
-7. Validate that secrets are properly injected into the application
+Deploy the Secret Generation and Management logic and verify that all secrets are created correctly. Test that the secrets contain the correct connection details. Verify that the secrets are exposed in the RealtimePlatformClaim status. Test the integration with External Secrets Operator if applicable.
 
 # Subtasks:
-## 1. Define and implement ApplicationClaim CRD [pending]
+## 1. Define Secret Naming Convention and Structure [pending]
 ### Dependencies: None
-### Description: Create the ApplicationClaim Custom Resource Definition (CRD) based on the schema provided in the PRD, ensuring all required fields and validations are properly implemented.
+### Description: Establish a standardized naming convention and structure for all connection secrets in the real-time platform following the {name}-{service}-secret pattern. Define the required fields for each type of service (PostgreSQL, Kafka, MQTT, etc.).
 ### Details:
-1. Create the CompositeResourceDefinition (XRD) YAML file for ApplicationClaim as specified in the PRD
-2. Ensure proper validation for enum fields (language, framework, database, cache)
-3. Add defaulting logic where appropriate (e.g., hasFrontend=false, database=none, cache=none if not specified)
-4. Include proper descriptions for each field to aid users
-5. Apply the CRD to the cluster and verify it can be created
+In the realtime-compositions.yaml file, create a helper function that generates secret names consistently. Define templates for different service types with all necessary connection fields: PostgreSQL (host, port, database, user, password), Kafka (bootstrap servers, schema registry URL), MQTT (broker URL, credentials), etc. Document the naming convention and field structure in comments.
 
-## 2. Create template repositories for supported language/framework combinations [pending]
-### Dependencies: None
-### Description: Implement template GitHub repositories for each supported language and framework combination that will be used as the basis for new application repositories.
+## 2. Implement Secret Generation for Database Components [pending]
+### Dependencies: 15.1
+### Description: Implement the generation of connection secrets for PostgreSQL database components, ensuring they contain all necessary connection details.
 ### Details:
-1. Create template repositories for: python-fastapi, java-springboot
-2. Each template should include:
-   - Appropriate Dockerfile optimized for the language/framework
-   - GitHub Actions workflow for CI/CD to Docker Hub
-   - Basic application structure with health endpoints
-   - README with usage instructions
-   - Configuration for database and cache connections (if applicable)
-3. Implement conditional logic in templates to handle optional features (frontend, database, cache, API exposure)
+In the realtime-compositions.yaml file, implement the logic to generate secrets for PostgreSQL database components. Extract connection details (host, port, database, user, password) from the PostgreSQL component definition. Create Kubernetes Secret resources with these details using the standardized naming pattern. Ensure the secrets are properly labeled and annotated for discovery.
 
-## 3. Implement Crossplane Composition for GitHub resources [pending]
-### Dependencies: 15.1, 15.2
-### Description: Create the first part of the Crossplane Composition that handles GitHub repository creation and configuration based on ApplicationClaim parameters.
+## 3. Implement Secret Generation for Messaging Components [pending]
+### Dependencies: 15.1
+### Description: Implement the generation of connection secrets for Kafka and MQTT broker components, ensuring they contain all necessary connection details.
 ### Details:
-1. Create a Composition that references the ApplicationClaim XRD
-2. Implement composition resources for GitHub provider to:
-   - Create a new repository with name from the claim
-   - Select and apply the appropriate template based on language/framework
-   - Configure branch protection rules
-   - Set up webhooks for CI/CD integration
-3. Include proper patching to pass parameters from the claim to the composed resources
-4. Handle error cases and provide meaningful status updates
+In the realtime-compositions.yaml file, implement the logic to generate secrets for Kafka and MQTT components. For Kafka, include bootstrap servers, schema registry URL, and any authentication details. For MQTT, include broker URL, ports (1883 for MQTT, 9001 for WebSockets), and authentication credentials. Create Kubernetes Secret resources with these details using the standardized naming pattern.
 
-## 4. Implement Crossplane Composition for infrastructure resources [pending]
-### Dependencies: 15.3
-### Description: Extend the Composition to provision infrastructure resources like databases and caches when specified in the ApplicationClaim.
+## 4. Expose Secrets in RealtimePlatformClaim Status [pending]
+### Dependencies: 15.2, 15.3
+### Description: Configure the generated secrets to be exposed in the RealtimePlatformClaim status to make them discoverable by applications.
 ### Details:
-1. Add composition resources for database provisioning when database=postgres
-   - Create a PostgreSQL instance or claim an existing one
-   - Generate and store connection credentials securely
-2. Add composition resources for cache provisioning when cache=redis
-   - Create a Redis instance or claim an existing one
-   - Generate and store connection information
-3. Implement proper dependency chains between resources
-4. Configure connection information to be injected into the application deployment
+Modify the RealtimePlatformClaim controller to collect all generated secrets and expose their names in the status field. Create a structured format in the status that organizes secrets by service type (database, messaging, etc.). Include secret names, service types, and optionally non-sensitive connection details like hostnames and ports. Ensure sensitive information like passwords is not exposed in the status.
 
-## 5. Implement Crossplane Composition for Knative and ArgoCD resources [pending]
-### Dependencies: 15.3, 15.4
-### Description: Complete the Composition by adding resources for deploying the application using Knative and ArgoCD for GitOps-based continuous deployment.
+## 5. Implement External Secrets Operator Integration for Snowflake [pending]
+### Dependencies: 15.1
+### Description: Implement integration with External Secrets Operator to manage Snowflake credentials when the snowflake parameter is enabled.
 ### Details:
-1. Add composition resources to create OAM Component definitions for Knative services
-   - Configure scaling parameters based on application type
-   - Set up proper container configuration with environment variables
-   - Configure networking based on exposeApi parameter
-2. Create ArgoCD Application resource that points to the GitHub repository
-   - Configure sync policy for automatic deployment
-   - Set up appropriate health checks
-3. Implement status reporting from all composed resources back to the ApplicationClaim
-4. Add finalizers to handle proper cleanup of all resources when an ApplicationClaim is deleted
-
-## 6. Define ApplicationClaim CRD and XRD [pending]
-### Dependencies: None
-### Description: Create the ApplicationClaim Custom Resource Definition (CRD) and Composite Resource Definition (XRD) with the schema specified in the PRD.
-### Details:
-1. Create the CompositeResourceDefinition (XRD) YAML file as specified in the PRD
-2. Ensure all required fields (name, language, framework) are properly defined
-3. Add validation for enum fields (language, framework, database, cache)
-4. Define the claim mapping with appropriate claimNames
-5. Add defaulting where appropriate
-6. Document the CRD schema for platform users
-
-## 7. Create template repositories for language/framework combinations [pending]
-### Dependencies: 15.6
-### Description: Implement template repositories for each supported language/framework combination with proper application structure, Dockerfile, and basic configuration.
-### Details:
-1. Create template repositories for:
-   - Python/FastAPI
-   - Java/SpringBoot
-2. Each template should include:
-   - Appropriate project structure
-   - Dockerfile optimized for the language/framework
-   - README with usage instructions
-   - Basic application code with health endpoints
-   - Configuration for environment variables
-3. Ensure templates can be easily cloned and customized
-
-## 8. Implement GitHub repository provisioning in Composition [pending]
-### Dependencies: 15.7
-### Description: Create the Crossplane Composition component that provisions GitHub repositories based on the ApplicationClaim parameters.
-### Details:
-1. Define the Composition resource that references the XRD
-2. Add a ComposedResource for GitHub repository creation
-3. Implement template selection logic based on language/framework
-4. Configure repository settings (visibility, branch protection)
-5. Set up appropriate permissions for the repository
-6. Implement patch transformations to map from claim fields to provider fields
-
-## 9. Implement CI/CD workflow and Knative service provisioning [pending]
-### Dependencies: 15.8
-### Description: Extend the Composition to provision CI/CD workflows (GitHub Actions) and Knative service resources.
-### Details:
-1. Add ComposedResource for GitHub Actions workflow configuration
-2. Configure workflow to build and push to Docker Hub
-3. Add ComposedResource for Knative Service via OAM components
-4. Implement conditional logic for frontend/API exposure based on claim parameters
-5. Configure appropriate scaling parameters for Knative
-6. Set up environment variables and secrets management
-7. Implement ArgoCD Application resource for GitOps deployment
-
-## 10. Implement database and cache provisioning [pending]
-### Dependencies: 15.9
-### Description: Complete the Composition by adding optional database and cache provisioning based on ApplicationClaim parameters.
-### Details:
-1. Add ComposedResources for database (PostgreSQL) when specified
-2. Add ComposedResources for cache (Redis) when specified
-3. Implement connection string and credential management
-4. Configure appropriate resource limits and scaling parameters
-5. Set up backup and recovery options
-6. Inject connection details into the application environment
-7. Document the complete ApplicationClaim usage with examples for different configurations
+In the realtime-compositions.yaml file, add conditional logic that checks if the snowflake parameter is enabled. If enabled, create an ExternalSecret resource that references Snowflake credentials stored in an external secrets manager. Configure the ExternalSecret to create a Kubernetes Secret with the standardized naming pattern. Include all necessary Snowflake connection details (account, username, password, role, warehouse, database). Ensure the secret is properly labeled and annotated for discovery.
 

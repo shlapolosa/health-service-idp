@@ -1,130 +1,43 @@
 # Task ID: 14
-# Title: Set Up External Secrets Operator for Auth0 and Neon Postgres
+# Title: Implement Snowflake Sink Connector Configuration
 # Status: pending
-# Dependencies: 11
-# Priority: high
-# Description: Install and configure External Secrets Operator to sync Auth0 and Neon Postgres credentials (found in crossplane/application.properties) into vClusters for application use.
+# Dependencies: 10, 12
+# Priority: low
+# Description: Configure the Snowflake Sink Connector that sends processed data to Snowflake for analytics.
 # Details:
-1. Install External Secrets Operator v0.9.0+ in the management cluster
-2. Configure SecretStore with AWS Secrets Manager or other backend
-3. Create ExternalSecret templates for Auth0 and Neon Postgres
-4. Implement ClusterSecretStore for cross-namespace secret access
-
-```yaml
-# Install External Secrets Operator
-helm repo add external-secrets https://charts.external-secrets.io
-helm install external-secrets external-secrets/external-secrets \
-  --namespace external-secrets --create-namespace --version 0.9.0
-
-# ClusterSecretStore configuration for AWS Secrets Manager
-apiVersion: external-secrets.io/v1beta1
-kind: ClusterSecretStore
-metadata:
-  name: aws-secretsmanager
-spec:
-  provider:
-    aws:
-      service: SecretsManager
-      region: us-west-2
-      auth:
-        jwt:
-          serviceAccountRef:
-            name: external-secrets-sa
-            namespace: external-secrets
-
-# ExternalSecret template for Auth0
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
-metadata:
-  name: auth0-credentials
-  namespace: {{.vcluster.namespace}}
-spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    kind: ClusterSecretStore
-    name: aws-secretsmanager
-  target:
-    name: auth0-credentials
-    creationPolicy: Owner
-  data:
-  - secretKey: clientId
-    remoteRef:
-      key: auth0/credentials
-      property: clientId
-  - secretKey: clientSecret
-    remoteRef:
-      key: auth0/credentials
-      property: clientSecret
-  - secretKey: domain
-    remoteRef:
-      key: auth0/credentials
-      property: domain
-```
-
-Implement a controller or use ArgoCD ApplicationSet to automatically create ExternalSecret resources in each vCluster namespace. Configure proper RBAC to ensure secrets are only accessible to authorized services.
+In the realtime-compositions.yaml file, implement the configuration for the Snowflake Sink Connector. Configure the connector with the appropriate settings for connecting to Snowflake (snowflake_url_name, snowflake_user_name, snowflake_database_name, snowflake_schema_name) and mapping Kafka topics to Snowflake tables. Set up authentication using the credentials from the snowflake parameter. Configure buffer settings and Avro conversion. Ensure the connector is deployed and managed by the Lenses Agent. Make this component conditional based on the snowflake.enabled parameter.
 
 # Test Strategy:
-1. Verify External Secrets Operator installation
-2. Test secret synchronization from backend to Kubernetes Secret
-3. Validate secret format matches the required schema in the PRD
-4. Test secret access from a pod in the vCluster namespace
-5. Verify secret rotation works when backend secret is updated
-6. Test error handling when backend is temporarily unavailable
+Deploy the Snowflake Sink Connector configuration and verify that it is created correctly. Test the connector by publishing messages to the Kafka topics and verifying that they appear in Snowflake tables. Test error handling and buffer settings.
 
 # Subtasks:
-## 1. Install External Secrets Operator in Management Cluster [pending]
+## 1. Define Snowflake Sink Connector Base Configuration [pending]
 ### Dependencies: None
-### Description: Set up External Secrets Operator v0.9.0+ in the management Kubernetes cluster to enable secret synchronization from external sources.
+### Description: Create the basic configuration structure for the Snowflake Sink Connector in the realtime-compositions.yaml file, including component name, image, and conditional deployment based on snowflake.enabled parameter.
 ### Details:
-Use Helm to install External Secrets Operator in a dedicated namespace:
-1. Add the external-secrets Helm repository
-2. Install the operator with version 0.9.0 or newer in the 'external-secrets' namespace
-3. Verify the installation by checking that all pods are running
-4. Create a service account with appropriate permissions for accessing AWS Secrets Manager
+Add a new component to realtime-compositions.yaml with name 'snowflake-sink-connector'. Use the Kafka Connect framework with the Snowflake connector plugin. Make the component conditional by adding a condition that checks if snowflake.enabled is true. Include basic deployment configuration with resource limits and requests. Set up the component to be managed by the Lenses Agent.
 
-## 2. Configure AWS Secrets Manager Integration [pending]
+## 2. Configure Snowflake Connection Parameters [pending]
 ### Dependencies: 14.1
-### Description: Set up the ClusterSecretStore resource to connect External Secrets Operator with AWS Secrets Manager where Auth0 and Neon Postgres credentials are stored.
+### Description: Set up the connection parameters for Snowflake, including URL, user, database, schema, and authentication credentials from the snowflake parameter.
 ### Details:
-1. Create an IAM role with permissions to access the required AWS Secrets Manager secrets
-2. Configure IRSA (IAM Roles for Service Accounts) for the external-secrets service account
-3. Create a ClusterSecretStore resource that references the service account and specifies AWS region
-4. Test the connection to ensure the operator can retrieve secrets from AWS Secrets Manager
-5. Document the AWS secret path structure for Auth0 and Neon credentials
+Configure environment variables or connector properties for Snowflake connection: SNOWFLAKE_URL_NAME, SNOWFLAKE_USER_NAME, SNOWFLAKE_DATABASE_NAME, and SNOWFLAKE_SCHEMA_NAME. Set up authentication using credentials from the snowflake parameter, referencing them as secrets. Include proper error handling for connection failures and implement retry logic.
 
-## 3. Create ExternalSecret Templates for Auth0 and Neon Postgres [pending]
+## 3. Implement Kafka Topic to Snowflake Table Mapping [pending]
 ### Dependencies: 14.2
-### Description: Develop template manifests for ExternalSecret resources that will sync Auth0 and Neon Postgres credentials from AWS Secrets Manager to Kubernetes Secrets in vCluster namespaces.
+### Description: Configure the mapping between Kafka topics and Snowflake tables, including topic patterns, table naming conventions, and schema handling.
 ### Details:
-1. Analyze the structure of Auth0 and Neon Postgres credentials in AWS Secrets Manager
-2. Create an ExternalSecret template for Auth0 with appropriate secretKey and remoteRef mappings
-3. Create an ExternalSecret template for Neon Postgres with appropriate secretKey and remoteRef mappings
-4. Include namespace templating to allow deployment across multiple vClusters
-5. Set appropriate refresh intervals and creation policies
-6. Ensure secret naming conventions align with application expectations
+Define the topics to be consumed by the connector using either specific topic names or patterns. Configure the table naming strategy to map Kafka topics to Snowflake tables (e.g., using the same name or a prefix/suffix). Set up schema handling to ensure that Kafka message schemas are properly translated to Snowflake table schemas. Configure the connector to handle schema evolution appropriately.
 
-## 4. Implement Automated ExternalSecret Deployment [pending]
+## 4. Configure Buffer Settings and Data Conversion [pending]
 ### Dependencies: 14.3
-### Description: Create a mechanism to automatically deploy ExternalSecret resources to each vCluster namespace using either a custom controller or ArgoCD ApplicationSet.
+### Description: Set up buffer settings for the connector to handle data flow efficiently and configure Avro conversion for data serialization.
 ### Details:
-1. Evaluate whether to use a custom controller or ArgoCD ApplicationSet based on existing infrastructure
-2. If using ArgoCD:
-   - Create an ApplicationSet template that generates Applications for each vCluster
-   - Configure the template to deploy ExternalSecret resources with appropriate namespace substitution
-3. If using a custom controller:
-   - Develop a controller that watches for vCluster creation
-   - Automatically deploy ExternalSecret resources when new vClusters are detected
-4. Implement error handling and logging for deployment failures
-5. Add annotations to track which controller created each ExternalSecret
+Configure buffer settings including batch size, flush interval, and retry parameters to optimize performance and reliability. Set up Avro conversion for data serialization, ensuring compatibility with the Kafka Schema Registry. Configure error handling for data conversion issues. Set appropriate buffer limits to prevent memory issues during high load.
 
-## 5. Configure RBAC and Validate End-to-End Functionality [pending]
+## 5. Implement Monitoring and Integration with Lenses Agent [pending]
 ### Dependencies: 14.4
-### Description: Set up appropriate RBAC permissions to secure access to secrets and validate the entire secret synchronization process from AWS to applications running in vClusters.
+### Description: Configure monitoring for the Snowflake Sink Connector and ensure proper integration with the Lenses Agent for management and observability.
 ### Details:
-1. Create Role and RoleBinding resources to restrict access to secrets within each vCluster namespace
-2. Configure NetworkPolicies to limit which pods can access the Kubernetes API for secret retrieval
-3. Implement PodSecurityPolicies or Pod Security Standards to prevent privilege escalation
-4. Perform end-to-end testing with actual application deployments in vClusters
-5. Document the entire setup including troubleshooting steps for common issues
-6. Create monitoring alerts for secret synchronization failures
+Set up JMX metrics for the connector to monitor performance and health. Configure logging with appropriate levels for troubleshooting. Ensure the connector is properly registered with the Lenses Agent for management. Set up health checks to monitor the connector's status. Configure alerts for critical issues such as connection failures or data processing errors.
 

@@ -1,210 +1,43 @@
 # Task ID: 20
-# Title: Create Application Templates for Python and Java
+# Title: Create Documentation and User Guide
 # Status: pending
-# Dependencies: 15, 19
+# Dependencies: 1, 2, 3, 4, 15, 16, 17
 # Priority: medium
-# Description: Develop template repositories for Python (FastAPI) and Java (Spring Boot) applications with proper structure, Dockerfile, configuration, and integration with Auth0 and Neon Postgres.
+# Description: Create comprehensive documentation and user guide for the real-time platform components.
 # Details:
-1. Create template repositories for each language/framework
-2. Implement proper Dockerfile with multi-stage builds
-3. Configure Auth0 integration
-4. Set up Neon Postgres connection
-5. Implement health checks and metrics endpoints
-
-**Python/FastAPI Template:**
-```python
-# main.py
-from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.security import OAuth2AuthorizationCodeBearer
-import os
-import httpx
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-
-app = FastAPI()
-
-# Auth0 configuration
-auth0_domain = os.getenv("AUTH0_DOMAIN")
-auth0_client_id = os.getenv("AUTH0_CLIENT_ID")
-auth0_client_secret = os.getenv("AUTH0_CLIENT_SECRET")
-
-oauth2_scheme = OAuth2AuthorizationCodeBearer(
-    authorizationUrl=f"https://{auth0_domain}/authorize",
-    tokenUrl=f"https://{auth0_domain}/oauth/token"
-)
-
-# Database configuration
-database_url = f"postgresql://{os.getenv('PGUSER')}:{os.getenv('PGPASSWORD')}@{os.getenv('PGHOST')}/{os.getenv('PGDATABASE')}"
-engine = create_engine(database_url)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-class Item(Base):
-    __tablename__ = "items"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True)
-    description = Column(String)
-
-Base.metadata.create_all(bind=engine)
-
-# Health check endpoint for Knative
-@app.get("/healthz/concurrency")
-async def health_check():
-    return {"status": "ok"}
-
-# Metrics endpoint for Prometheus
-@app.get("/metrics")
-async def metrics():
-    return {"requests_total": 0}
-
-@app.get("/")
-async def root():
-    return {"message": "Hello World"}
-
-@app.get("/items/")
-async def read_items(token: str = Depends(oauth2_scheme)):
-    # Verify token with Auth0
-    async with httpx.AsyncClient() as client:
-        response = await client.get(
-            f"https://{auth0_domain}/userinfo",
-            headers={"Authorization": f"Bearer {token}"}
-        )
-        if response.status_code != 200:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authentication credentials"
-            )
-    
-    # Query database
-    db = SessionLocal()
-    items = db.query(Item).all()
-    db.close()
-    return items
-```
-
-**Dockerfile for Python/FastAPI:**
-```dockerfile
-# Build stage
-FROM python:3.11-slim AS builder
-
-WORKDIR /app
-
-COPY requirements.txt .
-RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
-
-# Final stage
-FROM python:3.11-slim
-
-WORKDIR /app
-
-COPY --from=builder /app/wheels /wheels
-COPY --from=builder /app/requirements.txt .
-
-RUN pip install --no-cache /wheels/*
-
-COPY . .
-
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
-```
-
-Implement similar templates for Java/Spring Boot with appropriate structure and configuration. Include documentation and examples for common use cases.
+Create documentation that explains how to use the realtime-platform component and the enhanced webservice component with realtime integration. Include examples of minimal and comprehensive configurations. Document all available parameters and their default values. Explain how to access the various services (Lenses HQ, MQTT, Metabase) and how to use the connection secrets. Create troubleshooting guides and operational runbooks. Document the architecture and data flow of the real-time platform.
 
 # Test Strategy:
-1. Test template repositories with sample data
-2. Verify Auth0 integration works correctly
-3. Test Neon Postgres connection and queries
-4. Validate health check and metrics endpoints
-5. Test Dockerfile builds and runs correctly
-6. Verify that environment variables are properly used
-7. Test with various configuration options
+Review the documentation for accuracy and completeness. Test the examples provided in the documentation to ensure they work as described. Have other team members review the documentation and provide feedback.
 
 # Subtasks:
-## 1. Create Python/FastAPI Template Repository Structure [pending]
+## 1. Document Architecture and Component Overview [pending]
 ### Dependencies: None
-### Description: Set up a complete template repository for Python/FastAPI applications with proper directory structure, configuration files, and basic application setup.
+### Description: Create comprehensive documentation of the real-time platform architecture, data flow diagrams, and component relationships.
 ### Details:
-Create a new GitHub repository with the following structure:
-- `/app`: Main application code
-- `/tests`: Unit and integration tests
-- `/docs`: Documentation
-- `requirements.txt`: Dependencies
-- `requirements-dev.txt`: Development dependencies
-- `.env.example`: Example environment variables
-- `.gitignore`: Configured for Python
-- `README.md`: Setup and usage instructions
+Create a markdown document that includes: 1) High-level architecture diagram showing all components (Kafka, MQTT, Lenses HQ, Metabase, PostgreSQL), 2) Data flow diagrams showing how information moves through the system, 3) Component relationship diagrams showing dependencies, 4) Explanation of each component's purpose and role in the system, 5) System requirements and prerequisites. Include diagrams created with a tool like draw.io or mermaid and export them as SVG/PNG for inclusion in the documentation.
 
-Implement the FastAPI application with proper structure including routes, models, and services directories. Include configuration for environment variables loading and logging.
-
-## 2. Create Java/Spring Boot Template Repository Structure [pending]
-### Dependencies: None
-### Description: Set up a complete template repository for Java/Spring Boot applications with proper directory structure, configuration files, and basic application setup.
+## 2. Create Configuration Reference Documentation [pending]
+### Dependencies: 20.1
+### Description: Document all available configuration parameters for the realtime-platform and webservice components with realtime integration.
 ### Details:
-Create a new GitHub repository with Maven/Gradle project structure:
-- `src/main/java`: Main application code with package structure
-- `src/main/resources`: Configuration files (application.properties/yml)
-- `src/test`: Test classes
-- `.gitignore`: Configured for Java
-- `README.md`: Setup and usage instructions
+Create a comprehensive reference document that: 1) Lists all configuration parameters for the realtime-platform component, 2) Documents all parameters for webservice components with realtime integration, 3) Specifies default values, data types, and validation rules for each parameter, 4) Organizes parameters by functional area (e.g., Kafka settings, MQTT settings, scaling, etc.), 5) Includes tables showing parameter interdependencies and constraints. Reference the existing component definitions in realtime-component-definitions.yaml and realtime-compositions.yaml to ensure all parameters are documented.
 
-Implement Spring Boot application with proper structure including controllers, services, repositories, and models. Include configuration for profiles (dev, prod) and logging.
-
-## 3. Implement Multi-stage Dockerfiles and Docker Compose [pending]
+## 3. Develop Example-Based User Guide [pending]
 ### Dependencies: 20.1, 20.2
-### Description: Create optimized Dockerfiles for both Python and Java templates with multi-stage builds and Docker Compose configurations for local development.
+### Description: Create a user guide with step-by-step instructions and examples for common usage scenarios.
 ### Details:
-For Python/FastAPI:
-- Create multi-stage Dockerfile as shown in the example
-- Add Docker Compose file with Postgres service for local development
+Develop a user guide that includes: 1) Step-by-step instructions for deploying the realtime-platform using the minimal example (MINIMAL-REALTIME-OAM.yaml), 2) Instructions for deploying the comprehensive example (REALTIME-OAM-EXAMPLE.yaml), 3) Walkthrough of customizing configurations for specific use cases, 4) Examples of integrating webservices with the realtime platform, 5) Screenshots and command outputs showing expected results at each step. Include code snippets that users can copy and adapt for their own implementations.
 
-For Java/Spring Boot:
-- Create multi-stage Dockerfile using Maven/Gradle build and JRE runtime
-- Add Docker Compose file with Postgres service for local development
-
-Both should include:
-- Health check configurations
-- Environment variable handling
-- Proper security practices (non-root user, etc.)
-- Volume mounts for development
-
-## 4. Implement Auth0 Integration for Both Templates [pending]
-### Dependencies: 20.1, 20.2
-### Description: Add complete Auth0 integration to both template applications including configuration, middleware/filters, and example protected routes.
+## 4. Create Service Access and Secrets Management Guide [pending]
+### Dependencies: 20.2
+### Description: Document how to access the various services (Lenses HQ, MQTT, Metabase) and manage connection secrets.
 ### Details:
-For Python/FastAPI:
-- Implement Auth0 authentication using the OAuth2AuthorizationCodeBearer
-- Add middleware for token validation
-- Create example protected and public routes
+Create documentation that: 1) Explains how to retrieve and use connection secrets for each service, 2) Provides instructions for accessing the web interfaces of Lenses HQ and Metabase, 3) Documents MQTT connection parameters and authentication methods, 4) Includes examples of connecting to each service using different client libraries and tools, 5) Explains how to rotate credentials and manage access control. Include specific code examples in multiple languages (e.g., Python, JavaScript) showing how to connect to each service.
 
-For Java/Spring Boot:
-- Implement Auth0 authentication using Spring Security
-- Configure security filters for JWT validation
-- Create example protected and public endpoints
-
-Both should include:
-- Clear documentation on Auth0 setup requirements
-- Environment variable configuration
-- Role-based access control examples
-
-## 5. Implement Neon Postgres Connection and Observability [pending]
+## 5. Develop Troubleshooting Guide and Operational Runbooks [pending]
 ### Dependencies: 20.1, 20.2, 20.3, 20.4
-### Description: Add database connection configuration for Neon Postgres and implement health checks, metrics, and logging for observability.
+### Description: Create comprehensive troubleshooting guides and operational runbooks for maintaining the real-time platform.
 ### Details:
-For Python/FastAPI:
-- Configure SQLAlchemy for Neon Postgres connection with connection pooling
-- Add Prometheus metrics endpoint
-- Implement structured logging
-- Add health check endpoints for Knative
-
-For Java/Spring Boot:
-- Configure Spring Data JPA for Neon Postgres connection
-- Add Micrometer/Prometheus integration
-- Configure structured JSON logging
-- Implement Spring Boot Actuator endpoints
-
-Both should include:
-- Database migration tools (Alembic for Python, Flyway/Liquibase for Java)
-- Connection retry logic
-- Example entity/model and repository
-- Documentation on connection string format for Neon
+Develop documentation that includes: 1) Common error scenarios and their solutions, 2) Diagnostic procedures for identifying issues, 3) Operational runbooks for routine maintenance tasks, 4) Monitoring and alerting recommendations, 5) Backup and recovery procedures, 6) Scaling guidelines and performance optimization tips, 7) Upgrade and migration procedures. Organize the troubleshooting guide by component and symptom, with clear steps to diagnose and resolve each issue. Include command examples and expected outputs.
 

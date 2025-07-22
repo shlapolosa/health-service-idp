@@ -8,7 +8,7 @@ kind: ComponentDefinition
 metadata:
   name: webservice
   annotations:
-    definition.oam.dev/description: "Web service application with optional database and cache"
+    definition.oam.dev/description: "Web service application with optional database, cache, and realtime platform integration. Supports WebSocket endpoints and Kafka streaming when connected to a realtime-platform component. Use 'realtime' parameter to reference a realtime-platform component name."
 spec:
   workload:
     definition:
@@ -45,6 +45,19 @@ spec:
             if parameter.port != _|_ {
               port: parameter.port
             }
+            // Realtime platform integration: automatically injects connection secrets
+            // when 'realtime' parameter references a realtime-platform component
+            if parameter.realtime != _|_ {
+              realtime: parameter.realtime
+            }
+            // WebSocket endpoint configuration for real-time communication
+            if parameter.websocket != _|_ {
+              websocket: parameter.websocket
+            }
+            // Kafka streaming configuration for real-time data processing
+            if parameter.streaming != _|_ {
+              streaming: parameter.streaming
+            }
             resources: {
               if parameter.resources.cpu != _|_ {
                 cpu: parameter.resources.cpu
@@ -70,6 +83,19 @@ spec:
           cache?: "redis" | "memcached"
           hasFrontend: *false | bool
           exposeApi: *true | bool
+          realtime?: string  // References a realtime-platform component name for automatic secret injection
+          websocket?: bool   // Enable WebSocket endpoints for real-time communication
+          streaming?: {      // Kafka streaming configuration for real-time data processing
+            enabled?: bool
+            topics?: [...string]
+            consumerGroup?: string
+            autoOffsetReset?: "earliest" | "latest"
+            sessionTimeoutMs?: int
+            heartbeatIntervalMs?: int
+            maxPollRecords?: int
+            enableAutoCommit?: bool
+            maxPollIntervalMs?: int
+          }
           environment: *{} | {...}
           resources: *{
             cpu: "500m"

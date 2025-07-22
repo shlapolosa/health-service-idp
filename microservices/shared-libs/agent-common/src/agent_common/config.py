@@ -4,7 +4,7 @@ Configuration management for agent microservices
 
 import os
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
 from .models import AgentType, ImplementationType
 
@@ -28,6 +28,40 @@ class AgentConfig:
     # Performance configurations
     max_concurrent_tasks: int = 10
     task_timeout: int = 300  # seconds
+    
+    # Real-time platform configurations
+    realtime_platform: Optional[str] = None
+    websocket_enabled: bool = False
+    
+    # Streaming configurations
+    kafka_bootstrap_servers: Optional[str] = None
+    kafka_schema_registry_url: Optional[str] = None
+    streaming_topics: List[str] = field(default_factory=list)
+    streaming_consumer_group: Optional[str] = None
+    
+    # MQTT configurations  
+    mqtt_host: Optional[str] = None
+    mqtt_port: int = 1883
+    mqtt_user: Optional[str] = None
+    mqtt_password: Optional[str] = None
+    mqtt_topics: List[str] = field(default_factory=list)
+    
+    # Database configurations (from realtime platform)
+    db_host: Optional[str] = None
+    db_port: int = 5432
+    db_name: Optional[str] = None
+    db_user: Optional[str] = None
+    db_password: Optional[str] = None
+    
+    # Analytics configurations
+    metabase_url: Optional[str] = None
+    metabase_user: Optional[str] = None
+    metabase_password: Optional[str] = None
+    
+    # Stream processing configurations
+    lenses_url: Optional[str] = None
+    lenses_user: Optional[str] = None
+    lenses_password: Optional[str] = None
     
     # Custom configurations
     custom_config: Dict[str, Any] = field(default_factory=dict)
@@ -79,5 +113,39 @@ def get_agent_config() -> AgentConfig:
         redis_host=os.getenv("REDIS_HOST"),
         redis_port=int(os.getenv("REDIS_PORT", "6379")),
         max_concurrent_tasks=int(os.getenv("MAX_CONCURRENT_TASKS", "10")),
-        task_timeout=int(os.getenv("TASK_TIMEOUT", "300"))
+        task_timeout=int(os.getenv("TASK_TIMEOUT", "300")),
+        
+        # Real-time platform configurations
+        realtime_platform=os.getenv("REALTIME_PLATFORM"),
+        websocket_enabled=os.getenv("WEBSOCKET_ENABLED", "false").lower() == "true",
+        
+        # Streaming configurations
+        kafka_bootstrap_servers=os.getenv("KAFKA_BOOTSTRAP_SERVERS"),
+        kafka_schema_registry_url=os.getenv("KAFKA_SCHEMA_REGISTRY_URL"),
+        streaming_topics=os.getenv("STREAMING_TOPICS", "").split(",") if os.getenv("STREAMING_TOPICS") else [],
+        streaming_consumer_group=os.getenv("STREAMING_CONSUMER_GROUP"),
+        
+        # MQTT configurations
+        mqtt_host=os.getenv("MQTT_HOST"),
+        mqtt_port=int(os.getenv("MQTT_PORT", "1883")),
+        mqtt_user=os.getenv("MQTT_USER"),
+        mqtt_password=os.getenv("MQTT_PASSWORD"),
+        mqtt_topics=os.getenv("MQTT_TOPICS", "").split(",") if os.getenv("MQTT_TOPICS") else [],
+        
+        # Database configurations (from realtime platform)
+        db_host=os.getenv("DB_HOST"),
+        db_port=int(os.getenv("DB_PORT", "5432")),
+        db_name=os.getenv("DB_NAME"),
+        db_user=os.getenv("DB_USER"),
+        db_password=os.getenv("DB_PASSWORD"),
+        
+        # Analytics configurations
+        metabase_url=os.getenv("METABASE_URL"),
+        metabase_user=os.getenv("METABASE_USER"),
+        metabase_password=os.getenv("METABASE_PASSWORD"),
+        
+        # Stream processing configurations
+        lenses_url=os.getenv("LENSES_URL"),
+        lenses_user=os.getenv("LENSES_USER"),
+        lenses_password=os.getenv("LENSES_PASSWORD")
     )

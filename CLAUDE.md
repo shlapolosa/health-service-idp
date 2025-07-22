@@ -4,6 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 
 # Developer Process & Principles
+First go through REALTIME_SYSTEM.md for context.
 
 Welcome to the CLAUDE development process. This document outlines the core development methodology, tools, design patterns, and quality standards expected from all contributors. This platform aims to deliver a Kubernetes-native Internal Developer Platform (IDP) using GitOps principles and automated infrastructure. To ensure maintainability, quality, and scalability, all contributors must follow the principles below.
 
@@ -42,7 +43,7 @@ task-master set-status --id=11 --status=in-progress
 4. **Mark task complete** only after functional and regression testing is performed.
 
 Tasks may span multiple commits, but only functionally complete and tested code should be merged.
-
+After completing a task or subtask, go through ARCHITECTURAL_DECISIONS.md and check if any have been made and update accordingly if and only if an architectural decision was taken i.e. a trade-off made.
 ---
 
 ## 🧪 Testing Requirements

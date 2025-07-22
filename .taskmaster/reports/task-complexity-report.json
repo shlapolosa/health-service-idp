@@ -1,0 +1,261 @@
+{
+	"meta": {
+		"generatedAt": "2025-07-21T22:07:13.732Z",
+		"tasksAnalyzed": 31,
+		"totalTasks": 31,
+		"analysisCount": 31,
+		"thresholdScore": 5,
+		"projectName": "Taskmaster",
+		"usedResearch": true
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 17,
+			"taskTitle": "Create REALTIME-OAM-EXAMPLE.yaml",
+			"complexityScore": 8,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Expand on the implementation details for creating a comprehensive REALTIME-OAM-EXAMPLE.yaml file, including specific configurations for advanced features like custom MQTT users, data retention settings, scaling, and Snowflake integration.",
+			"reasoning": "This task requires creating a complex OAM application with multiple components and advanced configurations. It involves integrating various features and ensuring proper interaction between components, making it a high-complexity task."
+		},
+		{
+			"taskId": 16,
+			"taskTitle": "Create MINIMAL-REALTIME-OAM.yaml Example",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Detail the steps for creating a minimal REALTIME-OAM-EXAMPLE.yaml file, focusing on the essential configurations for the realtime-platform component and its integration with a webservice component.",
+			"reasoning": "While simpler than the comprehensive example, this task still requires understanding of OAM applications and the realtime-platform component. The focus on minimal configuration reduces complexity, but careful consideration is needed to ensure all essential elements are included."
+		},
+		{
+			"taskId": 33,
+			"taskTitle": "Create realtime-platform ComponentDefinition",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Elaborate on the process of creating the realtime-platform ComponentDefinition, including detailed steps for parameter definition, CUE template creation, and integration with existing components.",
+			"reasoning": "This task involves creating a high-level abstraction for complex infrastructure, requiring deep understanding of OAM, KubeVela, and the underlying components. The challenge lies in simplifying the interface while maintaining flexibility and functionality."
+		},
+		{
+			"taskId": 20,
+			"taskTitle": "Create Documentation and User Guide",
+			"complexityScore": 6,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Expand on the process of creating comprehensive documentation, including detailed outlines for user guides, configuration references, troubleshooting guides, and architectural documentation.",
+			"reasoning": "Creating thorough documentation requires a deep understanding of all components and their interactions. The complexity comes from ensuring accuracy, completeness, and clarity across various technical topics and user skill levels."
+		},
+		{
+			"taskId": 1,
+			"taskTitle": "Create realtime-component-definitions.yaml",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Detail the process of modifying the existing webservice ComponentDefinition to include realtime support, including specific changes to the parameter schema and CUE template.",
+			"reasoning": "This task involves modifying an existing, complex component definition. It requires careful integration of new features while maintaining backward compatibility and adhering to OAM standards, making it a moderately high complexity task."
+		},
+		{
+			"taskId": 32,
+			"taskTitle": "Create Service Enhancement Templates Following GitHub Structure",
+			"complexityScore": 9,
+			"recommendedSubtasks": 8,
+			"expansionPrompt": "Elaborate on the creation of parameterized templates for each layer of the Onion Architecture, including specific implementations for WebSocket endpoints, Kafka integration, and configuration management.",
+			"reasoning": "This task involves creating a comprehensive set of templates that cover multiple architectural layers and complex integrations. The need to adhere to specific architectural principles and ensure flexibility for various use cases makes this a highly complex task."
+		},
+		{
+			"taskId": 4,
+			"taskTitle": "Create initial realtime-compositions.yaml",
+			"complexityScore": 9,
+			"recommendedSubtasks": 8,
+			"expansionPrompt": "Detail the process of extending the existing application-claim-composition.yaml to include real-time streaming capabilities, including specific implementations for each new component and their integrations.",
+			"reasoning": "Modifying a large, existing composition file to add complex new functionality while ensuring proper integration and conditional logic is a highly complex task. It requires deep understanding of multiple components and their interactions."
+		},
+		{
+			"taskId": 2,
+			"taskTitle": "Create realtime-xrds.yaml for RealtimePlatformClaim",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Expand on the process of extending the ApplicationClaim XRD to include real-time streaming support, detailing the additions to the schema and ensuring backward compatibility.",
+			"reasoning": "This task involves modifying an existing, complex XRD schema. It requires careful consideration of new properties and their implications while maintaining compatibility with existing claims, making it a moderately high complexity task."
+		},
+		{
+			"taskId": 6,
+			"taskTitle": "Create Configuration Generator Component",
+			"complexityScore": 6,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Detail the implementation of the Configuration Generator component, including specific configurations for Lenses HQ and Agent, and the process of creating and mounting the generated configurations.",
+			"reasoning": "While focused on a specific task, this component requires handling multiple configuration files and ensuring they are correctly generated and accessible. The complexity comes from managing various configurations and integrating with Kubernetes concepts like Jobs and ConfigMaps."
+		},
+		{
+			"taskId": 25,
+			"taskTitle": "Create Generic Domain-Agnostic Real-time Platform Requirements",
+			"complexityScore": 8,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Elaborate on the process of transforming healthcare-specific components into domain-agnostic ones, including detailed steps for terminology mapping, schema updates, and documentation revisions.",
+			"reasoning": "This task requires a comprehensive review and modification of multiple components and documents. The complexity lies in ensuring consistency across all changes while maintaining the functionality and clarity of the platform for various domains."
+		},
+		{
+			"taskId": 3,
+			"taskTitle": "Enhance webservice ComponentDefinition with realtime integration",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on enhance webservice componentdefinition with realtime integration.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 7,
+			"taskTitle": "Implement Lenses HQ Component",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on implement lenses hq component.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 8,
+			"taskTitle": "Implement Kafka Cluster Component",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on implement kafka cluster component.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "Implement MQTT Broker Component",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on implement mqtt broker component.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "Implement Lenses Agent Component",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on implement lenses agent component.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 11,
+			"taskTitle": "Implement MQTT Source Connector Configuration",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on implement mqtt source connector configuration.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 12,
+			"taskTitle": "Implement Stream Processing Queries",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on implement stream processing queries.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 13,
+			"taskTitle": "Implement Metabase Analytics Dashboard",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on implement metabase analytics dashboard.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 14,
+			"taskTitle": "Implement Snowflake Sink Connector Configuration",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on implement snowflake sink connector configuration.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 15,
+			"taskTitle": "Implement Secret Generation and Management",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on implement secret generation and management.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 18,
+			"taskTitle": "Implement Health Checks and Monitoring",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on implement health checks and monitoring.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 19,
+			"taskTitle": "Implement Security Hardening",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on implement security hardening.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 21,
+			"taskTitle": "Implement Enhanced WebService ComponentDefinition with Realtime Parameter Support",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on implement enhanced webservice componentdefinition with realtime parameter support.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 22,
+			"taskTitle": "Implement Smart Real-time Service Management Logic",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on implement smart real-time service management logic.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 23,
+			"taskTitle": "Create Real-time Service Template for Kubernetes",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on create real-time service template for kubernetes.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 24,
+			"taskTitle": "Implement Application Claim Controller with Realtime-Platform Integration",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on implement application claim controller with realtime-platform integration.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 26,
+			"taskTitle": "Implement End-to-End Test Data Flow for Real-time Platform",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on implement end-to-end test data flow for real-time platform.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 28,
+			"taskTitle": "Enhance Secret Management for WebService Integration",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on enhance secret management for webservice integration.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 29,
+			"taskTitle": "Consolidate PostgreSQL Implementation for All Use Cases",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on consolidate postgresql implementation for all use cases.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 30,
+			"taskTitle": "Implement Simple Ping-Pong Default Service",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on implement simple ping-pong default service.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 31,
+			"taskTitle": "Implement Real-time Service Following GitHub Template with Onion Architecture",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on implement real-time service following github template with onion architecture.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		}
+	]
+}

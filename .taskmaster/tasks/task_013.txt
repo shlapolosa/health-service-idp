@@ -1,115 +1,43 @@
 # Task ID: 13
-# Title: Implement VClusterEnvironmentClaim CRD and Composition
+# Title: Implement Metabase Analytics Dashboard
 # Status: pending
-# Dependencies: 11, 12
-# Priority: high
-# Description: Create the VClusterEnvironmentClaim CRD and Crossplane Composition to provision isolated vClusters with Istio ingress and optional components (ArgoCD, observability stack).
+# Dependencies: None
+# Priority: medium
+# Description: Implement the Metabase component that provides real-time analytics dashboards for health data.
 # Details:
-1. Define the VClusterEnvironmentClaim CRD with the schema specified in the PRD
-2. Create a Crossplane Composition that provisions:
-   - vCluster using Helm chart (v0.15.0+)
-   - Istio ingress (v1.18+) with Gateway
-   - Optional components based on the 'include' field
-
-```yaml
-# VClusterEnvironmentClaim XRD
-apiVersion: apiextensions.crossplane.io/v1
-kind: CompositeResourceDefinition
-metadata:
-  name: xvclusterenvironmentclaims.platform.example.org
-spec:
-  group: platform.example.org
-  names:
-    kind: XVClusterEnvironmentClaim
-    plural: xvclusterenvironmentclaims
-  claimNames:
-    kind: VClusterEnvironmentClaim
-    plural: vclusterenvironmentclaims
-  versions:
-    - name: v1alpha1
-      served: true
-      referenceable: true
-      schema:
-        openAPIV3Schema:
-          type: object
-          properties:
-            spec:
-              type: object
-              properties:
-                name:
-                  type: string
-                domain:
-                  type: string
-                  nullable: true
-                include:
-                  type: array
-                  items:
-                    type: string
-                    enum: [argoCD, grafana, prometheus, jaeger, kiali, apiGatewaySupport]
-              required: [name]
-```
-
-Implement the Composition to use Helm provider for vCluster and component installation. Use Kubernetes provider for namespace creation and service account setup. Configure Istio Gateway with proper domain settings if provided.
+In the realtime-compositions.yaml file, implement the Metabase component using the metabase/metabase:latest image. Configure the deployment with the appropriate environment variables for connecting to the PostgreSQL database. Set up the service to expose port 3000 for the Web UI. Configure health checks and persistence. Set up the component to depend on the PostgreSQL database. Configure Metabase to connect to Snowflake if the snowflake parameter is enabled.
 
 # Test Strategy:
-1. Apply the VClusterEnvironmentClaim CRD and verify it's accepted
-2. Create a test claim with minimal configuration and verify vCluster is provisioned
-3. Test with various 'include' combinations to ensure optional components are correctly installed
-4. Verify Istio ingress is properly configured and accessible
-5. Test domain configuration if provided
-6. Validate that vCluster is running on nodes with appropriate taints/tolerations
+Deploy the Metabase component and verify that it starts correctly. Test the Web UI by accessing it on port 3000. Verify that Metabase can connect to the PostgreSQL database. Test the Snowflake connection if enabled.
 
 # Subtasks:
-## 1. Define VClusterEnvironmentClaim XRD [pending]
+## 1. Add Metabase Component Definition to YAML [pending]
 ### Dependencies: None
-### Description: Create the CompositeResourceDefinition (XRD) for VClusterEnvironmentClaim with the schema specified in the PRD
+### Description: Create the basic Metabase component definition in the realtime-compositions.yaml file using the metabase/metabase:latest image with appropriate resource allocations and container settings.
 ### Details:
-1. Create a YAML file for the XRD as shown in the PRD
-2. Add validation for the 'name' field (must be DNS-1123 compliant)
-3. Add description fields to document each property
-4. Define status subresource with appropriate fields (ready, clusterEndpoint, adminCredentials)
-5. Apply the XRD to the cluster using kubectl
+Add a new component section in realtime-compositions.yaml with name 'metabase'. Use metabase/metabase:latest as the container image. Configure basic container settings including resource requests and limits (recommend 1-2 CPU, 2-4Gi memory). Set restart policy to 'Always' and add appropriate labels for the component.
 
-## 2. Create base Composition for vCluster provisioning [pending]
+## 2. Configure Metabase Environment Variables for PostgreSQL Connection [pending]
 ### Dependencies: 13.1
-### Description: Implement the core Composition that provisions a vCluster using the Helm provider
+### Description: Set up the required environment variables to enable Metabase to connect to the PostgreSQL database component.
 ### Details:
-1. Create a Composition YAML file targeting the XRD
-2. Define resources for namespace creation
-3. Configure the Helm Release resource for vCluster v0.15.0+
-4. Set up proper values for the Helm chart (storage, service type, etc.)
-5. Define patches to propagate the name from claim to resources
-6. Configure readiness checks for the vCluster deployment
+Add environment variables section to the Metabase component with: MB_DB_TYPE=postgres, MB_DB_DBNAME=metabaseappdb, MB_DB_PORT=5432, MB_DB_USER and MB_DB_PASS referencing PostgreSQL credentials from the PostgreSQL component's secret. Add MB_DB_HOST pointing to the PostgreSQL service name. Include dependency configuration to ensure Metabase starts after PostgreSQL is ready.
 
-## 3. Add Istio ingress with Gateway configuration [pending]
-### Dependencies: 13.2
-### Description: Extend the Composition to install Istio ingress and configure Gateway resources
+## 3. Implement Metabase Service and Port Configuration [pending]
+### Dependencies: 13.1
+### Description: Configure the Kubernetes service to expose Metabase's web interface on port 3000 and set up any additional required networking configurations.
 ### Details:
-1. Add Helm Release resource for Istio installation (v1.18+)
-2. Configure Istio Gateway resource with proper domain settings
-3. Create patches to use the domain from the claim if provided, or generate a default domain
-4. Set up Virtual Service to route traffic to the vCluster
-5. Configure TLS settings for secure access
-6. Add status patch to expose the ingress endpoint
+Create a Kubernetes Service definition for Metabase that exposes port 3000 for the web UI. Configure the service type as ClusterIP for internal access or LoadBalancer/NodePort if external access is required. Add appropriate selector labels to match the Metabase pod. Include annotations for any service mesh integration if applicable.
 
-## 4. Implement optional components installation logic [pending]
-### Dependencies: 13.3
-### Description: Add support for installing optional components based on the 'include' field
+## 4. Set Up Metabase Persistence and Health Checks [pending]
+### Dependencies: 13.1, 13.2
+### Description: Configure persistent volume claims for Metabase data and implement health checks to ensure proper operation and reliability.
 ### Details:
-1. Create conditional resources for each optional component (argoCD, grafana, prometheus, jaeger, kiali, apiGatewaySupport)
-2. Configure Helm Release resources for each component with appropriate versions
-3. Implement patches to conditionally include resources based on the 'include' array
-4. Set up dependencies between components (e.g., Grafana depends on Prometheus)
-5. Configure each component to work within the vCluster environment
+Add a persistent volume claim for Metabase data storage (recommend at least 5Gi). Mount the PVC to /metabase-data in the container. Configure both liveness and readiness probes: use an HTTP GET probe on /api/health endpoint at port 3000 with appropriate initial delay (60s), timeout (5s), and period (10s) settings. Add appropriate failure thresholds to prevent premature restarts during initial database setup.
 
-## 5. Implement status updates and credential management [pending]
-### Dependencies: 13.4
-### Description: Configure the Composition to update status fields and manage admin credentials
+## 5. Implement Conditional Snowflake Connection Configuration [pending]
+### Dependencies: 13.2, 13.3, 13.4
+### Description: Add configuration to conditionally connect Metabase to Snowflake when the snowflake parameter is enabled in the deployment.
 ### Details:
-1. Add patches to update the status.ready field based on all resources being ready
-2. Configure credential extraction from the vCluster secret
-3. Set up patches to populate status.adminCredentials with access information
-4. Add status.clusterEndpoint with connection details for both direct and ingress access
-5. Implement proper error handling for status updates
-6. Add connection instructions in a user-friendly format
+Implement conditional logic in the component definition that checks for a 'snowflake.enabled' parameter. When enabled, add additional environment variables for Snowflake connection: MB_SNOWFLAKE_JDBC_URL with the Snowflake connection string, MB_SNOWFLAKE_USER and MB_SNOWFLAKE_PASSWORD referencing credentials from a Kubernetes secret. If using External Secrets Operator, configure the appropriate SecretStore and ExternalSecret resources to fetch Snowflake credentials from the external secret manager.
 

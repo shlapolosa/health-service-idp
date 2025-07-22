@@ -1,120 +1,43 @@
 # Task ID: 19
-# Title: Implement GitHub Actions CI/CD Templates
+# Title: Implement Security Hardening
 # Status: pending
-# Dependencies: 15
+# Dependencies: 7, 8, 9, 10, 13, 15
 # Priority: medium
-# Description: Create GitHub Actions workflow templates for Python (FastAPI) and Java (Spring Boot) applications with CI/CD pipelines to Docker Hub and GitOps updates.
+# Description: Implement security hardening for all components in the real-time platform.
 # Details:
-1. Create GitHub Actions workflow templates for each language/framework
-2. Configure Docker Hub authentication and image pushing
-3. Implement GitOps updates to ArgoCD repository
-4. Set up proper testing and validation steps
-
-```yaml
-# GitHub Actions workflow for Python/FastAPI
-name: CI/CD Pipeline
-
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install pytest
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Test with pytest
-      run: pytest
-
-  build-and-push:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-    - uses: actions/checkout@v3
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-    - name: Login to DockerHub
-      uses: docker/login-action@v2
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-    - name: Build and push
-      uses: docker/build-push-action@v4
-      with:
-        context: .
-        push: true
-        tags: socrates12345/${{ github.event.repository.name }}:latest
-
-  update-gitops:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-      with:
-        repository: socrates12345/gitops-repo
-        token: ${{ secrets.GITOPS_PAT }}
-    - name: Update image tag
-      run: |
-        cd apps/${{ github.event.repository.name }}
-        sed -i 's|image: socrates12345/${{ github.event.repository.name }}:.*|image: socrates12345/${{ github.event.repository.name }}:latest|' deployment.yaml
-        git config user.name github-actions
-        git config user.email github-actions@github.com
-        git add .
-        git commit -m "Update ${{ github.event.repository.name }} image to latest"
-        git push
-```
-
-Implement similar workflow for Java/Spring Boot with appropriate build tools (Maven/Gradle). Configure secrets for Docker Hub and GitOps repository access. Set up proper caching for dependencies to speed up builds.
+In the realtime-compositions.yaml file, implement security hardening for all components. Configure proper MQTT authentication and TLS. Set up Snowflake credential management via External Secrets Operator. Implement network policies to restrict communication between components. Configure service mesh security using Istio. Set up audit logging and access controls. Ensure all sensitive data is stored securely.
 
 # Test Strategy:
-1. Test workflow with sample Python/FastAPI application
-2. Test workflow with sample Java/Spring Boot application
-3. Verify Docker image is built and pushed to Docker Hub
-4. Validate GitOps update to ArgoCD repository
-5. Test error handling and notifications
-6. Verify that tests are run before building/pushing
-7. Test with various dependency configurations
+Deploy the Security Hardening configuration and verify that all security measures are working correctly. Test MQTT authentication and TLS. Verify that network policies are restricting communication as expected. Test service mesh security. Check that audit logging is capturing relevant events.
 
 # Subtasks:
-## 1. Create Python/FastAPI GitHub Actions workflow template [pending]
+## 1. Configure MQTT Authentication and TLS [pending]
 ### Dependencies: None
-### Description: Implement a complete GitHub Actions workflow template for Python/FastAPI applications with testing, Docker image building, and pushing to Docker Hub.
+### Description: Implement secure authentication and TLS encryption for the MQTT broker to protect device communications
 ### Details:
-Create a YAML file named 'python-fastapi-workflow.yml' with jobs for testing, building Docker images, and pushing to Docker Hub. Include proper caching for pip dependencies to speed up builds. Configure the workflow to trigger on push to main branch and pull requests. Use the provided example as a starting point, but enhance it with dependency caching and multi-stage Docker builds for smaller images.
+Update the realtime-compositions.yaml file to configure the MQTT broker security settings. Add TLS certificate configuration by creating a Secret resource containing the server certificate and private key. Modify the Mosquitto configuration to enable password-based authentication and TLS on ports 8883 (MQTT with TLS) and 9001 (WebSockets). Create a ConfigMap for mosquitto.conf with appropriate security settings including 'allow_anonymous false', 'password_file /mosquitto/config/passwd', and TLS certificate paths. Update volume mounts to include the TLS certificates and password file.
 
-## 2. Create Java/Spring Boot GitHub Actions workflow template [pending]
-### Dependencies: None
-### Description: Implement a complete GitHub Actions workflow template for Java/Spring Boot applications with Maven/Gradle build, testing, Docker image building, and pushing to Docker Hub.
+## 2. Implement Snowflake Credential Management via External Secrets Operator [pending]
+### Dependencies: 19.1
+### Description: Set up secure credential management for Snowflake connections using External Secrets Operator
 ### Details:
-Create a YAML file named 'java-springboot-workflow.yml' with jobs for building with Maven/Gradle, running tests, building Docker images, and pushing to Docker Hub. Include proper caching for Maven/Gradle dependencies. Configure the workflow to use JDK 17, run unit and integration tests, and build optimized Docker images. Include both Maven and Gradle configurations with conditional execution based on which build tool is detected in the repository.
+Install the External Secrets Operator in the cluster if not already present. Create a SecretStore resource that connects to your external secrets provider (AWS Secrets Manager, HashiCorp Vault, etc.). Define an ExternalSecret resource that references Snowflake credentials stored in the external provider. Configure the ExternalSecret to create a Kubernetes Secret with the format required by the Kafka Connect Snowflake connector. Update the Kafka component in realtime-compositions.yaml to mount this secret instead of using environment variables for credentials. Ensure the secret includes SNOWFLAKE_URL, SNOWFLAKE_USER, SNOWFLAKE_PRIVATE_KEY, and SNOWFLAKE_DATABASE fields.
 
-## 3. Implement GitOps update workflow component [pending]
+## 3. Implement Network Policies for Component Isolation [pending]
 ### Dependencies: 19.1, 19.2
-### Description: Create a reusable GitHub Actions workflow component that updates the GitOps repository with the new image tag after successful Docker image build and push.
+### Description: Create Kubernetes Network Policies to restrict communication between components to only necessary paths
 ### Details:
-Create a YAML file named 'gitops-update.yml' that can be included in both Python and Java workflows. This component should checkout the GitOps repository, update the appropriate Kubernetes manifest files with the new image tag, commit the changes, and push them back to the repository. Configure proper authentication using GitHub Personal Access Tokens (PATs) stored as secrets. Include error handling and validation to ensure the GitOps repository is in the expected state before making changes.
+Define NetworkPolicy resources in realtime-compositions.yaml for each component. For the MQTT broker, allow only inbound connections on ports 1883, 8883, and 9001 from authorized sources. For Kafka, restrict access to only components that need to produce or consume messages (Lenses Agent, MQTT connector). For PostgreSQL, allow connections only from Lenses HQ, Lenses Agent, and Metabase. For Lenses components, restrict API access to authorized frontend services. Use podSelector, namespaceSelector, and ipBlock selectors to precisely control traffic. Implement default deny policies for each namespace to block unspecified traffic. Label all pods appropriately to enable policy targeting.
 
-## 4. Configure secrets management and documentation [pending]
-### Dependencies: 19.1, 19.2, 19.3
-### Description: Set up the required secrets for Docker Hub authentication and GitOps repository access, and create comprehensive documentation for using the workflow templates.
+## 4. Configure Service Mesh Security with Istio [pending]
+### Dependencies: 19.3
+### Description: Implement Istio service mesh for enhanced security controls including mTLS, authorization policies, and traffic encryption
 ### Details:
-Create a README.md file explaining how to set up the required secrets in the GitHub repository: DOCKERHUB_USERNAME, DOCKERHUB_TOKEN, and GITOPS_PAT. Include step-by-step instructions for generating these tokens/credentials from Docker Hub and GitHub. Document how to configure the workflows for specific projects, including any customization options. Create a template for the GitOps repository structure that works with the update workflow.
+Install Istio in the cluster if not already present. Add the necessary annotations to enable Istio sidecar injection for all components in realtime-compositions.yaml. Create DestinationRule resources to enforce mutual TLS (mTLS) between all services. Implement AuthorizationPolicy resources to define fine-grained access controls based on service identity, path, method, and headers. Configure Istio Gateway and VirtualService resources for secure ingress traffic with proper TLS termination. Set up Istio RequestAuthentication and PeerAuthentication for JWT validation and service-to-service authentication. Update the realtime-compositions.yaml to include these Istio resources alongside the component definitions.
 
-## 5. Implement workflow templates with matrix builds and environment deployments [pending]
-### Dependencies: 19.1, 19.2, 19.3, 19.4
-### Description: Enhance the workflow templates to support matrix builds for multiple Python/Java versions and deployment to different environments (dev, staging, production).
+## 5. Implement Audit Logging and Secure Storage [pending]
+### Dependencies: 19.4
+### Description: Set up comprehensive audit logging for all components and ensure secure storage of sensitive data
 ### Details:
-Update both workflow templates to include matrix builds that test against multiple language versions (e.g., Python 3.9, 3.10, 3.11 or Java 11, 17, 21). Add environment-specific deployment configurations that tag Docker images appropriately (e.g., :dev, :staging, :production) based on the branch or tag that triggered the workflow. Implement conditional GitOps updates that target the correct environment folder in the GitOps repository. Include proper approval gates for production deployments using GitHub environments with required reviewers.
+Configure audit logging for all components in realtime-compositions.yaml. For Kafka, enable audit logging by setting the appropriate properties in server.properties (kafka.authorizer.logger=INFO, log4j.logger.kafka.request.logger=INFO). For PostgreSQL, enable pgaudit extension and configure it to log all DDL and DML operations. For MQTT, configure detailed logging of connection attempts and authentication events. Implement a centralized logging solution using Fluentd or Fluent Bit to collect logs from all components. Configure log forwarding to a secure SIEM system. For secure storage, implement encryption-at-rest for all persistent volumes using Kubernetes encryption providers. Configure Kubernetes Secrets encryption using KMS. Ensure all sensitive configuration values are stored as Secrets rather than ConfigMaps or environment variables.
 

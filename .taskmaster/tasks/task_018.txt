@@ -1,92 +1,43 @@
 # Task ID: 18
-# Title: Set Up Observability Stack with Prometheus, Grafana, Jaeger, and Kiali
+# Title: Implement Health Checks and Monitoring
 # Status: pending
-# Dependencies: 13, 16
+# Dependencies: 7, 8, 9, 10, 13
 # Priority: medium
-# Description: Install and configure the observability stack (Prometheus, Grafana, Jaeger, Kiali) for monitoring and tracing of vCluster environments and applications.
+# Description: Implement health checks and monitoring for all components in the real-time platform.
 # Details:
-1. Create Helm charts or Kustomize manifests for each component
-2. Configure Prometheus with appropriate scrape configs for Knative and Istio
-3. Set up Grafana dashboards for Kubernetes, Knative, and Istio metrics
-4. Configure Jaeger for distributed tracing
-5. Set up Kiali for service mesh visualization
-
-```yaml
-# Prometheus configuration for Knative and Istio metrics
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: prometheus-config
-  namespace: monitoring
-data:
-  prometheus.yml: |
-    global:
-      scrape_interval: 15s
-    scrape_configs:
-      - job_name: 'kubernetes-pods'
-        kubernetes_sd_configs:
-          - role: pod
-        relabel_configs:
-          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
-            action: keep
-            regex: true
-          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
-            action: replace
-            target_label: __metrics_path__
-            regex: (.+)
-          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
-            action: replace
-            regex: ([^:]+)(?::\d+)?;(\d+)
-            replacement: $1:$2
-            target_label: __address__
-      - job_name: 'istio-mesh'
-        kubernetes_sd_configs:
-          - role: pod
-        relabel_configs:
-          - source_labels: [__meta_kubernetes_pod_label_app]
-            action: keep
-            regex: istio-mesh
-```
-
-Implement a modular approach where components can be enabled/disabled based on the 'include' field in VClusterEnvironmentClaim. Configure proper resource limits and requests for each component to ensure stability.
+In the realtime-compositions.yaml file, implement health checks and monitoring for all components. Use the health check configurations provided in the PRD. Configure liveness and readiness probes for each component. Set up monitoring integration with the existing Prometheus/Grafana stack. Configure alerting for component failures. Implement log aggregation and monitoring.
 
 # Test Strategy:
-1. Verify installation of each component
-2. Test metric collection from Knative and Istio
-3. Validate Grafana dashboards for visibility into key metrics
-4. Test distributed tracing with Jaeger
-5. Verify service mesh visualization with Kiali
-6. Test resource usage and performance impact
-7. Validate that components can be enabled/disabled as specified
+Deploy the Health Checks and Monitoring configuration and verify that all health checks are working correctly. Test the monitoring integration by checking that metrics are being collected in Prometheus and displayed in Grafana. Test alerting by simulating component failures.
 
 # Subtasks:
-## 1. Create Helm Charts for Observability Components [pending]
+## 1. Configure Health Check Endpoints for All Components [pending]
 ### Dependencies: None
-### Description: Develop Helm charts for Prometheus, Grafana, Jaeger, and Kiali that can be conditionally installed based on the 'include' field in VClusterEnvironmentClaim.
+### Description: Implement health check endpoints for each component in the real-time platform, ensuring they expose appropriate liveness and readiness probes according to the PRD specifications.
 ### Details:
-Create a directory structure for Helm charts with separate charts for each component (prometheus, grafana, jaeger, kiali). Each chart should include templates for deployments, services, configmaps, and RBAC resources. Implement a values.yaml file for each chart with configurable resource limits/requests and other parameters. Create an umbrella chart that can conditionally enable/disable each component based on configuration values.
+For each component in the realtime-compositions.yaml file (MQTT Broker, Kafka Cluster, PostgreSQL, Lenses Agent, etc.), add health check endpoint configurations. For the MQTT Broker, configure TCP socket checks on port 1883. For Kafka, implement HTTP checks on the JMX exporter endpoint. For PostgreSQL, use a simple database connection check. For Lenses components, use their built-in health endpoints. Configure both liveness probes (to detect if a component is running) and readiness probes (to detect if a component is ready to accept traffic) with appropriate initialDelaySeconds, periodSeconds, and failureThreshold values.
 
-## 2. Configure Prometheus with Scrape Configs for Knative and Istio [pending]
-### Dependencies: None
-### Description: Set up Prometheus with appropriate scrape configurations to collect metrics from Kubernetes, Knative, and Istio components.
+## 2. Set Up Prometheus Metrics Exporters [pending]
+### Dependencies: 18.1
+### Description: Configure metrics exporters for all components to expose monitoring data to Prometheus in a standardized format.
 ### Details:
-Extend the Prometheus Helm chart to include the provided scrape configuration for Kubernetes pods and Istio mesh. Add additional scrape configurations for Knative components (activator, autoscaler, controller). Configure appropriate relabeling rules to properly identify and categorize metrics. Set up alerting rules for critical service metrics. Ensure Prometheus has the necessary RBAC permissions to discover and scrape targets across namespaces.
+Add Prometheus annotations to each component's service definition to enable scraping. For Kafka, configure and expose the JMX exporter on port 9404. For PostgreSQL, deploy the postgres_exporter sidecar container. For MQTT Broker, add the mosquitto_exporter sidecar. For Lenses components, enable their built-in Prometheus metrics endpoints. Configure appropriate scrape intervals and metrics paths in the annotations. Ensure all exporters expose key performance metrics such as resource usage, request rates, error rates, and latency.
 
-## 3. Set Up Grafana with Dashboards for Kubernetes, Knative, and Istio [pending]
-### Dependencies: None
-### Description: Configure Grafana with pre-built dashboards for visualizing metrics from Kubernetes, Knative, and Istio, and set up Prometheus as a data source.
+## 3. Implement Grafana Dashboards for Monitoring [pending]
+### Dependencies: 18.2
+### Description: Create comprehensive Grafana dashboards to visualize the health and performance metrics of all platform components.
 ### Details:
-Configure Grafana to use Prometheus as a data source in the Helm chart. Import or create dashboards for Kubernetes cluster metrics, node metrics, and pod metrics. Import or create Knative-specific dashboards for monitoring serving and eventing components. Import or create Istio dashboards for monitoring service mesh performance. Set up a default organization, users, and permissions. Configure persistent storage for Grafana to retain dashboard configurations.
+Develop a set of Grafana dashboards that visualize the metrics collected by Prometheus. Create a main overview dashboard showing the health status of all components at a glance. Create component-specific dashboards for MQTT Broker, Kafka Cluster, PostgreSQL, and Lenses components with detailed metrics. Include panels for CPU/memory usage, connection counts, message throughput, error rates, and latency. Configure appropriate thresholds and color coding to highlight potential issues. Store dashboard definitions as code in the project repository.
 
-## 4. Configure Jaeger for Distributed Tracing [pending]
-### Dependencies: None
-### Description: Set up Jaeger for collecting and visualizing distributed traces from applications and service mesh components.
+## 4. Configure Alerting Rules and Notifications [pending]
+### Dependencies: 18.2, 18.3
+### Description: Set up alerting rules in Prometheus AlertManager to detect and notify about component failures and performance issues.
 ### Details:
-Configure Jaeger with appropriate storage backend (start with in-memory for development, Elasticsearch for production). Set up Jaeger agent as a DaemonSet to collect traces from each node. Configure sampling strategies to balance performance and observability. Integrate Jaeger with Istio to collect traces automatically from the service mesh. Create a service and ingress/route for accessing the Jaeger UI. Configure appropriate resource limits based on expected trace volume.
+Define Prometheus alerting rules for critical conditions such as component unavailability, high error rates, resource exhaustion, and performance degradation. Configure the AlertManager to route alerts to appropriate channels (email, Slack, PagerDuty) based on severity and component. Set up alert grouping and silencing policies to prevent alert storms. Define escalation paths for unresolved alerts. Create alert templates with actionable information including component details, error messages, and troubleshooting links. Store alerting configurations in the project repository alongside the component definitions.
 
-## 5. Integrate Kiali for Service Mesh Visualization and Management [pending]
-### Dependencies: None
-### Description: Set up Kiali to provide visualization and management capabilities for the Istio service mesh.
+## 5. Implement Log Aggregation and Monitoring [pending]
+### Dependencies: 18.1
+### Description: Set up centralized log collection, aggregation, and monitoring for all platform components.
 ### Details:
-Configure Kiali to use Prometheus as a metrics source. Set up integration with Jaeger for trace visualization within Kiali. Configure RBAC for Kiali to access required Kubernetes resources. Set up authentication for the Kiali dashboard (OAuth or basic auth). Create a service and ingress/route for accessing the Kiali UI. Configure Kiali to display custom application health metrics. Ensure Kiali can properly visualize the service mesh topology for vCluster environments.
+Configure each component to output logs in a structured format (JSON). Deploy a log collector (Fluentd or Fluent Bit) as a DaemonSet to collect logs from all pods. Configure the log collector to parse and enrich logs with metadata such as component name, namespace, and pod ID. Set up log forwarding to a centralized logging system (Elasticsearch or Loki). Create log indices and retention policies based on component types. Configure log-based alerts for critical error patterns. Integrate log visualization with Grafana dashboards created in subtask 18.3. Ensure sensitive information is properly masked in logs.
 

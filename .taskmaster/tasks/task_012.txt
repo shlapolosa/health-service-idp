@@ -1,110 +1,43 @@
 # Task ID: 12
-# Title: Configure Karpenter for Dynamic Node Provisioning
+# Title: Implement Stream Processing Queries
 # Status: pending
-# Dependencies: None
-# Priority: high
-# Description: Set up Karpenter in the management cluster with appropriate provisioners, taints, and tolerations to support dynamic provisioning of nodes for vCluster workloads.
+# Dependencies: 10, 11
+# Priority: medium
+# Description: Configure the Lenses SQL queries for data decomposition and topic routing.
 # Details:
-Install Karpenter v0.30.0+ with the following configuration:
-
-1. Create dedicated node templates for vCluster workloads with taints
-2. Configure provisioners with low scale-up delay (< 10s) to minimize cold start issues
-3. Set up appropriate instance types optimized for cost/performance
-
-```yaml
-# Karpenter Provisioner for vCluster workloads
-apiVersion: karpenter.sh/v1alpha5
-kind: Provisioner
-metadata:
-  name: vcluster-provisioner
-spec:
-  requirements:
-    - key: karpenter.sh/capacity-type
-      operator: In
-      values: ["spot", "on-demand"]
-    - key: node.kubernetes.io/instance-type
-      operator: In
-      values: ["t3a.medium", "t3a.large", "m5a.large"]
-  taints:
-    - key: workload-type
-      value: vcluster
-      effect: NoSchedule
-  limits:
-    resources:
-      cpu: 1000
-      memory: 1000Gi
-  providerRef:
-    name: default
-  ttlSecondsAfterEmpty: 30
-  ttlSecondsUntilExpired: 2592000 # 30 days
-  startupTaints:
-    - key: node.kubernetes.io/not-ready
-      effect: NoSchedule
-  consolidation:
-    enabled: true
-```
-
-Implement node template with appropriate security groups, IAM roles, and subnet configuration. Configure Karpenter to use interruption handling for Spot instances to improve reliability.
+In the realtime-compositions.yaml file, implement the configuration for the Lenses SQL queries that transform data from the device_data topic to specialized topics (blood_pressure_device_topic, heart_rate_device_topic, oxygen_saturation_device_topic, temperature_device_topic). Use the SQL query templates provided in the PRD. Configure the queries to use the appropriate Avro schemas and key formats. Ensure the queries are deployed and managed by the Lenses Agent.
 
 # Test Strategy:
-1. Deploy a test pod with the vCluster taint toleration and verify Karpenter provisions a new node
-2. Test scale-down by removing workloads and verifying node termination
-3. Measure node provisioning latency to ensure it meets cold-start requirements (<30s)
-4. Verify proper instance type selection based on workload requirements
-5. Test interruption handling by simulating a spot instance interruption
+Deploy the Stream Processing Queries configuration and verify that the queries are created correctly. Test the queries by publishing messages to the device_data topic and verifying that they are transformed and routed to the specialized topics. Verify that the Avro schemas are applied correctly.
 
 # Subtasks:
-## 1. Install Karpenter v0.30.0+ in the management cluster [pending]
+## 1. Create realtime-compositions.yaml file structure for Lenses SQL queries [pending]
 ### Dependencies: None
-### Description: Install Karpenter v0.30.0+ in the management cluster using Helm and configure the necessary AWS infrastructure components.
+### Description: Set up the basic structure in the realtime-compositions.yaml file for implementing the Lenses SQL queries configuration. This includes defining the necessary sections for stream processing and establishing the connection to the device_data topic.
 ### Details:
-1. Create necessary IAM roles for Karpenter with appropriate permissions for EC2 instance management
-2. Set up IRSA (IAM Roles for Service Accounts) for Karpenter
-3. Install Karpenter using Helm chart version 0.30.0 or newer
-4. Configure Karpenter controller with appropriate AWS region and cluster name
-5. Verify Karpenter installation by checking pods and controller logs
+Create or update the realtime-compositions.yaml file with a dedicated section for Lenses SQL queries. Define the configuration structure that will contain the four transformation queries. Include the connection parameters to the Kafka cluster and ensure the device_data topic is properly referenced as the source. Set up the basic configuration that will be common across all queries, such as error handling and processing guarantees.
 
-## 2. Create node template with security groups and IAM configuration [pending]
+## 2. Implement blood pressure and heart rate transformation queries [pending]
 ### Dependencies: 12.1
-### Description: Create a node template for Karpenter that includes the necessary security groups, IAM roles, and subnet configuration for vCluster workloads.
+### Description: Configure the first two SQL queries that transform data from the device_data topic to the blood_pressure_device_topic and heart_rate_device_topic, following the templates from the PRD.
 ### Details:
-1. Create an EC2 NodeClass or equivalent resource defining the node template
-2. Configure security groups that allow necessary network traffic for vCluster workloads
-3. Set up IAM instance profile with permissions for node operations
-4. Configure subnet selection to use private subnets in multiple availability zones
-5. Set up appropriate user data for node bootstrap process
-6. Configure instance metadata service (IMDSv2) for security
+Implement the SQL queries for blood pressure and heart rate data transformation. For the blood pressure query, extract systolic and diastolic readings from the device_data topic and route them to blood_pressure_device_topic. For the heart rate query, extract pulse rate measurements and route them to heart_rate_device_topic. Configure both queries to use the appropriate Avro schemas for the output topics and set the correct key formats based on patient and device identifiers. Include proper error handling and data validation in the queries.
 
-## 3. Configure vCluster provisioner with taints and instance types [pending]
-### Dependencies: 12.2
-### Description: Create the Karpenter provisioner for vCluster workloads with appropriate taints, instance types, and capacity settings as specified in the requirements.
+## 3. Implement oxygen saturation and temperature transformation queries [pending]
+### Dependencies: 12.1
+### Description: Configure the remaining two SQL queries that transform data from the device_data topic to the oxygen_saturation_device_topic and temperature_device_topic, following the templates from the PRD.
 ### Details:
-1. Create the vcluster-provisioner resource as specified in the YAML template
-2. Configure the instance types (t3a.medium, t3a.large, m5a.large) optimized for cost/performance
-3. Set up taints with key 'workload-type', value 'vcluster', and effect 'NoSchedule'
-4. Configure resource limits (CPU: 1000, Memory: 1000Gi)
-5. Set ttlSecondsAfterEmpty to 30 and ttlSecondsUntilExpired to 2592000 (30 days)
-6. Enable consolidation for cost optimization
+Implement the SQL queries for oxygen saturation and temperature data transformation. For the oxygen saturation query, extract SpO2 readings from the device_data topic and route them to oxygen_saturation_device_topic. For the temperature query, extract temperature measurements and route them to temperature_device_topic. Configure both queries to use the appropriate Avro schemas for the output topics and set the correct key formats based on patient and device identifiers. Include proper error handling and data validation in the queries.
 
-## 4. Implement Spot instance interruption handling [pending]
-### Dependencies: 12.3
-### Description: Configure Karpenter to handle Spot instance interruptions gracefully to improve reliability of vCluster workloads running on Spot instances.
+## 4. Configure Lenses Agent integration for query deployment [pending]
+### Dependencies: 12.2, 12.3
+### Description: Set up the configuration to ensure the Lenses Agent properly deploys and manages the SQL queries. This includes specifying deployment parameters, resource allocation, and monitoring settings.
 ### Details:
-1. Enable the AWS Node Termination Handler or Karpenter's built-in interruption handling
-2. Configure appropriate draining behavior for Spot instances receiving interruption notices
-3. Set up event handling for EC2 Spot Instance Interruption Warning events
-4. Implement graceful pod termination with appropriate termination grace periods
-5. Configure Karpenter to quickly provision replacement capacity when interruptions occur
-6. Set up monitoring and alerting for Spot instance interruptions
+Configure the Lenses Agent integration for the SQL queries by specifying the deployment parameters such as parallelism, checkpoint intervals, and state store configuration. Set appropriate resource allocation (CPU, memory) for each query based on expected throughput. Configure monitoring and alerting for the queries, including metrics collection and error reporting. Ensure the queries are automatically deployed when the Lenses Agent starts and that they can be updated without service interruption.
 
-## 5. Optimize Karpenter for fast scale-up and minimal cold start [pending]
-### Dependencies: 12.3, 12.4
-### Description: Fine-tune Karpenter configuration to minimize scale-up delay and cold start issues for vCluster workloads.
+## 5. Implement error handling and validation for all queries [pending]
+### Dependencies: 12.2, 12.3, 12.4
+### Description: Enhance all SQL queries with comprehensive error handling, data validation, and logging to ensure robust operation in production.
 ### Details:
-1. Configure provisioner with low scale-up delay (< 10s) as required
-2. Implement appropriate node initialization and readiness settings
-3. Configure kubelet startup parameters for faster node registration
-4. Set up node warm pools if necessary for critical workloads
-5. Implement monitoring for scale-up events and latency
-6. Document the configuration and performance characteristics for the team
+Implement error handling for all queries to manage scenarios such as malformed input data, schema evolution, and downstream connectivity issues. Add data validation logic to ensure only valid measurements are processed and routed. Configure dead-letter queues for messages that fail processing. Implement detailed logging for query execution, including processing rates, latency metrics, and error counts. Set up alerting thresholds for critical error conditions. Ensure all queries have consistent error handling patterns and logging formats.
 

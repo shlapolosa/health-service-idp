@@ -1,0 +1,508 @@
+# OAM ComponentDefinitions for Real-time Platform Integration
+# These enable the use of realtime-platform and enhanced webservice components in OAM Applications
+
+---
+# Real-time Platform ComponentDefinition
+# This creates a comprehensive real-time streaming platform with Kafka, MQTT, Analytics
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: realtime-platform
+  annotations:
+    definition.oam.dev/description: "Real-time streaming platform with Kafka, MQTT, PostgreSQL, and Analytics"
+spec:
+  workload:
+    definition:
+      apiVersion: platform.example.org/v1alpha1
+      kind: RealtimePlatformClaim
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "platform.example.org/v1alpha1"
+          kind: "RealtimePlatformClaim"
+          metadata: {
+            name: parameter.name
+          }
+          spec: {
+            name: parameter.name
+            database: parameter.database
+            visualization: parameter.visualization
+            iot: parameter.iot
+            
+            // Lenses Configuration
+            if parameter.lensesConfig != _|_ {
+              lensesConfig: {
+                licenseKey: parameter.lensesConfig.licenseKey
+                heapSize: parameter.lensesConfig.heapSize
+                enableUI: parameter.lensesConfig.enableUI
+              }
+            }
+            
+            // MQTT Configuration
+            if parameter.mqttConfig != _|_ {
+              mqttConfig: {
+                users: parameter.mqttConfig.users
+                persistenceSize: parameter.mqttConfig.persistenceSize
+                enableWebSockets: parameter.mqttConfig.enableWebSockets
+                qosLevel: parameter.mqttConfig.qosLevel
+              }
+            }
+            
+            // Kafka Configuration
+            if parameter.kafkaConfig != _|_ {
+              kafkaConfig: {
+                topics: parameter.kafkaConfig.topics
+                retention: parameter.kafkaConfig.retention
+                partitions: parameter.kafkaConfig.partitions
+                replicationFactor: parameter.kafkaConfig.replicationFactor
+              }
+            }
+            
+            // Snowflake Integration
+            if parameter.snowflakeConfig != _|_ {
+              snowflakeConfig: {
+                enabled: parameter.snowflakeConfig.enabled
+                credentialsSecret: parameter.snowflakeConfig.credentialsSecret
+                database: parameter.snowflakeConfig.database
+                schema: parameter.snowflakeConfig.schema
+              }
+            }
+            
+            // Resource Configuration
+            if parameter.resources != _|_ {
+              resources: {
+                cpu: parameter.resources.cpu
+                memory: parameter.resources.memory
+              }
+            }
+            
+            // Scaling Configuration
+            if parameter.scaling != _|_ {
+              scaling: {
+                minReplicas: parameter.scaling.minReplicas
+                maxReplicas: parameter.scaling.maxReplicas
+                targetCPU: parameter.scaling.targetCPU
+              }
+            }
+          }
+        }
+        
+        parameter: {
+          // Required parameters
+          name: string
+          
+          // Platform configuration
+          database: *"postgres" | "mysql" | "mongodb"
+          visualization: *"metabase" | "grafana" | "superset"
+          iot: *true | false
+          
+          // Optional advanced configuration
+          lensesConfig?: {
+            licenseKey: string
+            heapSize: *"2048m" | string
+            enableUI: *true | bool
+          }
+          
+          mqttConfig?: {
+            users: [...{
+              username: string
+              password: string
+            }]
+            persistenceSize: *"10Gi" | string
+            enableWebSockets: *true | bool
+            qosLevel: *1 | int
+          }
+          
+          kafkaConfig?: {
+            topics: [...string]
+            retention: *"7d" | string
+            partitions: *3 | int
+            replicationFactor: *1 | int
+          }
+          
+          snowflakeConfig?: {
+            enabled: *false | bool
+            credentialsSecret?: string
+            database?: string
+            schema?: string
+          }
+          
+          resources?: {
+            cpu: *"2000m" | string
+            memory: *"4Gi" | string
+          }
+          
+          scaling?: {
+            minReplicas: *1 | int
+            maxReplicas: *5 | int
+            targetCPU: *80 | int
+          }
+        }
+
+---
+# Enhanced WebService ComponentDefinition with Real-time Support
+# This extends the existing webservice to support realtime platform integration
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: webservice-realtime
+  annotations:
+    definition.oam.dev/description: "Web service with optional real-time platform integration"
+spec:
+  workload:
+    definition:
+      apiVersion: platform.example.org/v1alpha1
+      kind: ApplicationClaim
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "platform.example.org/v1alpha1"
+          kind: "ApplicationClaim"
+          metadata: {
+            name: parameter.name
+          }
+          spec: {
+            name: parameter.name
+            language: parameter.language
+            framework: parameter.framework
+            image: parameter.image
+            
+            // Real-time platform integration
+            if parameter.realtime != _|_ {
+              realtime: parameter.realtime
+              realtimeEnabled: true
+            }
+            
+            if parameter.websocket != _|_ {
+              websocket: parameter.websocket
+            }
+            
+            // Streaming configuration
+            if parameter.streaming != _|_ {
+              streaming: {
+                enabled: parameter.streaming.enabled
+                topics: parameter.streaming.topics
+                consumerGroup: parameter.streaming.consumerGroup
+                if parameter.streaming.autoOffsetReset != _|_ {
+                  autoOffsetReset: parameter.streaming.autoOffsetReset
+                }
+                if parameter.streaming.sessionTimeoutMs != _|_ {
+                  sessionTimeoutMs: parameter.streaming.sessionTimeoutMs
+                }
+                if parameter.streaming.heartbeatIntervalMs != _|_ {
+                  heartbeatIntervalMs: parameter.streaming.heartbeatIntervalMs
+                }
+                if parameter.streaming.maxPollRecords != _|_ {
+                  maxPollRecords: parameter.streaming.maxPollRecords
+                }
+                if parameter.streaming.enableAutoCommit != _|_ {
+                  enableAutoCommit: parameter.streaming.enableAutoCommit
+                }
+                if parameter.streaming.maxPollIntervalMs != _|_ {
+                  maxPollIntervalMs: parameter.streaming.maxPollIntervalMs
+                }
+              }
+            }
+            
+            // Environment variables
+            if parameter.environment != _|_ {
+              environment: parameter.environment
+            }
+            
+            // Resource configuration
+            if parameter.resources != _|_ {
+              resources: {
+                cpu: parameter.resources.cpu
+                memory: parameter.resources.memory
+                if parameter.resources.storage != _|_ {
+                  storage: parameter.resources.storage
+                }
+              }
+            }
+          }
+        }
+        
+        parameter: {
+          // Required parameters
+          name: string
+          language: *"python" | "go" | "java" | "nodejs" | "rust"
+          framework: *"fastapi" | "flask" | "gin" | "spring" | "express" | "axum"
+          image: string
+          
+          // Real-time platform integration
+          realtime?: string  // Name of the realtime-platform component
+          websocket?: bool
+          
+          streaming?: {
+            enabled: *false | bool
+            topics?: [...string]
+            consumerGroup?: string
+            autoOffsetReset?: "earliest" | "latest"
+            sessionTimeoutMs?: int
+            heartbeatIntervalMs?: int
+            maxPollRecords?: int
+            enableAutoCommit?: bool
+            maxPollIntervalMs?: int
+          }
+          
+          // Service configuration
+          environment?: {[string]: string}
+          
+          resources?: {
+            cpu: *"1000m" | string
+            memory: *"2Gi" | string
+            storage?: string
+          }
+        }
+
+---
+# IoT Broker ComponentDefinition
+# For specialized IoT device management
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: iot-broker
+  annotations:
+    definition.oam.dev/description: "IoT device broker with MQTT and device management"
+spec:
+  workload:
+    definition:
+      apiVersion: platform.example.org/v1alpha1
+      kind: IoTBrokerClaim
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "platform.example.org/v1alpha1"
+          kind: "IoTBrokerClaim"
+          metadata: {
+            name: parameter.name
+          }
+          spec: {
+            name: parameter.name
+            mqttPort: parameter.mqttPort
+            websocketPort: parameter.websocketPort
+            
+            if parameter.authentication != _|_ {
+              authentication: {
+                enabled: parameter.authentication.enabled
+                users: parameter.authentication.users
+              }
+            }
+            
+            topics: parameter.topics
+            
+            if parameter.connector != _|_ {
+              connector: {
+                enabled: parameter.connector.enabled
+                kafkaTopic: parameter.connector.kafkaTopic
+                mqttTopic: parameter.connector.mqttTopic
+                keyField: parameter.connector.keyField
+                qos: parameter.connector.qos
+                errorPolicy: parameter.connector.errorPolicy
+              }
+            }
+            
+            if parameter.persistence != _|_ {
+              persistence: {
+                enabled: parameter.persistence.enabled
+                size: parameter.persistence.size
+              }
+            }
+          }
+        }
+        
+        parameter: {
+          // Required parameters
+          name: string
+          mqttPort: *1883 | int
+          websocketPort: *9001 | int
+          topics: [...string]
+          
+          // Optional configuration
+          authentication?: {
+            enabled: *true | bool
+            users?: [...{
+              username: string
+              password: string
+            }]
+          }
+          
+          connector?: {
+            enabled: *false | bool
+            kafkaTopic?: string
+            mqttTopic?: string
+            keyField?: string
+            qos: *1 | int
+            errorPolicy: *"RETRY" | "DROP" | "DEAD_LETTER"
+          }
+          
+          persistence?: {
+            enabled: *false | bool
+            size?: string
+          }
+        }
+
+---
+# Stream Processor ComponentDefinition
+# For real-time data processing with SQL queries
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: stream-processor
+  annotations:
+    definition.oam.dev/description: "Stream processing engine for real-time data transformation"
+spec:
+  workload:
+    definition:
+      apiVersion: platform.example.org/v1alpha1
+      kind: StreamProcessorClaim
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "platform.example.org/v1alpha1"
+          kind: "StreamProcessorClaim"
+          metadata: {
+            name: parameter.name
+          }
+          spec: {
+            name: parameter.name
+            
+            queries: parameter.queries
+            
+            topics: {
+              input: parameter.topics.input
+              output: parameter.topics.output
+            }
+            
+            if parameter.errorHandling != _|_ {
+              errorHandling: {
+                policy: parameter.errorHandling.policy
+                retries: parameter.errorHandling.retries
+                if parameter.errorHandling.deadLetterTopic != _|_ {
+                  deadLetterTopic: parameter.errorHandling.deadLetterTopic
+                }
+              }
+            }
+            
+            if parameter.processing != _|_ {
+              processing: {
+                parallelism: parameter.processing.parallelism
+                checkpointInterval: parameter.processing.checkpointInterval
+                stateBackend: parameter.processing.stateBackend
+              }
+            }
+          }
+        }
+        
+        parameter: {
+          // Required parameters
+          name: string
+          queries: [...{
+            name: string
+            sql: string
+          }]
+          topics: {
+            input: [...string]
+            output: [...string]
+          }
+          
+          // Optional configuration
+          errorHandling?: {
+            policy: *"RETRY" | "DROP" | "DEAD_LETTER"
+            retries: *3 | int
+            deadLetterTopic?: string
+          }
+          
+          processing?: {
+            parallelism: *2 | int
+            checkpointInterval: *"60s" | string
+            stateBackend: *"rocksdb" | "memory"
+          }
+        }
+
+---
+# Analytics Dashboard ComponentDefinition
+# For real-time analytics and visualization
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: analytics-dashboard
+  annotations:
+    definition.oam.dev/description: "Analytics dashboard with real-time data visualization"
+spec:
+  workload:
+    definition:
+      apiVersion: platform.example.org/v1alpha1
+      kind: AnalyticsDashboardClaim
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "platform.example.org/v1alpha1"
+          kind: "AnalyticsDashboardClaim"
+          metadata: {
+            name: parameter.name
+          }
+          spec: {
+            name: parameter.name
+            dashboardType: parameter.dashboardType
+            
+            dataSources: parameter.dataSources
+            
+            if parameter.dashboards != _|_ {
+              dashboards: parameter.dashboards
+            }
+            
+            if parameter.alerts != _|_ {
+              alerts: {
+                enabled: parameter.alerts.enabled
+                channels: parameter.alerts.channels
+              }
+            }
+            
+            if parameter.authentication != _|_ {
+              authentication: {
+                enabled: parameter.authentication.enabled
+                provider: parameter.authentication.provider
+                config: parameter.authentication.config
+              }
+            }
+          }
+        }
+        
+        parameter: {
+          // Required parameters
+          name: string
+          dashboardType: *"metabase" | "grafana" | "superset"
+          dataSources: [...{
+            name: string
+            type: "kafka" | "postgres" | "snowflake" | "elasticsearch"
+            connectionString?: string
+            secretRef?: string
+          }]
+          
+          // Optional configuration
+          dashboards?: [...{
+            name: string
+            template?: string
+            autoCreate: *false | bool
+          }]
+          
+          alerts?: {
+            enabled: *false | bool
+            channels?: [...{
+              type: "email" | "slack" | "webhook"
+              config: {[string]: string}
+            }]
+          }
+          
+          authentication?: {
+            enabled: *false | bool
+            provider?: "oauth" | "ldap" | "basic"
+            config?: {[string]: string}
+          }
+        }

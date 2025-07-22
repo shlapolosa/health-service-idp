@@ -1,0 +1,1005 @@
+<context>
+# Overview 
+This PRD defines the requirements for extending the health-service-idp platform with new OAM ComponentDefinitions that enable developers to declaratively provision complex real-time data streaming and IoT infrastructure through simple OAM application specifications. The goal is to abstract the complexity of multi-component real-time systems (MQTT brokers, Lenses stream processing, Kafka, Snowflake connectors, Metabase) behind high-level OAM component types like `realtime-system` and `iot-broker`, allowing developers to focus on business logic rather than infrastructure complexity.
+
+The integration will leverage the existing health-service-idp architecture (KubeVela + Crossplane + vCluster) to provision the complete real-time health data pipeline infrastructure found in the heath-health/realtime_data_pipeline repository using docker-compose orchestration patterns.
+
+## Current OAM Capabilities 
+
+The health-service-idp platform currently supports the following OAM ComponentDefinitions through `/Users/socrateshlapolosa/Development/health-service-idp/crossplane/oam/component-definitions.yaml` and `/Users/socrateshlapolosa/Development/health-service-idp/crossplane/oam/application-component-definitions.yaml`:
+
+### Infrastructure Components (Provision in Host Cluster)
+- **`vcluster`**: Virtual Kubernetes environments with optional Istio, Knative, ArgoCD, observability (Grafana, Prometheus, Jaeger, Kiali), and API Gateway
+- **`aws-apigateway`**: AWS API Gateway with CORS configuration and external service access
+- **`neon-postgres`**: Neon PostgreSQL managed database with External Secrets integration for credential sync
+- **`auth0-idp`**: Auth0 identity provider integration with External Secrets for credential management
+- **`karpenter-nodepool`**: Dynamic compute provisioning with workload-specific configurations, taints, and resource limits
+- **`snowflake-datawarehouse`**: Snowflake data warehouse provisioning via Terraform provider with warehouse and database creation
+
+### Application Components (Deploy to vCluster)
+- **`webservice`**: Web applications (Python/FastAPI, Java/SpringBoot, JavaScript, Go) with optional database, cache, frontend, API exposure, and resource configuration
+- **`kafka`**: Apache Kafka event streaming platform with Bitnami Helm chart (v26.8.5), configurable replicas, storage, ZooKeeper, and metrics
+- **`tfjob`**: TensorFlow training jobs for ML workloads with distributed/single-node modes, GPU support, custom commands/args, environment variables, and volume mounts
+- **`redis`**: Redis in-memory data store with standalone/replication architecture, authentication, persistence, and metrics
+- **`mongodb`**: MongoDB document database with standalone/replicaset architecture, authentication, persistence, and metrics
+
+### Traits and Policies (Operational Capabilities)
+Available through `/Users/socrateshlapolosa/Development/health-service-idp/crossplane/oam/traits-and-policies.yaml`:
+
+**Traits:**
+- **`ingress`**: Configure ingress routing with domain, path, and TLS support
+- **`autoscaler`**: Horizontal Pod Autoscaler with CPU/memory targets and min/max replicas
+- **`kafka-producer`**: Configure applications as Kafka producers with topic specification
+- **`kafka-consumer`**: Configure applications as Kafka consumers with topics and consumer groups
+
+**Policies:**
+- **`health`**: Health checking policy with configurable probe intervals
+- **`security-policy`**: Network policies and access control with allowed origins
+- **`override`**: Selective component configuration overrides for specific deployments
+
+### Complete Application Examples Currently Supported
+
+1. **User Management Application**: vCluster + Neon Postgres + Auth0 + FastAPI webservice with ingress
+2. **ML Analytics Pipeline**: vCluster + Snowflake + Neon Postgres + TensorFlow jobs + inference API with autoscaling
+3. **Event-Driven Microservices**: vCluster + Auth0 + Neon Postgres + Kafka + multiple webservices with producer/consumer traits
+4. **Full-Stack E-commerce**: vCluster + Neon Postgres + Auth0 + multiple APIs + React frontend with ingress routing
+
+## Real-time Application Examples (New)
+5. **Real-time Health Data Platform**: Complete streaming pipeline with IoT, analytics, and stream processing (see `/Users/socrateshlapolosa/Development/health-service-idp/REALTIME-OAM-EXAMPLE.yaml`)
+6. **Multi-Application Real-time System**: Shared real-time platform with multiple consuming applications
+7. **Minimal Real-time Setup**: Ultra-simple platform with intelligent defaults (see `/Users/socrateshlapolosa/Development/health-service-idp/MINIMAL-REALTIME-OAM.yaml`)
+
+### Integration Capabilities
+- **GitOps Automation**: ArgoCD synchronization of OAM definitions with GitHub Actions validation
+- **External Secrets**: AWS Secrets Manager integration for credential management
+- **Service Mesh**: Istio integration for inter-service communication and observability
+- **Monitoring Stack**: Prometheus, Grafana, Jaeger, Kiali integration for observability
+- **Cost Optimization**: Karpenter auto-scaling with spot instances and resource optimization
+
+# Core Features 
+1. **Ultra-Simplified Real-time System Component**: Single OAM ComponentDefinition that creates complete streaming platform
+   - **Minimal Developer Input**: Only requires `name`, optional `database`, `visualization`, `iot` flags
+   - **Complete Infrastructure Abstraction**: Automatically provisions 7+ interconnected services
+   - **Intelligent Defaults**: PostgreSQL database, Metabase visualization, MQTT IoT broker enabled by default
+   - **Automatic Secret Generation**: All connection details exposed via standardized Kubernetes secrets
+
+2. **Unified Streaming Platform Provisioning**: Single component creates entire ecosystem
+   - **Kafka Cluster**: lensesio/fast-data-dev:3.9.0 with Schema Registry, Connect, pre-loaded connectors
+   - **Lenses Platform**: HQ + Agent architecture for stream processing management and monitoring
+   - **MQTT Broker**: Eclipse Mosquitto with authentication, persistence, WebSocket support
+   - **Database Backend**: PostgreSQL for Lenses configuration and metadata storage
+   - **Analytics Dashboard**: Metabase with automatic Snowflake/database connections
+   - **Stream Processing**: Pre-configured Lenses SQL queries for health data decomposition
+
+3. **Zero-Configuration Secret Management**: Automatic credential and endpoint management
+   - **Standardized Secret Names**: `{name}-{service}-secret` pattern for predictable access
+   - **Complete Connection Details**: Host, port, database, user, password for each service
+   - **Microservice Integration**: Applications reference secrets without hardcoded values
+   - **External System Abstraction**: Snowflake, Neon DB, Auth0 connections via secrets only
+
+4. **Developer-Focused Abstraction**: Complex infrastructure hidden behind simple properties
+   - **No Infrastructure Knowledge Required**: Developers specify business intent, not technical implementation
+   - **Extensive Customization Available**: Advanced properties available without breaking simplicity
+   - **Sensible Scaling Defaults**: Auto-scaling, resource limits, health checks pre-configured
+   - **GitOps Ready**: Full integration with existing ArgoCD and GitHub Actions workflows
+
+# User Experience 
+**Developer Persona**: Healthcare application developers who need real-time data streaming capabilities without deep infrastructure expertise.
+
+**Primary User Flow (Ultra-Simplified)**:
+1. Developer writes minimal OAM Application specification (see `/Users/socrateshlapolosa/Development/health-service-idp/MINIMAL-REALTIME-OAM.yaml` for complete examples):
+   ```yaml
+   components:
+   - name: health-pipeline
+     type: realtime-platform
+     properties:
+       name: health-data
+       database: postgres     # Optional (defaults to postgres)
+       visualization: metabase # Optional (defaults to metabase)
+       iot: true              # Optional (defaults to true)
+   
+   # Real-time enabled application
+   - name: health-app
+     type: webservice
+     properties:
+       name: health-processor
+       image: "socrates12345/health-service:latest"
+       language: python
+       framework: fastapi
+       realtime: "health-data"  # References platform above
+   ```
+
+2. Platform automatically provisions complete infrastructure stack:
+   - Kafka cluster (lensesio/fast-data-dev:3.9.0) with Schema Registry + Connect
+   - Lenses HQ/Agent for stream processing and management
+   - PostgreSQL database for Lenses backend storage
+   - Eclipse Mosquitto MQTT broker for IoT device connectivity
+   - Metabase analytics dashboard connected to data warehouse
+   - All networking, security, and service mesh configuration
+
+3. Developer creates real-time-enabled applications using enhanced webservice:
+   ```yaml
+   - name: health-processor
+     type: webservice
+     properties:
+       name: health-realtime-service
+       image: "socrates12345/health-processor:latest"
+       language: python
+       framework: fastapi
+       realtime: "health-data"  # References realtime-platform name
+   ```
+
+4. Platform automatically:
+   - Checks if realtime-platform "health-data" exists in cluster
+   - Generates parameterized real-time service based on heath-health/realtime_data_pipeline/realtime_service template
+   - Implements Onion Architecture following CLAUDE.md guidelines
+   - Exposes WebSocket endpoints for real-time communication
+   - Configures aiokafka consumers for default topics
+   - Injects connection secrets into application environment
+
+5. Developer receives connection details via standardized Kubernetes secrets:
+   - `{name}-mqtt-secret`: MQTT broker connection (host, port, credentials)
+   - `{name}-kafka-secret`: Kafka cluster access (bootstrap servers, schema registry)
+   - `{name}-db-secret`: PostgreSQL database connection (host, port, database, user, password)
+   - `{name}-metabase-secret`: Analytics dashboard access (URL, admin credentials)
+   - `{name}-lenses-secret`: Stream processing UI access (URL, admin credentials)
+
+6. Applications automatically connect using secret references without hardcoded values
+
+**Real-time Service Template Requirements**:
+- **Source Template**: https://github.com/heath-health/realtime_data_pipeline/blob/main/realtime_service
+- **Architecture**: Onion Architecture with Domain, Application, Interface, Infrastructure layers
+- **Framework**: FastAPI with dependency injection
+- **Real-time Features**: WebSocket endpoints for live data streaming
+- **Kafka Integration**: aiokafka consumers for topic subscription
+- **Secret Integration**: Environment variables populated from platform secrets
+- **Compliance**: Follows all CLAUDE.md guidelines including 12-factor app principles
+
+**Key UX Principles**:
+- **Zero Infrastructure Knowledge**: Developers specify intent (realtime-system), not implementation
+- **Single Component Creates Everything**: One `realtime-platform` replaces 10+ infrastructure components
+- **Enhanced Application Integration**: webservice components with `realtime` parameter automatically connect to platforms
+- **Automatic Secret Management**: All connection details provided via Kubernetes secrets
+- **Sensible Defaults**: Minimal configuration required, extensive customization available
+- **Built-in Observability**: Monitoring, logging, and health checks included by default
+</context>
+
+<PRD>
+# Technical Architecture 
+
+## Component Integration Points
+
+**Reference Implementation Examples**:
+- **Comprehensive OAM Examples**: `/Users/socrateshlapolosa/Development/health-service-idp/REALTIME-OAM-EXAMPLE.yaml`
+- **Minimal OAM Examples**: `/Users/socrateshlapolosa/Development/health-service-idp/MINIMAL-REALTIME-OAM.yaml`
+
+### 1. Renamed Component: realtime-platform (formerly realtime-system)
+**Files Required**:
+- `/Users/socrateshlapolosa/Development/health-service-idp/crossplane/oam/realtime-component-definitions.yaml`
+
+**Real-time Platform ComponentDefinition Structure (Ultra-Minimal Developer Interface)**:
+```yaml
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: realtime-platform
+  annotations:
+    definition.oam.dev/description: "Complete real-time streaming platform with IoT, analytics, and stream processing"
+spec:
+  workload:
+    definition:
+      apiVersion: platform.example.org/v1alpha1
+      kind: RealtimePlatformClaim
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "platform.example.org/v1alpha1"
+          kind: "RealtimePlatformClaim"
+          metadata: {
+            name: parameter.name + "-realtime"
+          }
+          spec: {
+            name: parameter.name
+            // All complexity abstracted into Crossplane Composition:
+            // - Kafka cluster (lensesio/fast-data-dev)
+            // - Lenses HQ/Agent with license management
+            // - PostgreSQL backend with database creation
+            // - MQTT broker with authentication
+            // - Metabase with dashboard configuration
+            // - Schema Registry with health data schemas
+            // - Stream processing queries (device_data → specialized topics)
+            // - Network policies, volume mounts, health checks
+            // - Secret generation for all service connections
+            
+            // Expose only essential developer controls:
+            database: parameter.database
+            visualization: parameter.visualization  
+            iot: parameter.iot
+            if parameter.mqttUsers != _|_ {
+              mqttUsers: parameter.mqttUsers
+            }
+            if parameter.dataRetention != _|_ {
+              dataRetention: parameter.dataRetention
+            }
+            if parameter.scaling != _|_ {
+              scaling: parameter.scaling
+            }
+            if parameter.snowflake != _|_ {
+              snowflake: parameter.snowflake
+            }
+          }
+        }
+        
+        parameter: {
+          // Required (minimal)
+          name: string
+          
+          // Optional with intelligent defaults
+          database: *"postgres" | "postgres" | "mysql" | "mongodb"
+          visualization: *"metabase" | "metabase" | "grafana"
+          iot: *true | bool
+          
+          // Advanced optional (still simple)
+          mqttUsers?: [...{
+            username: string
+            password: string
+          }]
+          dataRetention?: string // "7d", "30d", etc.
+          scaling?: {
+            minReplicas?: int
+            maxReplicas?: int
+          }
+          snowflake?: {
+            enabled?: bool
+            credentialsSecret?: string
+          }
+        }
+```
+
+**Key Design Principle**: 
+- **Single Component Definition** replaces multiple infrastructure components
+- **Minimal Required Parameters**: Only `name` required, everything else has defaults
+- **Complex Logic Hidden**: All Kafka, Lenses, MQTT configuration handled in Crossplane Composition
+- **Secret-Based Integration**: External systems (Snowflake, Neon) accessed via secrets only
+
+### 2. Enhanced webservice ComponentDefinition with Real-time Integration
+**New Feature**: Add optional `realtime` parameter to existing webservice components
+**Example Usage**: See multiple webservice examples with `realtime` parameter in `/Users/socrateshlapolosa/Development/health-service-idp/REALTIME-OAM-EXAMPLE.yaml`
+
+**Enhanced webservice ComponentDefinition (supports real-time platform integration)**:
+```yaml
+parameter: {
+  # Existing webservice parameters
+  name: string
+  image: string
+  language: string
+  framework: string
+  environment?: {...}
+  
+  # NEW: Optional real-time platform integration
+  realtime?: string  // Name of realtime-platform component to connect to
+}
+
+# Logic: When realtime parameter is specified:
+# 1. Check if realtime-platform with that name exists in cluster
+# 2. If exists, inject connection secrets into webservice environment:
+#    - {realtime-name}-mqtt-secret
+#    - {realtime-name}-kafka-secret  
+#    - {realtime-name}-db-secret
+#    - {realtime-name}-metabase-secret
+#    - {realtime-name}-lenses-secret
+# 3. Use heath-health/realtime_data_pipeline/realtime_service as template
+# 4. Parameterize service with secrets for connections
+# 5. Expose WebSocket endpoints and consume default Kafka topics using aiokafka
+# 6. Implement Onion Architecture following CLAUDE.md guidelines
+```
+
+### 3. Simplified Crossplane XRD (Minimal Developer Surface)
+**Files Required**:
+- `/Users/socrateshlapolosa/Development/health-service-idp/crossplane/realtime-xrds.yaml`
+- `/Users/socrateshlapolosa/Development/health-service-idp/crossplane/realtime-compositions.yaml`
+
+**RealtimePlatformClaim XRD (Developer-Friendly Interface)**:
+```yaml
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xrealtimeplatformclaims.platform.example.org
+spec:
+  group: platform.example.org
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        properties:
+          spec:
+            type: object
+            properties:
+              # Minimal required properties
+              name:
+                type: string
+                description: "Name of the real-time system (used for all resources)"
+              
+              # Simple optional properties with defaults
+              database:
+                type: string
+                enum: ["postgres", "mysql", "mongodb"]
+                default: "postgres"
+                description: "Database type for backend storage"
+              visualization:
+                type: string  
+                enum: ["metabase", "grafana"]
+                default: "metabase"
+                description: "Analytics dashboard platform"
+              iot:
+                type: boolean
+                default: true
+                description: "Enable MQTT IoT broker"
+                
+              # Advanced optional properties (still simple)
+              mqttUsers:
+                type: array
+                description: "MQTT user credentials"
+                items:
+                  type: object
+                  properties:
+                    username: { type: string }
+                    password: { type: string }
+              dataRetention:
+                type: string
+                pattern: "^[0-9]+[dwm]$"
+                default: "7d"
+                description: "Data retention period (e.g. 7d, 30d, 6m)"
+              scaling:
+                type: object
+                properties:
+                  minReplicas: { type: integer, minimum: 1, default: 1 }
+                  maxReplicas: { type: integer, minimum: 1, default: 5 }
+              snowflake:
+                type: object
+                properties:
+                  enabled: { type: boolean, default: false }
+                  credentialsSecret: { type: string }
+                  
+          status:
+            type: object
+            properties:
+              # Standard status fields
+              ready: { type: boolean }
+              message: { type: string }
+              # Connection endpoints exposed as secrets
+              secrets:
+                type: object
+                properties:
+                  mqtt: { type: string, description: "MQTT connection secret name" }
+                  kafka: { type: string, description: "Kafka connection secret name" }
+                  database: { type: string, description: "Database connection secret name" }
+                  metabase: { type: string, description: "Analytics dashboard secret name" }
+                  lenses: { type: string, description: "Stream processing UI secret name" }
+              # External access URLs
+              endpoints:
+                type: object
+                properties:
+                  lensesUI: { type: string }
+                  metabaseUI: { type: string }
+                  mqttWebSocket: { type: string }
+
+# All complex configurations (Kafka topics, Lenses license, connector settings, 
+# health checks, volumes, etc.) are handled internally by the Crossplane Composition
+```
+
+**Design Philosophy**:
+- **Developer Interface**: Simple properties developers understand (database, visualization, iot)
+- **Platform Complexity Hidden**: No Kafka partitions, Lenses heap settings, connector configurations exposed
+- **Secret-First Integration**: All connections provided via predictable secret names
+- **Status Transparency**: Clear status and endpoint information without configuration complexity
+
+### 3. Multi-Component Orchestration Logic
+**Implementation**: Crossplane Composition with dependency management
+
+**Component Sequence**:
+1. **PostgreSQL Database** (existing neon-postgres or new postgres helm release)
+2. **Configuration Generator** (busybox job creating Lenses configs)
+3. **Lenses HQ** (lensting/lenses-hq:6-preview with health checks)
+4. **Demo Kafka** (lensesio/fast-data-dev:3.9.0 with connectors)
+5. **Lenses Agent** (lensting/lenses-agent:6-preview with environment variables)
+6. **MQTT Broker** (eclipse-mosquitto with volume mounts)
+7. **Metabase** (metabase/metabase:latest with Snowflake integration)
+
+### 4. Configuration Translation Layer
+**Source**: Docker Compose from heath-health/realtime_data_pipeline
+**Target**: Kubernetes manifests via Crossplane
+
+**Key Configuration Mappings**:
+
+**MQTT Broker (mqtt5 service)**:
+```yaml
+# Docker Compose → Kubernetes
+image: eclipse-mosquitto → image: eclipse-mosquitto
+ports: ["1883:1883", "9001:9001"] → containerPort: [1883, 9001]
+volumes: ["./mosquitto/config:/mosquitto/config"] → configMap + volumeMount
+restart: unless-stopped → restartPolicy: Always
+```
+
+**Lenses HQ Configuration**:
+```yaml
+# From docker-compose environment section
+hq.config.yaml: |
+  http: { address: ":9991" }
+  auth: { administrators: ["admin"], users: [{ username: "admin", password: "..." }] }
+  database: { host: "postgres:5432", username: "lenses", password: "lenses", database: "hq" }
+  license: { key: "...", acceptEULA: true }
+```
+
+**Lenses Agent Environment Variables**:
+```yaml
+DEMO_HQ_URL: http://lenses-hq:9991
+DEMO_HQ_USER: admin  
+DEMO_HQ_PASSWORD: admin
+LENSES_HEAP_OPTS: -Xmx1536m -Xms512m
+```
+
+### 5. Integration with Existing Infrastructure
+**vCluster Integration**: Deploy components within existing vCluster environments
+**Secret Management**: Use External Secrets Operator for Snowflake credentials
+**Networking**: Leverage Istio service mesh for inter-component communication
+**Monitoring**: Integrate with existing Prometheus/Grafana observability stack
+
+## Data Flow Architecture
+
+### Stream Processing Pipeline
+```
+IoT Devices → MQTT (port 1883) → MQTT Source Connector → Kafka Topic (device_data)
+    ↓
+Lenses SQL Processing → Decomposed Topics (blood_pressure, heart_rate, oxygen_saturation, temperature)
+    ↓
+Snowflake Sink Connector → Snowflake INGEST.INGEST Schema
+    ↓
+Metabase Analytics Dashboard → Real-time Health Monitoring
+```
+
+### Schema Management
+**Avro Schema Registry**: Kafka Schema Registry on port 8081
+**Health Data Schema**: JSON → Avro transformation with schema evolution
+**Topic Structure**: Unified device_data → specialized health metric topics
+
+## Technology Stack Integration
+
+### Container Images and Versions
+- **MQTT**: `eclipse-mosquitto:latest`
+- **Lenses HQ**: `lensting/lenses-hq:6-preview`
+- **Lenses Agent**: `lensting/lenses-agent:6-preview`
+- **Kafka Platform**: `lensesio/fast-data-dev:3.9.0`
+- **PostgreSQL**: `postgres:latest`
+- **Metabase**: `metabase/metabase:latest`
+- **Config Creator**: `busybox:latest`
+
+### Helm Chart Requirements
+- **Bitnami PostgreSQL**: For Lenses backend storage
+- **Custom Helm Charts**: For Lenses 6 Preview components (to be created)
+- **Eclipse Mosquitto Chart**: Community MQTT broker chart
+- **Metabase Chart**: Community analytics dashboard chart
+
+### Network Configuration
+- **MQTT Ports**: 1883 (MQTT), 9001 (WebSockets)
+- **Lenses HQ**: 9991 (Web UI)
+- **Kafka**: 9092 (internal), 19092 (external)
+- **Schema Registry**: 8081
+- **Metabase**: 3000
+- **PostgreSQL**: 5432
+
+### Volume and Persistence Requirements
+- **MQTT Data**: ConfigMap + PVC for mosquitto config/data/logs
+- **Kafka**: PVC for kafka and zookeeper data
+- **PostgreSQL**: PVC for database persistence
+- **Lenses**: Shared volumes for HQ ↔ Agent configuration
+
+# Development Roadmap 
+
+## Phase 1: Foundation Components (MVP)
+**Scope**: Basic IoT broker and minimal real-time system functionality
+
+### 1.1 IoT Broker ComponentDefinition
+- Create `/crossplane/oam/realtime-component-definitions.yaml`
+- Implement `iot-broker` ComponentDefinition using Helm Release
+- Map docker-compose mqtt5 service to Kubernetes manifests
+- Configure Eclipse Mosquitto with authentication (user1/password)
+- Set up ConfigMap for mosquitto.conf and volume mounts
+- Test basic MQTT pub/sub functionality
+
+### 1.2 Basic Real-time System Structure
+- Create RealtimeSystemClaim XRD in `/crossplane/realtime-xrds.yaml`
+- Implement PostgreSQL dependency (reuse existing neon-postgres or create new)
+- Create configuration generator job (busybox with environment injection)
+- Establish basic component dependency chain
+
+### 1.3 KubeVela Integration
+- Update `/crossplane/oam/component-definitions.yaml` with new components
+- Install ComponentDefinitions in existing vCluster environments
+- Test OAM Application creation with simple iot-broker component
+- Verify integration with existing Crossplane Claims workflow
+
+**Deliverable**: Working MQTT broker provisioning via OAM specification
+
+## Phase 2: Stream Processing Core
+**Scope**: Complete Lenses platform with Kafka integration
+
+### 2.1 Lenses Platform Deployment
+- Implement Lenses HQ deployment (lensting/lenses-hq:6-preview)
+- Configure PostgreSQL backend integration (databases: hq, agent1, agent2, metabaseappdb)
+- Set up Lenses Agent deployment with proper environment variables
+- Configure health checks and service dependencies
+
+### 2.2 Kafka Cluster Integration
+- Deploy lensesio/fast-data-dev:3.9.0 with Schema Registry
+- Configure Kafka listeners (PLAINTEXT:9092, DOCKERCOMPOSE:19092)
+- Mount Snowflake connector JAR (/connectors/snowflake.jar)
+- Set up sample data generation (RUNNING_SAMPLEDATA: 1)
+
+### 2.3 Service Interconnection
+- Configure Lenses HQ ↔ Agent communication
+- Set up Kafka ↔ Lenses integration with provisioning.yaml
+- Implement configuration sharing via volumes
+- Test end-to-end Lenses platform functionality
+
+**Deliverable**: Functional Lenses + Kafka streaming platform via OAM
+
+## Phase 3: Data Pipeline Integration
+**Scope**: MQTT → Kafka → Stream processing workflow
+
+### 3.1 MQTT Source Connector
+- Configure Lenses Stream Reactor MQTT Source Connector
+- Implement connection from MQTT broker to Kafka topics
+- Set up KCQL mapping: `INSERT INTO device_data SELECT * FROM health/device_data`
+- Configure connector parameters (QoS, error handling, retry logic)
+
+### 3.2 Stream Processing Logic
+- Implement Lenses SQL queries for data decomposition
+- Create topic transformations (device_data → specialized topics)
+- Configure Avro schema management via Schema Registry
+- Set up data validation and error handling
+
+### 3.3 Health Data Schema Implementation
+- Define HealthData Avro schema (deviceId, timestamp, vitals, location)
+- Configure schema evolution and compatibility rules
+- Implement specialized topic schemas (blood_pressure, heart_rate, etc.)
+- Test schema validation and topic routing
+
+**Deliverable**: Complete MQTT → Kafka → processed topics pipeline
+
+## Phase 4: Analytics and Monitoring
+**Scope**: Snowflake integration and Metabase dashboards
+
+### 4.1 Snowflake Sink Connector
+- Configure Snowflake authentication (RSA key-pair)
+- Set up INGEST database and schema creation
+- Implement Snowflake Sink Connector for processed topics
+- Configure buffer settings and batch processing
+
+### 4.2 Metabase Analytics Platform
+- Deploy Metabase with PostgreSQL backend
+- Configure Snowflake data source connection
+- Set up health monitoring dashboards
+- Implement real-time data visualization
+
+### 4.3 System Observability
+- Integrate with existing Prometheus/Grafana stack
+- Configure health checks for all components
+- Implement alerting for pipeline failures
+- Set up log aggregation and monitoring
+
+**Deliverable**: Complete real-time analytics platform with dashboards
+
+## Phase 5: Production Enhancements
+**Scope**: Security, scalability, and operational features
+
+### 5.1 Security Hardening
+- Implement proper MQTT authentication and TLS
+- Configure Snowflake credential management via External Secrets
+- Set up network policies and service mesh security
+- Implement audit logging and access controls
+
+### 5.2 Scalability and Performance
+- Configure horizontal scaling for Lenses Agents
+- Implement Kafka partition strategies for high throughput
+- Set up auto-scaling policies for resource optimization
+- Configure backup and disaster recovery procedures
+
+### 5.3 Operational Excellence
+- Create operational runbooks and troubleshooting guides
+- Implement automated health checks and self-healing
+- Set up performance monitoring and capacity planning
+- Create upgrade and rollback procedures
+
+**Deliverable**: Production-ready real-time streaming platform
+
+# Logical Dependency Chain
+
+## Foundation Layer (Must be built first)
+1. **PostgreSQL Database Setup**
+   - Required by: Lenses HQ, Lenses Agent, Metabase
+   - Implementation: Extend existing neon-postgres ComponentDefinition or create new
+   - Creates databases: hq, agent1, agent2, metabaseappdb
+
+2. **Configuration Management System**
+   - Required by: All Lenses components
+   - Implementation: Kubernetes Job using busybox image
+   - Generates: Lenses HQ config.yaml, Agent lenses.conf, provisioning.yaml
+
+3. **Basic ComponentDefinition Structure**
+   - Required by: All OAM components
+   - Implementation: CUE templates with proper parameter validation
+   - Includes: Dependency ordering, health checks, resource management
+
+## Core Platform Layer (Built on foundation)
+4. **Lenses HQ Control Plane**
+   - Depends on: PostgreSQL, Configuration Management
+   - Implementation: lensting/lenses-hq:6-preview deployment
+   - Provides: Web UI (port 9991), Agent management, License handling
+
+5. **Kafka Cluster Platform**
+   - Depends on: Basic networking
+   - Implementation: lensesio/fast-data-dev:3.9.0
+   - Provides: Kafka (9092), Schema Registry (8081), Connect (8083)
+
+6. **MQTT Broker Service**
+   - Depends on: Basic networking, configuration
+   - Implementation: eclipse-mosquitto with volume mounts
+   - Provides: MQTT (1883), WebSockets (9001)
+
+## Integration Layer (Connects core components)
+7. **Lenses Agent Data Plane**
+   - Depends on: Lenses HQ, PostgreSQL, Kafka
+   - Implementation: lensting/lenses-agent:6-preview with environment variables
+   - Provides: Stream processing, connector management
+
+8. **MQTT Source Connector**
+   - Depends on: MQTT Broker, Kafka, Lenses Agent
+   - Implementation: Lenses Stream Reactor configuration
+   - Provides: MQTT → Kafka topic bridging
+
+## Analytics Layer (Built on data integration)
+9. **Stream Processing Queries**
+   - Depends on: Lenses Agent, Kafka topics, Schema Registry
+   - Implementation: Lenses SQL transformations
+   - Provides: Data decomposition, topic routing
+
+10. **Metabase Analytics Dashboard**
+    - Depends on: PostgreSQL, Snowflake integration
+    - Implementation: metabase/metabase:latest with data source configuration
+    - Provides: Real-time dashboards, health monitoring
+
+## Development Pacing Strategy
+
+### Atomic Development Units
+Each component must be:
+- **Independently testable**: Can be deployed and validated in isolation
+- **Incrementally buildable**: Adds functionality without breaking existing features
+- **Reversible**: Can be rolled back without affecting other components
+
+### Quick Visibility Milestones
+1. **Week 1**: MQTT broker accepting connections and messages
+2. **Week 2**: Lenses platform showing Kafka topics and data flow
+3. **Week 3**: MQTT messages appearing in Kafka topics via connector
+4. **Week 4**: Processed data flowing to specialized topics
+5. **Week 5**: Metabase showing real-time health data dashboards
+
+### Component Build Order
+```
+PostgreSQL → Config Generator → Lenses HQ → Kafka → MQTT Broker
+                    ↓
+Lenses Agent → MQTT Connector → Stream Processing → Metabase
+                    ↓
+Snowflake Integration → Advanced Analytics → Production Hardening
+```
+
+# Risks and Mitigations 
+
+## Technical Challenges
+
+### 1. Complex Multi-Component Dependencies
+**Risk**: Component startup order and health check dependencies may cause cascade failures
+**Mitigation**: 
+- Implement robust health checks with retry logic
+- Use Kubernetes initContainers for dependency ordering
+- Create comprehensive component status monitoring
+- Implement graceful degradation for non-critical components
+
+### 2. Lenses 6 Preview Stability
+**Risk**: Preview version may have undocumented issues or breaking changes
+**Mitigation**:
+- Extensive testing in isolated environments before integration
+- Fallback option using Lenses 5.x stable version
+- Regular monitoring of Lenses release notes and community feedback
+- Container image pinning to specific preview tags
+
+### 3. Configuration Complexity
+**Risk**: Docker Compose → Kubernetes translation may lose critical configurations
+**Mitigation**:
+- Line-by-line configuration mapping verification
+- Comprehensive integration testing with original docker-compose as baseline
+- Configuration validation tools and automated checks
+- Detailed documentation of all configuration parameters
+
+### 4. Networking and Service Discovery
+**Risk**: Inter-component communication may fail in Kubernetes vs Docker Compose
+**Mitigation**:
+- Use Kubernetes Services with proper DNS naming conventions
+- Implement connection retry logic in all components
+- Network policy testing and validation
+- Service mesh integration for enhanced observability
+
+## MVP Development Risks
+
+### 1. Scope Creep and Over-Engineering
+**Risk**: Attempting to implement all features from docker-compose in initial version
+**Mitigation**:
+- Strict MVP definition: MQTT → Kafka → Basic Lenses functionality only
+- Phased approach with clear deliverables per phase
+- Regular scope review and prioritization sessions
+- Focus on "working end-to-end" over "feature complete"
+
+### 2. Integration with Existing Platform
+**Risk**: New components may conflict with existing OAM/Crossplane infrastructure
+**Mitigation**:
+- Thorough review of existing ComponentDefinitions and XRDs
+- Namespace isolation for new components during development
+- Backward compatibility testing with existing applications
+- Gradual rollout with feature flags
+
+### 3. Performance and Resource Requirements
+**Risk**: Resource-intensive components may overwhelm development environments
+**Mitigation**:
+- Resource limit configuration for all components
+- Development vs production resource profiles
+- Auto-scaling policies for resource optimization
+- Performance testing with realistic data volumes
+
+## Resource Constraints
+
+### 1. Container Registry and Image Management
+**Risk**: Multiple large container images may impact deployment speed
+**Mitigation**:
+- Image caching strategies in development environments
+- Multi-stage builds to reduce image sizes where possible
+- Container registry optimization and cleanup policies
+- Fallback to public registries for development
+
+### 2. Storage and Persistence Requirements
+**Risk**: Multiple components requiring persistence may exhaust storage
+**Mitigation**:
+- Storage class optimization and automatic provisioning
+- Data retention policies and cleanup automation
+- Volume sharing where architecturally appropriate
+- Cloud storage integration for backup and archival
+
+### 3. Development Environment Complexity
+**Risk**: Full real-time system may be too resource-intensive for local development
+**Mitigation**:
+- Lightweight development profiles with reduced resource requirements
+- Optional component deployment (can disable Metabase, Snowflake for basic testing)
+- Mock/stub services for expensive components during development
+- Clear documentation of minimum system requirements
+
+## Implementation Risk Factors
+
+### 1. Schema Evolution and Data Compatibility
+**Risk**: Changes to health data schema may break existing integrations
+**Mitigation**:
+- Strict schema versioning and backward compatibility policies
+- Schema registry enforcement and validation
+- Data migration strategies for schema changes
+- Comprehensive testing with schema evolution scenarios
+
+### 2. Credential and Secret Management
+**Risk**: Complex authentication requirements across multiple systems
+**Mitigation**:
+- Standardized secret management using External Secrets Operator
+- Credential rotation automation where possible
+- Security scanning and vulnerability assessments
+- Clear documentation of all credential requirements
+
+### 3. Testing and Validation Complexity
+**Risk**: End-to-end testing requires complex data generation and validation
+**Mitigation**:
+- Automated test data generation tools
+- Component-level unit testing before integration testing
+- Synthetic monitoring and health check automation
+- Clear success criteria and acceptance tests for each phase
+
+# Appendix 
+
+## Technical Specifications
+
+### Container Images and Exact Versions
+```yaml
+containers:
+  mqtt_broker: eclipse-mosquitto:latest
+  lenses_hq: lensting/lenses-hq:6-preview  
+  lenses_agent: lensting/lenses-agent:6-preview
+  kafka_platform: lensesio/fast-data-dev:3.9.0
+  postgres: postgres:latest
+  metabase: metabase/metabase:latest
+  config_generator: busybox:latest
+```
+
+### Port Mappings and Network Configuration
+```yaml
+network_topology:
+  mqtt_broker: [1883, 9001]  # MQTT, WebSockets
+  lenses_hq: [9991]          # Web UI
+  lenses_agent: [10000]      # HQ communication
+  kafka: [9092, 19092]       # Internal, External
+  schema_registry: [8081]    # Schema management
+  kafka_connect: [8083]      # Connector REST API
+  postgres: [5432]           # Database
+  metabase: [3000]           # Analytics UI
+```
+
+### Volume Mount Requirements
+```yaml
+volume_mounts:
+  mosquitto:
+    config: ./mosquitto/config:/mosquitto/config:rw
+    data: ./mosquitto/data:/mosquitto/data:rw
+    logs: ./mosquitto/log:/mosquitto/log:rw
+  lenses_hq: /app (configuration volume)
+  lenses_agent: /mnt/settings (shared settings)
+  kafka: ./snowflake-kafka-connector-3.1.0.jar:/connectors/snowflake.jar
+  postgres: /docker-entrypoint-initdb.d (initialization scripts)
+```
+
+### Environment Variable Configuration
+```yaml
+lenses_hq_config:
+  http_address: ":9991"
+  auth_administrators: ["admin"]  
+  auth_users: [{"username": "admin", "password": "$2a$10$DPQYpxj4Y2iTWeuF1n.ItewXnbYXh5/E9lQwDJ/cI/.gBboW2Hodm"}]
+  agents_address: ":10000"
+  database: {"host": "postgres:5432", "username": "lenses", "password": "lenses", "database": "hq"}
+  license_key: "license_key_2SFZ0BesCNu6NFv0-EOSIvY22ChSzNWXa5nSds2l4z3y7aBgRPKCVnaeMlS57hHNVboR2kKaQ8Mtv1LFt0MPBBACGhDT5If8PmTraUM5xXLz4MYv"
+  license_accept_eula: "${ACCEPT_EULA}"
+
+lenses_agent_config:
+  demo_hq_url: http://lenses-hq:9991
+  demo_hq_user: admin
+  demo_hq_password: admin  
+  demo_agentkey_path: /mnt/settings/DEMO_AGENTKEY
+  lenses_heap_opts: -Xmx1536m -Xms512m
+  
+kafka_config:
+  adv_host: demo-kafka
+  running_sampledata: 1
+  runtests: 0
+  kafka_listeners: PLAINTEXT://:9092,DOCKERCOMPOSE://:19092,CONTROLLER://:16062
+  kafka_advertised_listeners: PLAINTEXT://demo-kafka:9092,DOCKERCOMPOSE://demo-kafka:19092
+```
+
+### Health Check Configuration
+```yaml
+health_checks:
+  lenses_hq:
+    test: ["CMD", "lenses-hq", "is-up", "lenses-hq:9991"]
+    interval: 10s
+    timeout: 3s
+    retries: 5
+    start_period: 5s
+  
+  postgres:
+    test: ["CMD-SHELL", "pg_isready -U lenses"]
+    interval: 5s
+    timeout: 5s
+    retries: 5
+    
+  metabase:
+    test: curl --fail -I http://localhost:3000/api/health || exit 1
+    interval: 15s
+    timeout: 5s
+    retries: 5
+```
+
+## Existing File Integration Points
+
+### Files to Modify
+- `/Users/socrateshlapolosa/Development/health-service-idp/crossplane/oam/component-definitions.yaml` - Add iot-broker
+- `/Users/socrateshlapolosa/Development/health-service-idp/crossplane/oam/application-component-definitions.yaml` - Add realtime-system
+
+### Files to Create
+- `/Users/socrateshlapolosa/Development/health-service-idp/crossplane/oam/realtime-component-definitions.yaml`
+- `/Users/socrateshlapolosa/Development/health-service-idp/crossplane/realtime-xrds.yaml` 
+- `/Users/socrateshlapolosa/Development/health-service-idp/crossplane/realtime-compositions.yaml`
+- `/Users/socrateshlapolosa/Development/health-service-idp/crossplane/helm/lenses-hq-chart/` (Helm chart directory)
+- `/Users/socrateshlapolosa/Development/health-service-idp/crossplane/helm/lenses-agent-chart/` (Helm chart directory)
+
+### Reference Implementation Files
+- `/Users/socrateshlapolosa/Development/health-service-idp/REALTIME-OAM-EXAMPLE.yaml` - Comprehensive OAM examples with all features
+- `/Users/socrateshlapolosa/Development/health-service-idp/MINIMAL-REALTIME-OAM.yaml` - Minimal OAM examples with defaults
+
+### Integration with Existing Crossplane Claims
+The new components will integrate with existing claims structure:
+- `VClusterEnvironmentClaim` - Deploy components within existing vClusters
+- `ApplicationClaim` - Use for Lenses Agent workload deployment  
+- `ExternalSecret` - Integrate Snowflake and authentication credentials
+- Maintain compatibility with existing GitOps workflows and ArgoCD synchronization
+
+## Data Schema Specifications
+
+### Health Data Avro Schema
+```json
+{
+  "type": "record",
+  "name": "HealthData", 
+  "namespace": "com.example",
+  "fields": [
+    {"name": "deviceId", "type": "string"},
+    {"name": "timestamp", "type": "long"},
+    {"name": "heartRate", "type": "int"},
+    {"name": "systolic", "type": "int"},
+    {"name": "diastolic", "type": "int"}, 
+    {"name": "oxygenSaturation", "type": "int"},
+    {"name": "bodyTemperature", "type": "double"},
+    {"name": "latitude", "type": "double"},
+    {"name": "longitude", "type": "double"}
+  ]
+}
+```
+
+### Stream Processing Transformations
+```sql
+-- Blood Pressure Topic
+INSERT INTO blood_pressure_device_topic
+STORE KEY AS STRING VALUE AS AVRO
+SELECT STREAM
+    _value.deviceId AS _key,
+    _value.deviceId AS deviceId,
+    _value.systolic AS systolic,
+    _value.diastolic AS diastolic,
+    _value.latitude AS latitude,
+    _value.longitude AS longitude,
+    _value.timestamp AS createdTime
+FROM device_data;
+
+-- Heart Rate Topic  
+INSERT INTO heart_rate_device_topic
+STORE KEY AS STRING VALUE AS AVRO
+SELECT STREAM
+    _value.deviceId AS _key,
+    _value.deviceId AS deviceId,
+    _value.heartRate AS value,
+    _value.latitude AS latitude,
+    _value.longitude AS longitude,
+    _value.timestamp AS createdTime
+FROM device_data;
+
+-- Similar patterns for oxygen_saturation_device_topic and temperature_device_topic
+```
+
+### Connector Configuration Templates
+```yaml
+mqtt_source_connector:
+  name: device_data_connector
+  connector_class: io.lenses.streamreactor.connect.mqtt.source.MqttSourceConnector
+  tasks_max: 1
+  connect_mqtt_hosts: tcp://mqtt5:1883
+  connect_mqtt_kcql: INSERT INTO device_data SELECT * FROM health/device_data WITHKEY(deviceId)
+  connect_mqtt_username: user1
+  connect_mqtt_password: password
+  connect_mqtt_service_quality: 1
+  errors_tolerance: all
+
+snowflake_sink_connector:
+  name: HealthDataConnector
+  connector_class: com.snowflake.kafka.connector.SnowflakeSinkConnector
+  topics: temperature_device_topic,heart_rate_device_topic,blood_pressure_device_topic,oxygen_saturation_device_topic
+  snowflake_url_name: vhnysfx-pg06824.snowflakecomputing.com
+  snowflake_user_name: kafka_user
+  snowflake_database_name: INGEST
+  snowflake_schema_name: INGEST
+  buffer_count_records: 1000000
+  buffer_flush_time: 10
+  buffer_size_bytes: 250000000
+  value_converter: com.snowflake.kafka.connector.records.SnowflakeAvroConverter
+  value_converter_schema_registry_url: http://demo-kafka:8081
+```
+</PRD>

@@ -1,0 +1,517 @@
+# Crossplane Composite Resource Definitions (XRDs) for Real-time Platform
+# These define the schema for real-time platform claims that will be created by OAM applications
+
+---
+# RealtimePlatformClaim XRD
+# This defines the schema for comprehensive real-time streaming platforms
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xrealtimeplatformclaims.platform.example.org
+spec:
+  group: platform.example.org
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              name:
+                type: string
+                description: "Name of the realtime platform"
+              database:
+                type: string
+                enum: ["postgres", "mysql", "mongodb"]
+                default: "postgres"
+                description: "Database type for the platform"
+              visualization:
+                type: string
+                enum: ["metabase", "grafana", "superset"]
+                default: "metabase"
+                description: "Visualization tool for analytics"
+              iot:
+                type: boolean
+                default: true
+                description: "Enable IoT device connectivity"
+              
+              # Advanced Configuration
+              lensesConfig:
+                type: object
+                properties:
+                  licenseKey:
+                    type: string
+                    description: "Lenses license key"
+                  heapSize:
+                    type: string
+                    default: "2048m"
+                    description: "JVM heap size for Lenses"
+                  enableUI:
+                    type: boolean
+                    default: true
+                    description: "Enable Lenses web UI"
+              
+              mqttConfig:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        username:
+                          type: string
+                        password:
+                          type: string
+                      required: ["username", "password"]
+                    description: "MQTT user authentication"
+                  persistenceSize:
+                    type: string
+                    default: "10Gi"
+                    description: "MQTT message persistence storage size"
+                  enableWebSockets:
+                    type: boolean
+                    default: true
+                    description: "Enable MQTT over WebSockets"
+                  qosLevel:
+                    type: integer
+                    minimum: 0
+                    maximum: 2
+                    default: 1
+                    description: "MQTT Quality of Service level"
+              
+              kafkaConfig:
+                type: object
+                properties:
+                  topics:
+                    type: array
+                    items:
+                      type: string
+                    description: "Kafka topics to create"
+                  retention:
+                    type: string
+                    default: "7d"
+                    description: "Kafka message retention period"
+                  partitions:
+                    type: integer
+                    minimum: 1
+                    default: 3
+                    description: "Number of partitions per topic"
+                  replicationFactor:
+                    type: integer
+                    minimum: 1
+                    default: 1
+                    description: "Kafka replication factor"
+              
+              snowflakeConfig:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                    default: false
+                    description: "Enable Snowflake integration"
+                  credentialsSecret:
+                    type: string
+                    description: "Secret containing Snowflake credentials"
+                  database:
+                    type: string
+                    description: "Snowflake database name"
+                  schema:
+                    type: string
+                    description: "Snowflake schema name"
+              
+              resources:
+                type: object
+                properties:
+                  cpu:
+                    type: string
+                    default: "2000m"
+                    description: "CPU resource request"
+                  memory:
+                    type: string
+                    default: "4Gi"
+                    description: "Memory resource request"
+              
+              scaling:
+                type: object
+                properties:
+                  minReplicas:
+                    type: integer
+                    minimum: 1
+                    default: 1
+                    description: "Minimum number of replicas"
+                  maxReplicas:
+                    type: integer
+                    minimum: 1
+                    default: 5
+                    description: "Maximum number of replicas"
+                  targetCPU:
+                    type: integer
+                    minimum: 1
+                    maximum: 100
+                    default: 80
+                    description: "Target CPU utilization for scaling"
+            
+            required: ["name"]
+          
+          status:
+            type: object
+            properties:
+              conditions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                    reason:
+                      type: string
+                    message:
+                      type: string
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+              connectionDetails:
+                type: object
+                additionalProperties:
+                  type: string
+                description: "Connection details for accessing the platform services"
+              endpoints:
+                type: object
+                properties:
+                  kafka:
+                    type: string
+                    description: "Kafka bootstrap servers endpoint"
+                  mqtt:
+                    type: string
+                    description: "MQTT broker endpoint"
+                  database:
+                    type: string
+                    description: "Database connection endpoint"
+                  visualization:
+                    type: string
+                    description: "Visualization dashboard endpoint"
+                  lenses:
+                    type: string
+                    description: "Lenses UI endpoint"
+  names:
+    kind: XRealtimePlatformClaim
+    plural: xrealtimeplatformclaims
+  claimNames:
+    kind: RealtimePlatformClaim
+    plural: realtimeplatformclaims
+
+---
+# IoTBrokerClaim XRD
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xiotbrokerclaims.platform.example.org
+spec:
+  group: platform.example.org
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              name:
+                type: string
+                description: "Name of the IoT broker"
+              mqttPort:
+                type: integer
+                default: 1883
+                description: "MQTT port"
+              websocketPort:
+                type: integer
+                default: 9001
+                description: "WebSocket port for MQTT"
+              topics:
+                type: array
+                items:
+                  type: string
+                description: "MQTT topics to configure"
+              
+              authentication:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                    default: true
+                    description: "Enable user authentication"
+                  users:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        username:
+                          type: string
+                        password:
+                          type: string
+                      required: ["username", "password"]
+              
+              connector:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                    default: false
+                    description: "Enable Kafka connector"
+                  kafkaTopic:
+                    type: string
+                    description: "Target Kafka topic"
+                  mqttTopic:
+                    type: string
+                    description: "Source MQTT topic pattern"
+                  keyField:
+                    type: string
+                    description: "Message field to use as Kafka key"
+                  qos:
+                    type: integer
+                    minimum: 0
+                    maximum: 2
+                    default: 1
+                    description: "MQTT QoS level"
+                  errorPolicy:
+                    type: string
+                    enum: ["RETRY", "DROP", "DEAD_LETTER"]
+                    default: "RETRY"
+              
+              persistence:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                    default: false
+                    description: "Enable message persistence"
+                  size:
+                    type: string
+                    description: "Persistence volume size"
+            
+            required: ["name", "topics"]
+  names:
+    kind: XIoTBrokerClaim
+    plural: xiotbrokerclaims
+  claimNames:
+    kind: IoTBrokerClaim
+    plural: iotbrokerclaims
+
+---
+# StreamProcessorClaim XRD
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xstreamprocessorclaims.platform.example.org
+spec:
+  group: platform.example.org
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              name:
+                type: string
+                description: "Name of the stream processor"
+              
+              queries:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                      description: "Query name"
+                    sql:
+                      type: string
+                      description: "SQL query for stream processing"
+                  required: ["name", "sql"]
+                description: "Stream processing queries"
+              
+              topics:
+                type: object
+                properties:
+                  input:
+                    type: array
+                    items:
+                      type: string
+                    description: "Input Kafka topics"
+                  output:
+                    type: array
+                    items:
+                      type: string
+                    description: "Output Kafka topics"
+                required: ["input", "output"]
+              
+              errorHandling:
+                type: object
+                properties:
+                  policy:
+                    type: string
+                    enum: ["RETRY", "DROP", "DEAD_LETTER"]
+                    default: "RETRY"
+                    description: "Error handling policy"
+                  retries:
+                    type: integer
+                    minimum: 0
+                    default: 3
+                    description: "Number of retries"
+                  deadLetterTopic:
+                    type: string
+                    description: "Dead letter topic for failed messages"
+              
+              processing:
+                type: object
+                properties:
+                  parallelism:
+                    type: integer
+                    minimum: 1
+                    default: 2
+                    description: "Processing parallelism"
+                  checkpointInterval:
+                    type: string
+                    default: "60s"
+                    description: "Checkpoint interval"
+                  stateBackend:
+                    type: string
+                    enum: ["rocksdb", "memory"]
+                    default: "rocksdb"
+                    description: "State backend type"
+            
+            required: ["name", "queries", "topics"]
+  names:
+    kind: XStreamProcessorClaim
+    plural: xstreamprocessorclaims
+  claimNames:
+    kind: StreamProcessorClaim
+    plural: streamprocessorclaims
+
+---
+# AnalyticsDashboardClaim XRD
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xanalyticsdashboardclaims.platform.example.org
+spec:
+  group: platform.example.org
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              name:
+                type: string
+                description: "Name of the analytics dashboard"
+              dashboardType:
+                type: string
+                enum: ["metabase", "grafana", "superset"]
+                default: "metabase"
+                description: "Type of dashboard to deploy"
+              
+              dataSources:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                      description: "Data source name"
+                    type:
+                      type: string
+                      enum: ["kafka", "postgres", "snowflake", "elasticsearch"]
+                      description: "Data source type"
+                    connectionString:
+                      type: string
+                      description: "Connection string (if not using secret)"
+                    secretRef:
+                      type: string
+                      description: "Secret containing connection details"
+                  required: ["name", "type"]
+                description: "Data sources for the dashboard"
+              
+              dashboards:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                      description: "Dashboard name"
+                    template:
+                      type: string
+                      description: "Dashboard template to use"
+                    autoCreate:
+                      type: boolean
+                      default: false
+                      description: "Automatically create dashboard"
+                  required: ["name"]
+              
+              alerts:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                    default: false
+                    description: "Enable alerting"
+                  channels:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          enum: ["email", "slack", "webhook"]
+                          description: "Alert channel type"
+                        config:
+                          type: object
+                          additionalProperties:
+                            type: string
+                          description: "Channel-specific configuration"
+                      required: ["type", "config"]
+              
+              authentication:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                    default: false
+                    description: "Enable authentication"
+                  provider:
+                    type: string
+                    enum: ["oauth", "ldap", "basic"]
+                    description: "Authentication provider"
+                  config:
+                    type: object
+                    additionalProperties:
+                      type: string
+                    description: "Provider-specific configuration"
+            
+            required: ["name", "dataSources"]
+  names:
+    kind: XAnalyticsDashboardClaim
+    plural: xanalyticsdashboardclaims
+  claimNames:
+    kind: AnalyticsDashboardClaim
+    plural: analyticsdashboardclaims

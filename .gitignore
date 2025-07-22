@@ -90,3 +90,7 @@ downloads/
 # Old deployment scripts (moved to GitOps repo)
 deploy-*.sh
 setup-*.sh
+
+# Task files
+tasks.json
+tasks/ 
