@@ -574,12 +574,13 @@ spec:
                           type: webservice
                           properties:
                             name: $APP_NAME
+                            image: $APP_NAME:latest
                             language: python
                             framework: fastapi
+                            port: 8080
+                            healthPath: /health
                             database: postgres
                             cache: redis
-                            appContainer: $APP_NAME
-                            exposeApi: true
                         # Add your components here using the following types:
                         # - microservice-with-db: Full-featured microservice with database and cache
                         # - react-frontend: React TypeScript frontend with Material-UI

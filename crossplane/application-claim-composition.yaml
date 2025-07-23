@@ -2827,14 +2827,17 @@ spec:
                       echo "📋 Current OAM Application:"
                       cat oam/applications/application.yaml
                       
-                      # Create new component definition
+                      # Create new component definition for enhanced webservice ComponentDefinition
                       COMPONENT_YAML="
                         - name: $SERVICE_NAME
                           type: webservice
                           properties:
                             name: $SERVICE_NAME
+                            image: $SERVICE_NAME:latest
                             language: $LANGUAGE
-                            framework: $FRAMEWORK"
+                            framework: $FRAMEWORK
+                            port: 8080
+                            healthPath: /health"
                       
                       # Add database if specified
                       if [ "$DATABASE" != "none" ] && [ -n "$DATABASE" ]; then
