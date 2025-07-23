@@ -231,3 +231,4 @@ Follow the development guidelines in [../CLAUDE.md](../CLAUDE.md):
 **Development Model**: Dual use case support (Guided + Expert)  
 **Integration**: Full GitOps and OAM compatibility
 - trading-engine (java/springboot)
+- user-analytics-service (python/fastapi)
