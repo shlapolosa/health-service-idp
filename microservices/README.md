@@ -230,3 +230,4 @@ Follow the development guidelines in [../CLAUDE.md](../CLAUDE.md):
 **Microservices Status**: Production-ready with comprehensive real-time capabilities  
 **Development Model**: Dual use case support (Guided + Expert)  
 **Integration**: Full GitOps and OAM compatibility
+- trading-engine (java/springboot)
