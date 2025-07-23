@@ -233,3 +233,4 @@ Follow the development guidelines in [../CLAUDE.md](../CLAUDE.md):
 - trading-engine (java/springboot)
 - user-analytics-service (python/fastapi)
 - system-monitoring (python/fastapi)
+- notification-service (python/fastapi)
