@@ -1,0 +1,25 @@
+# Test Evolution: Developer Journey with OAM
+# Step 1: Basic webservice with existing image + Istio routing
+# Expected: Knative Service with Istio service mesh integration
+
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: health-api-test
+  namespace: default
+  annotations:
+    test.oam.dev/step: "1"
+    test.oam.dev/description: "Basic webservice with Istio routing - minimal artifacts with service mesh"
+spec:
+  components:
+  - name: health-api
+    type: webservice
+    properties:
+      name: health-api
+      image: nginx:alpine
+      port: 80
+      healthPath: "/"
+      environment:
+        SERVICE_NAME: "health-api"
+        ENV: "test"
+        REVISION: "2"
