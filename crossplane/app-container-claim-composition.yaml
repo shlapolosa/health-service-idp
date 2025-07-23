@@ -418,9 +418,18 @@ spec:
                       `$GITOPS_CLONE_URL`
                       EOF
                       
-                      # Commit and push
+                      # Create two separate commits to ensure GitHub Actions detect-changes works
                       git config user.name "AppContainer Setup"
                       git config user.email "appcontainer@platform.local"
+                      
+                      # First commit: Initial README only
+                      echo "# $APP_NAME" > README.md
+                      echo "" >> README.md
+                      echo "CLAUDE.md-compliant microservice application container." >> README.md
+                      git add README.md
+                      git commit -m "Initial commit - create repository"
+                      
+                      # Second commit: Add all microservice structure
                       git add .
                       git commit -m "Initialize CLAUDE.md-compliant app container structure
                       
@@ -429,7 +438,10 @@ spec:
                       - Add shared libraries framework
                       - Add documentation and examples
                       - Follow CLAUDE.md development methodology"
+                      
                       git push
+                      
+                      echo "Source repository structure created successfully with 2 commits"
                       
                       echo "Source repository structure created successfully"
                     env:
@@ -533,13 +545,12 @@ spec:
                       mkdir -p $TEMP_DIR
                       cd $TEMP_DIR
                       
-                      # Clone the GitOps repository
-                      git clone $GITOPS_CLONE_URL .
+                      # Clone the GitOps repository with authentication
+                      git clone "https://${GITHUB_TOKEN}@github.com/${GITHUB_REPO}-gitops.git" .
                       
-                      # Configure git with authentication for push
+                      # Configure git for commits
                       git config user.name "GitOps Setup"
                       git config user.email "gitops@platform.local"
-                      git remote set-url origin "https://${GITHUB_TOKEN}@github.com/${GITHUB_REPO}-gitops.git"
                       
                       # Create GitOps structure matching OAM-DRIVEN-DEVELOPMENT-GUIDE.md
                       mkdir -p apps
@@ -551,7 +562,7 @@ spec:
                       mkdir -p .github/workflows
                       
                       # Create blank OAM Application template
-                      cat > oam/applications/application.yaml << 'EOF'
+                      cat > oam/applications/application.yaml << EOF
                       apiVersion: core.oam.dev/v1beta1
                       kind: Application
                       metadata:
@@ -809,7 +820,7 @@ spec:
                       # Create ApplicationSet for microservices
                       
                       # Create GitOps update workflow from template
-                      cat > .github/workflows/deployment-update.yml << EOF
+                      cat > .github/workflows/deployment-update.yml << 'EOF'
                       name: GitOps Deployment Update
                       
                       on:

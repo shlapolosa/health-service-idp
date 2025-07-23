@@ -71,24 +71,53 @@ spec:
 - **KubeVela**: OAM application management and infrastructure orchestration
 - **Observability**: Prometheus, Grafana, Jaeger, Kiali accessible via subpath routing
 
-### Component Types Supported
+## 📋 OAM Components Reference
 
-**Application Components:**
-- `webservice` - Auto-scaling web services with Knative
-- `kafka` - Apache Kafka event streaming
-- `redis` - In-memory data store
-- `mongodb` - Document database
+### Table 1: OAM ComponentDefinitions
 
-**Infrastructure Components:**
-- `realtime-platform` - Complete streaming infrastructure (Kafka, MQTT, Analytics)
-- `vcluster` - Virtual Kubernetes cluster environments
-- `neon-postgres` - Managed PostgreSQL database
-- `auth0-idp` - Identity provider integration
+All components that can be added to OAM applications (`oam/applications/application.yaml`):
 
-**Real-time Components:**
-- `iot-broker` - MQTT broker for IoT devices
-- `stream-processor` - Real-time data processing engine
-- `analytics-dashboard` - Analytics and visualization dashboards
+| Component | Use Case | Crossplane Mapping | Kubernetes Artifact |
+|-----------|----------|-------------------|---------------------|
+| **Application Components** | | | |
+| `webservice` | Auto-scaling web applications, microservices, APIs | None (direct) | Knative Service |
+| `kafka` | Event streaming, message queues | None (direct) | Kafka Cluster (Strimzi) |
+| `redis` | In-memory caching, session storage | None (direct) | Redis Deployment + Service |
+| `mongodb` | Document database, NoSQL storage | None (direct) | MongoDB Deployment + PVC |
+| **Infrastructure Components** | | | |
+| `realtime-platform` | Complete streaming infrastructure with Kafka, MQTT, analytics | `RealtimePlatformClaim` | Multiple: Kafka, MQTT, Lenses, Metabase, PostgreSQL |
+| `vcluster` | Virtual Kubernetes environments, multi-tenancy | `VClusterClaim` | vCluster Custom Resource |
+| `neon-postgres` | Managed PostgreSQL database | `NeonPostgresClaim` | External Secret + Connection Details |
+| `auth0-idp` | Identity provider integration, SSO | `Auth0IdpClaim` | External Secret + Auth0 Config |
+| **Real-time Components** | | | |
+| `iot-broker` | MQTT broker for IoT devices, sensor data | `IoTBrokerClaim` | Eclipse Mosquitto + Kafka Connector |
+| `stream-processor` | Real-time data processing, ETL pipelines | `StreamProcessorClaim` | Lenses Agent + Processing Jobs |
+| `analytics-dashboard` | Data visualization, business intelligence | `AnalyticsDashboardClaim` | Metabase/Grafana + Data Sources |
+| **Specialized Components** | | | |
+| `snowflake-datawarehouse` | Data warehousing, analytics at scale | `SnowflakeDataWarehouseClaim` | Terraform Workspace + Snowflake Resources |
+| `data-pipeline` | ETL/ELT workflows, data processing | `DataPipelineClaim` | Apache Airflow + DAGs |
+
+### Table 2: Crossplane Claims (Beyond OAM)
+
+Additional Crossplane claims available for direct use, not mapped to OAM components:
+
+| Claim | Use Case | Example | Kubernetes Artifact |
+|-------|----------|---------|---------------------|
+| `ApplicationClaim` | Guided application creation with infrastructure | Creating complete app stack via Slack/API | Multiple: OAM Application + Infrastructure Claims |
+| `AppContainerClaim` | Repository and container management | Setting up source + GitOps repos | GitHub Repositories + ArgoCD Applications |
+| `VClusterInfrastructureClaim` | Advanced vCluster with custom networking | Multi-region vCluster with observability | vCluster + Network Policies + Monitoring Stack |
+| `WorkflowExecutionClaim` | Argo Workflows for CI/CD pipelines | Complex build/test/deploy workflows | Argo Workflow + WorkflowTemplate |
+| `ObservabilityStackClaim` | Complete monitoring setup | Prometheus + Grafana + Jaeger stack | Multiple: Prometheus, Grafana, Jaeger, AlertManager |
+| `NetworkPolicyClaim` | Advanced network security | Micro-segmentation between services | NetworkPolicy + Istio VirtualService |
+| `BackupConfigurationClaim` | Automated backup strategies | Database and PVC backup schedules | Velero Backup + Schedule |
+| `CertificateManagerClaim` | SSL/TLS certificate automation | Automatic Let's Encrypt certificates | cert-manager Certificate + Issuer |
+
+### Component Categories
+
+**Application Components** - Deploy directly as Kubernetes workloads  
+**Infrastructure Components** - Create Crossplane claims for managed resources  
+**Real-time Components** - Specialized streaming and IoT infrastructure  
+**Specialized Components** - Advanced data and processing platforms
 
 ## 🔄 System Workflows
 
