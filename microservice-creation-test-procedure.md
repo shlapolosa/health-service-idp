@@ -20,10 +20,15 @@ curl
 **⚠️ Important**: Due to known Crossplane provider idle behavior, both Kubernetes and GitHub providers must be restarted before each test to ensure proper resource processing.
 
 ```bash
-# Restart Kubernetes Provider
-kubectl delete pod -n crossplane-system -l pkg.crossplane.io/provider=provider-kubernetes
+# Automated restart script (recommended)
+./scripts/restart-crossplane-providers.sh
 
-# Restart GitHub Provider  
+# Or restart specific providers manually:
+./scripts/restart-crossplane-providers.sh kubernetes
+./scripts/restart-crossplane-providers.sh github
+
+# Manual alternative (if script not available):
+kubectl delete pod -n crossplane-system -l pkg.crossplane.io/provider=provider-kubernetes
 kubectl delete pod -n crossplane-system -l pkg.crossplane.io/provider=provider-upjet-github
 
 # Wait for providers to restart (30-60 seconds)

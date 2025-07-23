@@ -604,49 +604,9 @@ spec:
                         #     styling: material-ui
                         #     apiEndpoint: /api
                         
-                        # Workflow configuration for proper component ordering
-                        workflow:
-                          steps:
-                          - name: provision-infrastructure
-                            type: create-crossplane-claims
-                            timeout: 15m
-                          - name: wait-for-infrastructure
-                            type: wait-for-claims
-                            timeout: 10m
-                            dependsOn: ["provision-infrastructure"]
-                          - name: deploy-applications
-                            type: create-crossplane-claims
-                            timeout: 10m
-                            dependsOn: ["wait-for-infrastructure"]
-                          - name: validate-deployment
-                            type: wait-for-claims
-                            timeout: 5m
-                            dependsOn: ["deploy-applications"]
-                          
-                          # Failure handling
-                          onFailure:
-                            steps:
-                            - name: cleanup-resources
-                              type: cleanup-failed-claims
-                              timeout: 5m
-                        
-                        # Policies for execution order
-                        policies:
-                        - name: execution-order
-                          type: crossplane-execution-order
-                          properties:
-                            phases: ["infrastructure", "application"]
-                            phaseDelay: "30s"
-                            parallelWithinPhase: true
-                        
-                        # Traits for automatic workflow execution
-                        traits:
-                        - type: crossplane-workflow
-                          properties:
-                            enabled: true
-                            timeout: "30m"
-                            retries: 3
-                            cleanupOnFailure: true
+                        # Note: Workflow orchestration is handled by KubeVela WorkflowStepDefinitions
+                        # installed in the cluster, not embedded in the application spec.
+                        # See /crossplane/oam/workflow-step-definitions.yaml for orchestration logic.
                       EOF
                       
                       # Create workflow templates directory
