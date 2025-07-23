@@ -551,7 +551,7 @@ spec:
                       mkdir -p .github/workflows
                       
                       # Create blank OAM Application template
-                      cat > oam/applications/application.yaml << EOF
+                      cat > oam/applications/application.yaml << 'EOF'
                       apiVersion: core.oam.dev/v1beta1
                       kind: Application
                       metadata:
