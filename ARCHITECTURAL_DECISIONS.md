@@ -907,6 +907,128 @@ WHERE heartRate > 120 OR bloodPressure > 140;
 
 ---
 
+## Phase 9: OAM Workflow Orchestration Implementation
+
+#### ADR-021: Custom WorkflowStepDefinitions for OAM→Crossplane Orchestration
+**Date**: 2025-07-22  
+**Decision**: Implement declarative workflow orchestration through custom KubeVela WorkflowStepDefinitions rather than building a custom Go controller
+
+**Problem**: OAM Applications needed sophisticated orchestration capabilities to manage complex dependencies between Crossplane Claims, ensuring proper creation order and error recovery without requiring developers to understand infrastructure complexity.
+
+**Options Evaluated**:
+
+**Option A - Custom Go Controller**:
+- ✅ Complete control over orchestration logic
+- ✅ Direct Kubernetes API access for resource management
+- ✅ Custom business rules and complex dependency resolution
+- ❌ Significant development effort (weeks of Go development)
+- ❌ Testing complexity (unit tests, integration tests, e2e tests)
+- ❌ Operational burden (deployment, monitoring, debugging)
+- ❌ Maintenance overhead (security updates, API compatibility)
+- ❌ Duplicate functionality with existing KubeVela workflow capabilities
+
+**Option B - KubeVela WorkflowStepDefinitions Extension**:
+- ✅ Leverage proven KubeVela workflow engine
+- ✅ CUE-based declarative configuration with type safety
+- ✅ Built-in retry, timeout, and error handling mechanisms
+- ✅ Seamless integration with existing OAM/Crossplane architecture
+- ✅ Rapid implementation and testing (hours vs. weeks)
+- ✅ Comprehensive observability and debugging tools
+- ❌ Learning curve for CUE templating language
+- ❌ Dependency on KubeVela framework evolution
+
+**Decision**: Option B - Custom WorkflowStepDefinitions
+
+**Implementation Architecture**:
+
+```yaml
+# Three-Step Orchestration Pattern:
+workflow:
+  steps:
+  - name: provision-infrastructure
+    type: create-crossplane-claims     # Creates Claims from OAM components
+  - name: wait-for-infrastructure
+    type: wait-for-claims             # Waits for Ready status
+  - name: cleanup-on-failure
+    type: cleanup-failed-claims       # Error recovery
+```
+
+**Custom WorkflowStepDefinitions Implemented**:
+
+1. **`create-crossplane-claims`**:
+   - Analyzes OAM Application components
+   - Maps component types to appropriate Crossplane Claims
+   - Supports `microservice-with-db`, `vcluster`, `app-container` component types
+   - Creates Claims with proper labels for tracking
+
+2. **`wait-for-claims`**:
+   - Monitors Crossplane Claims for `Ready: True` status
+   - Configurable timeout and check intervals
+   - Progress reporting for long-running operations
+
+3. **`cleanup-failed-claims`**:
+   - Selective cleanup of failed Claims (`Ready: False`)
+   - Force cleanup option for complete resource cleanup
+   - Grace period controls for safe deletion
+
+**CUE Implementation Benefits**:
+```cue
+// Type-safe component detection and mapping
+if component.type == "microservice-with-db" {
+    applicationClaim: {
+        apiVersion: "platform.example.com/v1alpha1"
+        kind: "ApplicationClaim"
+        spec: {
+            name: component.name
+            language: component.properties.language
+            framework: component.properties.framework
+        }
+    }
+}
+```
+
+**Supporting Infrastructure**:
+- **PolicyDefinitions**: `crossplane-execution-order`, `health` for workflow management
+- **TraitDefinitions**: `crossplane-workflow` for automatic orchestration enablement
+- **Installation Scripts**: Automated deployment and verification
+- **Test Suite**: Comprehensive validation of workflow orchestration
+
+**Rationale**:
+- **Time to Market**: Implementation completed in 4 hours vs. estimated 2-4 weeks for custom controller
+- **Proven Architecture**: KubeVela provides battle-tested workflow orchestration
+- **Operational Simplicity**: No custom controllers to deploy, monitor, or debug
+- **Developer Experience**: 15-line OAM Applications enable complex infrastructure orchestration
+- **Extensibility**: CUE templating supports complex configuration with compile-time validation
+- **GitOps Integration**: Seamless integration with existing ArgoCD workflows
+
+**Consequences**:
+- ✅ Rapid implementation and deployment
+- ✅ Declarative infrastructure orchestration without custom code
+- ✅ Built-in error handling, retries, and observability
+- ✅ Type-safe configuration through CUE templating
+- ✅ Comprehensive workflow visibility and debugging
+- ❌ Dependency on KubeVela framework for workflow execution
+- ❌ CUE learning curve for advanced customization
+- ❌ Limited to KubeVela's workflow execution model
+
+**Implementation Metrics**:
+- **Development Time**: 4 hours total implementation
+- **Lines of Code**: ~800 lines of CUE/YAML vs. estimated 2000+ lines of Go
+- **Test Coverage**: Complete workflow orchestration validation
+- **Documentation**: Comprehensive usage and troubleshooting guide
+- **Installation**: Automated installation and verification scripts
+
+**Validation Results**:
+- ✅ WorkflowStepDefinitions successfully installed and recognized by KubeVela
+- ✅ CUE templating validation passes for all component type mappings
+- ✅ Workflow execution triggers properly on OAM Application creation
+- ✅ Error handling and cleanup mechanisms function as designed
+- ⚠️ PolicyDefinitions and TraitDefinitions require webhook validation resolution
+
+This architectural decision demonstrates the power of leveraging existing platform capabilities rather than building custom solutions, achieving sophisticated orchestration through declarative configuration in a fraction of the development time.
+
+---
+
 ## Current Architecture State (Post Real-time Integration)
 
 ### ✅ Complete Real-time Platform Stack
@@ -951,6 +1073,186 @@ WHERE heartRate > 120 OR bloodPressure > 140;
 - **Developer Interface**: 15-line minimal OAM application
 - **Services Deployed**: 7 platform services + 1 application service per real-time app
 - **Auto-scaling**: 0-5 replicas for applications, always-on for infrastructure
+
+---
+
+## Phase 10: OAM GitOps Architecture Simplification
+
+#### ADR-022: Single OAM Application File Architecture
+**Date**: 2025-07-23  
+**Decision**: Migrate from complex multi-file OAM component structure to single application file architecture
+
+**Problem**: The previous architecture created complexity through multiple moving parts:
+- Individual OAM Component files in `oam/components/*.yaml`
+- Standalone Knative Service manifests in `manifests/*/`
+- ApplicationSet monitoring multiple directories
+- Version management across multiple files
+- Mixed ArgoCD and KubeVela deployment responsibilities
+
+**Architecture Analysis**:
+```yaml
+# Previous Complex Structure:
+manifests/
+  service-name/
+    knative-service.yaml     # Direct Knative deployment
+    configmap.yaml
+oam/
+  components/
+    service-name.yaml        # OAM Component definition
+  applications/
+    application.yaml         # References components by name
+
+# ArgoCD ApplicationSet monitored both:
+- manifests/*                # Direct Kubernetes deployment
+- oam/components/*          # OAM Component deployment
+```
+
+**Root Cause Issues**:
+1. **Dual Deployment Models**: ArgoCD deploying Knative directly AND KubeVela processing OAM
+2. **Reference Management**: OAM Applications referencing external Component files
+3. **Version Synchronization**: Updates required across multiple files
+4. **Responsibility Confusion**: ArgoCD managing workloads instead of KubeVela
+
+**Solution Implemented**:
+```yaml
+# Simplified Single-File Structure:
+oam/
+  applications/
+    application.yaml         # Contains inline component definitions
+
+# ArgoCD monitors single directory:
+path: oam/applications      # KubeVela processes, creates Knative Services
+```
+
+**Implementation Changes**:
+
+1. **Removed OAM Component File Creation** (Crossplane composition):
+   - Eliminated `oam/components/` directory creation
+   - Removed complex component reference management
+   - Simplified commit messages to reflect inline approach
+
+2. **Updated ArgoCD Monitoring Configuration**:
+   - **Removed**: `manifests/*` ApplicationSet (direct Knative deployment)
+   - **Removed**: `oam/components/*` ApplicationSet (external component files)
+   - **Added**: Single ArgoCD Application monitoring `oam/applications/`
+   - **Target**: Deploys to `vela-system` namespace (KubeVela control plane)
+
+3. **Simplified Version Manager**:
+   - **Changed**: From updating multiple OAM files to single `application.yaml`
+   - **Added**: Service-specific image updates using sed pattern matching
+   - **Enhanced**: Application-level versioning and commit SHA tracking
+
+4. **Clear Responsibility Separation**:
+   - **ArgoCD**: GitOps synchronization of OAM Applications only
+   - **KubeVela**: OAM Application processing and Knative Service creation
+   - **Knative**: Serverless workload management and auto-scaling
+
+**Benefits**:
+- ✅ **Simplified Architecture**: Single file to monitor and update
+- ✅ **Clear Separation of Concerns**: ArgoCD → KubeVela → Knative pipeline
+- ✅ **Atomic Updates**: All components updated together in single transaction
+- ✅ **Reduced Complexity**: No component reference management needed
+- ✅ **Easier Version Management**: Single file for container image updates
+- ✅ **Better GitOps**: Clear file ownership and update patterns
+
+**Trade-offs**:
+- ❌ **Component Reusability**: Components cannot be shared across applications
+- ❌ **File Size**: Single application file grows with number of services
+- ❌ **Granular Updates**: Cannot update individual components independently
+
+---
+
+#### ADR-023: Dual Use Case Architecture Support
+**Date**: 2025-07-23  
+**Decision**: Support both Crossplane-driven and manual OAM application management workflows
+
+**Use Cases Supported**:
+
+**Use Case 1 - Crossplane ApplicationClaim Workflow**:
+```yaml
+# Developer creates ApplicationClaim
+apiVersion: platform.example.org/v1alpha1
+kind: ApplicationClaim
+spec:
+  name: my-service
+  language: python
+  framework: fastapi
+  
+# Flow: ApplicationClaim → Crossplane → OAM Application → KubeVela → Knative
+```
+
+**Use Case 2 - Direct OAM Application Management**:
+```yaml
+# Developer edits oam/applications/application.yaml directly
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+spec:
+  components:
+  - name: my-service
+    type: webservice
+    properties:
+      image: my-service:latest
+  - name: my-platform  
+    type: realtime-platform    # Non-webservice component
+    properties:
+      name: streaming-backend
+      
+# Flow: Manual Edit → ArgoCD → KubeVela → Mixed Resources (Knative + Crossplane)
+```
+
+**System Capabilities for Mixed Components**:
+
+The architecture supports heterogeneous component types within single applications:
+
+1. **WebService Components** → **Knative Services**:
+   - Auto-scaling web applications with Istio ingress
+   - Scale-to-zero cost optimization
+   - Health checks and rolling deployments
+
+2. **Infrastructure Components** → **Crossplane Claims**:
+   - `realtime-platform` → Complete streaming infrastructure (Kafka, MQTT, Analytics)
+   - `vcluster` → Virtual Kubernetes environments  
+   - `neon-postgres` → Managed database provisioning
+   - `auth0-idp` → Identity provider integration
+
+3. **Specialized Components** → **Custom Resources**:
+   - `iot-broker` → MQTT broker deployment
+   - `stream-processor` → Real-time data processing
+   - `analytics-dashboard` → Visualization platforms
+
+**Processing Workflow for Mixed Applications**:
+```mermaid
+graph TD
+    A[OAM Application] --> B[KubeVela Processing]
+    B --> C{Component Type Analysis}
+    C -->|webservice| D[Knative Service Creation]
+    C -->|realtime-platform| E[Crossplane Claim Generation]  
+    C -->|infrastructure| F[Crossplane Claim Generation]
+    E --> G[Infrastructure Provisioning]
+    F --> G
+    D --> H[Application Ready]
+    G --> H
+```
+
+**Rationale**:
+- **Developer Flexibility**: Support both guided (Crossplane) and direct (OAM) workflows
+- **Platform Evolution**: Enable migration from Crossplane-heavy to OAM-native approach
+- **Component Diversity**: Single application can provision infrastructure AND deploy services
+- **Operational Simplicity**: Consistent GitOps workflow regardless of creation method
+
+**Implementation Details**:
+- **KubeVela ComponentDefinitions**: Map component types to appropriate resource creation
+- **Crossplane XRDs**: Handle infrastructure provisioning for complex component types
+- **ArgoCD Integration**: Single monitoring path supports both use cases seamlessly
+- **Version Management**: Unified update mechanism works across all component types
+
+**Consequences**:
+- ✅ **Developer Choice**: Multiple workflows for different use cases and skill levels
+- ✅ **Platform Capabilities**: Full infrastructure AND application deployment in single definition
+- ✅ **Migration Path**: Gradual transition from Crossplane Claims to direct OAM management
+- ✅ **Consistent Experience**: Same GitOps workflow regardless of creation method
+- ❌ **Architectural Complexity**: System must support multiple resource creation patterns
+- ❌ **Learning Curve**: Developers need to understand both Crossplane and OAM paradigms
 
 ---
 

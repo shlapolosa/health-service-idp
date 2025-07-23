@@ -434,101 +434,6 @@ spec:
                       mkdir -p manifests/$SERVICE_NAME
                       cd manifests/$SERVICE_NAME
                       
-                      # Create Knative Service manifest with cost optimization
-                      cat > knative-service.yaml << EOF
-                      apiVersion: serving.knative.dev/v1
-                      kind: Service
-                      metadata:
-                        name: $SERVICE_NAME
-                        namespace: $APP_CONTAINER
-                        annotations:
-                          # Cost optimization: Scale to zero when not in use
-                          autoscaling.knative.dev/min-scale: "0"
-                          autoscaling.knative.dev/max-scale: "5"
-                          autoscaling.knative.dev/target: "50"
-                          autoscaling.knative.dev/metric: "concurrency"
-                          # Karpenter optimization
-                          karpenter.sh/do-not-evict: "false"
-                          cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
-                          # Internal only for cost savings
-                          serving.knative.dev/visibility: "cluster-local"
-                      spec:
-                        template:
-                          metadata:
-                            annotations:
-                              autoscaling.knative.dev/min-scale: "0"
-                              autoscaling.knative.dev/max-scale: "5"
-                              autoscaling.knative.dev/target: "50"
-                              autoscaling.knative.dev/scale-to-zero-pod-retention-period: "30s"
-                              # Queue proxy resource optimization
-                              queue.sidecar.serving.knative.dev/cpu-resource-request: "25m"
-                              queue.sidecar.serving.knative.dev/memory-resource-request: "50Mi"
-                              queue.sidecar.serving.knative.dev/cpu-resource-limit: "100m"
-                              queue.sidecar.serving.knative.dev/memory-resource-limit: "100Mi"
-                          spec:
-                            # Lower concurrency for better resource utilization
-                            containerConcurrency: 50
-                            # Shorter timeout for cost optimization
-                            timeoutSeconds: 300
-                            containers:
-                            - image: $DOCKER_REGISTRY/$DOCKER_USER/$SERVICE_NAME:latest
-                              ports:
-                              - containerPort: 8080
-                                name: http1
-                              env:
-                              - name: APP_NAME
-                                value: $SERVICE_NAME
-                              - name: LOG_LEVEL
-                                value: "INFO"
-                              - name: PORT
-                                value: "8080"
-                              envFrom:
-                              - configMapRef:
-                                  name: $SERVICE_NAME-config
-                                  optional: true
-                              - secretRef:
-                                  name: $SERVICE_NAME-postgres-secret
-                                  optional: true
-                              - secretRef:
-                                  name: $SERVICE_NAME-redis-secret
-                                  optional: true
-                              # Health checks optimized for cold starts
-                              livenessProbe:
-                                httpGet:
-                                  path: /health
-                                  port: 8080
-                                initialDelaySeconds: 15
-                                periodSeconds: 15
-                                timeoutSeconds: 5
-                                failureThreshold: 3
-                              readinessProbe:
-                                httpGet:
-                                  path: /health
-                                  port: 8080
-                                initialDelaySeconds: 5
-                                periodSeconds: 10
-                                timeoutSeconds: 3
-                                successThreshold: 1
-                                failureThreshold: 3
-                              # Minimal resource requests for cost optimization
-                              resources:
-                                requests:
-                                  cpu: 100m
-                                  memory: 128Mi
-                                limits:
-                                  cpu: 500m
-                                  memory: 256Mi
-                              # Security context
-                              securityContext:
-                                allowPrivilegeEscalation: false
-                                runAsNonRoot: true
-                                runAsUser: 1001
-                                capabilities:
-                                  drop:
-                                  - ALL
-                                seccompProfile:
-                                  type: RuntimeDefault
-                      EOF
                       
                       # Create ConfigMap for environment variables
                       cat > configmap.yaml << EOF
@@ -556,42 +461,6 @@ spec:
                       EOF
                       fi
                       
-                      # Create OAM Component in correct directory
-                      cd ../../oam/components
-                      cat > $SERVICE_NAME.yaml << EOF
-                      apiVersion: core.oam.dev/v1beta1
-                      kind: Component
-                      metadata:
-                        name: $SERVICE_NAME
-                        namespace: $APP_CONTAINER
-                        labels:
-                          app.oam.dev/component: $SERVICE_NAME
-                          app.oam.dev/name: $APP_CONTAINER
-                      spec:
-                        workload:
-                          apiVersion: serving.knative.dev/v1
-                          kind: Service
-                          metadata:
-                            name: $SERVICE_NAME
-                          spec:
-                            template:
-                              spec:
-                                containers:
-                                - name: $SERVICE_NAME
-                                  image: $DOCKER_REGISTRY/$DOCKER_USER/$SERVICE_NAME:latest
-                                  ports:
-                                  - containerPort: 8080
-                                  env:
-                                  - name: APP_NAME
-                                    value: $SERVICE_NAME
-                        parameters:
-                        - name: image
-                          fieldPaths:
-                          - "spec.template.spec.containers[0].image"
-                        - name: replicas
-                          fieldPaths:
-                          - "metadata.annotations[autoscaling.knative.dev/minScale]"
-                      EOF
                       
                       # Commit and push GitOps changes
                       cd ..
@@ -600,10 +469,8 @@ spec:
                       git add .
                       git commit -m "Add GitOps manifests for $SERVICE_NAME microservice
                       
-                      - Add Knative Service for $SERVICE_NAME
                       - Add ConfigMap for environment variables  
-                      - Add OAM Component definition
-                      - Configure autoscaling and health checks
+                      - Ready for OAM Application inline component definition
                       - Ready for ArgoCD ApplicationSet deployment"
                       git push
                       

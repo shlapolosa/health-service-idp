@@ -753,42 +753,31 @@ spec:
                           value: Automatically creates ApplicationClaims when OAM components are added
                       EOF
                       
-                      # Create ApplicationSet for generated components
-                      cat > apps/oam-components.yaml << EOF
+                      # Create ArgoCD Application for OAM Applications
+                      cat > apps/oam-application.yaml << EOF
                       apiVersion: argoproj.io/v1alpha1
-                      kind: ApplicationSet
+                      kind: Application
                       metadata:
-                        name: $APP_NAME-oam-components
+                        name: $APP_NAME-oam-application
                         namespace: argocd
+                        annotations:
+                          argocd.argoproj.io/sync-wave: "2"
                       spec:
-                        generators:
-                        - git:
-                            repoURL: $GITOPS_CLONE_URL
-                            revision: HEAD
-                            files:
-                            - path: "oam/components/*.yaml"
-                        template:
-                          metadata:
-                            name: '$APP_NAME-component-{{path.basename}}'
-                            annotations:
-                              argocd.argoproj.io/sync-wave: "2"
-                          spec:
-                            project: default
-                            source:
-                              repoURL: $GITOPS_CLONE_URL
-                              targetRevision: HEAD
-                              path: oam/components
-                              directory:
-                                include: '{{path.basename}}.yaml'
-                            destination:
-                              server: https://kubernetes.default.svc
-                              namespace: $APP_NAME
-                            syncPolicy:
-                              automated:
-                                prune: true
-                                selfHeal: true
-                              syncOptions:
-                                - CreateNamespace=true
+                        project: default
+                        source:
+                          repoURL: $GITOPS_CLONE_URL
+                          targetRevision: HEAD
+                          path: oam/applications
+                        destination:
+                          server: https://kubernetes.default.svc
+                          namespace: vela-system
+                        syncPolicy:
+                          automated:
+                            prune: true
+                            selfHeal: true
+                          syncOptions:
+                            - CreateNamespace=true
+                            - ServerSideApply=true
                       EOF
                       
                       # Create App of Apps ArgoCD Application
@@ -805,7 +794,7 @@ spec:
                         source:
                           repoURL: $GITOPS_CLONE_URL
                           targetRevision: HEAD
-                          path: apps/environments/production
+                          path: apps
                         destination:
                           server: https://kubernetes.default.svc
                           namespace: $APP_NAME
@@ -818,39 +807,6 @@ spec:
                       EOF
                       
                       # Create ApplicationSet for microservices
-                      mkdir -p apps/environments/production
-                      cat > apps/environments/production/applicationset.yaml << EOF
-                      apiVersion: argoproj.io/v1alpha1
-                      kind: ApplicationSet
-                      metadata:
-                        name: $APP_NAME-microservices
-                        namespace: argocd
-                      spec:
-                        generators:
-                        - git:
-                            repoURL: $GITOPS_CLONE_URL
-                            revision: HEAD
-                            directories:
-                            - path: manifests/*
-                        template:
-                          metadata:
-                            name: '$APP_NAME-{{path.basename}}'
-                          spec:
-                            project: default
-                            source:
-                              repoURL: $GITOPS_CLONE_URL
-                              targetRevision: HEAD
-                              path: '{{path}}'
-                            destination:
-                              server: https://kubernetes.default.svc
-                              namespace: $APP_NAME
-                            syncPolicy:
-                              automated:
-                                prune: true
-                                selfHeal: true
-                              syncOptions:
-                                - CreateNamespace=true
-                      EOF
                       
                       # Create GitOps update workflow from template
                       cat > .github/workflows/deployment-update.yml << EOF

@@ -1,13 +1,33 @@
 # Slack API Server
 
-A FastAPI-based microservice for handling Slack slash commands and triggering VCluster and AppContainer provisioning through GitOps workflows.
+A FastAPI-based microservice for handling Slack slash commands and triggering VCluster and AppContainer provisioning through GitOps workflows. This service supports **two primary use cases** for infrastructure and application provisioning:
+
+## 🚀 Use Cases
+
+### Use Case 1: Crossplane ApplicationClaim Workflow (Guided)
+Slack commands trigger ApplicationClaim creation for automatic infrastructure and application setup:
+
+```bash
+# Create complete application stack
+/microservice create health-analyzer with python and postgres
+# Flow: Slack → ApplicationClaim → Crossplane → GitOps → ArgoCD → KubeVela → Knative
+```
+
+### Use Case 2: Direct OAM Application Management (Expert)
+Slack commands can trigger direct OAM application updates for expert users:
+
+```bash
+# Trigger OAM updates through GitOps
+/vcluster create prod-cluster with observability
+# Flow: Slack → GitOps Repository Update → ArgoCD → KubeVela → Infrastructure
+```
 
 ## Overview
 
 This service implements the Onion Architecture pattern and provides:
 - Slack slash command handling (`/vcluster`, `/appcontainer`, and `/microservice`)
 - Advanced natural language processing with spaCy
-- Argo Workflows integration for GitOps automation
+- GitOps workflow integration supporting both use cases
 - Repository-focused microservice provisioning
 - Comprehensive error handling and logging
 
@@ -152,11 +172,19 @@ Creates a new microservice and adds it to an existing or new repository structur
 - `cache` - Cache type: `none`, `redis` (default: `none`)
 - `namespace` - Kubernetes namespace (default: `default`)
 
-**Flow**:
+**Flow (Use Case 1 - ApplicationClaim)**:
 1. Creates or updates AppContainer with repositories (source + GitOps)
 2. Adds microservice to `microservices/{name}/` folder
 3. Creates ApplicationClaim for Knative deployment
-4. Updates ArgoCD and OAM definitions
+4. Crossplane processes claim and creates infrastructure
+5. Updates ArgoCD and OAM definitions
+6. ArgoCD syncs to KubeVela for deployment
+
+**Flow (Use Case 2 - Direct OAM)**:
+1. Updates OAM application.yaml directly in GitOps repository
+2. ArgoCD detects changes and syncs
+3. KubeVela processes OAM components
+4. Creates Knative services and infrastructure claims
 
 **Important**: VCluster creation is separate. Use `/vcluster create` first if needed.
 
@@ -183,11 +211,30 @@ Shows available microservice commands and usage examples.
 - **Memory**: 256Mi request, 512Mi limit
 - **Scaling**: 1-5 replicas with scale-to-zero
 
-## Integration with GitHub Actions
+## 🔄 Integration Workflows
 
-The service triggers the `slack_create_vcluster` event via GitHub repository dispatch, which executes the VCluster provisioning workflow.
+### Use Case 1: ApplicationClaim Integration
+The service creates ApplicationClaims that trigger Crossplane compositions:
 
-**Payload Structure**:
+**ApplicationClaim Payload**:
+```yaml
+apiVersion: platform.example.org/v1alpha1
+kind: ApplicationClaim
+metadata:
+  name: slack-triggered-app
+spec:
+  name: my-microservice
+  language: python
+  framework: fastapi
+  database: postgres
+  cache: redis
+  realtime: health-streaming
+```
+
+### Use Case 2: Direct GitOps Integration
+The service triggers GitHub repository dispatch for direct OAM updates:
+
+**Repository Dispatch Payload**:
 ```json
 {
   "event_type": "slack_create_vcluster",
@@ -197,9 +244,19 @@ The service triggers the `slack_create_vcluster` event via GitHub repository dis
     "user": "user123",
     "slack_channel": "C1234567890",
     "capabilities": { ... },
-    "resources": { ... }
+    "resources": { ... },
+    "use_case": "direct_oam"  # or "application_claim"
   }
 }
+```
+
+### GitOps Repository Structure
+Both use cases update the GitOps repository:
+```
+health-service-idp-gitops/
+├── oam/applications/application.yaml    # Single OAM application (Use Case 2)
+├── crossplane/application-claims/       # ApplicationClaims (Use Case 1)
+└── argocd/applications/                 # ArgoCD app definitions
 ```
 
 ## Security
