@@ -232,3 +232,4 @@ Follow the development guidelines in [../CLAUDE.md](../CLAUDE.md):
 **Integration**: Full GitOps and OAM compatibility
 - trading-engine (java/springboot)
 - user-analytics-service (python/fastapi)
+- system-monitoring (python/fastapi)
