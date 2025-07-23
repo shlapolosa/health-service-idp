@@ -234,3 +234,4 @@ Follow the development guidelines in [../CLAUDE.md](../CLAUDE.md):
 - user-analytics-service (python/fastapi)
 - system-monitoring (python/fastapi)
 - notification-service (python/fastapi)
+- test-service-default (python/fastapi)
