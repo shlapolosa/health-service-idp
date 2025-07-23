@@ -1,0 +1,845 @@
+# Consolidated OAM ComponentDefinitions
+# Following Architecture Principles:
+# 1. Single component declaration creates everything needed
+# 2. ComponentDefinition-only (no Claims for basic components)
+# 3. Embedded workflows for complex orchestration
+# 4. KubeVela orchestrates, Crossplane executes
+
+---
+# Enhanced WebService ComponentDefinition with Embedded Workflow
+# Automatically handles infrastructure bootstrap when needed
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: webservice
+  annotations:
+    definition.oam.dev/description: "Enhanced webservice with automatic infrastructure bootstrap via embedded workflows"
+spec:
+  workload:
+    definition:
+      apiVersion: serving.knative.dev/v1
+      kind: Service
+  schematic:
+    cue:
+      template: |
+        // Primary Output: Knative Service (OAM-compliant workload)
+        output: {
+          apiVersion: "serving.knative.dev/v1"
+          kind: "Service"
+          metadata: {
+            name: parameter.name
+            namespace: context.namespace
+            labels: {
+              "app.kubernetes.io/name": parameter.name
+              "app.kubernetes.io/component": "web-service"
+              "app.kubernetes.io/managed-by": "kubevela"
+            }
+            annotations: {
+              if parameter.language != _|_ {
+                "webservice.oam.dev/bootstrap": "true"
+                "webservice.oam.dev/language": parameter.language
+                "webservice.oam.dev/framework": parameter.framework
+              }
+            }
+          }
+          spec: {
+            template: {
+              metadata: {
+                annotations: {
+                  "autoscaling.knative.dev/minScale": "0"
+                  "autoscaling.knative.dev/maxScale": "10"
+                  "run.googleapis.com/execution-environment": "gen2"
+                }
+                labels: {
+                  "app.kubernetes.io/name": parameter.name
+                  "app.kubernetes.io/version": parameter.version
+                }
+              }
+              spec: {
+                containers: [{
+                  image: parameter.image
+                  ports: [{
+                    containerPort: parameter.port
+                    name: "http1"
+                  }]
+                  resources: {
+                    limits: {
+                      cpu: parameter.resources.cpu
+                      memory: parameter.resources.memory
+                    }
+                    requests: {
+                      cpu: "100m"
+                      memory: "128Mi"
+                    }
+                  }
+                  if len(parameter.environment) > 0 {
+                    env: [
+                      for k, v in parameter.environment {
+                        name: k
+                        value: v
+                      }
+                    ]
+                  }
+                  // Health checks for robust deployment
+                  livenessProbe: {
+                    httpGet: {
+                      path: parameter.healthPath
+                      port: parameter.port
+                    }
+                    initialDelaySeconds: 30
+                    periodSeconds: 10
+                  }
+                  readinessProbe: {
+                    httpGet: {
+                      path: parameter.healthPath
+                      port: parameter.port
+                    }
+                    initialDelaySeconds: 5
+                    periodSeconds: 5
+                  }
+                }]
+              }
+            }
+          }
+        }
+        
+        // Secondary Outputs: Infrastructure Bootstrap (when language specified)
+        if parameter.language != _|_ {
+          outputs: {
+            // Create AppContainer repository and CI/CD
+            "app-container": {
+              apiVersion: "platform.example.org/v1alpha1"
+              kind: "AppContainerClaim"
+              metadata: {
+                name: parameter.name + "-container"
+                namespace: context.namespace
+                labels: {
+                  "app.kubernetes.io/name": parameter.name
+                  "app.kubernetes.io/component": "source-repository"
+                  "app.kubernetes.io/managed-by": "kubevela"
+                }
+                annotations: {
+                  "webservice.oam.dev/parent": parameter.name
+                  "webservice.oam.dev/bootstrap-type": "app-container"
+                }
+              }
+              spec: {
+                name: parameter.name
+                language: parameter.language
+                framework: parameter.framework
+                gitRepositoryTemplate: parameter.repository
+                containerRegistry: parameter.registry
+                secrets: {
+                  github: "github-token"
+                  registry: "container-registry"
+                }
+              }
+            }
+            
+            // Create application secrets configuration
+            "app-secrets": {
+              apiVersion: "v1"
+              kind: "Secret"
+              metadata: {
+                name: parameter.name + "-config"
+                namespace: context.namespace
+                labels: {
+                  "app.kubernetes.io/name": parameter.name
+                  "app.kubernetes.io/component": "configuration"
+                }
+              }
+              type: "Opaque"
+              stringData: {
+                "SERVICE_NAME": parameter.name
+                "SERVICE_PORT": "\(parameter.port)"
+                "SERVICE_VERSION": parameter.version
+                if parameter.database != _|_ {
+                  "DATABASE_TYPE": parameter.database
+                }
+                if parameter.cache != _|_ {
+                  "CACHE_TYPE": parameter.cache
+                }
+              }
+            }
+          }
+        }
+        
+        parameter: {
+          // Required Parameters
+          name: string
+          image: string
+          
+          // Optional Infrastructure Bootstrap
+          language?: string     // Triggers bootstrap: python, nodejs, java, go
+          framework?: string    // fastapi, express, spring, gin
+          repository?: string   // Git repository template name
+          registry?: string     // Container registry (default: docker.io)
+          
+          // Service Configuration
+          port: *8080 | int
+          version: *"latest" | string
+          healthPath: *"/health" | string
+          
+          // Resource Management
+          resources: *{
+            cpu: "500m"
+            memory: "512Mi"
+          } | {
+            cpu?: string
+            memory?: string
+          }
+          
+          // Environment Variables
+          environment: *{} | {[string]: string}
+          
+          // Infrastructure Dependencies (optional)
+          database?: string     // postgres, mysql, mongodb
+          cache?: string        // redis, memcached
+        }
+
+---
+# Native Kafka ComponentDefinition (Crossplane-managed via Helm)
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: kafka
+  annotations:
+    definition.oam.dev/description: "Apache Kafka event streaming platform via Crossplane Helm provider"
+spec:
+  workload:
+    definition:
+      apiVersion: helm.crossplane.io/v1beta1
+      kind: Release
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "helm.crossplane.io/v1beta1"
+          kind: "Release"
+          metadata: {
+            name: parameter.name + "-kafka"
+            namespace: context.namespace
+          }
+          spec: {
+            forProvider: {
+              chart: {
+                name: "kafka"
+                repository: "https://charts.bitnami.com/bitnami"
+                version: "26.8.5"
+              }
+              namespace: context.namespace
+              skipCreateNamespace: false
+              values: {
+                replicaCount: parameter.replicas
+                persistence: {
+                  enabled: true
+                  size: parameter.storage
+                }
+                service: {
+                  type: "ClusterIP"
+                }
+                auth: {
+                  clientProtocol: "plaintext"
+                  interBrokerProtocol: "plaintext"
+                }
+                metrics: {
+                  kafka: {
+                    enabled: true
+                  }
+                  jmx: {
+                    enabled: true
+                  }
+                }
+                if parameter.zookeeper.enabled {
+                  zookeeper: {
+                    enabled: true
+                    replicaCount: parameter.zookeeper.replicas
+                    persistence: {
+                      enabled: true
+                      size: parameter.zookeeper.storage
+                    }
+                  }
+                }
+              }
+            }
+            providerConfigRef: {
+              name: "default"
+            }
+          }
+        }
+        
+        parameter: {
+          // Required
+          name: string
+          
+          // Optional
+          replicas: *3 | int
+          storage: *"10Gi" | string
+          zookeeper: *{
+            enabled: true
+            replicas: 3
+            storage: "8Gi"
+          } | {
+            enabled: bool
+            replicas?: int
+            storage?: string
+          }
+        }
+
+---
+# Native Redis ComponentDefinition (Crossplane-managed via Helm)
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: redis
+  annotations:
+    definition.oam.dev/description: "Redis in-memory data store via Crossplane Helm provider"
+spec:
+  workload:
+    definition:
+      apiVersion: helm.crossplane.io/v1beta1
+      kind: Release
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "helm.crossplane.io/v1beta1"
+          kind: "Release"
+          metadata: {
+            name: parameter.name + "-redis"
+            namespace: context.namespace
+          }
+          spec: {
+            forProvider: {
+              chart: {
+                name: "redis"
+                repository: "https://charts.bitnami.com/bitnami"
+                version: "18.19.4"
+              }
+              namespace: context.namespace
+              skipCreateNamespace: false
+              values: {
+                architecture: parameter.architecture
+                auth: {
+                  enabled: parameter.auth.enabled
+                  if parameter.auth.enabled {
+                    password: parameter.auth.password
+                  }
+                }
+                master: {
+                  persistence: {
+                    enabled: true
+                    size: parameter.storage
+                  }
+                  resources: {
+                    requests: {
+                      cpu: parameter.resources.cpu
+                      memory: parameter.resources.memory
+                    }
+                    limits: {
+                      cpu: parameter.resources.cpu
+                      memory: parameter.resources.memory
+                    }
+                  }
+                }
+                if parameter.architecture == "replication" {
+                  replica: {
+                    replicaCount: parameter.replicas
+                    persistence: {
+                      enabled: true
+                      size: parameter.storage
+                    }
+                    resources: {
+                      requests: {
+                        cpu: parameter.resources.cpu
+                        memory: parameter.resources.memory
+                      }
+                      limits: {
+                        cpu: parameter.resources.cpu
+                        memory: parameter.resources.memory
+                      }
+                    }
+                  }
+                }
+                metrics: {
+                  enabled: true
+                  serviceMonitor: {
+                    enabled: true
+                  }
+                }
+              }
+            }
+            providerConfigRef: {
+              name: "default"
+            }
+          }
+        }
+        
+        parameter: {
+          // Required
+          name: string
+          
+          // Optional
+          architecture: *"standalone" | "replication"
+          replicas: *2 | int
+          storage: *"8Gi" | string
+          auth: *{
+            enabled: false
+          } | {
+            enabled: bool
+            password?: string
+          }
+          resources: *{
+            cpu: "100m"
+            memory: "128Mi"
+          } | {
+            cpu: string
+            memory: string
+          }
+        }
+
+---
+# Native MongoDB ComponentDefinition (Crossplane-managed via Helm)
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: mongodb
+  annotations:
+    definition.oam.dev/description: "MongoDB document database via Crossplane Helm provider"
+spec:
+  workload:
+    definition:
+      apiVersion: helm.crossplane.io/v1beta1
+      kind: Release
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "helm.crossplane.io/v1beta1"
+          kind: "Release"
+          metadata: {
+            name: parameter.name + "-mongodb"
+            namespace: context.namespace
+          }
+          spec: {
+            forProvider: {
+              chart: {
+                name: "mongodb"
+                repository: "https://charts.bitnami.com/bitnami"
+                version: "15.6.13"
+              }
+              namespace: context.namespace
+              skipCreateNamespace: false
+              values: {
+                architecture: parameter.architecture
+                auth: {
+                  enabled: parameter.auth.enabled
+                  if parameter.auth.enabled {
+                    rootPassword: parameter.auth.rootPassword
+                    username: parameter.auth.username
+                    password: parameter.auth.password
+                    database: parameter.auth.database
+                  }
+                }
+                persistence: {
+                  enabled: true
+                  size: parameter.storage
+                }
+                resources: {
+                  requests: {
+                    cpu: parameter.resources.cpu
+                    memory: parameter.resources.memory
+                  }
+                  limits: {
+                    cpu: parameter.resources.cpu
+                    memory: parameter.resources.memory
+                  }
+                }
+                if parameter.architecture == "replicaset" {
+                  replicaCount: parameter.replicas
+                  replicaSetName: parameter.name + "-rs"
+                }
+                metrics: {
+                  enabled: true
+                  serviceMonitor: {
+                    enabled: true
+                  }
+                }
+              }
+            }
+            providerConfigRef: {
+              name: "default"
+            }
+          }
+        }
+        
+        parameter: {
+          // Required
+          name: string
+          
+          // Optional
+          architecture: *"standalone" | "replicaset"
+          replicas: *3 | int
+          storage: *"8Gi" | string
+          auth: *{
+            enabled: true
+            rootPassword: "mongopass"
+            username: "mongodb"
+            password: "mongodb"
+            database: "mydb"
+          } | {
+            enabled: bool
+            rootPassword?: string
+            username?: string
+            password?: string
+            database?: string
+          }
+          resources: *{
+            cpu: "500m"
+            memory: "512Mi"
+          } | {
+            cpu: string
+            memory: string
+          }
+        }
+
+---
+# Infrastructure Components (Create Crossplane Claims for complex infrastructure)
+
+# Application Infrastructure Component (for complex setups)
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: application-infrastructure
+  annotations:
+    definition.oam.dev/description: "Complete application infrastructure including repos, databases, caches, and secrets. Use when you need the full ApplicationClaim workflow."
+spec:
+  workload:
+    definition:
+      apiVersion: platform.example.org/v1alpha1
+      kind: ApplicationClaim
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "platform.example.org/v1alpha1"
+          kind: "ApplicationClaim"
+          metadata: {
+            name: parameter.name + "-infra"
+            namespace: context.namespace
+          }
+          spec: {
+            name: parameter.name
+            language: parameter.language
+            framework: parameter.framework
+            if parameter.database != _|_ {
+              database: parameter.database
+            }
+            if parameter.cache != _|_ {
+              cache: parameter.cache
+            }
+            if parameter.generateRepo != _|_ {
+              generateRepo: parameter.generateRepo
+            }
+            resources: {
+              cpu: parameter.resources.cpu
+              memory: parameter.resources.memory
+            }
+            environment: parameter.environment
+          }
+        }
+        
+        parameter: {
+          // Required
+          name: string
+          language: "python" | "java" | "javascript" | "go"
+          framework: string
+          
+          // Optional
+          database?: "postgres" | "mysql" | "mongodb"
+          cache?: "redis" | "memcached"
+          generateRepo: *false | bool
+          environment: *{} | {...}
+          resources: *{
+            cpu: "500m"
+            memory: "512Mi"
+          } | {
+            cpu?: string
+            memory?: string
+          }
+        }
+
+---
+# Realtime Platform Component (creates complete streaming infrastructure)
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: realtime-platform
+  annotations:
+    definition.oam.dev/description: "Complete real-time streaming platform including Kafka, MQTT, Analytics via Crossplane"
+spec:
+  workload:
+    definition:
+      apiVersion: platform.example.org/v1alpha1
+      kind: RealtimePlatformClaim
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "platform.example.org/v1alpha1"
+          kind: "RealtimePlatformClaim"
+          metadata: {
+            name: parameter.name + "-platform"
+            namespace: context.namespace
+          }
+          spec: {
+            name: parameter.name
+            if parameter.database != _|_ {
+              database: parameter.database
+            }
+            if parameter.visualization != _|_ {
+              visualization: parameter.visualization
+            }
+            if parameter.iotBroker != _|_ {
+              iotBroker: parameter.iotBroker
+            }
+            if parameter.streamProcessor != _|_ {
+              streamProcessor: parameter.streamProcessor
+            }
+            resources: {
+              cpu: parameter.resources.cpu
+              memory: parameter.resources.memory
+            }
+          }
+        }
+        
+        parameter: {
+          // Required
+          name: string
+          
+          // Optional
+          database: *"postgres" | "mysql" | "mongodb"
+          visualization: *"metabase" | "grafana"
+          iotBroker: *true | bool
+          streamProcessor: *true | bool
+          resources: *{
+            cpu: "2000m"
+            memory: "4Gi"
+          } | {
+            cpu?: string
+            memory?: string
+          }
+        }
+
+---
+# VCluster Component (creates virtual Kubernetes environments)
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: vcluster
+  annotations:
+    definition.oam.dev/description: "Virtual Kubernetes cluster with optional components via Crossplane"
+spec:
+  workload:
+    definition:
+      apiVersion: platform.example.org/v1alpha1
+      kind: VClusterEnvironmentClaim
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "platform.example.org/v1alpha1"
+          kind: "VClusterEnvironmentClaim"
+          metadata: {
+            name: parameter.name
+            namespace: context.namespace
+          }
+          spec: {
+            name: parameter.name
+            if parameter.domain != _|_ {
+              domain: parameter.domain
+            }
+            components: {
+              istio: parameter.istio
+              knativeServing: parameter.knativeServing
+              argoCD: parameter.argoCD
+              if parameter.observability {
+                grafana: true
+                prometheus: true
+                jaeger: true
+                kiali: true
+              }
+              if parameter.apiGateway {
+                apiGateway: true
+              }
+            }
+          }
+        }
+        
+        parameter: {
+          // Required
+          name: string
+          
+          // Optional
+          domain?: string
+          istio: *true | bool
+          knativeServing: *true | bool
+          argoCD: *true | bool
+          observability: *true | bool
+          apiGateway: *false | bool
+        }
+
+---
+# External Integration Components
+
+# Neon Postgres Component (managed database via External Secrets)
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: neon-postgres
+  annotations:
+    definition.oam.dev/description: "Neon PostgreSQL managed database credentials via External Secrets"
+spec:
+  workload:
+    definition:
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "external-secrets.io/v1beta1"
+          kind: "ExternalSecret"
+          metadata: {
+            name: parameter.name + "-neon-sync"
+            namespace: context.namespace
+          }
+          spec: {
+            refreshInterval: "1h"
+            secretStoreRef: {
+              kind: "ClusterSecretStore"
+              name: "aws-secretsmanager"
+            }
+            target: {
+              name: parameter.name + "-db-credentials"
+              creationPolicy: "Owner"
+            }
+            data: [
+              {
+                secretKey: "PGHOST"
+                remoteRef: {
+                  key: "neon-postgres/credentials"
+                  property: "PGHOST"
+                }
+              },
+              {
+                secretKey: "PGUSER"  
+                remoteRef: {
+                  key: "neon-postgres/credentials"
+                  property: "PGUSER"
+                }
+              },
+              {
+                secretKey: "PGPASSWORD"
+                remoteRef: {
+                  key: "neon-postgres/credentials"
+                  property: "PGPASSWORD"
+                }
+              },
+              {
+                secretKey: "PGDATABASE"
+                value: parameter.database
+              },
+              {
+                secretKey: "PGPORT"
+                value: "5432"
+              },
+              {
+                secretKey: "DATABASE_URL"
+                remoteRef: {
+                  key: "neon-postgres/credentials"
+                  property: "DATABASE_URL"
+                }
+              }
+            ]
+          }
+        }
+        
+        parameter: {
+          // Required
+          name: string
+          
+          // Optional
+          database: *"postgres" | string
+        }
+
+---
+# Auth0 Identity Provider Component
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: auth0-idp
+  annotations:
+    definition.oam.dev/description: "Auth0 identity provider integration via External Secrets"
+spec:
+  workload:
+    definition:
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "external-secrets.io/v1beta1"
+          kind: "ExternalSecret"
+          metadata: {
+            name: parameter.name + "-auth0-credentials"
+            namespace: context.namespace
+          }
+          spec: {
+            refreshInterval: "1h"
+            secretStoreRef: {
+              kind: "ClusterSecretStore"
+              name: "aws-secretsmanager"
+            }
+            target: {
+              name: parameter.name + "-auth0-credentials"
+              creationPolicy: "Owner"
+            }
+            data: [
+              {
+                secretKey: "clientId"
+                remoteRef: {
+                  key: "auth0/credentials"
+                  property: "clientId"
+                }
+              },
+              {
+                secretKey: "clientSecret"
+                remoteRef: {
+                  key: "auth0/credentials"
+                  property: "clientSecret"
+                }
+              },
+              {
+                secretKey: "domain"
+                remoteRef: {
+                  key: "auth0/credentials"
+                  property: "domain"
+                }
+              },
+              {
+                secretKey: "audience"
+                remoteRef: {
+                  key: "auth0/credentials"  
+                  property: "audience"
+                }
+              }
+            ]
+          }
+        }
+        
+        parameter: {
+          // Required
+          name: string
+        }

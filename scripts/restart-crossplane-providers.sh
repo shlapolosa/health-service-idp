@@ -142,7 +142,7 @@ main() {
     
     if [ -n "$target_provider" ]; then
         # Restart specific provider
-        if [[ -v providers["$target_provider"] ]]; then
+        if [[ ${providers[$target_provider]+_} ]]; then
             restart_provider "$target_provider" "${providers[$target_provider]}"
             check_provider_health "$target_provider" "${providers[$target_provider]}"
         else

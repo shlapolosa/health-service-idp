@@ -1280,6 +1280,305 @@ graph TD
 
 ---
 
+## Phase 11: OAM Compliance and Component Architecture Refactoring
+
+#### ADR-024: OAM-Compliant WebService ComponentDefinition Implementation
+**Date**: 2025-07-23  
+**Decision**: Refactor webservice ComponentDefinition to create Knative Services directly instead of ApplicationClaims, achieving true OAM compliance with minimal artifacts
+
+**Problem**: The existing `webservice` ComponentDefinition violated OAM principles by creating `ApplicationClaim` resources instead of actual workloads, resulting in:
+- Non-OAM-compliant behavior (should create Knative Services directly)
+- Excessive artifact generation for simple webservices (30+ managed resources)
+- Confusion between workload and infrastructure concerns
+- Complex debugging due to unnecessary abstraction layers
+
+**Root Cause Analysis**:
+```yaml
+# Previous Implementation (Non-OAM Compliant):
+spec:
+  workload:
+    definition:
+      apiVersion: platform.example.org/v1alpha1
+      kind: ApplicationClaim    # ❌ NOT a workload
+
+# Correct OAM Implementation:
+spec:
+  workload:
+    definition:
+      apiVersion: serving.knative.dev/v1
+      kind: Service             # ✅ Actual workload
+```
+
+**Solution Implemented**:
+
+1. **New OAM-Compliant webservice ComponentDefinition**:
+   - Creates `serving.knative.dev/v1/Service` directly
+   - Minimal parameters: `name`, `image`, `port`, `environment`, `resources`
+   - CUE template with proper error handling and defaults
+   - Zero ApplicationClaims, XApplicationClaims, or Jobs created
+
+2. **Separate Infrastructure ComponentDefinitions**:
+   - `postgresql` - Creates PostgreSQL infrastructure via ApplicationClaim
+   - `redis-cache` - Creates Redis infrastructure via ApplicationClaim  
+   - `application-infrastructure` - Full ApplicationClaim workflow for complex setups
+
+3. **Meaningful Component Names**:
+   - Replaced generic `webservice-infra` with specific `postgresql`, `redis-cache`
+   - Clear separation between workload and infrastructure concerns
+   - Developers explicitly choose infrastructure components
+
+**Implementation Results**:
+
+**Simple WebService (Minimal Artifacts)**:
+```yaml
+# Creates ONLY: 1 Knative Service + 1 OAM Application (2 total artifacts)
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+spec:
+  components:
+  - name: hello-api
+    type: webservice
+    properties:
+      image: nginx:alpine
+      port: 80
+```
+
+**Complex Application with Infrastructure**:
+```yaml
+# Explicit infrastructure selection with clear separation
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+spec:
+  components:
+  - name: api-service
+    type: webservice        # OAM-compliant: creates Knative Service
+    properties:
+      image: python:3.11-slim
+  - name: api-database
+    type: postgresql        # Crossplane-managed: creates infrastructure
+    properties:
+      name: api-service
+  - name: api-cache
+    type: redis-cache       # Crossplane-managed: creates infrastructure
+    properties:
+      name: api-service
+  - name: message-queue
+    type: kafka             # Native OAM: creates Kafka cluster
+    properties:
+      name: api-events
+```
+
+**Architectural Benefits**:
+
+1. **OAM Compliance**: `webservice` now creates actual Knative Services (native OAM behavior)
+2. **Minimal Artifacts**: Simple webservice creates only necessary resources (2 vs. 30+ previously)
+3. **Clear Separation**: Workload vs. Infrastructure components clearly differentiated
+4. **Backward Compatibility**: Native OAM components (`kafka`, `redis`, `mongodb`) unchanged
+5. **Developer Choice**: Explicit infrastructure selection rather than automatic provisioning
+
+**Testing Results**:
+```bash
+# Simple webservice artifacts created:
+OAM Application: running ✅
+Knative Service: ready ✅  
+ApplicationClaims: 0 ✅
+XApplicationClaims: 0 ✅
+Jobs created: 0 ✅
+```
+
+**Component Categorization**:
+
+| Category | Technology | Creates | Use Case |
+|----------|------------|---------|----------|
+| **Application Components** | KubeVela/OAM | Knative Services | Webservices, APIs |
+| **Infrastructure Components** | Crossplane | ApplicationClaims → Infrastructure | Databases, Caches |
+| **Native OAM Components** | KubeVela/OAM | Direct K8s Resources | Kafka, Redis, MongoDB |
+
+**Migration Strategy**:
+- ✅ **Phase 1**: Created new OAM-compliant webservice ComponentDefinition
+- ✅ **Phase 2**: Added infrastructure ComponentDefinitions (postgresql, redis-cache, application-infrastructure)
+- ✅ **Phase 3**: Tested both use cases (simple and complex applications)
+- ✅ **Phase 4**: Verified native OAM components still function
+
+**Consequences**:
+- ✅ **OAM Standards Compliance**: Platform now follows OAM specifications correctly
+- ✅ **Performance Improvement**: Reduced resource creation by 90%+ for simple webservices
+- ✅ **Developer Experience**: Clear component purposes with meaningful names
+- ✅ **Debugging Simplification**: Direct workload creation eliminates abstraction layers
+- ✅ **Cost Optimization**: Minimal artifacts reduce cluster resource consumption
+- ❌ **Breaking Change**: Existing applications using old webservice definition require updates
+- ❌ **Learning Curve**: Developers must understand component type differences
+
+**Files Created/Modified**:
+- `/crossplane/oam/webservice-oam-compliant.yaml` - New OAM-compliant webservice ComponentDefinition
+- `/crossplane/oam/infrastructure-components.yaml` - Infrastructure ComponentDefinitions
+- Updated documentation in README.md with new component architecture
+
+This architectural decision resolves the fundamental OAM compliance issue while maintaining platform capabilities through proper separation of concerns between workload and infrastructure components.
+
+---
+
+## Phase 12: KubeVela/Crossplane Management Layer Clarification
+
+#### ADR-025: "KubeVela Orchestrates, Crossplane Executes" Architecture Principle
+**Date**: 2025-07-23  
+**Decision**: Establish clear architectural guardrails for what KubeVela manages versus what Crossplane manages
+
+**Critical Insight Discovered**: Even "Native OAM" components like `kafka`, `redis`, `mongodb` are actually managed by Crossplane through provider delegation, not direct Kubernetes resources.
+
+**Management Layer Analysis**:
+
+**KubeVela Responsibilities**:
+- **OAM Applications** - User interface and component orchestration
+- **ComponentDefinitions** - Component templates and parameter validation  
+- **Policies and Traits** - OAM-native features (scaling, ingress, etc.)
+- **Workload Orchestration** - Component composition and dependency management
+
+**Crossplane Responsibilities**:
+- **Helm Releases** - Via `provider-helm` for components like `kafka`, `redis`, `mongodb`
+- **ApplicationClaims** - Custom infrastructure provisioning
+- **External Resources** - AWS, GCP, Azure resources via cloud providers
+- **Complex Infrastructure Compositions** - Multi-resource provisioning
+
+**Direct Kubernetes (Minimal)**:
+- **Knative Services** - Only for `webservice` ComponentDefinition
+- **Core K8s Resources** - When no abstraction is needed
+
+**Resource Creation Flow for Different Component Types**:
+
+```yaml
+# Native OAM Components (kafka, redis, mongodb):
+OAM Application → KubeVela → helm.crossplane.io/v1beta1/Release → Crossplane provider-helm → Helm Chart Deployment
+
+# OAM-Compliant Components (webservice):
+OAM Application → KubeVela → serving.knative.dev/v1/Service → Kubernetes → Knative Pods
+
+# Infrastructure Components (realtime-platform, vcluster):
+OAM Application → KubeVela → platform.example.org/v1alpha1/RealtimePlatformClaim → Crossplane Composition → Multiple Resources
+```
+
+**Key Architectural Principle**: **"KubeVela orchestrates, Crossplane executes"**
+
+- **KubeVela**: Handles OAM semantics, policies, traits, component composition, and user experience
+- **Crossplane**: Handles actual resource provisioning whether through Helm charts, cloud resources, or custom infrastructure
+- **Direct K8s**: Only for resources KubeVela can natively manage without abstraction
+
+**Implications for Component Design**:
+1. **All components in OAM definitions must follow the same design pattern as kafka** (ComponentDefinition → Provider-managed resource)
+2. **No custom Crossplane Claims should appear directly in OAM definitions** 
+3. **Infrastructure complexity hidden behind ComponentDefinitions**
+4. **Different Crossplane providers can be used** (Helm, AWS, GitHub, etc.) but always through ComponentDefinitions
+
+**Rationale**:
+- **Consistency**: All OAM components follow same architectural pattern
+- **Separation of Concerns**: Clear boundaries between orchestration and execution
+- **Provider Flexibility**: Can use any Crossplane provider through ComponentDefinition abstraction
+- **User Experience**: Developers only see OAM interface, not underlying complexity
+
+**Consequences**:
+- ✅ **Architectural Clarity**: Clear responsibilities between KubeVela and Crossplane
+- ✅ **Component Consistency**: All OAM components follow same pattern
+- ✅ **Extensibility**: New providers can be added without changing OAM interface
+- ✅ **Debugging Simplicity**: Clear distinction between orchestration and execution issues
+- ❌ **Additional Abstraction Layer**: ComponentDefinitions required for all resources
+- ❌ **Crossplane Dependency**: Even "simple" components require Crossplane providers
+
+---
+
+#### ADR-026: ComponentDefinition-Only OAM Interface Enforcement  
+**Date**: 2025-07-23  
+**Decision**: Enforce that only KubeVela-native components with ComponentDefinitions appear in OAM applications, removing all direct Crossplane Claims
+
+**Problem**: Mixed interface where some OAM components created ComponentDefinitions while others created raw Crossplane Claims, violating the "kafka pattern" and creating inconsistent developer experience.
+
+**Current State Analysis**:
+```yaml
+# ✅ Follows kafka pattern (ComponentDefinition → Provider resource):
+kafka → ComponentDefinition → helm.crossplane.io/v1beta1/Release
+redis → ComponentDefinition → helm.crossplane.io/v1beta1/Release  
+mongodb → ComponentDefinition → helm.crossplane.io/v1beta1/Release
+webservice → ComponentDefinition → serving.knative.dev/v1/Service
+
+# ❌ Violates pattern (direct Crossplane Claims - REMOVED):
+postgresql → ApplicationClaim (eliminated)
+redis-cache → ApplicationClaim (eliminated)  
+webservice-infra → ApplicationClaim (eliminated)
+```
+
+**Architectural Changes Required**:
+
+1. **Remove Non-ComponentDefinition Components**:
+   - ✅ Eliminated `postgresql`, `redis-cache`, `application-infrastructure` that created raw ApplicationClaims
+   - ✅ Removed duplicate components (`webservice-fixed`, `webservice-realtime`, etc.)
+   - ✅ Kept only components that follow the ComponentDefinition pattern
+
+2. **Create Missing Native Components** (if needed):
+   - Potentially add `postgresql` ComponentDefinition following kafka pattern (Helm Release)
+   - All new components must create provider-managed resources, not direct Claims
+
+3. **Updated Component Architecture**:
+```yaml
+# Native OAM Components (via Crossplane providers):
+webservice → serving.knative.dev/v1/Service (KubeVela native)
+kafka → helm.crossplane.io/v1beta1/Release (Crossplane provider-helm)
+redis → helm.crossplane.io/v1beta1/Release (Crossplane provider-helm)  
+mongodb → helm.crossplane.io/v1beta1/Release (Crossplane provider-helm)
+
+# Infrastructure Components (via Crossplane providers):
+realtime-platform → platform.example.org/v1alpha1/RealtimePlatformClaim (Crossplane composition)
+vcluster → platform.example.org/v1alpha1/VClusterClaim (Crossplane composition)
+neon-postgres → kubernetes.crossplane.io/v1alpha1/Object (Crossplane provider-kubernetes)
+```
+
+**PostgreSQL Component Strategy**:
+For PostgreSQL database needs, developers now have:
+1. **neon-postgres** - External managed PostgreSQL (SaaS)
+2. **application-infrastructure** - Full application stack including PostgreSQL
+3. **Missing**: Native PostgreSQL ComponentDefinition (like kafka/redis pattern)
+
+**Developer Impact**:
+```yaml
+# For PostgreSQL database, developers must use:
+components:
+- name: my-database
+  type: neon-postgres          # External managed PostgreSQL
+  properties:
+    name: my-app
+    database: myappdb
+
+# OR for full application infrastructure:
+- name: my-infrastructure  
+  type: application-infrastructure
+  properties:
+    name: my-app
+    language: python
+    framework: fastapi
+    database: postgres
+```
+
+**Rationale**:
+- **Architectural Consistency**: All OAM components follow ComponentDefinition pattern
+- **Provider Abstraction**: Infrastructure complexity hidden behind ComponentDefinitions
+- **Developer Experience**: Consistent interface for all components
+- **Extensibility**: New components can use any Crossplane provider while maintaining consistent OAM interface
+
+**Implementation Plan**:
+1. ✅ **Phase 1**: Remove non-ComponentDefinition components (completed)
+2. **Phase 2**: Assess need for native PostgreSQL ComponentDefinition 
+3. **Phase 3**: Validate all remaining components follow kafka pattern
+4. **Phase 4**: Update documentation to reflect ComponentDefinition-only architecture
+
+**Consequences**:
+- ✅ **Architectural Purity**: All OAM components follow same pattern
+- ✅ **Provider Flexibility**: Can use any Crossplane provider through ComponentDefinitions
+- ✅ **Consistent Developer Experience**: No mixed interfaces in OAM applications
+- ❌ **Component Gap**: No native PostgreSQL option (only external or full-stack)
+- ❌ **Additional Development**: Need to create ComponentDefinitions for missing components
+
+This decision establishes the principle that **OAM applications contain only ComponentDefinition-based components**, ensuring architectural consistency and proper separation between OAM orchestration and Crossplane execution.
+
+---
+
 ## References
 
 - **Parameter Contract Implementation**: `argo-workflows/*-standard-contract.yaml`

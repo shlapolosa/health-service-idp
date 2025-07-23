@@ -28,37 +28,52 @@ spec:
 For developers who want direct control over their application definition:
 
 ```yaml
-# Edit oam/applications/application.yaml directly
+# Simple webservice (minimal artifacts) 
 apiVersion: core.oam.dev/v1beta1
 kind: Application
 metadata:
-  name: my-health-app
+  name: simple-app
 spec:
   components:
-  # Web service component → Creates Knative Service
+  - name: hello-api
+    type: webservice
+    properties:
+      image: nginx:alpine
+      port: 80
+
+# Complex application with infrastructure
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: complex-app
+spec:
+  components:
+  # OAM-compliant webservice → Knative Service (minimal artifacts)
   - name: health-api
     type: webservice
     properties:
       image: health-api:latest
       port: 8080
       
-  # Infrastructure component → Creates Crossplane Claims
+  # Complete infrastructure → Crossplane ApplicationClaim  
+  - name: app-infrastructure
+    type: application-infrastructure
+    properties:
+      name: health-api
+      language: python
+      framework: fastapi
+      database: postgres
+      cache: redis
+      
+  # Real-time platform → Complete streaming infrastructure
   - name: streaming-platform
     type: realtime-platform
     properties:
       name: health-streaming
       database: postgres
       visualization: metabase
-      iot: true
-      
-  # Database component → Creates managed database
-  - name: app-database
-    type: neon-postgres
-    properties:
-      name: health-db
-      size: 10Gi
 
-# Flow: Manual Edit → ArgoCD → KubeVela → Mixed Resources (Knative Services + Infrastructure)
+# Flow: Manual Edit → ArgoCD → KubeVela → Mixed Resources (Knative Services + Crossplane Claims)
 ```
 
 ## 🏗️ Architecture Overview
@@ -79,14 +94,15 @@ All components that can be added to OAM applications (`oam/applications/applicat
 
 | Component | Use Case | Crossplane Mapping | Kubernetes Artifact |
 |-----------|----------|-------------------|---------------------|
-| **Application Components** | | | |
-| `webservice` | Auto-scaling web applications, microservices, APIs | None (direct) | Knative Service |
+| **Application Components (OAM-Compliant)** | | | |
+| `webservice` | Auto-scaling web applications, microservices, APIs | None (direct) | **Knative Service** ⭐ |
 | `kafka` | Event streaming, message queues | None (direct) | Kafka Cluster (Strimzi) |
 | `redis` | In-memory caching, session storage | None (direct) | Redis Deployment + Service |
 | `mongodb` | Document database, NoSQL storage | None (direct) | MongoDB Deployment + PVC |
-| **Infrastructure Components** | | | |
-| `realtime-platform` | Complete streaming infrastructure with Kafka, MQTT, analytics | `RealtimePlatformClaim` | Multiple: Kafka, MQTT, Lenses, Metabase, PostgreSQL |
-| `vcluster` | Virtual Kubernetes environments, multi-tenancy | `VClusterClaim` | vCluster Custom Resource |
+| **Infrastructure Components (Crossplane-Managed)** | | | |
+| `application-infrastructure` | Complete application setup with repos | `ApplicationClaim` | Multiple: Repos + Infrastructure + Secrets |
+| `realtime-platform` | Complete streaming infrastructure | `RealtimePlatformClaim` | Multiple: Kafka, MQTT, Lenses, Metabase, PostgreSQL |
+| `vcluster` | Virtual Kubernetes environments | `VClusterClaim` | vCluster Custom Resource |
 | `neon-postgres` | Managed PostgreSQL database | `NeonPostgresClaim` | External Secret + Connection Details |
 | `auth0-idp` | Identity provider integration, SSO | `Auth0IdpClaim` | External Secret + Auth0 Config |
 | **Real-time Components** | | | |
@@ -114,10 +130,15 @@ Additional Crossplane claims available for direct use, not mapped to OAM compone
 
 ### Component Categories
 
-**Application Components** - Deploy directly as Kubernetes workloads  
-**Infrastructure Components** - Create Crossplane claims for managed resources  
-**Real-time Components** - Specialized streaming and IoT infrastructure  
-**Specialized Components** - Advanced data and processing platforms
+**Application Components (OAM-Compliant)** - Deploy directly as Kubernetes workloads via KubeVela  
+**Infrastructure Components (Crossplane-Managed)** - Create Crossplane claims for infrastructure that OAM/KubeVela cannot natively manage  
+**Real-time Components** - Specialized streaming and IoT infrastructure via Crossplane  
+**Specialized Components** - Advanced data and processing platforms via Crossplane
+
+> **Key Architecture**: 
+> - **Native OAM Components** (`webservice`, `kafka`, `redis`, `mongodb`) - Direct Kubernetes resources via KubeVela
+> - **Infrastructure Components** (`application-infrastructure`, `realtime-platform`, `vcluster`) - Crossplane Claims for complex infrastructure
+> - **Specialized Components** - External integrations and advanced platforms
 
 ## 🔄 System Workflows
 
