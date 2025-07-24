@@ -239,3 +239,4 @@ Follow the development guidelines in [../CLAUDE.md](../CLAUDE.md):
 - user-service (python/fastapi)
 - notification-service (python/fastapi)
 - notification-service-df3s3 (python/fastapi)
+- email-service-x9k2m (python/fastapi)
