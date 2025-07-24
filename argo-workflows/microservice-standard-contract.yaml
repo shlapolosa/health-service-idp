@@ -29,7 +29,7 @@ spec:
     - name: description
       value: "CLAUDE.md-compliant microservice"
     - name: github-org
-      value: "socrates12345"
+      value: "shlapolosa"
     - name: docker-registry
       value: "docker.io/socrates12345"
     - name: slack-channel
@@ -92,7 +92,7 @@ spec:
       - name: description
         default: "CLAUDE.md-compliant microservice"
       - name: github-org
-        default: "socrates12345"
+        default: "shlapolosa"
       - name: docker-registry
         default: "docker.io/socrates12345"
       - name: slack-channel
@@ -579,6 +579,7 @@ spec:
             description: "{{inputs.parameters.description}}"
             parameter-contract: "compliant"
             created-at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            webservice.oam.dev/source: "api-driven"
         spec:
           name: {{inputs.parameters.resource-name}}
           language: "{{inputs.parameters.microservice-language}}"

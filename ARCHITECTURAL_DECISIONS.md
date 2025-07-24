@@ -1579,6 +1579,124 @@ This decision establishes the principle that **OAM applications contain only Com
 
 ---
 
+## Phase 13: Bootstrap Source Detection and Repository Parameter System
+
+#### ADR-027: ApplicationClaim Bootstrap Source Detection Implementation
+**Date**: 2025-07-24  
+**Decision**: Implement comprehensive source detection system to prevent circular dependencies between API-driven and OAM-driven ApplicationClaim workflows
+
+**Problem**: The system supported two ApplicationClaim creation paths:
+1. **API-driven**: Created via Argo workflows from Slack commands/API calls
+2. **OAM-driven**: Created from user-modified OAM manifests via webservice ComponentDefinition
+
+Both paths triggered oam-updater jobs that attempted to update the same OAM application file, creating circular dependencies and resource conflicts.
+
+**Root Cause Analysis**:
+```bash
+# Circular dependency pattern:
+API-driven ApplicationClaim → oam-updater → Updates OAM application → Triggers OAM-driven ApplicationClaim → oam-updater → Conflicts
+```
+
+**Solution Implemented**:
+
+**1. Source Annotation System**:
+All ApplicationClaim and AppContainerClaim creation points now include source annotations:
+
+```yaml
+# API-driven sources (6 workflow files):
+annotations:
+  webservice.oam.dev/source: "api-driven"
+
+# OAM-driven sources (ComponentDefinition):
+annotations:
+  webservice.oam.dev/source: parameter.source || "api-driven"
+
+# Analyzer-driven sources (automated):
+annotations:
+  webservice.oam.dev/source: "analyzer-driven"
+```
+
+**2. Updated Workflow Files**:
+- ✅ `microservice-standard-contract.yaml` - ApplicationClaim creation
+- ✅ `appcontainer-standard-contract.yaml` - AppContainerClaim creation  
+- ✅ `appcontainer-core-templates.yaml` - AppContainerClaim creation
+- ✅ `appcontainer-template.yaml` - AppContainerClaim creation
+- ✅ `oam-analyzer-cronjob.yaml` - Analyzer-driven AppContainerClaim creation
+
+**3. oam-updater Logic Enhancement** (application-claim-composition.yaml:2978-3010):
+```bash
+# Source detection and circular dependency prevention
+SOURCE="${BOOTSTRAP_SOURCE:-api-driven}"
+
+if [ "$SOURCE" != "api-driven" ]; then
+  echo "🔄 OAM-driven ApplicationClaim detected (source: $SOURCE)"
+  echo "⚠️  Skipping OAM update to avoid circular dependency"
+  exit 0
+fi
+
+# Component existence check to prevent duplications
+if grep -q "name: $SERVICE_NAME" oam/applications/application.yaml; then
+  echo "⚠️  Component '$SERVICE_NAME' already exists in OAM Application"
+  echo "🔄 Skipping update to avoid duplication"
+  exit 0
+fi
+```
+
+**4. Repository Parameter Support**:
+Enhanced webservice ComponentDefinition to support repository parameter:
+
+```cue
+// consolidated-component-definitions.yaml:137-139
+if parameter.repository != _|_ {
+  appContainer: parameter.repository
+}
+```
+
+**Implementation Results**:
+- **Circular Dependencies**: Eliminated through source detection
+- **Component Duplication**: Prevented through existence checking
+- **Repository Flexibility**: ApplicationClaims can specify target repositories
+- **Use Case Separation**: Clear distinction between API-driven and OAM-driven workflows
+
+**Legacy File Cleanup**:
+Removed obsolete workflow templates:
+- ✅ Deleted `microservice-template.yaml`
+- ✅ Deleted `microservice-template-v2.yaml`
+
+**Testing Validation**:
+- ✅ API-driven ApplicationClaims properly tagged and processed
+- ✅ OAM-driven ApplicationClaims skip oam-updater to prevent loops
+- ✅ Repository parameter flows through ApplicationClaim composition
+- ✅ Component existence checking prevents duplicate entries
+
+**Architectural Benefits**:
+- **Workflow Isolation**: API-driven and OAM-driven paths no longer interfere
+- **Resource Consistency**: No duplicate components in OAM applications
+- **Repository Flexibility**: Support for custom repository names beyond default patterns
+- **Operational Clarity**: Clear audit trail of ApplicationClaim sources
+
+**Consequences**:
+- ✅ **Eliminated Circular Dependencies**: OAM-driven claims no longer trigger oam-updater
+- ✅ **Prevented Resource Conflicts**: Component existence checking avoids duplicates
+- ✅ **Enhanced Repository Management**: Custom repository parameter support
+- ✅ **Improved Debugging**: Clear source annotations for troubleshooting
+- ✅ **Backward Compatibility**: Existing workflows continue functioning
+- ❌ **Additional Complexity**: More logic in oam-updater job
+- ❌ **Annotation Dependency**: All ApplicationClaim sources must be properly annotated
+
+**Files Modified**:
+- `/crossplane/application-claim-composition.yaml` - Enhanced oam-updater logic
+- `/crossplane/oam/consolidated-component-definitions.yaml` - Repository parameter support
+- `/crossplane/oam/oam-analyzer-cronjob.yaml` - Analyzer-driven annotation
+- `/argo-workflows/microservice-standard-contract.yaml` - API-driven annotation
+- `/argo-workflows/appcontainer-standard-contract.yaml` - API-driven annotation
+- `/argo-workflows/appcontainer-core-templates.yaml` - API-driven annotation
+- `/argo-workflows/appcontainer-template.yaml` - API-driven annotation
+
+This architectural decision resolves the fundamental circular dependency issue while maintaining support for both guided (API-driven) and expert (OAM-driven) development workflows, ensuring the platform can scale without resource conflicts.
+
+---
+
 ## References
 
 - **Parameter Contract Implementation**: `argo-workflows/*-standard-contract.yaml`

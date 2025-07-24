@@ -131,23 +131,35 @@ main() {
         exit 1
     fi
     
-    # Define providers to restart
-    declare -A providers=(
-        ["kubernetes"]="pkg.crossplane.io/provider=provider-kubernetes"
-        ["github"]="pkg.crossplane.io/provider=provider-upjet-github"
-        ["helm"]="pkg.crossplane.io/provider=provider-helm"
-        ["aws"]="pkg.crossplane.io/provider=provider-aws"
-        ["terraform"]="pkg.crossplane.io/provider=provider-terraform"
-    )
+    # Define providers to restart (provider_name:label_selector format)
+    providers="
+    kubernetes:pkg.crossplane.io/provider=provider-kubernetes
+    github:pkg.crossplane.io/provider=provider-upjet-github
+    helm:pkg.crossplane.io/provider=provider-helm
+    aws:pkg.crossplane.io/provider=provider-aws
+    terraform:pkg.crossplane.io/provider=provider-terraform
+    "
+    
+    # Function to get provider label by name
+    get_provider_label() {
+        local target="$1"
+        echo "$providers" | grep "^[[:space:]]*$target:" | cut -d':' -f2- | tr -d ' '
+    }
+    
+    # Function to get all provider names
+    get_provider_names() {
+        echo "$providers" | grep ":" | cut -d':' -f1 | tr -d ' ' | grep -v "^$"
+    }
     
     if [ -n "$target_provider" ]; then
         # Restart specific provider
-        if [[ ${providers[$target_provider]+_} ]]; then
-            restart_provider "$target_provider" "${providers[$target_provider]}"
-            check_provider_health "$target_provider" "${providers[$target_provider]}"
+        local provider_label=$(get_provider_label "$target_provider")
+        if [ -n "$provider_label" ]; then
+            restart_provider "$target_provider" "$provider_label"
+            check_provider_health "$target_provider" "$provider_label"
         else
             print_error "Unknown provider: $target_provider"
-            print_status "Available providers: ${!providers[*]}"
+            print_status "Available providers: $(get_provider_names | tr '\n' ' ')"
             exit 1
         fi
     else
@@ -157,12 +169,17 @@ main() {
         local success_count=0
         local total_count=0
         
-        for provider in "${!providers[@]}"; do
-            total_count=$((total_count + 1))
-            echo ""
-            if restart_provider "$provider" "${providers[$provider]}"; then
-                success_count=$((success_count + 1))
-                check_provider_health "$provider" "${providers[$provider]}"
+        for provider_entry in $(echo "$providers" | grep ":" | tr -d ' '); do
+            if [ -n "$provider_entry" ]; then
+                local provider_name=$(echo "$provider_entry" | cut -d':' -f1)
+                local provider_label=$(echo "$provider_entry" | cut -d':' -f2-)
+                
+                total_count=$((total_count + 1))
+                echo ""
+                if restart_provider "$provider_name" "$provider_label"; then
+                    success_count=$((success_count + 1))
+                    check_provider_health "$provider_name" "$provider_label"
+                fi
             fi
         done
         

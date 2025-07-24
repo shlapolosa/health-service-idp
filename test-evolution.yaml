@@ -1,52 +1,42 @@
-# Test Evolution: Developer Journey with OAM
-# Step 2: Webservice + Database + Cache (same image, multiple components)
-# Expected: Knative Service + Redis Helm Release + Neon PostgreSQL External Secret
+# Test Evolution: Final Test with Fixed GitHub Username
+# Step 8: Clean test with fully updated configuration
+# Expected: Job created → HTTP call to Argo → Workflow with correct GitHub org → AppContainer + ApplicationClaim created → GitHub repos setup
 
 apiVersion: core.oam.dev/v1beta1
 kind: Application
 metadata:
-  name: health-api-test
+  name: invoice-system-test
   namespace: default
   annotations:
-    test.oam.dev/step: "2"
-    test.oam.dev/description: "Webservice with database and cache - multi-component architecture"
+    test.oam.dev/step: "8"
+    test.oam.dev/description: "Final test with fully corrected GitHub username configuration and applied manifests"
 spec:
   components:
-  # Main webservice (existing image)
-  - name: health-api
+  # Simple webservice (existing image for baseline)
+  - name: invoice-frontend
     type: webservice
     properties:
-      name: health-api
+      name: invoice-frontend
       image: nginx:alpine
       port: 80
       healthPath: "/"
       environment:
-        SERVICE_NAME: "health-api"
+        SERVICE_NAME: "invoice-frontend"
         ENV: "test"
-        REVISION: "6"
-      envFrom:
-        - secretRef:
-            name: "health-database-db-credentials"
-        - secretRef:
-            name: "health-cache-credentials"
   
-  # Database component (PostgreSQL via neon-postgres)
-  - name: health-database
-    type: neon-postgres
+  # NEW MICROSERVICE: Invoice processing service with Argo Workflow bootstrap
+  - name: invoice-processor-service
+    type: webservice
     properties:
-      name: health-database
-      namespace: default
-      database: "healthdb"
-  
-  # Cache component (native OAM)
-  - name: health-cache
-    type: redis
-    properties:
-      name: health-cache
-      architecture: "standalone"
-      auth:
-        enabled: false
-      storage: "2Gi"
-      resources:
-        cpu: "100m"
-        memory: "128Mi"
+      name: invoice-processor-service
+      image: docker.io/socrates12345/invoice-processor-service:latest    # Non-existent image triggers bootstrap
+      language: python                           # Triggers Argo Workflow
+      framework: fastapi
+      repository: invoice-platform-repo         # NEW REPOSITORY NAME
+      source: "oam-driven"                       # Proper source detection
+      port: 8080
+      healthPath: "/health"
+      environment:
+        SERVICE_NAME: "invoice-processor-service"
+        ENV: "test"
+        MICROSERVICE_TYPE: "invoice-processor"

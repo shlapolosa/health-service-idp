@@ -20,7 +20,7 @@ spec:
       - name: description
         default: "CLAUDE.md-compliant application container"
       - name: github-org
-        default: "socrates12345"
+        default: "shlapolosa"
       - name: docker-registry
         default: "docker.io/socrates12345"
       - name: observability

@@ -13,13 +13,17 @@ For developers who want a guided experience with automatic infrastructure provis
 # Create an ApplicationClaim for automatic setup
 apiVersion: platform.example.org/v1alpha1
 kind: ApplicationClaim
+metadata:
+  annotations:
+    webservice.oam.dev/source: "api-driven"  # Prevents circular dependencies
 spec:
   name: my-health-service
   language: python
   framework: fastapi
   database: postgres
   cache: redis
-  realtime: health-streaming  # Optional: adds real-time capabilities
+  appContainer: my-custom-repo  # Optional: specify target repository
+  realtime: health-streaming    # Optional: adds real-time capabilities
 
 # Flow: ApplicationClaim → Crossplane → GitOps Repository → ArgoCD → KubeVela → Knative + Infrastructure
 ```
@@ -64,6 +68,7 @@ spec:
       framework: fastapi
       database: postgres
       cache: redis
+      repository: custom-repo-name  # Optional: specify target repository
       
   # Real-time platform → Complete streaming infrastructure
   - name: streaming-platform
@@ -142,28 +147,42 @@ Additional Crossplane claims available for direct use, not mapped to OAM compone
 
 ## 🔄 System Workflows
 
-### Deployment Flow
+### Deployment Flow with Source Detection
 ```mermaid
 graph TD
     A[Developer Input] --> B{Use Case Choice}
-    B -->|Use Case 1| C[ApplicationClaim]
-    B -->|Use Case 2| D[Direct OAM Edit]
+    B -->|Use Case 1| C[ApplicationClaim with api-driven annotation]
+    B -->|Use Case 2| D[Direct OAM Edit with oam-driven source]
     C --> E[Crossplane Processing]
     D --> F[ArgoCD Sync]
-    E --> F
-    F --> G[KubeVela Processing]
-    G --> H{Component Type Analysis}
-    H -->|webservice| I[Knative Service]
-    H -->|infrastructure| J[Crossplane Claims]
-    H -->|realtime-platform| K[Streaming Infrastructure]
-    I --> L[Application Ready]
-    J --> L
-    K --> L
+    E --> G{Source Detection}
+    G -->|api-driven| H[oam-updater runs]
+    G -->|oam-driven| I[Skip oam-updater - prevent circular dependency]
+    H --> J[Component Existence Check]
+    J -->|New component| K[Update OAM Application]
+    J -->|Existing component| L[Skip to prevent duplication]
+    I --> F
+    K --> F
+    L --> F
+    F --> M[KubeVela Processing]
+    M --> N{Component Type Analysis}
+    N -->|webservice| O[Knative Service]
+    N -->|infrastructure| P[Crossplane Claims]
+    N -->|realtime-platform| Q[Streaming Infrastructure]
+    O --> R[Application Ready]
+    P --> R
+    Q --> R
 ```
 
-### GitOps Architecture
+### GitOps Architecture with Source Tracking
 ```
 Source Code Changes → Version Manager → GitOps Repo → ArgoCD → KubeVela → Kubernetes Resources
+                                                              ↓
+                                                    Source Detection System
+                                                              ↓
+                                               {api-driven, oam-driven, analyzer-driven}
+                                                              ↓
+                                               Prevents Circular Dependencies
 ```
 
 ## 📁 Project Structure
@@ -233,6 +252,20 @@ app = create_realtime_agent_app(HealthStreamingAgent)
 ```
 
 ## 🔧 Development Patterns
+
+### Bootstrap Source Detection System
+The platform prevents circular dependencies through comprehensive source tracking:
+
+**Source Types**:
+- **`api-driven`**: ApplicationClaims created via Argo workflows (Slack commands, API calls)
+- **`oam-driven`**: ApplicationClaims created from user-edited OAM manifests  
+- **`analyzer-driven`**: ApplicationClaims created by automated OAM analysis
+
+**Key Features**:
+- **Circular Dependency Prevention**: OAM-driven claims skip oam-updater to prevent loops
+- **Component Duplication Prevention**: Existence checking before adding components
+- **Repository Parameter Support**: Custom repository names via `repository` parameter
+- **Audit Trail**: Clear source annotations for troubleshooting and debugging
 
 ### Agent Microservice Structure
 All agent microservices follow this pattern:

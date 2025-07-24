@@ -22,7 +22,7 @@ This template is compliant with Parameter Contract **v1.0** and supports paramet
 | `default` | `*Required*` | *No description provided* | Workflow Arguments |
 | `system` | `*Required*` | *No description provided* | Workflow Arguments |
 | `VCluster created via standardized parameter contract` | `*Required*` | *No description provided* | Workflow Arguments |
-| `socrates12345` | `*Required*` | *No description provided* | Workflow Arguments |
+| `shlapolosa` | `*Required*` | *No description provided* | Workflow Arguments |
 | `docker.io/socrates12345` | `*Required*` | *No description provided* | Workflow Arguments |
 | `#vcluster-notifications` | `*Required*` | *No description provided* | Workflow Arguments |
 | `UNKNOWN` | `*Required*` | *No description provided* | Workflow Arguments |
@@ -31,7 +31,7 @@ This template is compliant with Parameter Contract **v1.0** and supports paramet
 | `namespace` | `default` | Kubernetes namespace for VCluster deployment | Template: create-vcluster |
 | `user` | `system` | User requesting VCluster creation | Template: create-vcluster |
 | `description` | `VCluster created via standardized parameter contract` | *No description provided* | Template: create-vcluster |
-| `github-org` | `socrates12345` | *No description provided* | Template: create-vcluster |
+| `github-org` | `shlapolosa` | *No description provided* | Template: create-vcluster |
 | `docker-registry` | `docker.io/socrates12345` | *No description provided* | Template: create-vcluster |
 | `slack-channel` | `#vcluster-notifications` | *No description provided* | Template: create-vcluster |
 | `slack-user-id` | `UNKNOWN` | *No description provided* | Template: create-vcluster |

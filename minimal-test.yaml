@@ -1,0 +1,15 @@
+# Minimal test for webservice ComponentDefinition
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: minimal-test
+  namespace: default
+spec:
+  components:
+  - name: simple-web
+    type: webservice
+    properties:
+      name: simple-web
+      image: nginx:alpine
+      port: 80
+      healthPath: "/"

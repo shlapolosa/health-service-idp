@@ -304,7 +304,7 @@ class TestAppContainerRequest:
 
         assert request.name == "test-app"
         assert request.description == "CLAUDE.md-compliant application container"
-        assert request.github_org == "socrates12345"
+        assert request.github_org == "shlapolosa"
         assert request.docker_registry == "docker.io/socrates12345"
         assert request.enable_observability is True
         assert request.enable_security is True
@@ -417,7 +417,7 @@ class TestMicroserviceRequest:
         assert request.database == MicroserviceDatabase.NONE
         assert request.cache == MicroserviceCache.NONE
         assert request.description == "CLAUDE.md-compliant microservice"
-        assert request.github_org == "socrates12345"
+        assert request.github_org == "shlapolosa"
         assert request.docker_registry == "docker.io/socrates12345"
         assert request.enable_observability is True
         assert request.enable_security is True

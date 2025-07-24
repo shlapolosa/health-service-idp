@@ -50,7 +50,7 @@ This document defines the **Standardized Parameter Contract** for all Argo Workf
 - name: github-org
   type: string
   description: "GitHub organization for repository creation"
-  default: "socrates12345"
+  default: "shlapolosa"
 
 - name: docker-registry
   type: string
@@ -319,7 +319,7 @@ spec:
       - name: description
         default: "Created via standardized parameter contract"
       - name: github-org
-        default: "socrates12345"
+        default: "shlapolosa"
       - name: docker-registry
         default: "docker.io/socrates12345"
       - name: slack-channel

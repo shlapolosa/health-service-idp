@@ -201,7 +201,7 @@ kubectl get applications -n argocd
 kubectl edit application health-service-app -n argocd
 
 # Or update via GitOps repository
-git clone https://github.com/socrates12345/health-service-idp-gitops
+git clone https://github.com/shlapolosa/health-service-idp-gitops
 # Edit oam/applications/application.yaml
 # Commit and push - ArgoCD will sync automatically
 ```
@@ -337,7 +337,7 @@ kubectl get realtimeplatformclaims,neonpostgresclaims,vclusters
 4. Access services via Knative ingress
 
 ### Option 2: Direct OAM Editing (Expert)
-1. Clone GitOps repository: `git clone https://github.com/socrates12345/health-service-idp-gitops`
+1. Clone GitOps repository: `git clone https://github.com/shlapolosa/health-service-idp-gitops`
 2. Edit `oam/applications/application.yaml`
 3. Commit and push changes
 4. ArgoCD automatically syncs and deploys

@@ -356,7 +356,7 @@ class TestEnhancedNLPParser:
         assert result.appcontainer_name == "my-app"
         assert result.namespace == "default"
         assert result.description == "CLAUDE.md-compliant application container"
-        assert result.github_org == "socrates12345"
+        assert result.github_org == "shlapolosa"
         assert result.enable_observability is True
         assert result.enable_security is True
 

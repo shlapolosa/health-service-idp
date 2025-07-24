@@ -202,7 +202,7 @@ metadata:
   name: app-fastapi
 spec:
   source:
-    repoURL: https://github.com/socrates12345/app-fastapi
+    repoURL: https://github.com/shlapolosa/app-fastapi
     path: manifests/
     targetRevision: HEAD
   destination:

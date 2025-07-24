@@ -1,0 +1,21 @@
+# WorkloadDefinition for webservice
+apiVersion: core.oam.dev/v1beta1
+kind: WorkloadDefinition
+metadata:
+  name: webservice
+  annotations:
+    definition.oam.dev/description: "Webservice workload definition"
+spec:
+  definitionRef:
+    name: webservice
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "serving.knative.dev/v1"
+          kind: "Service"
+        }
+        parameter: {
+          name: string
+          image: string
+        }

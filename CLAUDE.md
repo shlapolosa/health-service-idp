@@ -172,9 +172,9 @@ Only then may a PR be opened or branch merged.
 
 Each service repo must include:
 
-The GitOps configuration repo (`socrates12345/health-service-idp-gitops`) houses both ArgoCD and OAM application definitions, including manifests such as Knative services, OAM components, and Helm charts. These define deployment specifications, environments, and application topology and must not live in the source repo.
+The GitOps configuration repo (`shlapolosa/health-service-idp-gitops`) houses both ArgoCD and OAM application definitions, including manifests such as Knative services, OAM components, and Helm charts. These define deployment specifications, environments, and application topology and must not live in the source repo.
 
-All actual application source code resides in a separate source code repository (e.g., `socrates12345/health-service-idp`) and should only contain domain logic, application logic, infrastructure code, interfaces, tests, and CI configurations.
+All actual application source code resides in a separate source code repository (e.g., `shlapolosa/health-service-idp`) and should only contain domain logic, application logic, infrastructure code, interfaces, tests, and CI configurations.
 
 ```
 README.md

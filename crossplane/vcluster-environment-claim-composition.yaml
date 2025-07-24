@@ -284,7 +284,7 @@ spec:
                           gitHubOrg:
                             type: string
                             description: GitHub organization where repositories will be created
-                            default: "socrates12345"
+                            default: "shlapolosa"
                           dockerRegistry:
                             type: string
                             description: Docker registry for container images

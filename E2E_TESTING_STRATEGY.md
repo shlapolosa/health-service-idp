@@ -113,10 +113,10 @@ kubectl get applicationclaim -n default
 ```
 
 ### 4. GitHub Repositories
-**Organization**: `socrates12345`
+**Organization**: `shlapolosa`
 **Repositories Created**:
-- Source: `https://github.com/socrates12345/{service-name}`
-- GitOps: `https://github.com/socrates12345/{service-name}-gitops`
+- Source: `https://github.com/shlapolosa/{service-name}`
+- GitOps: `https://github.com/shlapolosa/{service-name}-gitops`
 
 **Expected Structure:**
 ```
@@ -154,7 +154,7 @@ gitops-repo/
 set -e
 
 SLACK_API_URL="http://af433f091b55640038c23af3a641d716-112208284.us-west-2.elb.amazonaws.com"
-GITHUB_ORG="socrates12345"
+GITHUB_ORG="shlapolosa"
 EXPECTED_SERVICE_NAME="test-e2e-service"
 EXPECTED_VCLUSTER="test-e2e-vcluster"
 
@@ -201,7 +201,7 @@ poetry run pytest tests/ -v
     "microservice_database": "postgresql",
     "microservice_cache": "none",
     "namespace": "default",
-    "github_org": "socrates12345"
+    "github_org": "shlapolosa"
 }
 ```
 
@@ -314,7 +314,7 @@ metadata:
   name: payment-app
 spec:
   description: "AppContainer for microservice payment-service"
-  gitHubOrg: socrates12345
+  gitHubOrg: shlapolosa
   vclusterName: payment-vcluster
 
 # ApplicationClaim
@@ -358,11 +358,11 @@ kubectl get applicationclaim -n default
 ### 3. Repository Verification
 ```bash
 # Check repository existence
-curl -s "https://api.github.com/repos/socrates12345/<repo-name>"
+curl -s "https://api.github.com/repos/shlapolosa/<repo-name>"
 
 # Check repository structure
-curl -s "https://api.github.com/repos/socrates12345/<repo-name>/contents/microservices"
-curl -s "https://api.github.com/repos/socrates12345/<repo-name>/contents/CLAUDE.md"
+curl -s "https://api.github.com/repos/shlapolosa/<repo-name>/contents/microservices"
+curl -s "https://api.github.com/repos/shlapolosa/<repo-name>/contents/CLAUDE.md"
 ```
 
 ### 4. Slack Notification Testing
@@ -410,7 +410,7 @@ curl -X POST -H 'Content-type: application/json' \
 ### Environment Variables
 ```bash
 export SLACK_API_URL="http://af433f091b55640038c23af3a641d716-112208284.us-west-2.elb.amazonaws.com"
-export GITHUB_ORG="socrates12345"
+export GITHUB_ORG="shlapolosa"
 export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/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"
 ```
 

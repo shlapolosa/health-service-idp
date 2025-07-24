@@ -50,7 +50,7 @@ We have successfully implemented a **standardized parameter contract system** th
 - namespace: "e2e-test"                 # Kubernetes namespace
 - user: "claude"                        # Requesting user
 - description: "Payment processing service"
-- github-org: "socrates12345"           # GitHub organization
+- github-org: "shlapolosa"           # GitHub organization
 - docker-registry: "docker.io/socrates12345"
 - slack-channel: "#all-internal-developer-platform"
 - slack-user-id: "U123456789"

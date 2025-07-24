@@ -1,0 +1,8 @@
+# ServiceAccount with Docker registry credentials for Knative
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: knative-docker-sa
+  namespace: default
+imagePullSecrets:
+- name: docker-registry-secret

@@ -16,7 +16,7 @@ spec:
     - name: description
       value: "CLAUDE.md-compliant application container"
     - name: github-org
-      value: "socrates12345"
+      value: "shlapolosa"
     - name: docker-registry
       value: "docker.io/socrates12345"
     - name: observability

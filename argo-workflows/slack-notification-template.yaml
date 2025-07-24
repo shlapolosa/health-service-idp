@@ -551,7 +551,7 @@ spec:
       - name: namespace
       - name: user
       - name: github-org
-        default: "socrates12345"
+        default: "shlapolosa"
       - name: vcluster-name
         default: ""
       - name: endpoints
@@ -734,7 +734,7 @@ spec:
       - name: cache
         default: "none"
       - name: github-org
-        default: "socrates12345"
+        default: "shlapolosa"
       - name: target-vcluster
         default: ""
       - name: repository-name

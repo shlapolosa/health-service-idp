@@ -1,0 +1,88 @@
+# RBAC Configuration for OAM ComponentDefinition to call Argo Workflows
+# This allows the webservice ComponentDefinition to trigger Argo workflows via HTTP API
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-workflows-client
+  namespace: default
+  labels:
+    app.kubernetes.io/name: argo-workflows-client
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/managed-by: oam
+  annotations:
+    oam.dev/description: "Service account for OAM ComponentDefinition to trigger Argo workflows"
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argo-workflows-client
+  labels:
+    app.kubernetes.io/name: argo-workflows-client
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/managed-by: oam
+rules:
+# Allow access to Argo Workflows API for workflow submission
+- apiGroups: ["argoproj.io"]
+  resources: ["workflows", "workflowtemplates"]
+  verbs: ["create", "get", "list", "watch"]
+# Allow reading workflow status for monitoring
+- apiGroups: ["argoproj.io"] 
+  resources: ["workflows/status"]
+  verbs: ["get", "list"]
+# Allow access to workflow logs for debugging
+- apiGroups: [""]
+  resources: ["pods/log"]
+  verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argo-workflows-client
+  labels:
+    app.kubernetes.io/name: argo-workflows-client
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/managed-by: oam
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argo-workflows-client
+subjects:
+- kind: ServiceAccount
+  name: argo-workflows-client
+  namespace: default
+
+---
+# Create ServiceAccount in additional namespaces if needed
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-workflows-client
+  namespace: vela-system
+  labels:
+    app.kubernetes.io/name: argo-workflows-client
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/managed-by: oam
+  annotations:
+    oam.dev/description: "Service account for OAM ComponentDefinition to trigger Argo workflows"
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argo-workflows-client-vela-system
+  labels:
+    app.kubernetes.io/name: argo-workflows-client
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/managed-by: oam
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argo-workflows-client
+subjects:
+- kind: ServiceAccount
+  name: argo-workflows-client
+  namespace: vela-system

@@ -362,6 +362,8 @@ spec:
             created-by: parameter-mapping-layer
             requested-by: "{{inputs.parameters.user}}"
             slack-channel: "$SLACK_CHANNEL_LABEL"
+          annotations:
+            webservice.oam.dev/source: "api-driven"
         spec:
           name: {{inputs.parameters.appcontainer-name}}
           description: "{{inputs.parameters.description}}"

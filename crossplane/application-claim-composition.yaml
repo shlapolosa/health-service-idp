@@ -222,6 +222,9 @@ spec:
                       # Switch to non-root user
                       USER app
                       
+                      # Set PYTHONPATH for proper module imports
+                      ENV PYTHONPATH=/app/src
+                      
                       # 12-Factor: Port binding
                       EXPOSE 8080
                       
@@ -2818,6 +2821,19 @@ spec:
                       git config user.name "ApplicationClaim OAM Updater"
                       git config user.email "applicationclaim@platform.local"
                       
+                      # Check if this is an API-driven ApplicationClaim (should update OAM)
+                      # vs OAM-driven ApplicationClaim (should NOT update OAM to avoid circular dependency)
+                      SOURCE="${BOOTSTRAP_SOURCE:-api-driven}"
+                      
+                      if [ "$SOURCE" != "api-driven" ]; then
+                        echo "🔄 OAM-driven ApplicationClaim detected (source: $SOURCE)"
+                        echo "⚠️  Skipping OAM update to avoid circular dependency"
+                        echo "ℹ️  User should manually update OAM Application if needed"
+                        exit 0
+                      fi
+                      
+                      echo "🔄 API-driven ApplicationClaim detected - proceeding with OAM update"
+                      
                       # Check if OAM application file exists
                       if [ ! -f "oam/applications/application.yaml" ]; then
                         echo "❌ OAM application file not found"
@@ -2826,6 +2842,16 @@ spec:
                       
                       echo "📋 Current OAM Application:"
                       cat oam/applications/application.yaml
+                      
+                      # Check if component already exists in OAM Application
+                      if grep -q "name: $SERVICE_NAME" oam/applications/application.yaml; then
+                        echo "⚠️  Component '$SERVICE_NAME' already exists in OAM Application"
+                        echo "🔄 Skipping update to avoid duplication"
+                        echo "ℹ️  If you need to update the component, modify the OAM Application directly"
+                        exit 0
+                      fi
+                      
+                      echo "✅ Component '$SERVICE_NAME' not found - proceeding with addition"
                       
                       # Create new component definition for enhanced webservice ComponentDefinition
                       COMPONENT_YAML="
@@ -2904,6 +2930,8 @@ spec:
                       value: "placeholder"
                     - name: CACHE
                       value: "placeholder"
+                    - name: BOOTSTRAP_SOURCE
+                      value: "placeholder"
                     - name: GITHUB_TOKEN
                       valueFrom:
                         secretKeyRef:
@@ -2949,3 +2977,12 @@ spec:
     - type: FromCompositeFieldPath
       fromFieldPath: spec.cache
       toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[5].value
+    - type: FromCompositeFieldPath
+      fromFieldPath: metadata.annotations["webservice.oam.dev/source"]
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[6].value
+      policy:
+        fromFieldPath: Optional
+      transforms:
+      - type: string
+        string:
+          fmt: "%s"

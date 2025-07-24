@@ -193,6 +193,7 @@ spec:
                   generated-by: "oam-analyzer"
                   generated-at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
                   source-application: "$source_app"
+                  webservice.oam.dev/source: "analyzer-driven"
                 labels:
                   generated-by: "oam-analyzer"
               spec:
