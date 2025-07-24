@@ -238,3 +238,4 @@ Follow the development guidelines in [../CLAUDE.md](../CLAUDE.md):
 - simple-web (python/fastapi)
 - user-service (python/fastapi)
 - notification-service (python/fastapi)
+- notification-service-df3s3 (python/fastapi)
