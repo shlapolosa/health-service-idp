@@ -1,6 +1,6 @@
 # Test Evolution: Developer Journey with OAM
-# Step 1: Basic webservice with existing image + Istio routing
-# Expected: Knative Service with Istio service mesh integration
+# Step 2: Webservice + Database + Cache (same image, multiple components)
+# Expected: Knative Service + Redis Helm Release + Neon PostgreSQL External Secret
 
 apiVersion: core.oam.dev/v1beta1
 kind: Application
@@ -8,10 +8,11 @@ metadata:
   name: health-api-test
   namespace: default
   annotations:
-    test.oam.dev/step: "1"
-    test.oam.dev/description: "Basic webservice with Istio routing - minimal artifacts with service mesh"
+    test.oam.dev/step: "2"
+    test.oam.dev/description: "Webservice with database and cache - multi-component architecture"
 spec:
   components:
+  # Main webservice (existing image)
   - name: health-api
     type: webservice
     properties:
@@ -22,4 +23,30 @@ spec:
       environment:
         SERVICE_NAME: "health-api"
         ENV: "test"
-        REVISION: "2"
+        REVISION: "6"
+      envFrom:
+        - secretRef:
+            name: "health-database-db-credentials"
+        - secretRef:
+            name: "health-cache-credentials"
+  
+  # Database component (PostgreSQL via neon-postgres)
+  - name: health-database
+    type: neon-postgres
+    properties:
+      name: health-database
+      namespace: default
+      database: "healthdb"
+  
+  # Cache component (native OAM)
+  - name: health-cache
+    type: redis
+    properties:
+      name: health-cache
+      architecture: "standalone"
+      auth:
+        enabled: false
+      storage: "2Gi"
+      resources:
+        cpu: "100m"
+        memory: "128Mi"

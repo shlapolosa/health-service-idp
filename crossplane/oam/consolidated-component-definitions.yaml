@@ -80,6 +80,9 @@ spec:
                       }
                     ]
                   }
+                  if parameter.envFrom != _|_ {
+                    envFrom: parameter.envFrom
+                  }
                   // Health checks for robust deployment
                   livenessProbe: {
                     httpGet: {
@@ -191,6 +194,13 @@ spec:
           
           // Environment Variables
           environment: *{} | {[string]: string}
+          
+          // Environment Variables from Secrets
+          envFrom?: [...{
+            secretRef: {
+              name: string
+            }
+          }]
           
           // Infrastructure Dependencies (optional)
           database?: string     // postgres, mysql, mongodb
@@ -362,10 +372,7 @@ spec:
                   }
                 }
                 metrics: {
-                  enabled: true
-                  serviceMonitor: {
-                    enabled: true
-                  }
+                  enabled: false
                 }
               }
             }
@@ -460,10 +467,7 @@ spec:
                   replicaSetName: parameter.name + "-rs"
                 }
                 metrics: {
-                  enabled: true
-                  serviceMonitor: {
-                    enabled: true
-                  }
+                  enabled: false
                 }
               }
             }
@@ -692,76 +696,37 @@ spec:
 ---
 # External Integration Components
 
-# Neon Postgres Component (managed database via External Secrets)
+# Neon Postgres Component (managed database via Secret reference)
 apiVersion: core.oam.dev/v1beta1
 kind: ComponentDefinition
 metadata:
   name: neon-postgres
   annotations:
-    definition.oam.dev/description: "Neon PostgreSQL managed database credentials via External Secrets"
+    definition.oam.dev/description: "Neon PostgreSQL managed database credentials via Secret reference"
 spec:
   workload:
     definition:
-      apiVersion: external-secrets.io/v1beta1
-      kind: ExternalSecret
+      apiVersion: v1
+      kind: Secret
   schematic:
     cue:
       template: |
         output: {
-          apiVersion: "external-secrets.io/v1beta1"
-          kind: "ExternalSecret"
+          apiVersion: "v1"
+          kind: "Secret"
           metadata: {
-            name: parameter.name + "-neon-sync"
+            name: parameter.name + "-db-credentials" 
             namespace: context.namespace
+            annotations: {
+              "neon-postgres.oam.dev/source-secret": "neon-postgres-credentials"
+              "neon-postgres.oam.dev/component-scoped": "true"
+            }
           }
-          spec: {
-            refreshInterval: "1h"
-            secretStoreRef: {
-              kind: "ClusterSecretStore"
-              name: "aws-secretsmanager"
-            }
-            target: {
-              name: parameter.name + "-db-credentials"
-              creationPolicy: "Owner"
-            }
-            data: [
-              {
-                secretKey: "PGHOST"
-                remoteRef: {
-                  key: "neon-postgres/credentials"
-                  property: "PGHOST"
-                }
-              },
-              {
-                secretKey: "PGUSER"  
-                remoteRef: {
-                  key: "neon-postgres/credentials"
-                  property: "PGUSER"
-                }
-              },
-              {
-                secretKey: "PGPASSWORD"
-                remoteRef: {
-                  key: "neon-postgres/credentials"
-                  property: "PGPASSWORD"
-                }
-              },
-              {
-                secretKey: "PGDATABASE"
-                value: parameter.database
-              },
-              {
-                secretKey: "PGPORT"
-                value: "5432"
-              },
-              {
-                secretKey: "DATABASE_URL"
-                remoteRef: {
-                  key: "neon-postgres/credentials"
-                  property: "DATABASE_URL"
-                }
-              }
-            ]
+          type: "Opaque"
+          stringData: {
+            PGDATABASE: parameter.database
+            // Component references host secret via external mechanism
+            DB_REF: "host-cluster"
           }
         }
         
