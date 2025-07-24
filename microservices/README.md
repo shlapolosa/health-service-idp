@@ -237,3 +237,4 @@ Follow the development guidelines in [../CLAUDE.md](../CLAUDE.md):
 - test-service-default (python/fastapi)
 - simple-web (python/fastapi)
 - user-service (python/fastapi)
+- notification-service (python/fastapi)
