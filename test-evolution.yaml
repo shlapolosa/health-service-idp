@@ -5,7 +5,7 @@
 apiVersion: core.oam.dev/v1beta1
 kind: Application
 metadata:
-  name: streaming-platform-test-2025
+  name: test-realtime
   namespace: default
   annotations:
     test.oam.dev/step: "9"
@@ -13,11 +13,11 @@ metadata:
 spec:
   components:
   # Real-time Platform Infrastructure
-  - name: streaming-platform-2025
+  - name: test-realtime
     type: realtime-platform
     properties:
-      name: streaming-platform-2025
-      image: nginx:alpine
+      name: test-realtime
+      image: test-realtime:latest
       database: postgres
       visualization: metabase
       iot: true
