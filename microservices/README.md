@@ -240,3 +240,4 @@ Follow the development guidelines in [../CLAUDE.md](../CLAUDE.md):
 - notification-service (python/fastapi)
 - notification-service-df3s3 (python/fastapi)
 - email-service-x9k2m (python/fastapi)
+- retail-realtime-test (python/fastapi)
