@@ -1697,6 +1697,58 @@ This architectural decision resolves the fundamental circular dependency issue w
 
 ---
 
+#### ADR-028: Real-time Platform Architectural Equivalence to WebService Pattern
+**Date**: 2025-07-24  
+**Decision**: Implement `realtime-platform` as architecturally identical to `webservice` pattern, following established OAM + infrastructure composition model
+
+**Problem**: Need to implement comprehensive real-time streaming capabilities (Kafka, MQTT, WebSocket, Analytics) while maintaining architectural consistency with existing webservice pattern.
+
+**Architectural Analysis**: Both `webservice` and `realtime-platform` follow identical patterns:
+- **Application Layer**: Knative Service with specific capabilities
+- **Infrastructure Layer**: Crossplane-managed infrastructure components
+- **OAM Integration**: ComponentDefinition with CUE templating
+- **GitOps Workflow**: Same deployment and versioning patterns
+
+**Equivalence Table**:
+
+| **Aspect** | **webservice** | **realtime-platform** |
+|------------|----------------|------------------------|
+| **Application Layer** | Knative Service (FastAPI/SpringBoot/etc.) | Knative Service (FastAPI with WebSocket + Kafka consumers) |
+| **Infrastructure Components** | PostgreSQL, Redis, MongoDB | Kafka, MQTT, Lenses HQ/Agent, PostgreSQL, Metabase |
+| **ComponentDefinition** | `webservice` in component-definitions.yaml | `realtime-platform` in component-definitions.yaml |
+| **Crossplane Integration** | ApplicationClaim → Infrastructure providers | RealtimePlatformClaim → Infrastructure providers |
+| **Argo Workflow** | comprehensive-gitops.yml for source generation | Same workflow with conditional realtime logic |
+| **Secret Management** | Database/cache connection secrets | Kafka/MQTT/Lenses connection secrets |
+| **OAM Usage Pattern** | `type: webservice` with database/cache properties | `type: realtime-platform` with streaming properties |
+| **GitOps Repository** | Creates source repo + infrastructure manifests | Creates source repo + streaming infrastructure manifests |
+| **Service Discovery** | Via database/cache service names | Via Kafka/MQTT broker service names |
+| **Configuration** | Environment variables from secrets | Environment variables from streaming platform secrets |
+| **Scaling** | Knative auto-scaling for web traffic | Knative auto-scaling for streaming workloads |
+| **Monitoring** | Standard web service metrics | Streaming metrics + web service metrics |
+
+**Implementation Strategy**:
+1. **Leverage Existing Patterns**: Use proven webservice + ApplicationClaim architecture
+2. **Add Missing Application Service**: Include Knative Service component in RealtimePlatformClaim composition
+3. **Extend Agent-Common Library**: Use existing realtime capabilities in shared library
+4. **Maintain GitOps Consistency**: Same deployment pipeline with conditional real-time logic
+
+**Key Insight**: Both are **composite components** that provision complete application stacks (workload + infrastructure) rather than single-purpose components. The only difference is the type of infrastructure they provision and the application template they use.
+
+**Benefits**:
+- ✅ **Architectural Consistency**: Follows established platform patterns
+- ✅ **Developer Familiarity**: Same OAM interface and deployment model
+- ✅ **Operational Simplicity**: Reuses existing GitOps and monitoring infrastructure
+- ✅ **Rapid Implementation**: Leverages proven components and workflows
+
+**Consequences**:
+- ✅ **Pattern Reuse**: No new architectural concepts to learn or maintain
+- ✅ **Infrastructure Leverage**: Builds on existing Crossplane and KubeVela investments
+- ✅ **Team Velocity**: Developers can apply existing webservice knowledge to real-time platforms
+- ❌ **Pattern Constraints**: Must follow webservice architectural limitations
+- ❌ **Abstraction Level**: Cannot deviate from established ComponentDefinition patterns
+
+---
+
 ## References
 
 - **Parameter Contract Implementation**: `argo-workflows/*-standard-contract.yaml`
@@ -1704,9 +1756,11 @@ This architectural decision resolves the fundamental circular dependency issue w
 - **Slack Integration**: `argo-workflows/simple-slack-notifications.yaml`
 - **RBAC Configuration**: kubectl commands in session history
 - **Secret Management**: `deploy-slack-notifications.sh`
+- **Real-time Requirements**: `.taskmaster/docs/REAL-TIME-REQUIREMENTS.txt`
+- **Equivalence Analysis**: ADR-028 Architectural Equivalence Table
 
 ---
 
 **Document Status**: Current as of latest session  
-**Next Review**: After AWS re-authentication and VCluster debugging  
+**Next Review**: After realtime-platform implementation completion  
 **Maintained By**: Platform Team

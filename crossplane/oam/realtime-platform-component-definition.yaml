@@ -1,0 +1,76 @@
+# Real-time Platform ComponentDefinition
+# Architecturally identical to webservice pattern: OAM Component → Crossplane Claim → Infrastructure + Application
+
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: realtime-platform
+  annotations:
+    definition.oam.dev/description: "Complete real-time streaming platform with IoT, analytics, and stream processing"
+spec:
+  workload:
+    definition:
+      apiVersion: platform.example.org/v1alpha1
+      kind: RealtimePlatformClaim
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "platform.example.org/v1alpha1"
+          kind: "RealtimePlatformClaim"
+          metadata: {
+            name: parameter.name + "-realtime"
+            labels: {
+              "app.kubernetes.io/name": parameter.name
+              "app.kubernetes.io/component": "realtime-platform"
+              "app.kubernetes.io/part-of": "health-service-idp"
+            }
+          }
+          spec: {
+            name: parameter.name
+            
+            // Essential developer controls (following webservice pattern)
+            database: parameter.database
+            visualization: parameter.visualization  
+            iot: parameter.iot
+            
+            // Advanced optional parameters
+            if parameter.mqttUsers != _|_ {
+              mqttUsers: parameter.mqttUsers
+            }
+            if parameter.dataRetention != _|_ {
+              dataRetention: parameter.dataRetention
+            }
+            if parameter.scaling != _|_ {
+              scaling: parameter.scaling
+            }
+            if parameter.snowflake != _|_ {
+              snowflake: parameter.snowflake
+            }
+          }
+        }
+        
+        parameter: {
+          // Required (minimal - following webservice pattern)
+          name: string
+          
+          // Optional with intelligent defaults (following webservice pattern)
+          database: *"postgres" | "postgres" | "mysql" | "mongodb"
+          visualization: *"metabase" | "metabase" | "grafana"
+          iot: *true | bool
+          
+          // Advanced optional (still simple)
+          mqttUsers?: [...{
+            username: string
+            password: string
+          }]
+          dataRetention?: string // "7d", "30d", etc.
+          scaling?: {
+            minReplicas?: int
+            maxReplicas?: int
+          }
+          snowflake?: {
+            enabled?: bool
+            credentialsSecret?: string
+          }
+        }

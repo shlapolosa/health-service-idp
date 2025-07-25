@@ -1,42 +1,26 @@
-# Test Evolution: Final Test with Fixed GitHub Username
-# Step 8: Clean test with fully updated configuration
-# Expected: Job created → HTTP call to Argo → Workflow with correct GitHub org → AppContainer + ApplicationClaim created → GitHub repos setup
+# Test Evolution: Real-time Platform Test
+# Step 9: Start with realtime-platform component
+# Expected: Real-time platform infrastructure creation and setup
 
 apiVersion: core.oam.dev/v1beta1
 kind: Application
 metadata:
-  name: invoice-system-test
+  name: streaming-platform-test-2025
   namespace: default
   annotations:
-    test.oam.dev/step: "8"
-    test.oam.dev/description: "Final test with fully corrected GitHub username configuration and applied manifests"
+    test.oam.dev/step: "9"
+    test.oam.dev/description: "Real-time platform infrastructure test"
 spec:
   components:
-  # Simple webservice (existing image for baseline)
-  - name: invoice-frontend
-    type: webservice
+  # Real-time Platform Infrastructure
+  - name: streaming-platform-2025
+    type: realtime-platform
     properties:
-      name: invoice-frontend
+      name: streaming-platform-2025
       image: nginx:alpine
-      port: 80
-      healthPath: "/"
-      environment:
-        SERVICE_NAME: "invoice-frontend"
-        ENV: "test"
-  
-  # NEW MICROSERVICE: Invoice processing service with Argo Workflow bootstrap
-  - name: invoice-processor-service
-    type: webservice
-    properties:
-      name: invoice-processor-service
-      image: docker.io/socrates12345/invoice-processor-service:latest    # Non-existent image triggers bootstrap
-      language: python                           # Triggers Argo Workflow
-      framework: fastapi
-      repository: invoice-platform-repo         # NEW REPOSITORY NAME
-      source: "oam-driven"                       # Proper source detection
-      port: 8080
-      healthPath: "/health"
-      environment:
-        SERVICE_NAME: "invoice-processor-service"
-        ENV: "test"
-        MICROSERVICE_TYPE: "invoice-processor"
+      database: postgres
+      visualization: metabase
+      iot: true
+      resources:
+        cpu: "500m"
+        memory: "1Gi"

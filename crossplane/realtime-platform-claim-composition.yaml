@@ -1,0 +1,1056 @@
+# RealtimePlatformClaim Composition
+# Creates complete real-time streaming platform infrastructure
+# Includes: Postgres, MQTT, Kafka, Lenses HQ/Agent, Metabase, Secrets
+
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: realtime-platform-claim
+  labels:
+    crossplane.io/xrd: realtimeplatformclaims.platform.example.org
+spec:
+  writeConnectionSecretsToNamespace: crossplane-system
+  compositeTypeRef:
+    apiVersion: platform.example.org/v1alpha1
+    kind: XRealtimePlatformClaim
+  resources:
+
+  # Realtime Platform Namespace
+  - name: realtime-namespace
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: placeholder-realtime
+              labels:
+                app.kubernetes.io/part-of: realtime-platform
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-namespace"
+
+  # PostgreSQL Storage PVC
+  - name: realtime-postgres-storage
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: PersistentVolumeClaim
+            metadata:
+              name: postgres-storage
+              namespace: placeholder-realtime
+            spec:
+              accessModes:
+              - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 10Gi
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-postgres-storage"
+
+  # PostgreSQL Secret
+  - name: realtime-postgres-secret
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: postgres-secret
+              namespace: placeholder-realtime
+            type: Opaque
+            data:
+              POSTGRES_DB: bGVuc2Vz  # 'lenses' base64
+              POSTGRES_USER: bGVuc2Vz  # 'lenses' base64
+              POSTGRES_PASSWORD: bGVuc2Vz  # 'lenses' base64
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-postgres-secret"
+
+  # PostgreSQL Deployment
+  - name: realtime-postgres
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: postgres
+              namespace: placeholder-realtime
+            spec:
+              replicas: 1
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: postgres
+              template:
+                metadata:
+                  labels:
+                    app.kubernetes.io/name: postgres
+                spec:
+                  containers:
+                  - name: postgres
+                    image: postgres:13
+                    ports:
+                    - containerPort: 5432
+                      name: postgres
+                    env:
+                    - name: POSTGRES_DB
+                      value: lenses
+                    - name: POSTGRES_USER
+                      value: lenses
+                    - name: POSTGRES_PASSWORD
+                      value: lenses
+                    - name: PGDATA
+                      value: /var/lib/postgresql/data/pgdata
+                    volumeMounts:
+                    - name: postgres-storage
+                      mountPath: /var/lib/postgresql/data
+                  volumes:
+                  - name: postgres-storage
+                    persistentVolumeClaim:
+                      claimName: postgres-storage
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-postgres"
+
+  # PostgreSQL Service
+  - name: realtime-postgres-service
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: postgres
+              namespace: placeholder-realtime
+            spec:
+              selector:
+                app.kubernetes.io/name: postgres
+              ports:
+              - port: 5432
+                targetPort: 5432
+                name: postgres
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-postgres-service"
+
+  # MQTT Broker Deployment
+  - name: realtime-mqtt
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: mqtt-broker
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: mqtt-broker
+            spec:
+              replicas: 1
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: mqtt-broker
+              template:
+                metadata:
+                  labels:
+                    app.kubernetes.io/name: mqtt-broker
+                spec:
+                  containers:
+                  - name: mqtt
+                    image: eclipse-mosquitto:2.0
+                    ports:
+                    - containerPort: 1883
+                      name: mqtt
+                    - containerPort: 9001
+                      name: websocket
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-mqtt"
+
+  # MQTT Service
+  - name: realtime-mqtt-service
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: mqtt-broker
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: mqtt-broker
+            spec:
+              selector:
+                app.kubernetes.io/name: mqtt-broker
+              ports:
+              - port: 1883
+                targetPort: 1883
+                name: mqtt
+              - port: 9001
+                targetPort: 9001
+                name: websocket
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-mqtt-service"
+
+  # Kafka Deployment (using lensesio/fast-data-dev)
+  - name: realtime-kafka
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: demo-kafka
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: kafka
+            spec:
+              replicas: 1
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: kafka
+              template:
+                metadata:
+                  labels:
+                    app.kubernetes.io/name: kafka
+                spec:
+                  hostname: demo-kafka
+                  containers:
+                  - name: kafka
+                    image: lensesio/fast-data-dev:3.9.0
+                    ports:
+                    - containerPort: 9092
+                      name: kafka
+                    - containerPort: 8083
+                      name: kafka-connect
+                    - containerPort: 8081
+                      name: schema-registry
+                    env:
+                    - name: ADV_HOST
+                      value: "demo-kafka"
+                    - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
+                      value: "true"
+                    - name: KAFKA_ADVERTISED_LISTENERS
+                      value: "PLAINTEXT://demo-kafka:9092,DOCKERCOMPOSE://demo-kafka:19092"
+                    - name: CONNECT_BOOTSTRAP_SERVERS
+                      value: "demo-kafka:9092"
+                    - name: CONNECT_REST_PORT
+                      value: "8083"
+                    - name: CONNECT_GROUP_ID
+                      value: "compose-connect-group"
+                    - name: CONNECT_CONFIG_STORAGE_TOPIC
+                      value: "docker-connect-configs"
+                    - name: CONNECT_OFFSET_STORAGE_TOPIC
+                      value: "docker-connect-offsets"
+                    - name: CONNECT_STATUS_STORAGE_TOPIC
+                      value: "docker-connect-status"
+                    - name: CONNECT_KEY_CONVERTER
+                      value: "org.apache.kafka.connect.json.JsonConverter"
+                    - name: CONNECT_VALUE_CONVERTER
+                      value: "org.apache.kafka.connect.json.JsonConverter"
+                    - name: CONNECT_INTERNAL_KEY_CONVERTER
+                      value: "org.apache.kafka.connect.json.JsonConverter"
+                    - name: CONNECT_INTERNAL_VALUE_CONVERTER
+                      value: "org.apache.kafka.connect.json.JsonConverter"
+                    - name: CONNECT_REST_ADVERTISED_HOST_NAME
+                      value: "demo-kafka"
+                    - name: CONNECT_LOG4J_ROOT_LOGLEVEL
+                      value: "WARN"
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-kafka"
+
+  # Kafka Service
+  - name: realtime-kafka-service
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: demo-kafka
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: kafka
+            spec:
+              selector:
+                app.kubernetes.io/name: kafka
+              ports:
+              - port: 9092
+                targetPort: 9092
+                name: kafka
+              - port: 8083
+                targetPort: 8083
+                name: kafka-connect
+              - port: 8081
+                targetPort: 8081
+                name: schema-registry
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-kafka-service"
+
+  # Lenses HQ ConfigMap
+  - name: realtime-lenses-hq-config
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: lenses-hq-config
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: lenses-hq
+            data:
+              lenses.conf: |
+                lenses:
+                  http:
+                    port: 9991
+                    bind: 0.0.0.0
+                  authentication:
+                    default:
+                      enabled: true
+                      username: "lenses" 
+                      password: "lenses"
+                  database:
+                    url: "jdbc:postgresql://postgres:5432/hq"
+                    username: "lenses"
+                    password: "lenses"
+                  kafka:
+                    brokers:
+                      - "demo-kafka:9092"
+                    schema-registry:
+                      url: "http://demo-kafka:8081"
+                    connect:
+                      - name: "demo-kafka-connect"
+                        url: "http://demo-kafka:8083"
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-lenses-hq-config"
+
+  # Lenses HQ Deployment
+  - name: realtime-lenses-hq
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: lenses-hq
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: lenses-hq
+            spec:
+              replicas: 1
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: lenses-hq
+              template:
+                metadata:
+                  labels:
+                    app.kubernetes.io/name: lenses-hq
+                spec:
+                  initContainers:
+                  - name: wait-for-postgres
+                    image: postgres:13
+                    command:
+                    - sh
+                    - -c
+                    - |
+                      until pg_isready -h postgres -U lenses; do
+                        echo "Waiting for PostgreSQL..."
+                        sleep 2
+                      done
+                      echo "PostgreSQL is ready"
+                      export PGPASSWORD=lenses
+                      psql -h postgres -U lenses -tc "SELECT 1 FROM pg_database WHERE datname = 'hq'" | grep -q 1 || \
+                        psql -h postgres -U lenses -c "CREATE DATABASE hq;"
+                      psql -h postgres -U lenses -tc "SELECT 1 FROM pg_database WHERE datname = 'agent1'" | grep -q 1 || \
+                        psql -h postgres -U lenses -c "CREATE DATABASE agent1;"
+                      psql -h postgres -U lenses -tc "SELECT 1 FROM pg_database WHERE datname = 'metabaseappdb'" | grep -q 1 || \
+                        psql -h postgres -U lenses -c "CREATE DATABASE metabaseappdb;"
+                  containers:
+                  - name: lenses-hq
+                    image: lensting/lenses-hq:6-preview
+                    ports:
+                    - containerPort: 9991
+                      name: http
+                    env:
+                    - name: LENSES_LICENSE_KEY
+                      value: "placeholder-license"
+                    volumeMounts:
+                    - name: lenses-hq-config
+                      mountPath: /opt/lenses/lenses.conf
+                      subPath: lenses.conf
+                    livenessProbe:
+                      httpGet:
+                        path: /api/health
+                        port: 9991
+                      initialDelaySeconds: 60
+                      periodSeconds: 30
+                    readinessProbe:
+                      httpGet:
+                        path: /api/health
+                        port: 9991
+                      initialDelaySeconds: 30
+                      periodSeconds: 10
+                  volumes:
+                  - name: lenses-hq-config
+                    configMap:
+                      name: lenses-hq-config
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-lenses-hq"
+
+  # Lenses HQ Service
+  - name: realtime-lenses-hq-service
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: lenses-hq
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: lenses-hq
+            spec:
+              selector:
+                app.kubernetes.io/name: lenses-hq
+              ports:
+              - port: 9991
+                targetPort: 9991
+                name: http
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-lenses-hq-service"
+
+  # Lenses Agent Deployment
+  - name: realtime-lenses-agent
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: lenses-agent
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: lenses-agent
+            spec:
+              replicas: 1
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: lenses-agent
+              template:
+                metadata:
+                  labels:
+                    app.kubernetes.io/name: lenses-agent
+                spec:
+                  initContainers:
+                  - name: wait-for-lenses-hq
+                    image: curlimages/curl:8.5.0
+                    command:
+                    - sh
+                    - -c
+                    - |
+                      until curl -f http://lenses-hq:9991/api/health; do
+                        echo "Waiting for Lenses HQ..."
+                        sleep 5
+                      done
+                      echo "Lenses HQ is ready"
+                  containers:
+                  - name: lenses-agent
+                    image: lensting/lenses-agent:6-preview
+                    env:
+                    - name: LENSES_HQ_URL
+                      value: "http://lenses-hq:9991"
+                    - name: LENSES_HQ_USER
+                      value: "lenses"
+                    - name: LENSES_HQ_PASSWORD
+                      value: "lenses"
+                    - name: LENSES_HEAP_OPTS
+                      value: "-Xmx1536m -Xms512m"
+                    - name: LENSES_KAFKA_BROKERS
+                      value: "demo-kafka:9092"
+                    - name: LENSES_SCHEMA_REGISTRY_URL
+                      value: "http://demo-kafka:8081"
+                    resources:
+                      limits:
+                        memory: "2Gi"
+                        cpu: "1000m"
+                      requests:
+                        memory: "1Gi"
+                        cpu: "500m"
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-lenses-agent"
+
+  # Lenses Agent Service
+  - name: realtime-lenses-agent-service
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: lenses-agent
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: lenses-agent
+            spec:
+              selector:
+                app.kubernetes.io/name: lenses-agent
+              ports:
+              - port: 9991
+                targetPort: 9991
+                name: http
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-lenses-agent-service"
+
+  # Metabase Deployment
+  - name: realtime-metabase
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: metabase
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: metabase
+            spec:
+              replicas: 1
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: metabase
+              template:
+                metadata:
+                  labels:
+                    app.kubernetes.io/name: metabase
+                spec:
+                  initContainers:
+                  - name: wait-for-postgres
+                    image: postgres:13
+                    command:
+                    - sh
+                    - -c
+                    - |
+                      until pg_isready -h postgres -U lenses; do
+                        echo "Waiting for PostgreSQL..."
+                        sleep 2
+                      done
+                  containers:
+                  - name: metabase
+                    image: metabase/metabase:latest
+                    ports:
+                    - containerPort: 3000
+                      name: http
+                    env:
+                    - name: MB_DB_TYPE
+                      value: "postgres"
+                    - name: MB_DB_DBNAME
+                      value: "metabaseappdb"
+                    - name: MB_DB_PORT
+                      value: "5432"
+                    - name: MB_DB_USER
+                      value: "lenses"
+                    - name: MB_DB_PASS
+                      value: "lenses"
+                    - name: MB_DB_HOST
+                      value: "postgres"
+                    resources:
+                      limits:
+                        memory: "2Gi"
+                        cpu: "1000m"
+                      requests:
+                        memory: "1Gi"
+                        cpu: "500m"
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-metabase"
+
+  # Metabase Service
+  - name: realtime-metabase-service
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: metabase
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: metabase
+            spec:
+              selector:
+                app.kubernetes.io/name: metabase
+              ports:
+              - port: 3000
+                targetPort: 3000
+                name: http
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-metabase-service"
+
+  # Application Secrets for Real-time Platform
+  - name: realtime-mqtt-secret
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: placeholder-mqtt-secret
+              namespace: default
+            type: Opaque
+            stringData:
+              MQTT_HOST: "placeholder-mqtt.placeholder-realtime.svc.cluster.local"
+              MQTT_PORT: "1883"
+              MQTT_USER: "realtime-user"
+              MQTT_PASSWORD: "realtime-pass"
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-mqtt-secret"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-mqtt-secret"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.stringData.MQTT_HOST
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-mqtt.%s-realtime.svc.cluster.local"
+
+  - name: realtime-kafka-secret
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: placeholder-kafka-secret
+              namespace: default
+            type: Opaque
+            stringData:
+              KAFKA_BOOTSTRAP_SERVERS: "placeholder-kafka.placeholder-realtime.svc.cluster.local:9092"
+              KAFKA_SCHEMA_REGISTRY_URL: "http://placeholder-kafka.placeholder-realtime.svc.cluster.local:8081"
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-kafka-secret"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-kafka-secret"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.stringData.KAFKA_BOOTSTRAP_SERVERS
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-kafka.%s-realtime.svc.cluster.local:9092"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.stringData.KAFKA_SCHEMA_REGISTRY_URL
+      transforms:
+      - type: string
+        string:
+          fmt: "http://%s-kafka.%s-realtime.svc.cluster.local:8081"
+
+  - name: realtime-lenses-secret
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: placeholder-lenses-secret
+              namespace: default
+            type: Opaque
+            stringData:
+              LENSES_URL: "http://placeholder-lenses-hq.placeholder-realtime.svc.cluster.local:9991"
+              LENSES_USER: "lenses"
+              LENSES_PASSWORD: "lenses"
+              LENSES_HQ_URL: "http://placeholder-lenses-hq.placeholder-realtime.svc.cluster.local:9991"
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-lenses-secret"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-lenses-secret"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.stringData.LENSES_URL
+      transforms:
+      - type: string
+        string:
+          fmt: "http://%s-lenses-hq.%s-realtime.svc.cluster.local:9991"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.stringData.LENSES_HQ_URL
+      transforms:
+      - type: string
+        string:
+          fmt: "http://%s-lenses-hq.%s-realtime.svc.cluster.local:9991"
+
+  - name: realtime-metabase-secret
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: placeholder-metabase-secret
+              namespace: default
+            type: Opaque
+            stringData:
+              METABASE_URL: "http://placeholder-metabase.placeholder-realtime.svc.cluster.local:3000"
+              METABASE_USER: "admin@metabase.local"
+              METABASE_PASSWORD: "metabase123"
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-metabase-secret"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-metabase-secret"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.stringData.METABASE_URL
+      transforms:
+      - type: string
+        string:
+          fmt: "http://%s-metabase.%s-realtime.svc.cluster.local:3000"

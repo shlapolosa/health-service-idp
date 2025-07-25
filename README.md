@@ -100,23 +100,16 @@ All components that can be added to OAM applications (`oam/applications/applicat
 | Component | Use Case | Crossplane Mapping | Kubernetes Artifact |
 |-----------|----------|-------------------|---------------------|
 | **Application Components (OAM-Compliant)** | | | |
-| `webservice` | Auto-scaling web applications, microservices, APIs | None (direct) | **Knative Service** ⭐ |
-| `kafka` | Event streaming, message queues | None (direct) | Kafka Cluster (Strimzi) |
-| `redis` | In-memory caching, session storage | None (direct) | Redis Deployment + Service |
-| `mongodb` | Document database, NoSQL storage | None (direct) | MongoDB Deployment + PVC |
+| `webservice` | Auto-scaling web applications, microservices, APIs | Optional: `ApplicationClaim` for infrastructure | **Knative Service** + Optional Argo Workflow ⭐ |
+| `kafka` | Event streaming, message queues | None (direct) | Helm Release (Bitnami Kafka Chart) |
+| `redis` | In-memory caching, session storage | None (direct) | Helm Release (Bitnami Redis Chart) |
+| `mongodb` | Document database, NoSQL storage | None (direct) | Helm Release (Bitnami MongoDB Chart) |
 | **Infrastructure Components (Crossplane-Managed)** | | | |
 | `application-infrastructure` | Complete application setup with repos | `ApplicationClaim` | Multiple: Repos + Infrastructure + Secrets |
-| `realtime-platform` | Complete streaming infrastructure | `RealtimePlatformClaim` | Multiple: Kafka, MQTT, Lenses, Metabase, PostgreSQL |
-| `vcluster` | Virtual Kubernetes environments | `VClusterClaim` | vCluster Custom Resource |
-| `neon-postgres` | Managed PostgreSQL database | `NeonPostgresClaim` | External Secret + Connection Details |
-| `auth0-idp` | Identity provider integration, SSO | `Auth0IdpClaim` | External Secret + Auth0 Config |
-| **Real-time Components** | | | |
-| `iot-broker` | MQTT broker for IoT devices, sensor data | `IoTBrokerClaim` | Eclipse Mosquitto + Kafka Connector |
-| `stream-processor` | Real-time data processing, ETL pipelines | `StreamProcessorClaim` | Lenses Agent + Processing Jobs |
-| `analytics-dashboard` | Data visualization, business intelligence | `AnalyticsDashboardClaim` | Metabase/Grafana + Data Sources |
-| **Specialized Components** | | | |
-| `snowflake-datawarehouse` | Data warehousing, analytics at scale | `SnowflakeDataWarehouseClaim` | Terraform Workspace + Snowflake Resources |
-| `data-pipeline` | ETL/ELT workflows, data processing | `DataPipelineClaim` | Apache Airflow + DAGs |
+| `realtime-platform` | Complete streaming infrastructure | `RealtimePlatformClaim` | **Knative Service** + Kafka + MQTT + Lenses + Metabase + PostgreSQL ⭐ |
+| `vcluster` | Virtual Kubernetes environments | `VClusterEnvironmentClaim` | vCluster + Istio + Knative + ArgoCD + Observability |
+| `neon-postgres` | Managed PostgreSQL database | None (direct) | Secret with connection details |
+| `auth0-idp` | Identity provider integration, SSO | None (direct) | ExternalSecret from AWS Secrets Manager |
 
 ### Table 2: Crossplane Claims (Beyond OAM)
 
@@ -125,13 +118,8 @@ Additional Crossplane claims available for direct use, not mapped to OAM compone
 | Claim | Use Case | Example | Kubernetes Artifact |
 |-------|----------|---------|---------------------|
 | `ApplicationClaim` | Guided application creation with infrastructure | Creating complete app stack via Slack/API | Multiple: OAM Application + Infrastructure Claims |
-| `AppContainerClaim` | Repository and container management | Setting up source + GitOps repos | GitHub Repositories + ArgoCD Applications |
-| `VClusterInfrastructureClaim` | Advanced vCluster with custom networking | Multi-region vCluster with observability | vCluster + Network Policies + Monitoring Stack |
-| `WorkflowExecutionClaim` | Argo Workflows for CI/CD pipelines | Complex build/test/deploy workflows | Argo Workflow + WorkflowTemplate |
-| `ObservabilityStackClaim` | Complete monitoring setup | Prometheus + Grafana + Jaeger stack | Multiple: Prometheus, Grafana, Jaeger, AlertManager |
-| `NetworkPolicyClaim` | Advanced network security | Micro-segmentation between services | NetworkPolicy + Istio VirtualService |
-| `BackupConfigurationClaim` | Automated backup strategies | Database and PVC backup schedules | Velero Backup + Schedule |
-| `CertificateManagerClaim` | SSL/TLS certificate automation | Automatic Let's Encrypt certificates | cert-manager Certificate + Issuer |
+| `RealtimePlatformClaim` | Complete streaming infrastructure | Real-time analytics platform | Namespace + Kafka + MQTT + Lenses + Metabase + PostgreSQL + Secrets |
+| `VClusterEnvironmentClaim` | Virtual Kubernetes environments | Isolated development environments | vCluster + Istio + Knative + ArgoCD + Observability Stack |
 
 ### Component Categories
 
@@ -144,6 +132,27 @@ Additional Crossplane claims available for direct use, not mapped to OAM compone
 > - **Native OAM Components** (`webservice`, `kafka`, `redis`, `mongodb`) - Direct Kubernetes resources via KubeVela
 > - **Infrastructure Components** (`application-infrastructure`, `realtime-platform`, `vcluster`) - Crossplane Claims for complex infrastructure
 > - **Specialized Components** - External integrations and advanced platforms
+
+## 🔄 Architectural Equivalence: WebService vs Real-time Platform
+
+Both `webservice` and `realtime-platform` follow identical architectural patterns as **composite components** that provision complete application stacks (workload + infrastructure):
+
+| **Aspect** | **webservice** | **realtime-platform** |
+|------------|----------------|------------------------|
+| **Primary Output** | Knative Service (HTTP/REST endpoints) | Knative Service (WebSocket + Kafka consumers) |
+| **Secondary Output** | Optional: Argo Workflow (when `language` specified) | RealtimePlatformClaim → Complete streaming infrastructure |
+| **Infrastructure Components** | Optional: PostgreSQL, Redis, MongoDB via ApplicationClaim | Kafka, MQTT, Lenses HQ/Agent, PostgreSQL, Metabase |
+| **ComponentDefinition** | `webservice` in consolidated-component-definitions.yaml | `realtime-platform` in consolidated-component-definitions.yaml |
+| **Crossplane Integration** | Optional: ApplicationClaim for infrastructure bootstrap | Required: RealtimePlatformClaim for streaming infrastructure |
+| **Environment Variables** | `AGENT_TYPE`, `LOG_LEVEL`, custom environment | `REALTIME_PLATFORM_NAME`, `WEBSOCKET_ENABLED`, `AGENT_TYPE` |
+| **Secret Management** | Optional: Database/cache connection secrets | Required: Kafka/MQTT/Lenses/Metabase connection secrets |
+| **OAM Usage Pattern** | `type: webservice` with optional `language`/`database` | `type: realtime-platform` with `database`/`visualization`/`iot` |
+| **Architectural Pattern** | **Composite Component**: Workload + Optional Infrastructure | **Composite Component**: Workload + Required Infrastructure |
+| **Service Discovery** | Via optional database/cache service names | Via Kafka/MQTT/Lenses service names in dedicated namespace |
+| **Namespace Strategy** | Single namespace (where Application defined) | Dual namespace: Application + `{name}-realtime` namespace |
+| **Scaling** | Knative auto-scaling (0-10 replicas) | Knative auto-scaling (1-10 replicas, min=1 for streaming) |
+
+**Key Insight**: Both are **composite components** that provision complete application stacks rather than single-purpose components. The only difference is the type of infrastructure they provision and the application template they use.
 
 ## 🔄 System Workflows
 

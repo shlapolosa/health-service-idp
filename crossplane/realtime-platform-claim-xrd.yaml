@@ -1,0 +1,127 @@
+# RealtimePlatformClaim XRD (Custom Resource Definition)
+# Defines the API schema for real-time platform claims
+
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xrealtimeplatformclaims.platform.example.org
+spec:
+  group: platform.example.org
+  names:
+    kind: XRealtimePlatformClaim
+    plural: xrealtimeplatformclaims
+  claimNames:
+    kind: RealtimePlatformClaim
+    plural: realtimeplatformclaims
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              # Minimal required properties
+              name:
+                type: string
+                description: "Name of the real-time system (used for all resources)"
+                pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+                maxLength: 63
+              
+              # Simple optional properties with defaults
+              database:
+                type: string
+                enum: ["postgres", "mysql", "mongodb"]
+                default: "postgres"
+                description: "Database type for backend storage"
+              visualization:
+                type: string  
+                enum: ["metabase", "grafana"]
+                default: "metabase"
+                description: "Analytics dashboard platform"
+              iot:
+                type: boolean
+                default: true
+                description: "Enable MQTT IoT broker"
+                
+              # Advanced optional properties (still simple)
+              mqttUsers:
+                type: array
+                description: "MQTT user credentials"
+                items:
+                  type: object
+                  properties:
+                    username: 
+                      type: string
+                    password: 
+                      type: string
+                  required: ["username", "password"]
+              dataRetention:
+                type: string
+                pattern: "^[0-9]+[dwm]$"
+                default: "7d"
+                description: "Data retention period (e.g. 7d, 30d, 6m)"
+              scaling:
+                type: object
+                properties:
+                  minReplicas: 
+                    type: integer
+                    minimum: 1
+                    default: 1
+                  maxReplicas: 
+                    type: integer
+                    minimum: 1
+                    default: 5
+              snowflake:
+                type: object
+                properties:
+                  enabled: 
+                    type: boolean
+                    default: false
+                  credentialsSecret: 
+                    type: string
+            required: ["name"]
+                  
+          status:
+            type: object
+            properties:
+              # Standard status fields
+              ready: 
+                type: boolean
+              message: 
+                type: string
+              # Connection endpoints exposed as secrets
+              secrets:
+                type: object
+                properties:
+                  mqtt: 
+                    type: string
+                    description: "MQTT connection secret name"
+                  kafka: 
+                    type: string
+                    description: "Kafka connection secret name"
+                  database: 
+                    type: string
+                    description: "Database connection secret name"
+                  metabase: 
+                    type: string
+                    description: "Analytics dashboard secret name"
+                  lenses: 
+                    type: string
+                    description: "Stream processing UI secret name"
+              # External access URLs
+              endpoints:
+                type: object
+                properties:
+                  lensesUI: 
+                    type: string
+                  metabaseUI: 
+                    type: string
+                  mqttWebSocket: 
+                    type: string
+                  realtimeService:
+                    type: string
+                    description: "Real-time application service URL"
