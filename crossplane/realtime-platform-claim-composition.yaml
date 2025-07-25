@@ -63,6 +63,7 @@ spec:
             spec:
               accessModes:
               - ReadWriteOnce
+              storageClassName: gp3
               resources:
                 requests:
                   storage: 10Gi
@@ -248,7 +249,7 @@ spec:
                 spec:
                   containers:
                   - name: mqtt
-                    image: eclipse-mosquitto:2.0
+                    image: eclipse-mosquitto
                     ports:
                     - containerPort: 1883
                       name: mqtt
@@ -354,10 +355,20 @@ spec:
                     env:
                     - name: ADV_HOST
                       value: "demo-kafka"
-                    - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
-                      value: "true"
+                    - name: RUNNING_SAMPLEDATA
+                      value: "1"
+                    - name: RUNTESTS
+                      value: "0"
+                    - name: KAFKA_LISTENERS
+                      value: "PLAINTEXT://:9092,DOCKERCOMPOSE://:19092,CONTROLLER://:16062"
                     - name: KAFKA_ADVERTISED_LISTENERS
                       value: "PLAINTEXT://demo-kafka:9092,DOCKERCOMPOSE://demo-kafka:19092"
+                    - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+                      value: "DOCKERCOMPOSE:PLAINTEXT,CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,SSL:SSL,SASL_PLAINTEXT:SASL_PLAINTEXT,SASL_SSL:SASL_SSL"
+                    - name: DISABLE
+                      value: "debezium-mongodb,debezium-mysql,debezium-sqlserver,debezium-jdbc"
+                    - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
+                      value: "true"
                     - name: CONNECT_BOOTSTRAP_SERVERS
                       value: "demo-kafka:9092"
                     - name: CONNECT_REST_PORT
@@ -462,28 +473,25 @@ spec:
               labels:
                 app.kubernetes.io/name: lenses-hq
             data:
-              lenses.conf: |
-                lenses:
-                  http:
-                    port: 9991
-                    bind: 0.0.0.0
-                  authentication:
-                    default:
-                      enabled: true
-                      username: "lenses" 
-                      password: "lenses"
-                  database:
-                    url: "jdbc:postgresql://postgres:5432/hq"
-                    username: "lenses"
-                    password: "lenses"
-                  kafka:
-                    brokers:
-                      - "demo-kafka:9092"
-                    schema-registry:
-                      url: "http://demo-kafka:8081"
-                    connect:
-                      - name: "demo-kafka-connect"
-                        url: "http://demo-kafka:8083"
+              config.yaml: |
+                http:
+                  address: :9991
+                  secureSessionCookies: false
+                auth:
+                  administrators:
+                    - admin
+                  users:
+                    - username: admin
+                      password: $2a$10$DPQYpxj4Y2iTWeuF1n.ItewXnbYXh5/E9lQwDJ/cI/.gBboW2Hodm
+                agents:
+                  address: :10000
+                database:
+                  host: postgres:5432
+                  username: lenses
+                  password: lenses
+                  database: hq
+                logger:
+                  mode: text
         providerConfigRef:
           name: kubernetes-provider
     patches:
@@ -528,6 +536,42 @@ spec:
                     app.kubernetes.io/name: lenses-hq
                 spec:
                   initContainers:
+                  - name: create-config
+                    image: busybox
+                    envFrom:
+                    - secretRef:
+                        name: lenses-credentials
+                    command:
+                    - sh
+                    - -c
+                    - |
+                      # Create config using standard shell variables
+                      cat > /shared/config.yaml << EOF
+                      http:
+                        address: :9991
+                        secureSessionCookies: false
+                      auth:
+                        administrators:
+                          - $HQ_USER
+                        users:
+                          - username: $HQ_USER
+                            password: \$2a\$10\$DPQYpxj4Y2iTWeuF1n.ItewXnbYXh5/E9lQwDJ/cI/.gBboW2Hodm
+                      agents:
+                        address: :10000
+                      database:
+                        host: postgres:5432
+                        username: $DB_USERNAME
+                        password: $DB_PASSWORD
+                        database: hq
+                      logger:
+                        mode: text
+                      license:
+                        key: $LICENSE_KEY
+                        acceptEULA: $ACCEPT_EULA
+                      EOF
+                    volumeMounts:
+                    - name: shared-config
+                      mountPath: /shared
                   - name: wait-for-postgres
                     image: postgres:13
                     command:
@@ -549,32 +593,30 @@ spec:
                   containers:
                   - name: lenses-hq
                     image: lensting/lenses-hq:6-preview
+                    command: ["lenses-hq"]
+                    args: ["/app/config.yaml"]
                     ports:
                     - containerPort: 9991
                       name: http
-                    env:
-                    - name: LENSES_LICENSE_KEY
-                      value: "placeholder-license"
                     volumeMounts:
-                    - name: lenses-hq-config
-                      mountPath: /opt/lenses/lenses.conf
-                      subPath: lenses.conf
+                    - name: shared-config
+                      mountPath: /app/config.yaml
+                      subPath: config.yaml
                     livenessProbe:
                       httpGet:
-                        path: /api/health
+                        path: /
                         port: 9991
                       initialDelaySeconds: 60
                       periodSeconds: 30
                     readinessProbe:
                       httpGet:
-                        path: /api/health
+                        path: /
                         port: 9991
                       initialDelaySeconds: 30
                       periodSeconds: 10
                   volumes:
-                  - name: lenses-hq-config
-                    configMap:
-                      name: lenses-hq-config
+                  - name: shared-config
+                    emptyDir: {}
         providerConfigRef:
           name: kubernetes-provider
     patches:
@@ -615,6 +657,9 @@ spec:
               - port: 9991
                 targetPort: 9991
                 name: http
+              - port: 10000
+                targetPort: 10000
+                name: agent-registration
         providerConfigRef:
           name: kubernetes-provider
     patches:
@@ -665,27 +710,126 @@ spec:
                     - sh
                     - -c
                     - |
-                      until curl -f http://lenses-hq:9991/api/health; do
+                      until curl -f http://lenses-hq:9991/; do
                         echo "Waiting for Lenses HQ..."
                         sleep 5
                       done
                       echo "Lenses HQ is ready"
+                  - name: create-agent-config
+                    image: busybox
+                    envFrom:
+                    - secretRef:
+                        name: lenses-credentials
+                    env:
+                    - name: NAMESPACE
+                      valueFrom:
+                        fieldRef:
+                          fieldPath: metadata.namespace
+                    - name: KAFKA_SERVICE
+                      value: "demo-kafka"
+                    - name: LENSES_HQ_SERVICE
+                      value: "lenses-hq"
+                    command:
+                    - sh
+                    - -c
+                    - |
+                      # Create agent key
+                      echo "$AGENT_KEY" > /mnt/settings/DEMO_AGENTKEY
+                      
+                      # Create lenses.conf
+                      cat > /mnt/settings/lenses.conf << EOF
+                      lenses {
+                        storage.postgres.host = "postgres"
+                        storage.postgres.port = 5432
+                        storage.postgres.database = "agent1"
+                        storage.postgres.username = "lenses"
+                        storage.postgres.password = "lenses"
+                        provisioning.path = "/mnt/settings"
+                        sql.state.dir = "/data/lsql-state-dir"
+                        secret.file = "/data/security.conf"
+                        storage.directory = "/data/lenses"
+                        
+                        connectors.info = [
+                          {       
+                            class.name    = "com.snowflake.kafka.connector.SnowflakeSinkConnector"
+                            name          = "Snowflake Kafka Connector"
+                            sink          = true
+                            description   = "Writes Kafka data into Snowflake for analytics."
+                            docs          = "https://docs.snowflake.com/en/user-guide/kafka-connector.html"
+                            author        = "Snowflake"
+                          }
+                        ]
+                      }
+                      EOF
+                      
+                      # Create provisioning.yaml with parameterized service names
+                      cat > /mnt/settings/provisioning.yaml << EOF
+                      lensesHq:
+                        - configuration:
+                            agentKey:
+                              value: $AGENT_KEY
+                            port:
+                              value: 10000
+                            server:
+                              value: lenses-hq
+                          name: lenses-hq
+                          tags: ['hq']
+                          version: 1
+                      kafka:
+                        - name: kafka
+                          version: 1
+                          tags: ['kafka', 'dev']
+                          configuration:
+                            kafkaBootstrapServers:
+                              value: [PLAINTEXT://$KAFKA_SERVICE.$NAMESPACE.svc.cluster.local:9092]
+                            protocol:
+                              value: PLAINTEXT
+                      confluentSchemaRegistry:
+                        - name: schema-registry
+                          version: 1
+                          tags: ['dev']
+                          configuration:
+                            schemaRegistryUrls:
+                              value: [http://$KAFKA_SERVICE.$NAMESPACE.svc.cluster.local:8081]
+                      connect:
+                        - name: dev
+                          version: 1
+                          tags: ['dev']
+                          configuration:
+                            workers:
+                              value: [http://$KAFKA_SERVICE.$NAMESPACE.svc.cluster.local:8083]
+                            aes256Key:
+                              value: 0123456789abcdef0123456789abcdef
+                      EOF
+                    volumeMounts:
+                    - name: agent-settings
+                      mountPath: /mnt/settings
                   containers:
                   - name: lenses-agent
                     image: lensting/lenses-agent:6-preview
+                    envFrom:
+                    - secretRef:
+                        name: lenses-credentials
                     env:
-                    - name: LENSES_HQ_URL
+                    - name: DEMO_HQ_URL
                       value: "http://lenses-hq:9991"
-                    - name: LENSES_HQ_USER
-                      value: "lenses"
-                    - name: LENSES_HQ_PASSWORD
-                      value: "lenses"
+                    - name: DEMO_HQ_USER
+                      valueFrom:
+                        secretKeyRef:
+                          name: lenses-credentials
+                          key: HQ_USER
+                    - name: DEMO_HQ_PASSWORD
+                      valueFrom:
+                        secretKeyRef:
+                          name: lenses-credentials
+                          key: HQ_PASSWORD
+                    - name: DEMO_AGENTKEY_PATH
+                      value: "/mnt/settings/DEMO_AGENTKEY"
                     - name: LENSES_HEAP_OPTS
                       value: "-Xmx1536m -Xms512m"
-                    - name: LENSES_KAFKA_BROKERS
-                      value: "demo-kafka:9092"
-                    - name: LENSES_SCHEMA_REGISTRY_URL
-                      value: "http://demo-kafka:8081"
+                    volumeMounts:
+                    - name: agent-settings
+                      mountPath: /mnt/settings
                     resources:
                       limits:
                         memory: "2Gi"
@@ -693,6 +837,9 @@ spec:
                       requests:
                         memory: "1Gi"
                         cpu: "500m"
+                  volumes:
+                  - name: agent-settings
+                    emptyDir: {}
         providerConfigRef:
           name: kubernetes-provider
     patches:
@@ -870,6 +1017,323 @@ spec:
       - type: string
         string:
           fmt: "%s-realtime-metabase-service"
+
+  # Lenses Credentials Secret (reference from default namespace)
+  - name: realtime-lenses-credentials
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: lenses-credentials
+              namespace: placeholder-realtime
+            type: Opaque
+            data:
+              license-key: ""
+              accept-eula: ""
+              hq-user: ""
+              hq-password: ""
+              db-username: ""
+              db-password: ""
+              agent-key: ""
+        providerConfigRef:
+          name: kubernetes-provider
+        references:
+        - patchesFrom:
+            apiVersion: v1
+            kind: Secret
+            name: lenses-credentials
+            namespace: default
+            fieldPath: data
+          toFieldPath: spec.forProvider.manifest.data
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-lenses-credentials"
+
+
+  # ServiceAccount for secret copying
+  - name: realtime-secret-copier-sa
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: ServiceAccount
+            metadata:
+              name: secret-copier
+              namespace: placeholder-realtime
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-secret-copier-sa"
+
+  # ClusterRole for secret reading
+  - name: realtime-secret-reader-role
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: ClusterRole
+            metadata:
+              name: secret-reader
+            rules:
+            - apiGroups: [""]
+              resources: ["secrets"]
+              verbs: ["get", "list"]
+            - apiGroups: [""]
+              resources: ["secrets"]
+              verbs: ["create", "update", "patch"]
+              resourceNames: ["lenses-credentials"]
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-secret-reader-role"
+
+  # ClusterRoleBinding
+  - name: realtime-secret-copier-binding
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: ClusterRoleBinding
+            metadata:
+              name: secret-copier-binding
+            subjects:
+            - kind: ServiceAccount
+              name: secret-copier
+              namespace: placeholder-realtime
+            roleRef:
+              kind: ClusterRole
+              name: secret-reader
+              apiGroup: rbac.authorization.k8s.io
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-secret-copier-binding"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.subjects[0].namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-secret-copier-binding"
+
+  # Secret copying Job
+  - name: realtime-secret-copier-job
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: copy-lenses-credentials
+              namespace: placeholder-realtime
+            spec:
+              template:
+                spec:
+                  serviceAccountName: secret-copier
+                  restartPolicy: OnFailure
+                  containers:
+                  - name: copy-secret
+                    image: bitnami/kubectl:latest
+                    command:
+                    - sh
+                    - -c
+                    - |
+                      # Copy lenses-credentials secret from default to current namespace
+                      kubectl get secret lenses-credentials -n default -o yaml | \
+                        sed "s/namespace: default/namespace: $TARGET_NAMESPACE/" | \
+                        sed '/resourceVersion:/d' | \
+                        sed '/uid:/d' | \
+                        sed '/creationTimestamp:/d' | \
+                        kubectl apply -f -
+                      echo "Secret copied successfully"
+                    env:
+                    - name: TARGET_NAMESPACE
+                      value: placeholder-realtime
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[0].value
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-secret-copier-job"
+
+  # Istio Gateway for Lenses HQ
+  - name: realtime-lenses-gateway
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: networking.istio.io/v1beta1
+            kind: Gateway
+            metadata:
+              name: lenses-hq-gateway
+              namespace: placeholder-realtime
+            spec:
+              selector:
+                istio: ingressgateway
+              servers:
+              - port:
+                  number: 80
+                  name: http
+                  protocol: HTTP
+                hosts:
+                - "lenses-hq.placeholder-realtime.local"
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.spec.servers[0].hosts[0]
+      transforms:
+      - type: string
+        string:
+          fmt: "lenses-hq.%s-realtime.local"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-lenses-gateway"
+
+  # Istio VirtualService for Lenses HQ
+  - name: realtime-lenses-virtualservice
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: networking.istio.io/v1beta1
+            kind: VirtualService
+            metadata:
+              name: lenses-hq-vs
+              namespace: placeholder-realtime
+            spec:
+              hosts:
+              - "lenses-hq.placeholder-realtime.local"
+              gateways:
+              - lenses-hq-gateway
+              http:
+              - match:
+                - uri:
+                    prefix: /
+                route:
+                - destination:
+                    host: lenses-hq
+                    port:
+                      number: 9991
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.spec.hosts[0]
+      transforms:
+      - type: string
+        string:
+          fmt: "lenses-hq.%s-realtime.local"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-lenses-virtualservice"
 
   # Application Secrets for Real-time Platform
   - name: realtime-mqtt-secret
@@ -1054,3 +1518,234 @@ spec:
       - type: string
         string:
           fmt: "http://%s-metabase.%s-realtime.svc.cluster.local:3000"
+
+  # Kafka Configuration Job
+  - name: realtime-kafka-config-job
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: kafka-config-job
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: kafka-config
+            spec:
+              template:
+                spec:
+                  restartPolicy: OnFailure
+                  serviceAccountName: secret-copier
+                  containers:
+                  - name: kafka-config
+                    image: bitnami/kubectl:latest
+                    command:
+                    - sh
+                    - -c
+                    - |
+                      # Wait for Kafka to be ready
+                      echo "Waiting for Kafka to be ready..."
+                      until nc -z demo-kafka 9092; do
+                        echo "Waiting for Kafka..."
+                        sleep 5
+                      done
+                      
+                      # Wait for Schema Registry to be ready
+                      echo "Waiting for Schema Registry to be ready..."
+                      until nc -z demo-kafka 8081; do
+                        echo "Waiting for Schema Registry..."
+                        sleep 5
+                      done
+                      
+                      # Wait for Kafka Connect to be ready
+                      echo "Waiting for Kafka Connect to be ready..."
+                      until nc -z demo-kafka 8083; do
+                        echo "Waiting for Kafka Connect..."
+                        sleep 5
+                      done
+                      
+                      echo "All Kafka services are ready! Installing Snowflake connector..."
+                      
+                      # Install Snowflake connector in Kafka container
+                      echo "📦 Installing Snowflake Kafka Connector..."
+                      kubectl exec -n $NAMESPACE deployment/demo-kafka -- bash -c "
+                        # Update package list and install wget if not present
+                        apt-get update && apt-get install -y wget || echo 'wget already installed'
+                        
+                        # Download Snowflake Kafka Connector if not exists
+                        if [ ! -f /connectors/snowflake-kafka-connector-3.1.0.jar ]; then
+                          cd /connectors
+                          echo 'Downloading Snowflake Kafka Connector...'
+                          wget -O snowflake-kafka-connector-3.1.0.jar https://repo1.maven.org/maven2/com/snowflake/snowflake-kafka-connector/3.1.0/snowflake-kafka-connector-3.1.0.jar
+                          echo 'Snowflake connector downloaded successfully'
+                        else
+                          echo 'Snowflake connector already exists'
+                        fi
+                        
+                        # Restart Kafka Connect to load new connector
+                        echo 'Restarting Kafka Connect to load connector...'
+                        if supervisorctl status connect-distributed | grep -q RUNNING; then
+                          supervisorctl restart connect-distributed
+                          echo 'Kafka Connect restarted successfully'
+                        else
+                          echo 'Kafka Connect not running, starting...'
+                          supervisorctl start connect-distributed
+                        fi
+                      "
+                      
+                      # Wait for Kafka Connect to restart and be ready
+                      echo "⏳ Waiting for Kafka Connect to restart..."
+                      sleep 10
+                      until nc -z demo-kafka 8083; do
+                        echo "Waiting for Kafka Connect to be ready after restart..."
+                        sleep 5
+                      done
+                      
+                      # Verify Snowflake connector is available
+                      echo "🔍 Verifying Snowflake connector installation..."
+                      RETRIES=0
+                      MAX_RETRIES=10
+                      while [ $RETRIES -lt $MAX_RETRIES ]; do
+                        if kubectl exec -n $NAMESPACE deployment/demo-kafka -- curl -s http://demo-kafka:8083/connector-plugins | grep -q "SnowflakeSinkConnector"; then
+                          echo "✅ Snowflake connector installed and available!"
+                          break
+                        else
+                          echo "Waiting for connector to be available... (attempt $((RETRIES + 1))/$MAX_RETRIES)"
+                          sleep 10
+                          RETRIES=$((RETRIES + 1))
+                        fi
+                      done
+                      
+                      if [ $RETRIES -eq $MAX_RETRIES ]; then
+                        echo "⚠️  Snowflake connector installation may have failed"
+                      fi
+                      
+                      echo "🎉 Kafka configuration job completed successfully!"
+                    env:
+                    - name: NAMESPACE
+                      valueFrom:
+                        fieldRef:
+                          fieldPath: metadata.namespace
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-kafka-config-job"
+
+  # Multi-Environment Secret Sync CronJob (deployed once in default namespace)
+  - name: multi-env-secret-sync-cronjob
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: batch/v1
+            kind: CronJob
+            metadata:
+              name: multi-env-secret-sync
+              namespace: default
+            spec:
+              schedule: "*/2 * * * *"
+              concurrencyPolicy: Replace
+              jobTemplate:
+                spec:
+                  template:
+                    spec:
+                      serviceAccountName: secret-copier
+                      containers:
+                      - name: sync-secrets
+                        image: bitnami/kubectl:latest
+                        command:
+                        - sh
+                        - -c
+                        - |
+                          echo "Starting multi-environment secret sync..."
+                          
+                          # Get all realtime namespaces
+                          NAMESPACES=$(kubectl get ns -l app.kubernetes.io/part-of=realtime-platform -o jsonpath='{.items[*].metadata.name}')
+                          
+                          if [ -z "$NAMESPACES" ]; then
+                            echo "No realtime-platform namespaces found"
+                            exit 0
+                          fi
+                          
+                          for ns in $NAMESPACES; do
+                            echo "Processing namespace: $ns"
+                            
+                            # Check if namespace still exists (it might have been deleted)
+                            if ! kubectl get namespace "$ns" >/dev/null 2>&1; then
+                              echo "⚠️  Namespace $ns no longer exists, skipping..."
+                              continue
+                            fi
+                            
+                            # Get the base secret from default namespace
+                            BASE_SECRET=$(kubectl get secret lenses-credentials -n default -o yaml 2>/dev/null)
+                            if [ $? -ne 0 ]; then
+                              echo "ERROR: lenses-credentials secret not found in default namespace"
+                              continue
+                            fi
+                            
+                            # Look for namespace-specific agent key
+                            AGENT_KEY_VAR="${ns}-agent-key"
+                            AGENT_KEY=$(kubectl get configmap env-agent-keys -n default -o jsonpath="{.data.${AGENT_KEY_VAR}}" 2>/dev/null || echo "")
+                            
+                            if [ -z "$AGENT_KEY" ]; then
+                              echo "WARNING: No agent key found for namespace $ns"
+                              continue
+                            fi
+                            
+                            echo "Found agent key for $ns"
+                            
+                            # Create the secret with namespace-specific agent key
+                            echo "$BASE_SECRET" | \
+                              sed "s/namespace: default/namespace: $ns/" | \
+                              sed '/resourceVersion:/d' | \
+                              sed '/uid:/d' | \
+                              sed '/creationTimestamp:/d' | \
+                              sed "/# Agent keys will be added per-namespace by the CronJob/a\\  AGENT_KEY: \"$AGENT_KEY\"" | \
+                              kubectl apply -f -
+                            
+                            if [ $? -eq 0 ]; then
+                              echo "✅ Secret synced successfully to $ns"
+                              
+                              # Check if lenses-agent deployment exists before restarting
+                              if kubectl get deployment lenses-agent -n $ns >/dev/null 2>&1; then
+                                echo "🔄 Restarting lenses-agent in $ns..."
+                                kubectl rollout restart deployment/lenses-agent -n $ns
+                              else
+                                echo "ℹ️  No lenses-agent deployment found in $ns (may not be deployed yet)"
+                              fi
+                              
+                            else
+                              echo "❌ Failed to sync secret to $ns"
+                            fi
+                          done
+                          
+                          echo "Multi-environment secret sync completed"
+                      restartPolicy: OnFailure
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-multi-env-secret-sync"

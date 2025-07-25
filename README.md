@@ -154,6 +154,121 @@ Both `webservice` and `realtime-platform` follow identical architectural pattern
 
 **Key Insight**: Both are **composite components** that provision complete application stacks rather than single-purpose components. The only difference is the type of infrastructure they provision and the application template they use.
 
+## 🔗 Lenses Agent-to-HQ Connection Process
+
+The real-time platform uses **Lenses HQ** for Kafka management with a **Lenses Agent** that connects to provide monitoring and control capabilities. The connection process is **fully automated** through our multi-environment setup:
+
+### Architecture Overview
+```
+┌─────────────┐    gRPC    ┌──────────────┐    ┌─────────────────┐
+│  Lenses HQ  │ ←────────→ │ Lenses Agent │ ←→ │ Kafka Ecosystem │
+│  (Port 9991)│  Port 10000│   (Per NS)   │    │ Schema Registry │
+│  (Port 10000)│           │              │    │ Kafka Connect   │
+└─────────────┘            └──────────────┘    └─────────────────┘
+```
+
+### Multi-Environment Agent Key Management
+
+**1. Environment Creation Process:**
+```bash
+# 1. Access Lenses HQ web interface
+http://lenses-hq.streaming-platform-2025-realtime.local/environments
+
+# 2. Create new environment
+- Login with admin/admin
+- Navigate to Environments → New Environment  
+- Name: my-streaming-platform
+- Get generated agent key: agent_key_xyz123...
+
+# 3. Add to .env file
+echo "my-namespace-realtime-agent-key=agent_key_xyz123..." >> .env
+
+# 4. Update secrets and trigger automation
+./setup-secrets.sh
+```
+
+**2. Automated Connection Flow:**
+```mermaid
+graph TD
+    A[Create Environment in HQ] --> B[Get Agent Key]
+    B --> C[Add to .env file]
+    C --> D[Run setup-secrets.sh]
+    D --> E[ConfigMap Updated]
+    E --> F[CronJob Syncs Secret]
+    F --> G[Agent Deployment Restarted]
+    G --> H[Agent Connects to HQ]
+    H --> I[Environment Shows Connected]
+```
+
+**3. Technical Implementation:**
+
+| Component | Purpose | Configuration |
+|-----------|---------|---------------|
+| **ConfigMap** | `env-agent-keys` stores namespace→key mappings | `streaming-platform-2025-realtime-agent-key: agent_key_xyz` |
+| **CronJob** | Syncs secrets every 2 minutes with namespace-specific keys | Reads ConfigMap, creates `lenses-credentials` per namespace |
+| **Secret** | `lenses-credentials` contains `AGENT_KEY` for each namespace | Agent reads `AGENT_KEY` from secret in its namespace |
+| **Agent Config** | `provisioning.yaml` uses environment variable from secret | `agentKey: value: $AGENT_KEY` |
+
+**4. Connection Requirements:**
+- **HQ Service**: Exposes both port 9991 (web UI) and port 10000 (agent registration)
+- **Agent Authentication**: Uses HQ-generated agent key (not demo keys)
+- **Network**: Agent connects to `lenses-hq:10000` via gRPC within cluster
+- **Restart Policy**: Agent automatically restarts when secrets change
+
+**5. Accessing Lenses HQ Web Interface:**
+
+The realtime-platform automatically creates Istio networking resources to expose Lenses HQ:
+
+```bash
+# Check if HQ is accessible (requires Istio LoadBalancer)
+kubectl get svc istio-ingressgateway -n istio-system
+
+# Get the external IP/hostname
+GATEWAY_URL=$(kubectl get svc istio-ingressgateway -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+
+# Access HQ via browser (replace namespace-name with your actual namespace)
+echo "Lenses HQ: http://$GATEWAY_URL/"
+echo "Host header required: lenses-hq.<namespace-name>-realtime.local"
+```
+
+**Local Development Access:**
+```bash
+# Port-forward for local access (alternative to LoadBalancer)
+kubectl port-forward -n <namespace>-realtime svc/lenses-hq 9991:9991
+
+# Access HQ locally
+echo "Lenses HQ Local: http://localhost:9991"
+echo "Login: admin/admin"
+```
+
+**DNS Configuration:**
+If using the hostname approach, add to your `/etc/hosts`:
+```bash
+# Get LoadBalancer IP
+LB_IP=$(kubectl get svc istio-ingressgateway -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+# Add to /etc/hosts
+echo "$LB_IP lenses-hq.streaming-platform-2025-realtime.local" | sudo tee -a /etc/hosts
+```
+
+**6. Troubleshooting:**
+```bash
+# Check agent key in namespace
+kubectl get secret lenses-credentials -n <namespace> -o jsonpath='{.data.AGENT_KEY}' | base64 -d
+
+# Check agent logs for connection status  
+kubectl logs -n <namespace> deployment/lenses-agent --tail=20
+
+# Check HQ logs for agent registration attempts
+kubectl logs -n <namespace> deployment/lenses-hq --tail=20 | grep agent
+
+# Check HQ web interface accessibility
+kubectl get gateway,virtualservice -n <namespace>-realtime
+
+# Manual trigger secret sync
+kubectl create job manual-sync --from=cronjob/multi-env-secret-sync -n default
+```
+
 ## 🔄 System Workflows
 
 ### Deployment Flow with Source Detection
