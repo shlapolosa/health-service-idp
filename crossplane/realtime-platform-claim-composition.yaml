@@ -1071,6 +1071,96 @@ spec:
         string:
           fmt: "%s-realtime-lenses-credentials"
 
+  # ServiceAccount for secret copying in default namespace (for CronJob)
+  - name: default-secret-copier-sa
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: ServiceAccount
+            metadata:
+              name: secret-copier
+              namespace: default
+              labels:
+                managed-by: crossplane
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-default-secret-copier-sa"
+
+  # ClusterRole for secret management
+  - name: secret-copier-cluster-role
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: ClusterRole
+            metadata:
+              name: secret-copier
+              labels:
+                managed-by: crossplane
+            rules:
+            - apiGroups: [""]
+              resources: ["secrets", "namespaces", "configmaps"]
+              verbs: ["get", "list", "watch", "create", "update", "patch"]
+            - apiGroups: ["apps"]
+              resources: ["deployments"]
+              verbs: ["get", "list", "patch"]
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-secret-copier-cluster-role"
+
+  # ClusterRoleBinding for secret-copier
+  - name: secret-copier-cluster-binding
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: ClusterRoleBinding
+            metadata:
+              name: secret-copier
+              labels:
+                managed-by: crossplane
+            roleRef:
+              apiGroup: rbac.authorization.k8s.io
+              kind: ClusterRole
+              name: secret-copier
+            subjects:
+            - kind: ServiceAccount
+              name: secret-copier
+              namespace: default
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-secret-copier-cluster-binding"
 
   # ServiceAccount for secret copying
   - name: realtime-secret-copier-sa
@@ -1271,7 +1361,7 @@ spec:
                   name: http
                   protocol: HTTP
                 hosts:
-                - "lenses-hq.placeholder-realtime.local"
+                - "lenses-hq.streaming-platform-2025-realtime.local"
         providerConfigRef:
           name: kubernetes-provider
     patches:
@@ -1312,14 +1402,11 @@ spec:
               namespace: placeholder-realtime
             spec:
               hosts:
-              - "lenses-hq.placeholder-realtime.local"
+              - "lenses-hq.streaming-platform-2025-realtime.local"
               gateways:
               - lenses-hq-gateway
               http:
-              - match:
-                - uri:
-                    prefix: /
-                route:
+              - route:
                 - destination:
                     host: lenses-hq
                     port:
@@ -1726,14 +1813,17 @@ spec:
                             
                             echo "Found agent key for $ns"
                             
-                            # Create the secret with namespace-specific agent key
+                            # Copy base secret to target namespace
                             echo "$BASE_SECRET" | \
                               sed "s/namespace: default/namespace: $ns/" | \
                               sed '/resourceVersion:/d' | \
                               sed '/uid:/d' | \
                               sed '/creationTimestamp:/d' | \
-                              sed "/# Agent keys will be added per-namespace by the CronJob/a\\  AGENT_KEY: \"$AGENT_KEY\"" | \
                               kubectl apply -f -
+                            
+                            # Add namespace-specific agent key using kubectl patch
+                            AGENT_KEY_B64=$(echo -n "$AGENT_KEY" | base64 -w 0)
+                            kubectl patch secret lenses-credentials -n $ns --type='merge' -p="{\"data\":{\"AGENT_KEY\":\"$AGENT_KEY_B64\"}}"
                             
                             if [ $? -eq 0 ]; then
                               echo "✅ Secret synced successfully to $ns"
