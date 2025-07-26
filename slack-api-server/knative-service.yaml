@@ -24,7 +24,7 @@ spec:
       serviceAccountName: slack-api-server
       containers:
       - name: slack-api-server
-        image: shlapolosa/slack-api-server:latest
+        image: socrates12345/slack-api-server:latest
         ports:
         - containerPort: 8080
           protocol: TCP

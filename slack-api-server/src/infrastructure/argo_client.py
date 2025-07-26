@@ -5,6 +5,7 @@ Handles Argo Workflows API communication for VCluster creation
 
 import json
 import logging
+import os
 from typing import Dict, Tuple
 
 import requests
@@ -17,12 +18,37 @@ logger = logging.getLogger(__name__)
 class ArgoWorkflowsClient(VClusterDispatcherInterface):
     """Argo Workflows API client for VCluster creation operations."""
 
-    def __init__(self, server_url: str, namespace: str = "argo", timeout: int = 30):
+    def __init__(self, server_url: str, namespace: str = "argo", timeout: int = 30, token_file: str = None):
         """Initialize Argo Workflows client with configuration."""
         self.server_url = server_url.rstrip("/")
         self.namespace = namespace
         self.timeout = timeout
         self.base_url = f"{self.server_url}/api/v1"
+        self.token_file = token_file or os.getenv("ARGO_TOKEN_FILE")
+        self._token = None
+    
+    def _get_auth_headers(self) -> Dict[str, str]:
+        """Get authentication headers with Bearer token."""
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        
+        if self.token_file and os.path.exists(self.token_file):
+            try:
+                with open(self.token_file, 'r') as f:
+                    token = f.read().strip()
+                    if token:
+                        headers["Authorization"] = f"Bearer {token}"
+                        logger.debug("Successfully loaded Argo authentication token")
+                    else:
+                        logger.warning("Argo token file is empty")
+            except Exception as e:
+                logger.error(f"Failed to read Argo token file {self.token_file}: {e}")
+        else:
+            logger.warning(f"Argo token file not found: {self.token_file}")
+        
+        return headers
 
     def trigger_vcluster_creation(self, payload: Dict) -> Tuple[bool, str]:
         """Trigger VCluster creation via Argo Workflows."""
@@ -84,10 +110,7 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
         }
 
         url = f"{self.base_url}/workflows/{self.namespace}"
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
+        headers = self._get_auth_headers()
 
         try:
             logger.info(
@@ -99,7 +122,8 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
                 url, 
                 headers=headers, 
                 json=workflow_spec, 
-                timeout=self.timeout
+                timeout=self.timeout,
+                verify=False  # Skip SSL verification for internal cluster communication
             )
 
             if response.status_code in [200, 201]:
@@ -180,17 +204,15 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
 
         # Submit workflow to Argo
         url = f"{self.base_url}/workflows/{self.namespace}"
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
+        headers = self._get_auth_headers()
 
         try:
             response = requests.post(
                 url, 
                 headers=headers, 
                 json=workflow_spec, 
-                timeout=self.timeout
+                timeout=self.timeout,
+                verify=False  # Skip SSL verification for internal cluster communication
             )
 
             if response.status_code in [200, 201]:
@@ -292,17 +314,15 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
 
         # Submit workflow to Argo
         url = f"{self.base_url}/workflows/{self.namespace}"
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
+        headers = self._get_auth_headers()
 
         try:
             response = requests.post(
                 url, 
                 headers=headers, 
                 json=workflow_spec, 
-                timeout=self.timeout
+                timeout=self.timeout,
+                verify=False  # Skip SSL verification for internal cluster communication
             )
 
             if response.status_code in [200, 201]:
@@ -360,12 +380,10 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
 
         # Test API connectivity
         url = f"{self.base_url}/info"
-        headers = {
-            "Accept": "application/json",
-        }
+        headers = self._get_auth_headers()
 
         try:
-            response = requests.get(url, headers=headers, timeout=self.timeout)
+            response = requests.get(url, headers=headers, timeout=self.timeout, verify=False)
 
             if response.status_code == 200:
                 return True, "Argo Workflows configuration valid"
@@ -378,12 +396,10 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
     def get_workflow_status(self, workflow_name: str) -> Tuple[bool, Dict]:
         """Get status of a specific workflow."""
         url = f"{self.base_url}/workflows/{self.namespace}/{workflow_name}"
-        headers = {
-            "Accept": "application/json",
-        }
+        headers = self._get_auth_headers()
 
         try:
-            response = requests.get(url, headers=headers, timeout=self.timeout)
+            response = requests.get(url, headers=headers, timeout=self.timeout, verify=False)
             
             if response.status_code == 200:
                 workflow_data = response.json()

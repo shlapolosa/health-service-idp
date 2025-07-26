@@ -19,7 +19,8 @@ class TestArgoWorkflowsClient:
         self.client = ArgoWorkflowsClient(
             server_url="http://argo-server.argo:2746", 
             namespace="argo", 
-            timeout=30
+            timeout=30,
+            token_file=None  # No token file for tests
         )
 
     def test_initialization(self):
@@ -33,7 +34,8 @@ class TestArgoWorkflowsClient:
         """Test ArgoWorkflowsClient initialization with trailing slash in URL."""
         client = ArgoWorkflowsClient(
             server_url="http://argo-server.argo:2746/", 
-            namespace="argo"
+            namespace="argo",
+            token_file=None
         )
         assert client.server_url == "http://argo-server.argo:2746"
         assert client.base_url == "http://argo-server.argo:2746/api/v1"
@@ -313,8 +315,9 @@ class TestArgoWorkflowsClient:
 
         mock_get.assert_called_once_with(
             "http://argo-server.argo:2746/api/v1/info",
-            headers={"Accept": "application/json"},
-            timeout=30
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            timeout=30,
+            verify=False
         )
 
     @patch('src.infrastructure.argo_client.requests.get')
@@ -341,7 +344,7 @@ class TestArgoWorkflowsClient:
 
     def test_validate_configuration_missing_server_url(self):
         """Test configuration validation with missing server URL."""
-        client = ArgoWorkflowsClient(server_url="", namespace="argo")
+        client = ArgoWorkflowsClient(server_url="", namespace="argo", token_file=None)
 
         is_valid, message = client.validate_configuration()
 
@@ -394,8 +397,9 @@ class TestArgoWorkflowsClient:
 
         mock_get.assert_called_once_with(
             "http://argo-server.argo:2746/api/v1/workflows/argo/test-workflow",
-            headers={"Accept": "application/json"},
-            timeout=30
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            timeout=30,
+            verify=False
         )
 
     @patch('src.infrastructure.argo_client.requests.get')
@@ -419,3 +423,72 @@ class TestArgoWorkflowsClient:
 
         assert success is False
         assert "Error getting workflow status: Network error" in result["error"]
+
+    def test_get_auth_headers_no_token_file(self):
+        """Test auth headers when no token file is configured."""
+        client = ArgoWorkflowsClient(
+            server_url="http://argo-server.argo:2746",
+            namespace="argo",
+            token_file=None
+        )
+        
+        headers = client._get_auth_headers()
+        
+        assert headers["Content-Type"] == "application/json"
+        assert headers["Accept"] == "application/json"
+        assert "Authorization" not in headers
+
+    @patch('builtins.open', create=True)
+    @patch('os.path.exists')
+    def test_get_auth_headers_with_token_file(self, mock_exists, mock_open):
+        """Test auth headers when token file exists."""
+        mock_exists.return_value = True
+        mock_open.return_value.__enter__.return_value.read.return_value = "test-token-123"
+        
+        client = ArgoWorkflowsClient(
+            server_url="http://argo-server.argo:2746",
+            namespace="argo",
+            token_file="/var/run/secrets/argo/token"
+        )
+        
+        headers = client._get_auth_headers()
+        
+        assert headers["Content-Type"] == "application/json"
+        assert headers["Accept"] == "application/json"
+        assert headers["Authorization"] == "Bearer test-token-123"
+
+    @patch('builtins.open', create=True)
+    @patch('os.path.exists')
+    def test_get_auth_headers_empty_token_file(self, mock_exists, mock_open):
+        """Test auth headers when token file is empty."""
+        mock_exists.return_value = True
+        mock_open.return_value.__enter__.return_value.read.return_value = "   "
+        
+        client = ArgoWorkflowsClient(
+            server_url="http://argo-server.argo:2746",
+            namespace="argo",
+            token_file="/var/run/secrets/argo/token"
+        )
+        
+        headers = client._get_auth_headers()
+        
+        assert headers["Content-Type"] == "application/json"
+        assert headers["Accept"] == "application/json"
+        assert "Authorization" not in headers
+
+    @patch('os.path.exists')
+    def test_get_auth_headers_missing_token_file(self, mock_exists):
+        """Test auth headers when token file doesn't exist."""
+        mock_exists.return_value = False
+        
+        client = ArgoWorkflowsClient(
+            server_url="http://argo-server.argo:2746",
+            namespace="argo",
+            token_file="/var/run/secrets/argo/token"
+        )
+        
+        headers = client._get_auth_headers()
+        
+        assert headers["Content-Type"] == "application/json"
+        assert headers["Accept"] == "application/json"
+        assert "Authorization" not in headers

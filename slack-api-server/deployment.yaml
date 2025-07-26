@@ -20,15 +20,20 @@ spec:
         component: slack-integration
     spec:
       serviceAccountName: slack-api-server
+      volumes:
+      - name: argo-token
+        secret:
+          secretName: slack-api-argo-token-copy
       containers:
       - name: slack-api-server
-        image: socrates12345/slack-api-server:latest
+        image: socrates12345/slack-api-server:latest-auth-fix
+        imagePullPolicy: Always
         ports:
         - containerPort: 8080
           protocol: TCP
         env:
         - name: LOG_LEVEL
-          value: "INFO"
+          value: "DEBUG"
         - name: ENVIRONMENT
           value: "production"
         - name: GITHUB_REPOSITORY
@@ -36,9 +41,15 @@ spec:
         - name: VCLUSTER_DISPATCHER
           value: "argo"
         - name: ARGO_SERVER_URL
-          value: "http://argo-server.argo:2746"
+          value: "https://argo-server.argo:2746"
         - name: ARGO_NAMESPACE
           value: "argo"
+        - name: ARGO_TOKEN_FILE
+          value: "/var/run/secrets/argo/token"
+        volumeMounts:
+        - name: argo-token
+          mountPath: /var/run/secrets/argo
+          readOnly: true
         resources:
           limits:
             cpu: "1"
@@ -89,3 +100,78 @@ spec:
     protocol: TCP
     name: https
   type: ClusterIP
+---
+# Argo Workflows API access role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argo-workflow-api-access
+  namespace: argo
+  labels:
+    app: slack-api-server
+    component: argo-authentication
+rules:
+- apiGroups: ["argoproj.io"]
+  resources: ["workflows", "workflowtemplates"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: [""]
+  resources: ["pods", "pods/log"]
+  verbs: ["get", "list", "watch"]
+---
+# ServiceAccount for Argo API access
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: slack-api-argo-access
+  namespace: argo
+  labels:
+    app: slack-api-server
+    component: argo-authentication
+---
+# RoleBinding to connect ServiceAccount to Role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: slack-api-argo-access
+  namespace: argo
+  labels:
+    app: slack-api-server
+    component: argo-authentication
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: argo-workflow-api-access
+subjects:
+- kind: ServiceAccount
+  name: slack-api-argo-access
+  namespace: argo
+---
+# Secret for service account token
+apiVersion: v1
+kind: Secret
+metadata:
+  name: slack-api-argo-token
+  namespace: argo
+  labels:
+    app: slack-api-server
+    component: argo-authentication
+  annotations:
+    kubernetes.io/service-account.name: slack-api-argo-access
+    description: "Service account token for slack-api-server to authenticate with Argo Workflows API"
+type: kubernetes.io/service-account-token
+---
+# Copy of Argo token secret in default namespace for slack-api-server access
+apiVersion: v1
+kind: Secret
+metadata:
+  name: slack-api-argo-token-copy
+  namespace: default
+  labels:
+    app: slack-api-server
+    component: argo-authentication
+  annotations:
+    description: "Copy of Argo token for slack-api-server pod access"
+type: Opaque
+data:
+  # This will be populated by copying from the argo namespace secret
+  token: ""

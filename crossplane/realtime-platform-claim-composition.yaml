@@ -598,6 +598,11 @@ spec:
                     ports:
                     - containerPort: 9991
                       name: http
+                    - containerPort: 10000
+                      name: agent-reg
+                    envFrom:
+                    - secretRef:
+                        name: lenses-credentials
                     volumeMounts:
                     - name: shared-config
                       mountPath: /app/config.yaml
@@ -659,7 +664,7 @@ spec:
                 name: http
               - port: 10000
                 targetPort: 10000
-                name: agent-registration
+                name: agent-reg
         providerConfigRef:
           name: kubernetes-provider
     patches:
@@ -1118,6 +1123,15 @@ spec:
               resources: ["secrets"]
               verbs: ["create", "update", "patch"]
               resourceNames: ["lenses-credentials"]
+            - apiGroups: ["apps"]
+              resources: ["deployments"]
+              verbs: ["get", "list"]
+            - apiGroups: [""]
+              resources: ["pods"]
+              verbs: ["get", "list"]
+            - apiGroups: [""]
+              resources: ["pods/exec"]
+              verbs: ["create"]
         providerConfigRef:
           name: kubernetes-provider
     patches:
@@ -1548,21 +1562,21 @@ spec:
                     - |
                       # Wait for Kafka to be ready
                       echo "Waiting for Kafka to be ready..."
-                      until nc -z demo-kafka 9092; do
+                      until kubectl exec -n $NAMESPACE deployment/demo-kafka -- curl -f http://localhost:9092 >/dev/null 2>&1 || kubectl exec -n $NAMESPACE deployment/demo-kafka -- supervisorctl status broker | grep RUNNING >/dev/null; do
                         echo "Waiting for Kafka..."
                         sleep 5
                       done
                       
                       # Wait for Schema Registry to be ready
                       echo "Waiting for Schema Registry to be ready..."
-                      until nc -z demo-kafka 8081; do
+                      until kubectl exec -n $NAMESPACE deployment/demo-kafka -- curl -f http://localhost:8081/subjects >/dev/null 2>&1; do
                         echo "Waiting for Schema Registry..."
                         sleep 5
                       done
                       
                       # Wait for Kafka Connect to be ready
                       echo "Waiting for Kafka Connect to be ready..."
-                      until nc -z demo-kafka 8083; do
+                      until kubectl exec -n $NAMESPACE deployment/demo-kafka -- curl -f http://localhost:8083/connectors >/dev/null 2>&1; do
                         echo "Waiting for Kafka Connect..."
                         sleep 5
                       done
@@ -1599,7 +1613,7 @@ spec:
                       # Wait for Kafka Connect to restart and be ready
                       echo "⏳ Waiting for Kafka Connect to restart..."
                       sleep 10
-                      until nc -z demo-kafka 8083; do
+                      until kubectl exec -n $NAMESPACE deployment/demo-kafka -- curl -f http://localhost:8083/connectors >/dev/null 2>&1; do
                         echo "Waiting for Kafka Connect to be ready after restart..."
                         sleep 5
                       done

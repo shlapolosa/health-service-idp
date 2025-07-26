@@ -91,6 +91,113 @@ spec:
 - **KubeVela**: OAM application management and infrastructure orchestration
 - **Observability**: Prometheus, Grafana, Jaeger, Kiali accessible via subpath routing
 
+## 🛤️ Critical Paths
+
+### Use Case 1: Slack API Server Path (API-Driven Microservice Creation)
+
+**Triggered by**: Slack commands (`/microservice create`, `/vcluster create`, `/appcontainer create`)
+
+```mermaid
+graph TD
+    A[Slack Command] --> B[slack-api-server]
+    B --> C[NLP Command Parsing]
+    C --> D[Argo Workflows Dispatch]
+    D --> E[microservice-standard-contract.yaml]
+    E --> F[Parameter Validation & Processing]
+    F --> G[ApplicationClaim Creation]
+    G --> H[Crossplane Processing]
+    H --> I[application-claim-composition.yaml]
+    I --> J[Source Detection: api-driven]
+    J --> K[Repository Creation]
+    K --> L[OAM Application Update]
+    L --> M[ArgoCD Sync]
+    M --> N[KubeVela Processing]
+    N --> O[webservice ComponentDefinition]
+    O --> P[Knative Service Creation]
+    P --> Q[Slack Success Notification]
+```
+
+**Critical Path Files:**
+- `/slack-api-server/` - FastAPI service for Slack integration
+- `/argo-workflows/microservice-standard-contract.yaml` - Main workflow orchestration
+- `/argo-workflows/simple-slack-notifications.yaml` - Notification system
+- `/crossplane/application-claim-composition.yaml` - Infrastructure provisioning
+- `/crossplane/oam/consolidated-component-definitions.yaml` - webservice ComponentDefinition
+- `/.github/workflows/comprehensive-gitops.yml` - CI/CD pipeline
+
+**Key Features:**
+- ✅ **Guided Experience**: NLP parsing of natural language commands
+- ✅ **Auto Repository Creation**: GitHub repos with CLAUDE.md-compliant structure
+- ✅ **Infrastructure Bootstrap**: Automatic database, cache, and platform setup
+- ✅ **GitOps Integration**: Seamless deployment via ArgoCD
+- ✅ **Slack Notifications**: Real-time progress updates
+
+### Use Case 2: Direct OAM Path (Expert-Driven Component Creation)
+
+**Triggered by**: Direct editing of OAM Application manifests in GitOps repository
+
+```mermaid
+graph TD
+    A[Developer Edits OAM Application] --> B[GitOps Repository Push]
+    B --> C[ArgoCD Detects Changes]
+    C --> D[ArgoCD Sync to vela-system]
+    D --> E[KubeVela Application Controller]
+    E --> F{Component Type Detection}
+    F -->|webservice| G[webservice ComponentDefinition]
+    F -->|realtime-platform| H[realtime-platform ComponentDefinition]
+    F -->|application-infrastructure| I[ApplicationClaim Creation]
+    G --> J[Direct Knative Service]
+    H --> K[RealtimePlatformClaim Creation]
+    I --> L[Crossplane Processing]
+    K --> M[Crossplane Processing]
+    L --> N[Source Detection: oam-driven]
+    M --> O[Streaming Infrastructure]
+    N --> P[Skip OAM Update - Prevent Loop]
+    J --> Q[Application Ready]
+    O --> Q
+    P --> Q
+```
+
+**Critical Path Files:**
+- `/crossplane/oam/consolidated-component-definitions.yaml` - webservice ComponentDefinition (OAM-compliant)
+- `/crossplane/oam/realtime-platform-component-definition.yaml` - realtime-platform ComponentDefinition  
+- `/crossplane/realtime-platform-claim-composition.yaml` - Streaming infrastructure
+- `/crossplane/application-claim-composition.yaml` - Bootstrap source detection
+- `ArgoCD Application monitoring oam/applications/` - GitOps synchronization
+
+**Key Features:**
+- ✅ **Direct Control**: Expert users edit OAM manifests directly
+- ✅ **Component Flexibility**: Mix webservice, realtime-platform, and infrastructure components
+- ✅ **Circular Dependency Prevention**: Source detection prevents oam-updater loops
+- ✅ **Minimal Artifacts**: webservice creates only Knative Service (2 artifacts vs 30+)
+- ✅ **Composite Components**: realtime-platform provisions complete streaming stack
+
+### Path Convergence: Common Infrastructure
+
+Both paths converge at the **KubeVela + Crossplane** layer:
+
+```mermaid
+graph TD
+    A[Use Case 1: Slack API] --> C[KubeVela Application Controller]
+    B[Use Case 2: Direct OAM] --> C
+    C --> D{Component Processing}
+    D --> E[webservice → Knative Service]
+    D --> F[realtime-platform → RealtimePlatformClaim → Streaming Stack]
+    D --> G[application-infrastructure → ApplicationClaim → Full Bootstrap]
+    E --> H[Istio Service Mesh]
+    F --> I[Kafka + MQTT + Lenses + Metabase + PostgreSQL]
+    G --> J[Repository + Infrastructure + OAM Application]
+    H --> K[Auto-scaling Workloads]
+    I --> L[Real-time Streaming Platform]
+    J --> M[Complete Application Stack]
+```
+
+**Architectural Principles:**
+- **"KubeVela orchestrates, Crossplane executes"** - Clear separation of concerns
+- **ComponentDefinition-only OAM interface** - All components follow kafka/redis pattern
+- **Source detection system** - Prevents circular dependencies between API and OAM paths
+- **Composite component architecture** - Both webservice and realtime-platform create complete application stacks
+
 ## 📋 OAM Components Reference
 
 ### Table 1: OAM ComponentDefinitions

@@ -5,19 +5,22 @@
 apiVersion: core.oam.dev/v1beta1
 kind: Application
 metadata:
-  name: test-realtime
+  name: streaming-platform-2025
   namespace: default
   annotations:
-    test.oam.dev/step: "9"
-    test.oam.dev/description: "Real-time platform infrastructure test"
+    test.oam.dev/step: "realtime-platform-validation"
+    test.oam.dev/description: "Verify complete real-time streaming platform creation"
+    test.oam.dev/expected: "Kafka, MQTT, Lenses HQ/Agent, Metabase, PostgreSQL infrastructure"
 spec:
   components:
-  # Real-time Platform Infrastructure
-  - name: test-realtime
+  # Real-time Platform Infrastructure - Critical Path Component
+  - name: streaming-platform-2025
     type: realtime-platform
     properties:
-      name: test-realtime
-      image: test-realtime:latest
+      name: streaming-platform-2025
+      image: streaming-platform:latest
+      language: python
+      framework: fastapi
       database: postgres
       visualization: metabase
       iot: true
