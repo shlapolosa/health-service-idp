@@ -1,6 +1,6 @@
+---
 # Real-time Platform ComponentDefinition
-# Architecturally identical to webservice pattern: OAM Component → Crossplane Claim → Infrastructure + Application
-
+# Architecturally identical to webservice pattern: OAM Component → Knative Service + Infrastructure Claims
 apiVersion: core.oam.dev/v1beta1
 kind: ComponentDefinition
 metadata:
@@ -10,67 +10,189 @@ metadata:
 spec:
   workload:
     definition:
-      apiVersion: platform.example.org/v1alpha1
-      kind: RealtimePlatformClaim
+      apiVersion: serving.knative.dev/v1
+      kind: Service
+    type: services.serving.knative.dev
   schematic:
     cue:
       template: |
+        // Primary Output: Knative Service (OAM-compliant workload)
         output: {
-          apiVersion: "platform.example.org/v1alpha1"
-          kind: "RealtimePlatformClaim"
+          apiVersion: "serving.knative.dev/v1"
+          kind: "Service"
           metadata: {
-            name: parameter.name + "-realtime"
+            name: parameter.name + "-realtime-service"
+            namespace: context.namespace
             labels: {
               "app.kubernetes.io/name": parameter.name
-              "app.kubernetes.io/component": "realtime-platform"
-              "app.kubernetes.io/part-of": "health-service-idp"
+              "app.kubernetes.io/component": "realtime-service"
+              "app.kubernetes.io/managed-by": "kubevela"
+              "app.kubernetes.io/part-of": "realtime-platform"
+            }
+            annotations: {
+              "realtime-platform.oam.dev/bootstrap": "true"
+              "realtime-platform.oam.dev/database": parameter.database
+              "realtime-platform.oam.dev/visualization": parameter.visualization
+              "realtime-platform.oam.dev/iot": "\\(parameter.iot)"
             }
           }
           spec: {
-            name: parameter.name
-            
-            // Essential developer controls (following webservice pattern)
-            database: parameter.database
-            visualization: parameter.visualization  
-            iot: parameter.iot
-            
-            // Advanced optional parameters
-            if parameter.mqttUsers != _|_ {
-              mqttUsers: parameter.mqttUsers
+            template: {
+              metadata: {
+                annotations: {
+                  "autoscaling.knative.dev/minScale": "1"
+                  "autoscaling.knative.dev/maxScale": "10"
+                  "run.googleapis.com/execution-environment": "gen2"
+                }
+                labels: {
+                  "app.kubernetes.io/name": parameter.name
+                  "app.kubernetes.io/version": parameter.version
+                  "app.kubernetes.io/part-of": "realtime-platform"
+                }
+              }
+              spec: {
+                serviceAccountName: "knative-docker-sa"
+                containers: [{
+                  image: parameter.image
+                  ports: [{
+                    containerPort: parameter.port
+                    name: "http1"
+                  }]
+                  resources: {
+                    limits: {
+                      cpu: parameter.resources.cpu
+                      memory: parameter.resources.memory
+                    }
+                    requests: {
+                      cpu: "250m"
+                      memory: "512Mi"
+                    }
+                  }
+                  env: [
+                    {
+                      name: "REALTIME_PLATFORM_NAME"
+                      value: parameter.name
+                    },
+                    {
+                      name: "AGENT_TYPE"
+                      value: "realtime-data-processor"
+                    },
+                    {
+                      name: "IMPLEMENTATION_TYPE"
+                      value: "anthropic"
+                    },
+                    {
+                      name: "LOG_LEVEL"
+                      value: "INFO"
+                    },
+                    {
+                      name: "WEBSOCKET_ENABLED"
+                      value: "true"
+                    }
+                  ]
+                  if len(parameter.environment) > 0 {
+                    env: env + [
+                      for k, v in parameter.environment {
+                        name: k
+                        value: v
+                      }
+                    ]
+                  }
+                  if parameter.envFrom != _|_ {
+                    envFrom: parameter.envFrom
+                  }
+                  // Health checks for robust deployment
+                  livenessProbe: {
+                    httpGet: {
+                      path: parameter.healthPath
+                      port: parameter.port
+                    }
+                    initialDelaySeconds: 30
+                    periodSeconds: 10
+                  }
+                  readinessProbe: {
+                    httpGet: {
+                      path: parameter.healthPath
+                      port: parameter.port
+                    }
+                    initialDelaySeconds: 5
+                    periodSeconds: 5
+                  }
+                }]
+              }
             }
-            if parameter.dataRetention != _|_ {
-              dataRetention: parameter.dataRetention
+          }
+        }
+        
+        // Secondary Output: Infrastructure via RealtimePlatformClaim
+        outputs: {
+          "realtime-infrastructure": {
+            apiVersion: "platform.example.org/v1alpha1"
+            kind: "RealtimePlatformClaim"
+            metadata: {
+              name: parameter.name + "-infrastructure"
+              namespace: context.namespace
+              labels: {
+                "app.kubernetes.io/name": parameter.name
+                "app.kubernetes.io/component": "realtime-infrastructure"
+                "app.kubernetes.io/part-of": "realtime-platform"
+              }
             }
-            if parameter.scaling != _|_ {
-              scaling: parameter.scaling
-            }
-            if parameter.snowflake != _|_ {
-              snowflake: parameter.snowflake
+            spec: {
+              name: parameter.name
+              appContainer: (*parameter.name | parameter.repository)
+              database: parameter.database
+              visualization: parameter.visualization
+              iot: parameter.iot
+              if parameter.dataRetention != _|_ {
+                dataRetention: parameter.dataRetention
+              }
+              if parameter.mqttUsers != _|_ {
+                mqttUsers: parameter.mqttUsers
+              }
             }
           }
         }
         
         parameter: {
-          // Required (minimal - following webservice pattern)
+          // Required (following webservice pattern)
           name: string
+          image: *"socrates12345/realtime-service-template:latest" | string
           
-          // Optional with intelligent defaults (following webservice pattern)
+          // Service Configuration
+          port: *8080 | int
+          version: *"latest" | string
+          healthPath: *"/health" | string
+          
+          // Resource Management
+          resources: *{
+            cpu: "1000m"
+            memory: "2Gi"
+          } | {
+            cpu?: string
+            memory?: string
+          }
+          
+          // Environment Variables
+          environment: *{} | {[string]: string}
+          
+          // Environment Variables from Secrets
+          envFrom?: [...{
+            secretRef: {
+              name: string
+            }
+          }]
+          
+          // Realtime Platform Configuration
           database: *"postgres" | "postgres" | "mysql" | "mongodb"
           visualization: *"metabase" | "metabase" | "grafana"
           iot: *true | bool
           
-          // Advanced optional (still simple)
+          // Advanced optional
+          repository?: string   // Git repository template name (defaults to name)
+          dataRetention?: string // "7d", "30d", etc.
           mqttUsers?: [...{
             username: string
             password: string
           }]
-          dataRetention?: string // "7d", "30d", etc.
-          scaling?: {
-            minReplicas?: int
-            maxReplicas?: int
-          }
-          snowflake?: {
-            enabled?: bool
-            credentialsSecret?: string
-          }
         }
