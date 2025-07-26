@@ -1697,6 +1697,137 @@ This architectural decision resolves the fundamental circular dependency issue w
 
 ---
 
+#### ADR-029: Repository Parameter Resolution and Default Logic Implementation
+**Date**: 2025-07-26  
+**Decision**: Implement default repository resolution logic where webservice and realtime-platform components default to their component name when repository parameter is not explicitly specified
+
+**Problem**: Components needed a consistent way to determine which repository/AppContainer they belong to, with sensible defaults to reduce configuration overhead while supporting explicit repository specification for advanced use cases.
+
+**Repository Resolution Requirements**:
+1. **Default Behavior**: If no repository specified, use component metadata.name
+2. **Explicit Override**: If repository parameter provided, use that value
+3. **Consistent Pattern**: Same logic for both webservice and realtime-platform components
+4. **Infrastructure Integration**: Repository value flows through to ApplicationClaim and RealtimePlatformClaim
+
+**Implementation Details**:
+
+**WebService Component** (consolidated-component-definitions.yaml:196):
+```cue
+// Repository parameter defaults to component name
+"repository-name": (*parameter.name | parameter.repository)
+
+// Parameter definition
+repository?: string   // Git repository template name (optional)
+```
+
+**Realtime-Platform Component** (consolidated-component-definitions.yaml:1038):
+```cue
+// AppContainer parameter defaults to component name  
+appContainer: (*parameter.name | parameter.repository)
+
+// Parameter definition
+repository?: string   // Git repository template name (defaults to name)
+```
+
+**XRD Schema Updates**:
+- Added `appContainer` field to RealtimePlatformClaim XRD with default "health-service-idp"
+- Maintains backward compatibility with existing Claims
+
+**Test Case: Inventory-Platform Mixed Architecture**:
+```yaml
+# test-evolution.yaml - Demonstrates repository resolution
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: inventory-platform
+
+spec:
+  components:
+  # Real-time platform (defaults to "inventory-platform" repository)
+  - name: inventory-platform
+    type: realtime-platform
+    properties:
+      name: inventory-platform
+      # repository: implicitly "inventory-platform"
+
+  # Webservice component (explicitly specifies repository)  
+  - name: accounting-service
+    type: webservice
+    properties:
+      image: accounting-service:latest
+      repository: inventory-platform  # Explicit: both services → same repo
+```
+
+**Expected Repository Resolution**:
+- **inventory-platform component**: repository = "inventory-platform" (default from name)
+- **accounting-service component**: repository = "inventory-platform" (explicit parameter)
+- **Result**: Both components deploy to same inventory-platform repository
+
+**Architecture Benefits**:
+- **Sensible Defaults**: Zero configuration for simple single-component applications
+- **Explicit Control**: Repository parameter allows grouping multiple components
+- **Consistent Behavior**: Same defaulting logic across component types
+- **Infrastructure Integration**: Repository flows through Crossplane Claims correctly
+
+**Use Case Support**:
+
+1. **Simple Application** (single component):
+```yaml
+components:
+- name: my-api
+  type: webservice
+  # repository: defaults to "my-api"
+```
+
+2. **Multi-Component Application** (shared repository):
+```yaml
+components:
+- name: api-service
+  type: webservice
+  properties:
+    repository: my-app  # Explicit grouping
+- name: worker-service  
+  type: webservice
+  properties:
+    repository: my-app  # Same repository
+```
+
+3. **Mixed Infrastructure Application** (platform + services):
+```yaml
+components:
+- name: data-platform
+  type: realtime-platform
+  # repository: defaults to "data-platform"
+- name: analytics-service
+  type: webservice
+  properties:
+    repository: data-platform  # Groups with platform
+```
+
+**Implementation Files Modified**:
+- `/crossplane/oam/consolidated-component-definitions.yaml`: Updated repository defaulting logic
+- `/crossplane/realtime-platform-claim-xrd.yaml`: Added appContainer field with default
+- `/test-evolution.yaml`: Demonstrates mixed component repository resolution
+
+**Consequences**:
+- ✅ **Reduced Configuration Overhead**: Most applications need zero repository configuration
+- ✅ **Flexible Repository Management**: Support for both single and multi-component repositories
+- ✅ **Consistent Component Behavior**: Same defaulting pattern across all component types
+- ✅ **Backward Compatibility**: Existing components continue working without changes
+- ✅ **Clear Repository Ownership**: Explicit control over component grouping when needed
+- ❌ **Parameter Complexity**: Additional logic in CUE templates for defaulting
+- ❌ **Documentation Burden**: Need to explain defaulting behavior to developers
+
+**Rationale**:
+- **Convention over Configuration**: Sensible defaults reduce cognitive load
+- **Flexibility**: Explicit repository parameter supports advanced use cases
+- **Consistency**: Same pattern across webservice and realtime-platform components
+- **Integration**: Repository parameter flows correctly through infrastructure provisioning
+
+This architectural decision establishes clear repository resolution patterns that support both simple single-component applications and complex multi-component systems with shared repositories, while maintaining the principle that sensible defaults reduce configuration overhead.
+
+---
+
 #### ADR-028: Real-time Platform Architectural Equivalence to WebService Pattern
 **Date**: 2025-07-24  
 **Decision**: Implement `realtime-platform` as architecturally identical to `webservice` pattern, following established OAM + infrastructure composition model

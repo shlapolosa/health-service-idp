@@ -5,20 +5,20 @@
 apiVersion: core.oam.dev/v1beta1
 kind: Application
 metadata:
-  name: streaming-platform-2025
+  name: inventory-platform
   namespace: default
   annotations:
     test.oam.dev/step: "realtime-platform-validation"
-    test.oam.dev/description: "Verify complete real-time streaming platform creation"
-    test.oam.dev/expected: "Kafka, MQTT, Lenses HQ/Agent, Metabase, PostgreSQL infrastructure"
+    test.oam.dev/description: "Verify complete real-time streaming platform creation with microservice"
+    test.oam.dev/expected: "Kafka, MQTT, Lenses HQ/Agent, Metabase, PostgreSQL infrastructure + accounting service"
 spec:
   components:
   # Real-time Platform Infrastructure - Critical Path Component
-  - name: streaming-platform-2025
+  - name: inventory-platform
     type: realtime-platform
     properties:
-      name: streaming-platform-2025
-      image: streaming-platform:latest
+      name: inventory-platform
+      image: inventory-platform:latest
       language: python
       framework: fastapi
       database: postgres
@@ -27,3 +27,14 @@ spec:
       resources:
         cpu: "500m"
         memory: "1Gi"
+  
+  # Microservice component using webservice type
+  - name: accounting-service
+    type: webservice
+    properties:
+      image: accounting-service:latest
+      port: 8080
+      repository: inventory-platform
+      resources:
+        cpu: "200m"
+        memory: "512Mi"

@@ -193,7 +193,7 @@ spec:
                         "          {\"name\": \"microservice-expose-api\", \"value\": \"false\"},\n" +
                         "          {\"name\": \"target-vcluster\", \"value\": \"\"},\n" +
                         "          {\"name\": \"parent-appcontainer\", \"value\": \"\"},\n" +
-                        "          {\"name\": \"repository-name\", \"value\": \"" + (*"" | parameter.repository) + "\"}\n" +
+                        "          {\"name\": \"repository-name\", \"value\": \"" + (*parameter.name | parameter.repository) + "\"}\n" +
                         "        ]\n" +
                         "      }\n" +
                         "    }\n" +
@@ -1035,6 +1035,7 @@ spec:
             }
             spec: {
               name: parameter.name
+              appContainer: (*parameter.name | parameter.repository)
               database: parameter.database
               visualization: parameter.visualization
               iot: parameter.iot
@@ -1083,6 +1084,7 @@ spec:
           iot: *true | bool
           
           // Advanced optional
+          repository?: string   // Git repository template name (defaults to name)
           dataRetention?: string // "7d", "30d", etc.
           mqttUsers?: [...{
             username: string

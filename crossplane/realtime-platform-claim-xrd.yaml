@@ -30,6 +30,12 @@ spec:
                 description: "Name of the real-time system (used for all resources)"
                 pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
                 maxLength: 63
+              appContainer:
+                type: string
+                description: "Name of the AppContainer this realtime platform belongs to"
+                pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+                maxLength: 63
+                default: "health-service-idp"
               
               # Simple optional properties with defaults
               database:
