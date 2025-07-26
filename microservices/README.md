@@ -241,3 +241,4 @@ Follow the development guidelines in [../CLAUDE.md](../CLAUDE.md):
 - notification-service-df3s3 (python/fastapi)
 - email-service-x9k2m (python/fastapi)
 - retail-realtime-test (python/fastapi)
+- fintech-realtime-manual (python/fastapi)
