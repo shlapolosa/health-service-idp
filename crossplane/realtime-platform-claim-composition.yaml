@@ -222,6 +222,45 @@ spec:
         string:
           fmt: "%s-realtime-postgres-service"
 
+  # MQTT Broker Configuration
+  - name: realtime-mqtt-config
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: mosquitto-config
+              namespace: placeholder-realtime
+            data:
+              mosquitto.conf: |
+                # MQTT Broker Configuration for External Access
+                listener 1883 0.0.0.0
+                allow_anonymous true
+                log_dest stdout
+                log_type all
+                connection_messages true
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-mqtt-config"
+
   # MQTT Broker Deployment
   - name: realtime-mqtt
     base:
@@ -255,6 +294,14 @@ spec:
                       name: mqtt
                     - containerPort: 9001
                       name: websocket
+                    volumeMounts:
+                    - name: mosquitto-config
+                      mountPath: /mosquitto/config
+                      readOnly: true
+                  volumes:
+                  - name: mosquitto-config
+                    configMap:
+                      name: mosquitto-config
         providerConfigRef:
           name: kubernetes-provider
     patches:
@@ -315,6 +362,91 @@ spec:
       - type: string
         string:
           fmt: "%s-realtime-mqtt-service"
+
+  # MQTT Istio Gateway
+  - name: realtime-mqtt-gateway
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: networking.istio.io/v1beta1
+            kind: Gateway
+            metadata:
+              name: mqtt-gateway
+              namespace: placeholder-realtime
+            spec:
+              selector:
+                istio: ingressgateway
+              servers:
+              - port:
+                  number: 1883
+                  name: mqtt-tcp
+                  protocol: TCP
+                hosts:
+                - "*"
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-mqtt-gateway"
+
+  # MQTT Istio VirtualService
+  - name: realtime-mqtt-virtualservice
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: networking.istio.io/v1beta1
+            kind: VirtualService
+            metadata:
+              name: mqtt-virtualservice
+              namespace: placeholder-realtime
+            spec:
+              hosts:
+              - "*"
+              gateways:
+              - mqtt-gateway
+              tcp:
+              - match:
+                - port: 1883
+                route:
+                - destination:
+                    host: mqtt-broker
+                    port:
+                      number: 1883
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-mqtt-virtualservice"
 
   # Kafka Deployment (using lensesio/fast-data-dev)
   - name: realtime-kafka

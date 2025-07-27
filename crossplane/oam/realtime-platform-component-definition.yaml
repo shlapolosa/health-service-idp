@@ -33,7 +33,7 @@ spec:
               "realtime-platform.oam.dev/bootstrap": "true"
               "realtime-platform.oam.dev/database": parameter.database
               "realtime-platform.oam.dev/visualization": parameter.visualization
-              "realtime-platform.oam.dev/iot": "\\(parameter.iot)"
+              "realtime-platform.oam.dev/iot": "\(parameter.iot)"
             }
           }
           spec: {
