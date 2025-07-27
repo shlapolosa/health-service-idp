@@ -1,0 +1,98 @@
+# Repository Creation Test
+# Tests repository creation equivalence between webservice and realtime-platform
+# Both should trigger Argo Workflows when language/framework parameters are specified
+
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: repo-creation-test
+  namespace: default
+  annotations:
+    test.oam.dev/purpose: "Repository Creation Equivalence Test"
+    test.oam.dev/description: "Verify both webservice and realtime-platform create repositories via Argo Workflows"
+    test.oam.dev/expected-resources: "2 Knative Services, 1 RealtimePlatformClaim, 1 Secret, 2 Workflow Jobs"
+spec:
+  components:
+  
+  # Test 1: WebService with repository creation trigger
+  - name: payment-service
+    type: webservice
+    properties:
+      image: payment-service:latest
+      port: 8080
+      version: "v1.0.0"
+      # Repository creation triggers
+      language: python
+      framework: fastapi
+      database: postgres
+      cache: redis
+      # Repository will default to 'payment-service' (component name)
+      resources:
+        cpu: "500m"
+        memory: "1Gi"
+      environment:
+        SERVICE_TYPE: "payment-processor"
+        PAYMENT_METHODS: "card,paypal,stripe"
+        
+  # Test 2: WebService with explicit repository name
+  - name: notification-service  
+    type: webservice
+    properties:
+      image: notification-service:latest
+      port: 8080
+      version: "v1.0.0"
+      # Repository creation triggers
+      language: nodejs
+      framework: express
+      database: mongodb
+      # Explicit repository name override
+      repository: "payment-platform"
+      resources:
+        cpu: "300m"
+        memory: "512Mi"
+      environment:
+        NOTIFICATION_TYPES: "email,sms,push"
+
+  # Test 3: Realtime Platform with repository creation trigger
+  - name: analytics-platform
+    type: realtime-platform
+    properties:
+      image: analytics-platform:latest
+      port: 8080
+      version: "v1.0.0"
+      # Repository creation triggers
+      language: python
+      framework: fastapi
+      database: postgres
+      visualization: metabase
+      iot: true
+      # Repository will default to 'analytics-platform' (component name)
+      resources:
+        cpu: "1000m"
+        memory: "2Gi"
+      environment:
+        ANALYTICS_TYPE: "real-time-streaming"
+        DATA_SOURCES: "kafka,mqtt,websocket"
+        
+  # Test 4: Realtime Platform with explicit repository name
+  - name: streaming-processor
+    type: realtime-platform
+    properties:
+      image: streaming-processor:latest
+      port: 8080
+      version: "v1.0.0"
+      # Repository creation triggers
+      language: java
+      framework: spring
+      database: postgres
+      visualization: grafana
+      iot: false
+      # Explicit repository name override  
+      repository: "analytics-platform"
+      dataRetention: "30d"
+      resources:
+        cpu: "1500m"
+        memory: "3Gi"
+      environment:
+        PROCESSOR_TYPE: "stream-analytics"
+        BATCH_SIZE: "1000"
