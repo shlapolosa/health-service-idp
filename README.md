@@ -439,6 +439,79 @@ health-service-idp/
 
 ## 🛠️ Essential Commands
 
+### 💬 Slack Commands
+
+The platform supports microservice creation directly from Slack using natural language commands:
+
+#### Command Structure
+```
+/microservice create [name] [options]
+/service create [name] [options]    # Alias for microservice
+```
+
+#### Language Options
+- `python` or `fastapi` - Python with FastAPI framework
+- `java` or `springboot` - Java with Spring Boot framework
+
+#### Infrastructure Options
+- `with database` or `with postgresql` - PostgreSQL database
+- `with cache` or `with redis` - Redis cache
+- `without database` / `without cache` - No infrastructure (default)
+
+#### Real-time & IoT Options
+- `iot true` - Enable IoT/MQTT capabilities for real-time data ingestion
+- `language python database postgres iot true` - Complete real-time platform
+
+#### Examples
+
+**Basic Microservice:**
+```slack
+/microservice create order-service
+/microservice create user-api python
+```
+
+**Microservice with Infrastructure:**
+```slack
+/microservice create payment-service python with database
+/microservice create inventory-service java with redis
+/microservice create notification-service python with database with cache
+```
+
+**Real-time Platform with IoT:**
+```slack
+/microservice create sensor-platform language python database postgres iot true
+/microservice create analytics-stream python with database iot true
+```
+
+**Advanced Options:**
+```slack
+/microservice create warehouse-service java springboot with postgresql with redis
+/service create finance-api python fastapi with database
+```
+
+#### What Gets Created
+
+Each Slack command automatically creates:
+- 📚 **Source Repository**: GitHub repo with CLAUDE.md-compliant structure
+- 🔄 **GitOps Repository**: Deployment configurations and manifests  
+- 🔧 **VCluster**: Isolated Kubernetes environment (when specified)
+- ⚙️ **Infrastructure**: Database, cache, and platform components as requested
+- 🚀 **Knative Service**: Auto-scaling containerized application
+- 📊 **Real-time Stack**: Kafka, MQTT, Lenses, Metabase (for IoT-enabled services)
+
+#### Response Flow
+1. **Immediate Response**: Confirmation message with creation details
+2. **Progress Notifications**: Real-time updates on repository and infrastructure setup
+3. **Success Notification**: Complete endpoint information and access details
+4. **Error Handling**: Detailed error messages with troubleshooting guidance
+
+#### Slack Integration Setup
+
+Ensure your Slack app is configured with:
+- **Slash Command URL**: `https://your-loadbalancer/slack/command`
+- **Webhook URL**: Configured in `.env` as `SLACK_WEBHOOK_URL`
+- **Permissions**: `commands`, `incoming-webhook`, `chat:write`
+
 ### Infrastructure Management
 ```bash
 # Create or resume EKS cluster with vCluster
@@ -473,7 +546,11 @@ The platform includes comprehensive real-time streaming capabilities:
 
 #### 🌐 External MQTT Access for IoT Devices
 
-The realtime-platform automatically exposes MQTT brokers externally via Istio Gateway:
+The realtime-platform automatically exposes MQTT brokers externally via Istio Gateway. Create IoT-enabled services instantly via Slack:
+
+```slack
+/microservice create sensor-data-processor language python database postgres iot true
+```
 
 ```bash
 # MQTT broker is accessible at LoadBalancer:1883
@@ -606,6 +683,34 @@ The platform includes a comprehensive GitOps pipeline:
 - **Automated testing**: Unit, integration, and deployment tests
 - **GitOps synchronization**: Automatic deployment via ArgoCD
 - **Version management**: Automatic OAM application updates
+
+## 📖 Quick Reference
+
+### Common Slack Commands
+```slack
+# Basic microservice
+/microservice create my-service python
+
+# With database  
+/microservice create api-service python with database
+
+# IoT/Real-time platform
+/microservice create iot-processor language python database postgres iot true
+
+# Java with full infrastructure
+/microservice create enterprise-api java with database with cache
+```
+
+### Command Help
+```slack
+/microservice help          # Show available commands and options
+/service help              # Alias for microservice help
+```
+
+### Notification Channels
+- **Progress Updates**: Real-time workflow status in configured Slack channel
+- **Success Messages**: Complete endpoint and repository information  
+- **Error Alerts**: Detailed troubleshooting information with logs
 
 ## 🤝 Contributing
 
