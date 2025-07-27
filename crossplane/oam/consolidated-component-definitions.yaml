@@ -28,10 +28,10 @@ spec:
           apiVersion: "serving.knative.dev/v1"
           kind: "Service"
           metadata: {
-            name: parameter.name
+            name: context.name
             namespace: context.namespace
             labels: {
-              "app.kubernetes.io/name": parameter.name
+              "app.kubernetes.io/name": context.name
               "app.kubernetes.io/component": "web-service"
               "app.kubernetes.io/managed-by": "kubevela"
             }
@@ -58,7 +58,7 @@ spec:
                   "run.googleapis.com/execution-environment": "gen2"
                 }
                 labels: {
-                  "app.kubernetes.io/name": parameter.name
+                  "app.kubernetes.io/name": context.name
                   "app.kubernetes.io/version": parameter.version
                 }
               }
@@ -122,10 +122,10 @@ spec:
               apiVersion: "batch/v1"
               kind: "Job"
               metadata: {
-                name: parameter.name + "-workflow-trigger"
+                name: context.name + "-workflow-trigger"
                 namespace: context.namespace
                 labels: {
-                  "app.kubernetes.io/name": parameter.name
+                  "app.kubernetes.io/name": context.name
                   "app.kubernetes.io/component": "workflow-trigger"
                   "app.kubernetes.io/managed-by": "kubevela"
                 }
@@ -150,7 +150,7 @@ spec:
                       image: "curlimages/curl:latest"
                       command: ["/bin/sh", "-c"]
                       args: [
-                        "echo '🚀 Triggering Argo Workflow for microservice: " + parameter.name + "'\n" +
+                        "echo '🚀 Triggering Argo Workflow for microservice: " + context.name + "'\n" +
                         "cat > /tmp/workflow.json << 'WORKFLOW_EOF'\n" +
                         "{\n" +
                         "  \"namespace\": \"argo\",\n" +
@@ -161,7 +161,7 @@ spec:
                         "      \"namespace\": \"argo\",\n" +
                         "      \"labels\": {\n" +
                         "        \"created-by\": \"oam-componentdefinition\",\n" +
-                        "        \"microservice-name\": \"" + parameter.name + "\",\n" +
+                        "        \"microservice-name\": \"" + context.name + "\",\n" +
                         "        \"source\": \"" + (*"oam-driven" | parameter.source) + "\"\n" +
                         "      }\n" +
                         "    },\n" +
@@ -171,7 +171,7 @@ spec:
                         "      },\n" +
                         "      \"arguments\": {\n" +
                         "        \"parameters\": [\n" +
-                        "          {\"name\": \"resource-name\", \"value\": \"" + parameter.name + "\"},\n" +
+                        "          {\"name\": \"resource-name\", \"value\": \"" + context.name + "\"},\n" +
                         "          {\"name\": \"resource-type\", \"value\": \"microservice\"},\n" +
                         "          {\"name\": \"namespace\", \"value\": \"" + context.namespace + "\"},\n" +
                         "          {\"name\": \"user\", \"value\": \"oam-system\"},\n" +
@@ -193,7 +193,7 @@ spec:
                         "          {\"name\": \"microservice-expose-api\", \"value\": \"false\"},\n" +
                         "          {\"name\": \"target-vcluster\", \"value\": \"\"},\n" +
                         "          {\"name\": \"parent-appcontainer\", \"value\": \"\"},\n" +
-                        "          {\"name\": \"repository-name\", \"value\": \"" + (*parameter.name | parameter.repository) + "\"}\n" +
+                        "          {\"name\": \"repository-name\", \"value\": \"" + (*context.name | parameter.repository) + "\"}\n" +
                         "        ]\n" +
                         "      }\n" +
                         "    }\n" +
@@ -227,16 +227,16 @@ spec:
               apiVersion: "v1"
               kind: "Secret"
               metadata: {
-                name: parameter.name + "-config"
+                name: context.name + "-config"
                 namespace: context.namespace
                 labels: {
-                  "app.kubernetes.io/name": parameter.name
+                  "app.kubernetes.io/name": context.name
                   "app.kubernetes.io/component": "configuration"
                 }
               }
               type: "Opaque"
               stringData: {
-                "SERVICE_NAME": parameter.name
+                "SERVICE_NAME": context.name
                 "SERVICE_PORT": "\(parameter.port)"
                 "SERVICE_VERSION": parameter.version
                 if parameter.database != _|_ {
@@ -252,7 +252,6 @@ spec:
         
         parameter: {
           // Required Parameters
-          name: string
           image: string
           
           // Optional Infrastructure Bootstrap

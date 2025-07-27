@@ -34,6 +34,9 @@ spec:
     properties:
       image: accounting-service:latest
       port: 8080
+      version: "latest"
+      language: python
+      framework: fastapi
       repository: inventory-platform
       resources:
         cpu: "200m"
