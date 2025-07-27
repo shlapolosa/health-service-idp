@@ -248,8 +248,10 @@ Both `webservice` and `realtime-platform` follow identical architectural pattern
 |------------|----------------|------------------------|
 | **Primary Output** | Knative Service (HTTP/REST endpoints) | Knative Service (WebSocket + Kafka consumers) |
 | **Secondary Output** | Optional: Argo Workflow (when `language` specified) | RealtimePlatformClaim → Complete streaming infrastructure |
-| **Infrastructure Components** | Optional: PostgreSQL, Redis, MongoDB via ApplicationClaim | Kafka, MQTT, Lenses HQ/Agent, PostgreSQL, Metabase |
-| **ComponentDefinition** | `webservice` in consolidated-component-definitions.yaml | `realtime-platform` in consolidated-component-definitions.yaml |
+| **Repository Creation** | ✅ **Equivalent**: Triggers Argo Workflow when `language` specified | ✅ **Equivalent**: Triggers Argo Workflow when `language` specified |
+| **External Connectivity** | HTTP/HTTPS via Istio Gateway | **MQTT + HTTP**: MQTT (port 1883) + WebSocket via Istio Gateway 🆕 |
+| **Infrastructure Components** | Optional: PostgreSQL, Redis, MongoDB via ApplicationClaim | **Kafka + MQTT + Lenses HQ/Agent + PostgreSQL + Metabase** |
+| **ComponentDefinition** | `webservice` in consolidated-component-definitions.yaml | `realtime-platform` in realtime-platform-component-definition.yaml |
 | **Crossplane Integration** | Optional: ApplicationClaim for infrastructure bootstrap | Required: RealtimePlatformClaim for streaming infrastructure |
 | **Environment Variables** | `AGENT_TYPE`, `LOG_LEVEL`, custom environment | `REALTIME_PLATFORM_NAME`, `WEBSOCKET_ENABLED`, `AGENT_TYPE` |
 | **Secret Management** | Optional: Database/cache connection secrets | Required: Kafka/MQTT/Lenses/Metabase connection secrets |
@@ -464,12 +466,31 @@ docker-compose up
 The platform includes comprehensive real-time streaming capabilities:
 
 - **Kafka Cluster**: Event streaming with Schema Registry
-- **MQTT Broker**: IoT device connectivity  
+- **MQTT Broker**: IoT device connectivity with external access 🆕
 - **Lenses**: Stream processing with SQL-based transformations
 - **Metabase**: Analytics dashboards and visualization
 - **WebSocket Support**: Real-time client connectivity
 
-Example real-time microservice:
+#### 🌐 External MQTT Access for IoT Devices
+
+The realtime-platform automatically exposes MQTT brokers externally via Istio Gateway:
+
+```bash
+# MQTT broker is accessible at LoadBalancer:1883
+MQTT_HOST=$(kubectl get svc istio-ingressgateway -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+
+# Test MQTT connectivity from external devices
+mosquitto_pub -h $MQTT_HOST -p 1883 -t "iot/sensors" -m "Temperature: 22.5°C"
+mosquitto_sub -h $MQTT_HOST -p 1883 -t "iot/sensors"
+```
+
+**Key Features:**
+- ✅ **External Access**: MQTT broker accessible from outside the cluster
+- ✅ **Istio Integration**: Secure routing through service mesh  
+- ✅ **Auto-Configuration**: Mosquitto configured to bind to all interfaces (0.0.0.0:1883)
+- ✅ **IoT Ready**: Perfect for edge devices, sensors, and real-time data ingestion
+
+Example real-time microservice with MQTT/IoT integration:
 ```python
 from agent_common import create_realtime_agent_app, RealtimeAgent
 
@@ -481,6 +502,30 @@ class HealthStreamingAgent(RealtimeAgent):
 
 app = create_realtime_agent_app(HealthStreamingAgent)
 ```
+
+#### 🔌 IoT Device Integration Patterns
+
+The platform supports multiple IoT connectivity patterns through the MQTT broker:
+
+```bash
+# 1. Sensor Data Ingestion (IoT → Platform)
+mosquitto_pub -h $MQTT_HOST -p 1883 -t "sensors/temperature" -m '{"device":"sensor01","temp":23.5,"timestamp":"2025-07-27T14:30:00Z"}'
+
+# 2. Device Commands (Platform → IoT)  
+mosquitto_sub -h $MQTT_HOST -p 1883 -t "commands/+/actuate"
+
+# 3. Real-time Alerts (Platform → IoT)
+mosquitto_sub -h $MQTT_HOST -p 1883 -t "alerts/critical"
+
+# 4. Device Health Monitoring (Bidirectional)
+mosquitto_pub -h $MQTT_HOST -p 1883 -t "devices/sensor01/status" -m "online"
+```
+
+**MQTT Topic Conventions:**
+- `sensors/{device_id}/{metric}` - Sensor data from devices
+- `commands/{device_id}/{action}` - Commands to devices  
+- `alerts/{severity}` - Platform-generated alerts
+- `devices/{device_id}/status` - Device health/connectivity status
 
 ## 🔧 Development Patterns
 
