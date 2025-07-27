@@ -362,10 +362,16 @@ spec:
         fi
         
         # Validate resource-type
-        if [ "{{inputs.parameters.resource-type}}" != "microservice" ]; then
-          echo "❌ Invalid resource-type for Microservice template: {{inputs.parameters.resource-type}}"
-          exit 1
-        fi
+        case "{{inputs.parameters.resource-type}}" in
+          microservice|realtime-platform)
+            echo "✅ Valid resource-type: {{inputs.parameters.resource-type}}"
+            ;;
+          *)
+            echo "❌ Invalid resource-type for Microservice template: {{inputs.parameters.resource-type}}"
+            echo "Must be one of: microservice, realtime-platform"
+            exit 1
+            ;;
+        esac
         
         # Validate namespace format
         if ! echo "{{inputs.parameters.namespace}}" | grep -E '^[a-z0-9][a-z0-9-]*[a-z0-9]$'; then
