@@ -138,7 +138,7 @@ spec:
             }
             spec: {
               name: context.name
-              appContainer: (*context.name | parameter.repository)
+              appContainer: (*parameter.repository | context.name)
               database: parameter.database
               visualization: parameter.visualization
               iot: parameter.iot
@@ -250,7 +250,7 @@ spec:
                         "          {\"name\": \"realtime-mqtt-enabled\", \"value\": \"" + (*"true" | parameter.iot) + "\"},\n" +
                         "          {\"name\": \"target-vcluster\", \"value\": \"\"},\n" +
                         "          {\"name\": \"parent-appcontainer\", \"value\": \"\"},\n" +
-                        "          {\"name\": \"repository-name\", \"value\": \"" + (*context.name | parameter.repository) + "\"}\n" +
+                        "          {\"name\": \"repository-name\", \"value\": \"" + (*parameter.repository | context.name) + "\"}\n" +
                         "        ]\n" +
                         "      }\n" +
                         "    }\n" +

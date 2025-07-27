@@ -208,7 +208,7 @@ spec:
                         "          {\"name\": \"microservice-expose-api\", \"value\": \"false\"},\n" +
                         "          {\"name\": \"target-vcluster\", \"value\": \"\"},\n" +
                         "          {\"name\": \"parent-appcontainer\", \"value\": \"\"},\n" +
-                        "          {\"name\": \"repository-name\", \"value\": \"" + (parameter.repository | *context.name) + "\"}\n" +
+                        "          {\"name\": \"repository-name\", \"value\": \"" + (*parameter.repository | context.name) + "\"}\n" +
                         "        ]\n" +
                         "      }\n" +
                         "    }\n" +
