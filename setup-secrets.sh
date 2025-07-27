@@ -1,0 +1,80 @@
+#!/bin/bash
+set -e
+
+# Check if .env file exists
+if [ ! -f .env ]; then
+    echo "❌ .env file not found. Please copy .env.example to .env and fill in the values."
+    exit 1
+fi
+
+# Load environment variables from .env file (only valid shell variables)
+echo "📁 Loading environment variables from .env file..."
+export $(grep -v '^#' .env | grep '^[A-Z_][A-Z0-9_]*=' | xargs)
+
+# Validate required variables
+required_vars=("PERSONAL_ACCESS_TOKEN" "GITHUB_USERNAME" "DOCKER_USERNAME" "DOCKER_PASSWORD" "DOCKER_AUTH" "SLACK_SIGNING_SECRET" "SLACK_WEBHOOK_URL" "LENSES_LICENSE_KEY" "LENSES_ACCEPT_EULA" "LENSES_HQ_USER" "LENSES_HQ_PASSWORD" "LENSES_DB_USERNAME" "LENSES_DB_PASSWORD")
+for var in "${required_vars[@]}"; do
+    if [ -z "${!var}" ]; then
+        echo "❌ Required environment variable $var is not set in .env file"
+        exit 1
+    fi
+done
+
+echo "✅ All required environment variables found"
+
+# Apply the secrets using envsubst
+echo "🔧 Applying secrets from manual-secrets.yaml..."
+envsubst < manual-secrets.yaml | kubectl apply -f -
+
+# Create ConfigMap with namespace-specific agent keys
+echo "🔧 Creating agent keys ConfigMap..."
+echo "apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: env-agent-keys
+  namespace: default
+  labels:
+    managed-by: manual
+data:" > /tmp/agent-keys-configmap.yaml
+
+# Extract all agent key variables from .env file
+AGENT_KEYS_FOUND=false
+while IFS= read -r line; do
+    # Skip comments and empty lines
+    if [[ $line =~ ^[[:space:]]*# ]] || [[ -z "${line// }" ]]; then
+        continue
+    fi
+    
+    # Check if line contains an agent key
+    if [[ $line =~ ^([a-zA-Z0-9_-]+)-agent-key=(.+)$ ]]; then
+        NAMESPACE_KEY="${BASH_REMATCH[1]}-agent-key"
+        AGENT_KEY_VALUE="${BASH_REMATCH[2]}"
+        echo "  $NAMESPACE_KEY: \"$AGENT_KEY_VALUE\"" >> /tmp/agent-keys-configmap.yaml
+        echo "  ✓ Found agent key for: ${BASH_REMATCH[1]}"
+        AGENT_KEYS_FOUND=true
+    fi
+done < .env
+
+if [ "$AGENT_KEYS_FOUND" = false ]; then
+    echo "  # No agent keys found in .env file" >> /tmp/agent-keys-configmap.yaml
+    echo "⚠️  No agent keys found in .env file"
+    echo "    Add keys in format: <namespace>-agent-key=<key>"
+else
+    echo "✅ Agent keys extracted from .env file"
+fi
+
+kubectl apply -f /tmp/agent-keys-configmap.yaml
+rm -f /tmp/agent-keys-configmap.yaml
+
+echo "🎉 All secrets created successfully from .env file!"
+echo ""
+echo "📋 Created resources:"
+echo "  - github-credentials (token, personal-access-token, user)"
+echo "  - docker-credentials (registry, username, password)"
+echo "  - docker-registry-secret (kubernetes.io/dockerconfigjson for image pulls)"
+echo "  - slack-credentials (signing-secret)"
+echo "  - slack-webhook (webhook-url) in argo namespace"
+echo "  - lenses-credentials (license-key, accept-eula, hq-user, hq-password, db-username, db-password)"
+echo "  - env-agent-keys ConfigMap (namespace-specific agent keys)"
+echo ""
+echo "⚠️  Remember: .env file is git-ignored for security"
