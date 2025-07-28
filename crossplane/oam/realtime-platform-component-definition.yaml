@@ -250,7 +250,7 @@ spec:
                         "          {\"name\": \"realtime-mqtt-enabled\", \"value\": \"" + (*"true" | parameter.iot) + "\"},\n" +
                         "          {\"name\": \"target-vcluster\", \"value\": \"\"},\n" +
                         "          {\"name\": \"parent-appcontainer\", \"value\": \"\"},\n" +
-                        "          {\"name\": \"repository-name\", \"value\": \"" + (*parameter.repository | context.name) + "\"}\n" +
+                        "          {\"name\": \"repository-name\", \"value\": \"" + (*parameter.repository | context.appName) + "\"}\n" +
                         "        ]\n" +
                         "      }\n" +
                         "    }\n" +

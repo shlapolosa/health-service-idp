@@ -756,9 +756,8 @@ spec:
           REPOSITORY_NAME="{{inputs.parameters.repository-name}}"
           echo "✅ Using provided repository name: $REPOSITORY_NAME"
         else
-          # Remove -service suffix if present to get base name
-          BASE_NAME=$(echo "{{inputs.parameters.resource-name}}" | sed 's/-service$//')
-          REPOSITORY_NAME="$BASE_NAME"
+          # Use resource name as repository name when not explicitly provided
+          REPOSITORY_NAME="{{inputs.parameters.resource-name}}"
           echo "✅ Auto-derived repository name: $REPOSITORY_NAME"
         fi
         
