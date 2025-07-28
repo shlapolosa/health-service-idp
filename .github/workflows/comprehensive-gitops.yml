@@ -5,10 +5,28 @@ on:
     branches: [ main, develop, 'feature/*', 'hotfix/*', 'release/*' ]
     paths:
       - 'microservices/**'
+    paths-ignore:
+      - 'microservices/**/domain.yml'
+      - 'microservices/**/config.yml'
+      - 'microservices/**/data/**'
+      - 'microservices/**/actions/**'
+      - 'microservices/**/docker/Dockerfile.rasa'
+      - 'microservices/**/docker/Dockerfile.actions'
+      - 'microservices/**/credentials.yml'
+      - 'microservices/**/endpoints.yml'
   pull_request:
     branches: [ main ]
     paths:
       - 'microservices/**'
+    paths-ignore:
+      - 'microservices/**/domain.yml'
+      - 'microservices/**/config.yml'
+      - 'microservices/**/data/**'
+      - 'microservices/**/actions/**'
+      - 'microservices/**/docker/Dockerfile.rasa'
+      - 'microservices/**/docker/Dockerfile.actions'
+      - 'microservices/**/credentials.yml'
+      - 'microservices/**/endpoints.yml'
   schedule:
     # Run security scans daily at 2 AM UTC
     - cron: '0 2 * * *'
@@ -52,20 +70,37 @@ jobs:
             CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -E '^microservices/' || true)
           fi
           
-          # Extract unique service directories
+          # Extract unique service directories and exclude chat services
           CHANGED_SERVICES=""
           CHANGED_SERVICES_JSON="[]"
           
           if [ ! -z "$CHANGED_FILES" ]; then
             # Get service names
-            SERVICE_NAMES=$(echo "$CHANGED_FILES" | cut -d'/' -f1-2 | sort -u | grep '^microservices/' | cut -d'/' -f2)
-            CHANGED_SERVICES=$(echo "$SERVICE_NAMES" | tr '\n' ',' | sed 's/,$//')
+            ALL_SERVICE_NAMES=$(echo "$CHANGED_FILES" | cut -d'/' -f1-2 | sort -u | grep '^microservices/' | cut -d'/' -f2)
             
-            # Create JSON array for matrix (simpler approach)
-            if [ ! -z "$SERVICE_NAMES" ]; then
+            # Filter out chat services (those with domain.yml and config.yml)
+            FILTERED_SERVICES=""
+            for service in $ALL_SERVICE_NAMES; do
+              if [ -f "microservices/$service/domain.yml" ] && [ -f "microservices/$service/config.yml" ]; then
+                echo "🤖 Excluding chat service from standard pipeline: $service (handled by chat-gitops.yml)"
+              else
+                echo "📦 Including standard service: $service"
+                if [ -z "$FILTERED_SERVICES" ]; then
+                  FILTERED_SERVICES="$service"
+                else
+                  FILTERED_SERVICES="$FILTERED_SERVICES $service"
+                fi
+              fi
+            done
+            
+            # Convert to comma-separated for output
+            if [ ! -z "$FILTERED_SERVICES" ]; then
+              CHANGED_SERVICES=$(echo "$FILTERED_SERVICES" | tr ' ' ',' | sed 's/,$//')
+              
+              # Create JSON array for matrix
               CHANGED_SERVICES_JSON="["
               FIRST=true
-              for service in $SERVICE_NAMES; do
+              for service in $FILTERED_SERVICES; do
                 if [ "$FIRST" = true ]; then
                   CHANGED_SERVICES_JSON="$CHANGED_SERVICES_JSON\"$service\""
                   FIRST=false
