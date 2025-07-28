@@ -78,6 +78,15 @@ spec:
       database: postgres
       visualization: metabase
 
+  # Chat services → Rasa chatbot with Actions server
+  - name: customer-support-chat
+    type: rasa-chatbot
+    properties:
+      rasaImage: "socrates12345/customer-support-rasa:latest"
+      actionsImage: "socrates12345/customer-support-actions:latest"
+      enableIstioGateway: true
+      chatbotHost: "chat.example.com"
+
 # Flow: Manual Edit → ArgoCD → KubeVela → Mixed Resources (Knative Services + Crossplane Claims)
 ```
 
@@ -208,6 +217,7 @@ All components that can be added to OAM applications (`oam/applications/applicat
 |-----------|----------|-------------------|---------------------|
 | **Application Components (OAM-Compliant)** | | | |
 | `webservice` | Auto-scaling web applications, microservices, APIs | Optional: `ApplicationClaim` for infrastructure | **Knative Service** + Optional Argo Workflow ⭐ |
+| `rasa-chatbot` | Conversational AI chatbots with NLP | None (direct) | **2x Knative Services** (Rasa + Actions) + Optional Istio Gateway ⭐ |
 | `kafka` | Event streaming, message queues | None (direct) | Helm Release (Bitnami Kafka Chart) |
 | `redis` | In-memory caching, session storage | None (direct) | Helm Release (Bitnami Redis Chart) |
 | `mongodb` | Document database, NoSQL storage | None (direct) | Helm Release (Bitnami MongoDB Chart) |
@@ -418,6 +428,163 @@ Source Code Changes → Version Manager → GitOps Repo → ArgoCD → KubeVela 
                                                Prevents Circular Dependencies
 ```
 
+## 🤖 Chat Services Development
+
+The platform includes comprehensive chatbot capabilities through Rasa integration with dual CI/CD pipelines:
+
+### Creating Chat Services
+
+#### Option 1: Direct OAM Application
+```yaml
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: customer-support
+spec:
+  components:
+  - name: support-chat
+    type: rasa-chatbot
+    properties:
+      # Container images (automatically built via chat-gitops.yml)
+      rasaImage: "socrates12345/support-chat-rasa:latest"
+      actionsImage: "socrates12345/support-chat-actions:latest"
+      
+      # Scaling configuration
+      minScale: 1
+      maxScale: 10
+      targetConcurrency: 10
+      actionsMinScale: 0
+      actionsMaxScale: 5
+      
+      # External access (optional)
+      enableIstioGateway: true
+      chatbotHost: "chat.example.com"
+      enableTLS: true
+      
+      # Custom environment variables
+      environment:
+        LOG_LEVEL: "INFO"
+        CUSTOM_SETTING: "value"
+```
+
+#### Option 2: Using Chat Template Repository
+```bash
+# 1. Use the health-service-chat-template
+git clone https://github.com/your-org/health-service-chat-template.git my-chatbot
+cd my-chatbot
+
+# 2. Customize your chatbot
+# - Edit domain.yml (responses and slots)
+# - Edit data/nlu.yml (training examples)
+# - Edit data/stories.yml (conversation flows)
+# - Edit actions/actions.py (custom logic)
+
+# 3. Deploy with Docker Compose (development)
+docker-compose up --build
+
+# 4. Deploy to Kubernetes (production)
+kubectl apply -f oam/chat-template-componentdef.yaml
+kubectl apply -f oam/sample-applications.yaml
+```
+
+### Chat Service Architecture
+
+**Dual Container Pattern:**
+- **Rasa Server Container**: Handles NLP, conversation management, and API endpoints
+- **Actions Server Container**: Executes custom business logic and external integrations
+
+**Automatic Service Discovery:**
+- Rasa server automatically discovers Actions server via Kubernetes service names
+- Environment variables injected: `ACTION_ENDPOINT_URL`, `ACTIONS_SERVER_HOST`, `ACTIONS_SERVER_PORT`
+
+**Scaling Strategy:**
+- **Rasa Server**: Always-on (minScale: 1) for immediate response
+- **Actions Server**: Scale-to-zero (minScale: 0) for cost optimization
+
+### Chat-Specific CI/CD Pipeline
+
+The platform includes a dedicated `chat-gitops.yml` workflow that automatically:
+
+**Triggers on Chat Files:**
+- `domain.yml`, `config.yml` (Rasa configuration)
+- `data/**` (training data)
+- `actions/**` (custom actions)
+- `docker/Dockerfile.rasa`, `docker/Dockerfile.actions`
+
+**Build Process:**
+1. **Detects Chat Services**: Identifies services with `domain.yml` + `config.yml`
+2. **Builds Dual Containers**: 
+   - `socrates12345/{service}-rasa:commit-sha`
+   - `socrates12345/{service}-actions:commit-sha`
+3. **Security Scanning**: Scans both containers for vulnerabilities
+4. **GitOps Integration**: Triggers `update-chat-deployments` event
+
+**Separate from Standard Pipeline:**
+- Standard microservices use `comprehensive-gitops.yml`
+- Chat services use `chat-gitops.yml`
+- No conflicts or duplicate builds
+
+### Chat Service Endpoints
+
+**Rasa Server Endpoints:**
+- `GET /api/status` - Health check and model status
+- `POST /webhooks/rest/webhook` - Chat API for frontend integration
+- `GET /conversations/{conversation_id}/tracker` - Conversation state
+- `GET /` - Server status and version
+
+**Actions Server Endpoints:**
+- `GET /health` - Health check for Kubernetes probes
+- `POST /webhook` - Webhook for custom action execution
+
+### Development Workflow
+
+1. **Local Development:**
+   ```bash
+   # Test with Docker Compose
+   docker-compose up --build
+   ./test-deployment.sh
+   ```
+
+2. **Training and Testing:**
+   ```bash
+   # Train the model
+   rasa train
+   
+   # Test conversations
+   rasa test
+   
+   # Validate training data
+   rasa data validate
+   ```
+
+3. **Deployment:**
+   ```bash
+   # Deploy ComponentDefinition
+   kubectl apply -f oam/chat-template-componentdef.yaml
+   
+   # Deploy Application
+   kubectl apply -f oam/sample-applications.yaml
+   ```
+
+### Chat Integration Examples
+
+**REST API Integration:**
+```bash
+# Send message to chatbot
+curl -X POST http://chat.example.com/webhooks/rest/webhook \
+  -H "Content-Type: application/json" \
+  -d '{"sender": "user123", "message": "Hello, I need help"}'
+```
+
+**WebSocket Integration:** (when realtime platform is enabled)
+```javascript
+const ws = new WebSocket('ws://chat.example.com/ws');
+ws.send(JSON.stringify({
+  sender: "user123",
+  message: "Hello, I need help"
+}));
+```
+
 ## 📁 Project Structure
 
 ```
@@ -427,13 +594,20 @@ health-service-idp/
 │   ├── streamlit-frontend/           # Web interface
 │   ├── orchestration-service/        # Central workflow coordinator
 │   └── *-anthropic/ & *-deterministic/  # AI + rule-based agent pairs
+├── health-service-chat-template/     # Rasa chatbot template repository
+│   ├── oam/chat-template-componentdef.yaml  # Chat ComponentDefinition
+│   ├── docker/                       # Rasa and Actions Dockerfiles
+│   ├── data/                         # Training data (NLU, stories, rules)
+│   ├── actions/                      # Custom action implementations
+│   └── domain.yml                    # Bot responses and conversation domain
 ├── crossplane/                       # Infrastructure definitions
 │   ├── application-claim-composition.yaml  # ApplicationClaim → Infrastructure
 │   ├── oam/                          # OAM component definitions
 │   └── realtime-platform-manifests/  # Real-time infrastructure
 ├── slack-api-server/                 # Slack integration for commands
 ├── .github/workflows/                # CI/CD pipelines
-│   └── comprehensive-gitops.yml      # Main deployment pipeline
+│   ├── comprehensive-gitops.yml      # Standard microservices pipeline
+│   └── chat-gitops.yml              # Chat-specific pipeline
 └── cluster-lifecycle.sh             # Infrastructure management
 ```
 

@@ -1880,6 +1880,240 @@ This architectural decision establishes clear repository resolution patterns tha
 
 ---
 
+## Phase 14: Chat Services CI/CD Pipeline Separation
+
+#### ADR-030: Dual CI/CD Pipeline Architecture for Chat and Standard Microservices
+**Date**: 2025-07-28  
+**Decision**: Implement separate CI/CD pipelines for chat services and standard microservices to handle different build requirements
+
+**Problem**: Chat services (Rasa chatbots) require fundamentally different build processes than standard FastAPI microservices:
+- **Standard Services**: Single container with FastAPI application
+- **Chat Services**: Dual containers (Rasa server + Actions server) with different build contexts and dependencies
+- **Conflict Risk**: Mixed build logic in single pipeline created complexity and potential conflicts
+
+**Options Evaluated**:
+
+**Option A - Single Pipeline with Conditional Logic**:
+- ✅ Centralized pipeline management
+- ✅ Single workflow to maintain
+- ❌ Complex conditional logic throughout pipeline
+- ❌ Risk of conflicts between service types
+- ❌ Difficult to debug service-specific build issues
+- ❌ Harder to optimize for each service type
+
+**Option B - Separate Dedicated Pipelines**:
+- ✅ Clear separation of concerns
+- ✅ Optimized build processes for each service type
+- ✅ Independent evolution of pipelines
+- ✅ Better error isolation and debugging
+- ❌ Two pipelines to maintain
+- ❌ Potential duplication of shared logic
+
+**Decision**: Option B - Separate Dedicated Pipelines
+
+**Implementation Architecture**:
+
+**1. Pipeline Separation Strategy**:
+```yaml
+# comprehensive-gitops.yml (Standard Microservices)
+on:
+  push:
+    paths:
+      - 'microservices/**'
+    paths-ignore:
+      - 'microservices/**/domain.yml'
+      - 'microservices/**/config.yml'
+      - 'microservices/**/data/**'
+      - 'microservices/**/actions/**'
+      - 'microservices/**/docker/Dockerfile.rasa'
+      - 'microservices/**/docker/Dockerfile.actions'
+
+# chat-gitops.yml (Chat Services)
+on:
+  push:
+    paths:
+      - 'microservices/**/domain.yml'
+      - 'microservices/**/config.yml'
+      - 'microservices/**/data/**'
+      - 'microservices/**/actions/**'
+      - 'microservices/**/docker/Dockerfile.rasa'
+      - 'microservices/**/docker/Dockerfile.actions'
+```
+
+**2. Service Detection Logic**:
+```bash
+# Standard pipeline: Actively excludes chat services
+for service in $SERVICES; do
+  if [ -f "microservices/$service/domain.yml" ] && [ -f "microservices/$service/config.yml" ]; then
+    echo "🤖 Excluding chat service from standard pipeline: $service"
+  else
+    echo "📦 Including standard service: $service"
+  fi
+done
+
+# Chat pipeline: Detects only chat services
+for service in $SERVICES; do
+  if [ -f "microservices/$service/domain.yml" ] && [ -f "microservices/$service/config.yml" ]; then
+    echo "🤖 Detected chat service: $service"
+  fi
+done
+```
+
+**3. Container Build Differences**:
+```bash
+# Standard Pipeline: Single container
+docker build -t "socrates12345/$service:$commit" ./microservices/$service
+
+# Chat Pipeline: Dual containers
+docker build -t "socrates12345/${service}-rasa:$commit" \
+  -f ./microservices/$service/docker/Dockerfile.rasa ./microservices/$service
+docker build -t "socrates12345/${service}-actions:$commit" \
+  -f ./microservices/$service/docker/Dockerfile.actions ./microservices/$service
+```
+
+**4. GitOps Integration**:
+```bash
+# Standard Pipeline: update-deployments event
+gh api repos/shlapolosa/health-service-idp-gitops/dispatches \
+  --field event_type=update-deployments \
+  --field client_payload[type]="standard"
+
+# Chat Pipeline: update-chat-deployments event  
+gh api repos/shlapolosa/health-service-idp-gitops/dispatches \
+  --field event_type=update-chat-deployments \
+  --field client_payload[type]="chat"
+```
+
+**Benefits Achieved**:
+- ✅ **Clear Separation**: No build conflicts between service types
+- ✅ **Optimized Builds**: Each pipeline optimized for its service type
+- ✅ **Better Debugging**: Service-specific build failures are isolated
+- ✅ **Independent Evolution**: Chat pipeline can evolve without affecting standard services
+- ✅ **Specialized Security Scanning**: Different vulnerability scans for different container types
+
+**Trade-offs**:
+- ❌ **Pipeline Duplication**: Some shared logic exists in both pipelines
+- ❌ **Maintenance Overhead**: Two pipelines to maintain and update
+- ❌ **Documentation Complexity**: Need to document both pipeline behaviors
+
+**Files Implemented**:
+- `.github/workflows/comprehensive-gitops.yml` - Updated with chat service exclusion
+- `.github/workflows/chat-gitops.yml` - New dedicated chat pipeline
+- Path-based triggering ensures only relevant pipeline runs
+
+---
+
+#### ADR-031: OAM ComponentDefinition Integration for Rasa Chatbots
+**Date**: 2025-07-28  
+**Decision**: Implement `rasa-chatbot` as a native OAM ComponentDefinition following platform architectural patterns
+
+**Problem**: Need to integrate Rasa chatbot services into the existing OAM/KubeVela architecture while maintaining consistency with other platform components.
+
+**Architecture Analysis**: Rasa chatbots differ from standard microservices in requiring:
+- **Dual Knative Services**: Separate Rasa server and Actions server containers
+- **Service Discovery**: Automatic connection configuration between Rasa and Actions
+- **External Access**: Optional Istio Gateway for public chatbot endpoints
+- **Scaling Profiles**: Different scaling needs (Rasa always-on, Actions scale-to-zero)
+
+**Implementation Strategy**:
+
+**1. ComponentDefinition Design**:
+```yaml
+# Follows established platform patterns
+spec:
+  workload:
+    definition:
+      apiVersion: serving.knative.dev/v1
+      kind: Service        # Creates actual Knative workloads, not Claims
+```
+
+**2. Dual Service Architecture**:
+```cue
+// Primary output: Rasa server
+output: {
+  apiVersion: "serving.knative.dev/v1"
+  kind: "Service"
+  metadata: name: context.name + "-rasa"
+}
+
+// Secondary output: Actions server
+outputs: {
+  "actions-service": {
+    apiVersion: "serving.knative.dev/v1"
+    kind: "Service"
+    metadata: name: context.name + "-actions"
+  }
+}
+```
+
+**3. Automatic Service Discovery**:
+```cue
+// Environment variables auto-injected into Rasa container
+env: [
+  {
+    name: "ACTION_ENDPOINT_URL"
+    value: "http://\(context.name)-actions.\(context.namespace).svc.cluster.local/webhook"
+  },
+  {
+    name: "ACTIONS_SERVER_HOST"
+    value: "\(context.name)-actions.\(context.namespace).svc.cluster.local"
+  }
+]
+```
+
+**4. Optional Istio Integration**:
+```cue
+// Conditional Istio Gateway and VirtualService creation
+if parameter.enableIstioGateway {
+  "istio-gateway": {
+    apiVersion: "networking.istio.io/v1beta1"
+    kind: "Gateway"
+    spec: {
+      servers: [{
+        hosts: [parameter.chatbotHost]
+        port: { number: 80, protocol: "HTTP" }
+      }]
+    }
+  }
+}
+```
+
+**Component Integration**:
+- **Native OAM Component**: Creates Knative Services directly (not ApplicationClaims)
+- **Platform Consistency**: Follows same patterns as `webservice`, `kafka`, `redis` components
+- **Developer Experience**: Simple OAM Application with `type: rasa-chatbot`
+- **Infrastructure Integration**: Compatible with existing GitOps and monitoring
+
+**Testing Results**:
+- ✅ ComponentDefinition successfully installs and validates
+- ✅ Dual Knative Services created with proper service discovery
+- ✅ Environment variables correctly injected
+- ✅ Scaling annotations properly configured
+- ⚠️ Health checks need base container with trained models (future work)
+
+**Benefits**:
+- ✅ **Platform Integration**: Follows established OAM component patterns
+- ✅ **Service Discovery**: Automatic configuration between Rasa and Actions
+- ✅ **Developer Experience**: Simple OAM Application interface
+- ✅ **Flexible Deployment**: Support for internal and external access patterns
+- ✅ **Cost Optimization**: Independent scaling for Rasa and Actions containers
+
+**Consequences**:
+- ✅ **Architectural Consistency**: Maintains platform ComponentDefinition patterns
+- ✅ **Operational Simplicity**: Standard KubeVela deployment and monitoring
+- ✅ **Flexible Scaling**: Different scaling profiles for each container type
+- ❌ **Health Check Complexity**: Requires trained models for proper readiness
+- ❌ **Container Dependency**: Need to manage base containers with models
+
+**Files Created**:
+- `health-service-chat-template/oam/chat-template-componentdef.yaml` - ComponentDefinition implementation
+- `health-service-chat-template/oam/sample-applications.yaml` - Usage examples
+- `health-service-chat-template/README.md` - Comprehensive deployment guide
+
+**Integration Pattern**: The `rasa-chatbot` ComponentDefinition follows the established platform pattern of creating actual Kubernetes workloads (Knative Services) rather than infrastructure Claims, maintaining consistency with `webservice` while supporting the dual-container requirements of Rasa chatbots.
+
+---
+
 ## References
 
 - **Parameter Contract Implementation**: `argo-workflows/*-standard-contract.yaml`
@@ -1889,9 +2123,11 @@ This architectural decision establishes clear repository resolution patterns tha
 - **Secret Management**: `deploy-slack-notifications.sh`
 - **Real-time Requirements**: `.taskmaster/docs/REAL-TIME-REQUIREMENTS.txt`
 - **Equivalence Analysis**: ADR-028 Architectural Equivalence Table
+- **Chat CI/CD Implementation**: `.github/workflows/chat-gitops.yml`
+- **Chat ComponentDefinition**: `health-service-chat-template/oam/chat-template-componentdef.yaml`
 
 ---
 
 **Document Status**: Current as of latest session  
-**Next Review**: After realtime-platform implementation completion  
+**Next Review**: After chat services implementation completion  
 **Maintained By**: Platform Team
