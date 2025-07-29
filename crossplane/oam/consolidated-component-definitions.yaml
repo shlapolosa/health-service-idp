@@ -182,6 +182,131 @@ spec:
           }
         }
         
+        // Secondary Outputs: Infrastructure Bootstrap via Argo Workflow (when language specified)
+        if parameter.language != _|_ {
+          outputs: {
+            // Create Job to trigger Argo Workflow for microservice creation
+            "workflow-trigger": {
+              apiVersion: "batch/v1"
+              kind: "Job"
+              metadata: {
+                name: context.name + "-workflow-trigger"
+                namespace: context.namespace
+                labels: {
+                  "app.kubernetes.io/name": context.name
+                  "app.kubernetes.io/component": "workflow-trigger"
+                  "app.kubernetes.io/managed-by": "kubevela"
+                }
+                annotations: {
+                  "webservice.oam.dev/trigger-type": "argo-workflow"
+                  "webservice.oam.dev/workflow-template": "microservice-standard-contract"
+                  if parameter.source != _|_ {
+                    "webservice.oam.dev/source": parameter.source
+                  }
+                  if parameter.source == _|_ {
+                    "webservice.oam.dev/source": "oam-driven"
+                  }
+                }
+              }
+              spec: {
+                template: {
+                  spec: {
+                    serviceAccountName: "argo-workflows-client"
+                    restartPolicy: "Never"
+                    volumes: [
+                      {
+                        name: "argo-token"
+                        secret: {
+                          secretName: "slack-api-argo-token-copy"
+                        }
+                      }
+                    ]
+                    containers: [{
+                      name: "workflow-trigger"
+                      image: "curlimages/curl:latest"
+                      command: ["/bin/sh", "-c"]
+                      volumeMounts: [
+                        {
+                          name: "argo-token"
+                          mountPath: "/var/run/secrets/argo"
+                          readOnly: true
+                        }
+                      ]
+                      args: [
+                        "echo '🚀 Triggering Argo Workflow for microservice: " + context.name + "'\n" +
+                        "cat > /tmp/workflow.json << 'WORKFLOW_EOF'\n" +
+                        "{\n" +
+                        "  \"namespace\": \"argo\",\n" +
+                        "  \"serverDryRun\": false,\n" +
+                        "  \"workflow\": {\n" +
+                        "    \"metadata\": {\n" +
+                        "      \"generateName\": \"microservice-creation-\",\n" +
+                        "      \"namespace\": \"argo\",\n" +
+                        "      \"labels\": {\n" +
+                        "        \"created-by\": \"oam-componentdefinition\",\n" +
+                        "        \"microservice-name\": \"" + context.name + "\",\n" +
+                        "        \"source\": \"" + (*"oam-driven" | parameter.source) + "\"\n" +
+                        "      }\n" +
+                        "    },\n" +
+                        "    \"spec\": {\n" +
+                        "      \"workflowTemplateRef\": {\n" +
+                        "        \"name\": \"microservice-standard-contract\"\n" +
+                        "      },\n" +
+                        "      \"arguments\": {\n" +
+                        "        \"parameters\": [\n" +
+                        "          {\"name\": \"resource-name\", \"value\": \"" + context.name + "\"},\n" +
+                        "          {\"name\": \"resource-type\", \"value\": \"microservice\"},\n" +
+                        "          {\"name\": \"namespace\", \"value\": \"" + context.namespace + "\"},\n" +
+                        "          {\"name\": \"user\", \"value\": \"oam-system\"},\n" +
+                        "          {\"name\": \"description\", \"value\": \"OAM-driven microservice via ComponentDefinition\"},\n" +
+                        "          {\"name\": \"github-org\", \"value\": \"shlapolosa\"},\n" +
+                        "          {\"name\": \"docker-registry\", \"value\": \"docker.io/socrates12345\"},\n" +
+                        "          {\"name\": \"slack-channel\", \"value\": \"#oam-notifications\"},\n" +
+                        "          {\"name\": \"slack-user-id\", \"value\": \"OAM\"},\n" +
+                        "          {\"name\": \"security-enabled\", \"value\": \"true\"},\n" +
+                        "          {\"name\": \"observability-enabled\", \"value\": \"true\"},\n" +
+                        "          {\"name\": \"backup-enabled\", \"value\": \"false\"},\n" +
+                        "          {\"name\": \"environment-tier\", \"value\": \"development\"},\n" +
+                        "          {\"name\": \"auto-create-dependencies\", \"value\": \"true\"},\n" +
+                        "          {\"name\": \"resource-size\", \"value\": \"medium\"},\n" +
+                        "          {\"name\": \"microservice-language\", \"value\": \"" + parameter.language + "\"},\n" +
+                        "          {\"name\": \"microservice-framework\", \"value\": \"" + parameter.framework + "\"},\n" +
+                        "          {\"name\": \"microservice-database\", \"value\": \"none\"},\n" +
+                        "          {\"name\": \"microservice-cache\", \"value\": \"none\"},\n" +
+                        "          {\"name\": \"microservice-expose-api\", \"value\": \"false\"},\n" +
+                        "          {\"name\": \"target-vcluster\", \"value\": \"\"},\n" +
+                        "          {\"name\": \"parent-appcontainer\", \"value\": \"\"},\n" +
+                        "          {\"name\": \"repository-name\", \"value\": \"" + (*context.name | parameter.repository) + "\"}\n" +
+                        "        ]\n" +
+                        "      }\n" +
+                        "    }\n" +
+                        "  }\n" +
+                        "}\n" +
+                        "WORKFLOW_EOF\n" +
+                        "echo '📋 Workflow JSON created, submitting to Argo...'\n" +
+                        "cat /tmp/workflow.json\n" +
+                        "RESPONSE=$(curl -s -k -w 'HTTPSTATUS:%{http_code}' -X POST -H \"Authorization: Bearer $(cat /var/run/secrets/argo/token)\" -H 'Content-Type: application/json' -H 'Accept: application/json' -d @/tmp/workflow.json https://argo-server.argo.svc.cluster.local:2746/api/v1/workflows/argo)\n" +
+                        "HTTP_STATUS=$(echo $RESPONSE | tr -d '\\n' | sed -e 's/.*HTTPSTATUS://')\n" +
+                        "BODY=$(echo $RESPONSE | sed -e 's/HTTPSTATUS:.*//g')\n" +
+                        "echo '📊 HTTP Status:' $HTTP_STATUS\n" +
+                        "echo '📄 Response:' $BODY\n" +
+                        "if [ \"$HTTP_STATUS\" -eq 200 ] || [ \"$HTTP_STATUS\" -eq 201 ]; then\n" +
+                        "  echo '✅ Workflow submission successful!'\n" +
+                        "  echo \"$BODY\" | grep -o '\"name\":\"[^\"]*\"' | head -1\n" +
+                        "else\n" +
+                        "  echo '❌ Workflow submission failed with status:' $HTTP_STATUS\n" +
+                        "  echo 'Response:' $BODY\n" +
+                        "  exit 1\n" +
+                        "fi"
+                      ]
+                    }]
+                  }
+                }
+              }
+            }
+          }
+        }
+        
         parameter: {
           // Required Parameters
           image: string
@@ -205,6 +330,7 @@ spec:
           framework?: string
           source?: string
           realtime?: string
+          repository?: string
         }
 
 ---

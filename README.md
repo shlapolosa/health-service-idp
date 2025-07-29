@@ -7,7 +7,7 @@ A GitOps-enabled cloud-native platform for intelligent architecture visualizatio
 **CRITICAL**: Before starting any development work, always run the infrastructure health check to ensure all components are operational:
 
 ```bash
-./infrastructure-health-check.sh
+./scripts/infrastructure-health-check.sh
 ```
 
 This diagnostic script validates:

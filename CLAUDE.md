@@ -22,7 +22,7 @@ before starting a task, check if already implimented, then just test and verify.
 **CRITICAL**: Before starting any development work, always run the infrastructure health check to ensure all components are operational:
 
 ```bash
-./infrastructure-health-check.sh
+./scripts/infrastructure-health-check.sh
 ```
 
 This diagnostic script validates:
