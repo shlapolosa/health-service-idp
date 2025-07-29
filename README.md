@@ -2,6 +2,26 @@
 
 A GitOps-enabled cloud-native platform for intelligent architecture visualization and microservice development, built with minimal cost and maximum stability principles.
 
+## 🔍 Infrastructure Health Check
+
+**CRITICAL**: Before starting any development work, always run the infrastructure health check to ensure all components are operational:
+
+```bash
+./infrastructure-health-check.sh
+```
+
+This diagnostic script validates:
+- Slack API server accessibility and external routing
+- Essential secrets (Docker registry, Slack, Argo tokens)
+- Service accounts and RBAC configurations  
+- OAM ComponentDefinitions and WorkloadDefinitions
+- Argo Workflows infrastructure and templates
+- Crossplane CRDs and compositions
+- Istio service mesh and ingress gateway
+- ArgoCD applications and sync status
+
+Only proceed with development work after confirming all infrastructure components are healthy. If issues are found, resolve them before continuing with any tasks.
+
 ## 🚀 Quick Start
 
 The platform supports **two primary use cases** for application development:
