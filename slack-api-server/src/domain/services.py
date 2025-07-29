@@ -333,6 +333,10 @@ class SlackResponseBuilderService:
                         },
                         {
                             "type": "mrkdwn",
+                            "text": f"*Realtime:*\n{request.realtime or 'None'}",
+                        },
+                        {
+                            "type": "mrkdwn",
                             "text": f"*GitHub Org:*\n{request.github_org}",
                         },
                     ],
@@ -357,7 +361,7 @@ class SlackResponseBuilderService:
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": "*Available Commands:*\n• `/microservice create [name] [options]` - Create new microservice with OAM environment\n• `/service create [name] [options]` - Alias for microservice creation\n\n*Language Options:*\n• `python` or `fastapi` - Python with FastAPI framework\n• `java` or `springboot` - Java with Spring Boot framework\n\n*Database Options:*\n• `with database` or `with postgresql` - PostgreSQL database\n• `without database` - No database (default)\n\n*Cache Options:*\n• `with cache` or `with redis` - Redis cache\n• `without cache` - No cache (default)\n\n*VCluster Options:*\n• `vcluster [name]` - Use existing vCluster\n• `in namespace [name]` - Set deployment namespace\n\n*Examples:*\n• `/microservice create order-service`\n• `/microservice create user-service python with database`\n• `/microservice create payment-service java with redis vcluster finance-cluster`\n• `/microservice create inventory-service in namespace warehouse vcluster factory`",
+                        "text": "*Available Commands:*\n• `/microservice create [name] [options]` - Create new microservice with OAM environment\n• `/service create [name] [options]` - Alias for microservice creation\n\n*Language Options:*\n• `python` or `fastapi` - Python with FastAPI framework\n• `java` or `springboot` - Java with Spring Boot framework\n\n*Database Options:*\n• `with database` or `with postgresql` - PostgreSQL database\n• `without database` - No database (default)\n\n*Cache Options:*\n• `with cache` or `with redis` - Redis cache\n• `without cache` - No cache (default)\n\n*🆕 Realtime Integration:*\n• `realtime [platform-name]` - Integrate with existing realtime platform\n• `platform [platform-name]` - Connect to streaming platform\n• `streaming [platform-name]` - Link to data streaming infrastructure\n• `iot [platform-name]` - Connect to IoT/MQTT platform\n\n*VCluster Options:*\n• `vcluster [name]` - Use existing vCluster\n• `in namespace [name]` - Set deployment namespace\n\n*Examples:*\n• `/microservice create order-service`\n• `/microservice create user-service python with database`\n• `/microservice create payment-service java with redis vcluster finance-cluster`\n• `/microservice create analytics-api realtime health-streaming` 🆕\n• `/microservice create iot-processor python platform sensor-data` 🆕\n• `/microservice create stream-api streaming financial-data with database` 🆕",
                     },
                 }
             ],

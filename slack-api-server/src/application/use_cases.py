@@ -324,6 +324,7 @@ class CreateMicroserviceUseCase:
                 language=parsed_command.microservice_language,
                 database=parsed_command.microservice_database,
                 cache=parsed_command.microservice_cache,
+                realtime=parsed_command.microservice_realtime,
                 description=parsed_command.description,
                 github_org=parsed_command.github_org,
                 docker_registry=parsed_command.docker_registry,

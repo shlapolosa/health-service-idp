@@ -1,0 +1,173 @@
+# Example: Integrated Health Application with Automatic Secret Management
+# This example demonstrates the enhanced secret management system with:
+# 1. Realtime platform providing infrastructure and secrets
+# 2. Webservice automatically discovering and using platform secrets
+# 3. Cross-component integration with validation
+
+---
+# Complete integrated application with realtime platform and webservice
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: health-monitoring-platform
+  namespace: health-production
+  annotations:
+    description: "Complete health monitoring platform with automatic secret management"
+    example-type: "integrated-application"
+    secret-management: "enhanced"
+spec:
+  components:
+  
+  # Realtime Platform Component - Provides infrastructure and creates secrets
+  - name: health-streaming
+    type: realtime-platform
+    properties:
+      # Infrastructure configuration
+      database: postgres
+      visualization: metabase
+      iot: true
+      
+      # Data retention and IoT configuration
+      dataRetention: "30d"
+      mqttUsers:
+      - username: "health_devices"
+        password: "secure_iot_password"
+      - username: "mobile_apps"
+        password: "secure_app_password"
+      
+      # Container image for the realtime service
+      image: "socrates12345/health-realtime-processor:latest"
+      port: 8080
+      
+      # Environment variables for the realtime service
+      environment:
+        LOG_LEVEL: "INFO"
+        HEALTH_DATA_RETENTION: "30d"
+        IOT_DEVICE_LIMIT: "1000"
+        ANALYTICS_ENABLED: "true"
+      
+      # Repository configuration for GitOps
+      language: python
+      framework: fastapi
+      repository: health-monitoring-platform
+
+  # Webservice Component - Automatically discovers and uses realtime platform secrets
+  - name: health-api
+    type: webservice
+    properties:
+      # Basic webservice configuration
+      image: "socrates12345/health-api:latest"
+      port: 8080
+      version: "v1.2.0"
+      
+      # 🆕 Realtime integration - Automatically discovers secrets from health-streaming platform
+      realtime: health-streaming
+      
+      # Application environment variables
+      environment:
+        LOG_LEVEL: "INFO"
+        SERVICE_TYPE: "health-api"
+        API_VERSION: "v1"
+        ENABLE_KAFKA_PUBLISHING: "true"
+        ENABLE_MQTT_MONITORING: "true"
+        DASHBOARD_INTEGRATION: "enabled"
+        HEALTH_CHECK_INTERVAL: "30s"
+      
+      # Resource allocation
+      resources:
+        cpu: "1000m"
+        memory: "1Gi"
+      
+      # Optional: Repository configuration for source code updates
+      language: python
+      framework: fastapi
+      repository: health-api-service
+
+  # Additional webservice for mobile app backend
+  - name: mobile-backend
+    type: webservice
+    properties:
+      image: "socrates12345/health-mobile-backend:latest"
+      port: 8080
+      
+      # 🆕 Same realtime platform integration - Shares secrets automatically
+      realtime: health-streaming
+      
+      environment:
+        LOG_LEVEL: "INFO"
+        SERVICE_TYPE: "mobile-backend"
+        CLIENT_TYPE: "mobile"
+        PUSH_NOTIFICATIONS: "enabled"
+        REAL_TIME_UPDATES: "enabled"
+      
+      resources:
+        cpu: "500m"
+        memory: "512Mi"
+
+---
+# Optional: Manual secret injection for advanced use cases
+apiVersion: platform.example.org/v1alpha1
+kind: SecretInjectorClaim
+metadata:
+  name: health-api-advanced-integration
+  namespace: health-production
+  annotations:
+    description: "Advanced secret injection with strict validation"
+spec:
+  webserviceName: "health-api"
+  realtimePlatformName: "health-streaming"
+  namespace: "health-production"
+  
+  # Validation configuration
+  validationMode: "strict"
+  requiredServices: ["kafka", "mqtt", "db", "metabase"]
+  
+  # Injection strategy
+  injectionStrategy: "immediate"
+  forceReinjection: false
+
+---
+# Example of what gets created automatically by the enhanced secret management
+
+# 1. Realtime Platform Secrets (created by realtime-platform component)
+# health-streaming-kafka-secret:
+#   KAFKA_BOOTSTRAP_SERVERS: "health-streaming-kafka:9092"
+#   KAFKA_SCHEMA_REGISTRY_URL: "http://health-streaming-schema-registry:8081"
+
+# 2. health-streaming-mqtt-secret:
+#   MQTT_HOST: "health-streaming-mqtt"
+#   MQTT_PORT: "1883"
+#   MQTT_USER: "health_devices"
+#   MQTT_PASSWORD: "secure_iot_password"
+
+# 3. health-streaming-db-secret:
+#   DB_HOST: "health-streaming-postgres"
+#   DB_PORT: "5432"
+#   DB_NAME: "health_streaming_db"
+#   DB_USER: "health_api_user"
+#   DB_PASSWORD: "generated_secure_password"
+
+# 4. health-streaming-metabase-secret:
+#   METABASE_URL: "http://health-streaming-metabase:3000"
+#   METABASE_USER: "health_dashboard"
+#   METABASE_PASSWORD: "generated_secure_password"
+
+# 5. health-streaming-lenses-secret:
+#   LENSES_URL: "http://health-streaming-lenses-hq:9991"
+#   LENSES_USER: "health_stream_processor"
+#   LENSES_PASSWORD: "generated_secure_password"
+
+# 6. Integration Secrets (created by webservice components)
+# health-api-health-streaming-integration:
+#   REALTIME_PLATFORM_NAME: "health-streaming"
+#   WEBSERVICE_NAME: "health-api"
+#   INTEGRATION_ENABLED: "true"
+#   SECRET_DISCOVERY_PATTERN: "health-streaming-*-secret"
+#   DISCOVERED_SECRET_COUNT: "5"
+
+# mobile-backend-health-streaming-integration:
+#   REALTIME_PLATFORM_NAME: "health-streaming"
+#   WEBSERVICE_NAME: "mobile-backend"
+#   INTEGRATION_ENABLED: "true"
+#   SECRET_DISCOVERY_PATTERN: "health-streaming-*-secret"
+#   DISCOVERED_SECRET_COUNT: "5"

@@ -299,6 +299,7 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
                             {"name": "microservice-framework", "value": "auto"},
                             {"name": "microservice-database", "value": payload.get("database", "none")},
                             {"name": "microservice-cache", "value": payload.get("cache", "none")},
+                            {"name": "microservice-realtime", "value": payload.get("realtime", "")},
                             {"name": "microservice-expose-api", "value": "false"},
                             {"name": "target-vcluster", "value": payload.get("target-vcluster", "")},
                             {"name": "parent-appcontainer", "value": ""},

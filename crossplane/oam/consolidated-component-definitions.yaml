@@ -6,8 +6,8 @@
 # 4. KubeVela orchestrates, Crossplane executes
 
 ---
-# Enhanced WebService ComponentDefinition with Embedded Workflow
-# Automatically handles infrastructure bootstrap when needed
+# Enhanced WebService ComponentDefinition with Parameter Transformation
+# Works with webservice WorkloadDefinition for Knative Service rendering
 apiVersion: core.oam.dev/v1beta1
 kind: ComponentDefinition
 metadata:
@@ -23,7 +23,6 @@ spec:
   schematic:
     cue:
       template: |
-        // Primary Output: Knative Service (OAM-compliant workload)
         output: {
           apiVersion: "serving.knative.dev/v1"
           kind: "Service"
@@ -46,6 +45,11 @@ spec:
                 if parameter.source == _|_ {
                   "webservice.oam.dev/source": "api-driven"
                 }
+              }
+              if parameter.realtime != _|_ {
+                "realtime.platform.example.org/integration": parameter.realtime
+                "webservice.oam.dev/secret-discovery": "enabled"
+                "webservice.oam.dev/secret-pattern": parameter.realtime + "-*-secret"
               }
             }
           }
@@ -80,16 +84,80 @@ spec:
                       memory: "128Mi"
                     }
                   }
-                  if len(parameter.environment) > 0 {
-                    env: [
-                      for k, v in parameter.environment {
-                        name: k
-                        value: v
+                  env: [
+                    for k, v in parameter.environment {
+                      name: k
+                      value: v
+                    }
+                  ] + [
+                    if parameter.realtime != _|_ {
+                      {
+                        name: "REALTIME_PLATFORM_NAME"
+                        value: parameter.realtime
+                      }
+                    },
+                    if parameter.realtime != _|_ {
+                      {
+                        name: "REALTIME_INTEGRATION_ENABLED"
+                        value: "true"
+                      }
+                    },
+                    if parameter.realtime != _|_ {
+                      {
+                        name: "WEBSERVICE_NAME"
+                        value: context.name
+                      }
+                    }
+                  ]
+                  if parameter.envFrom != _|_ || parameter.realtime != _|_ {
+                    envFrom: [
+                      if parameter.envFrom != _|_ {
+                        for envRef in parameter.envFrom {
+                          envRef
+                        }
+                      }
+                    ] + [
+                      if parameter.realtime != _|_ {
+                        {
+                          secretRef: {
+                            name: parameter.realtime + "-kafka-secret"
+                            optional: true
+                          }
+                        }
+                      },
+                      if parameter.realtime != _|_ {
+                        {
+                          secretRef: {
+                            name: parameter.realtime + "-mqtt-secret" 
+                            optional: true
+                          }
+                        }
+                      },
+                      if parameter.realtime != _|_ {
+                        {
+                          secretRef: {
+                            name: parameter.realtime + "-db-secret"
+                            optional: true
+                          }
+                        }
+                      },
+                      if parameter.realtime != _|_ {
+                        {
+                          secretRef: {
+                            name: parameter.realtime + "-metabase-secret"
+                            optional: true
+                          }
+                        }
+                      },
+                      if parameter.realtime != _|_ {
+                        {
+                          secretRef: {
+                            name: parameter.realtime + "-lenses-secret"
+                            optional: true
+                          }
+                        }
                       }
                     ]
-                  }
-                  if parameter.envFrom != _|_ {
-                    envFrom: parameter.envFrom
                   }
                   // Health checks for robust deployment
                   livenessProbe: {
@@ -114,174 +182,12 @@ spec:
           }
         }
         
-        // Secondary Outputs: Infrastructure Bootstrap via Argo Workflow (when language specified)
-        if parameter.language != _|_ {
-          outputs: {
-            // Create Job to trigger Argo Workflow for microservice creation
-            "workflow-trigger": {
-              apiVersion: "batch/v1"
-              kind: "Job"
-              metadata: {
-                name: context.name + "-workflow-trigger"
-                namespace: context.namespace
-                labels: {
-                  "app.kubernetes.io/name": context.name
-                  "app.kubernetes.io/component": "workflow-trigger"
-                  "app.kubernetes.io/managed-by": "kubevela"
-                }
-                annotations: {
-                  "webservice.oam.dev/trigger-type": "argo-workflow"
-                  "webservice.oam.dev/workflow-template": "microservice-standard-contract"
-                  if parameter.source != _|_ {
-                    "webservice.oam.dev/source": parameter.source
-                  }
-                  if parameter.source == _|_ {
-                    "webservice.oam.dev/source": "oam-driven"
-                  }
-                }
-              }
-              spec: {
-                template: {
-                  spec: {
-                    serviceAccountName: "argo-workflows-client"
-                    restartPolicy: "Never"
-                    volumes: [
-                      {
-                        name: "argo-token"
-                        secret: {
-                          secretName: "slack-api-argo-token-copy"
-                        }
-                      }
-                    ]
-                    containers: [{
-                      name: "workflow-trigger"
-                      image: "curlimages/curl:latest"
-                      command: ["/bin/sh", "-c"]
-                      volumeMounts: [
-                        {
-                          name: "argo-token"
-                          mountPath: "/var/run/secrets/argo"
-                          readOnly: true
-                        }
-                      ]
-                      args: [
-                        "echo '🚀 Triggering Argo Workflow for microservice: " + context.name + "'\n" +
-                        "cat > /tmp/workflow.json << 'WORKFLOW_EOF'\n" +
-                        "{\n" +
-                        "  \"namespace\": \"argo\",\n" +
-                        "  \"serverDryRun\": false,\n" +
-                        "  \"workflow\": {\n" +
-                        "    \"metadata\": {\n" +
-                        "      \"generateName\": \"microservice-creation-\",\n" +
-                        "      \"namespace\": \"argo\",\n" +
-                        "      \"labels\": {\n" +
-                        "        \"created-by\": \"oam-componentdefinition\",\n" +
-                        "        \"microservice-name\": \"" + context.name + "\",\n" +
-                        "        \"source\": \"" + (*"oam-driven" | parameter.source) + "\"\n" +
-                        "      }\n" +
-                        "    },\n" +
-                        "    \"spec\": {\n" +
-                        "      \"workflowTemplateRef\": {\n" +
-                        "        \"name\": \"microservice-standard-contract\"\n" +
-                        "      },\n" +
-                        "      \"arguments\": {\n" +
-                        "        \"parameters\": [\n" +
-                        "          {\"name\": \"resource-name\", \"value\": \"" + context.name + "\"},\n" +
-                        "          {\"name\": \"resource-type\", \"value\": \"microservice\"},\n" +
-                        "          {\"name\": \"namespace\", \"value\": \"" + context.namespace + "\"},\n" +
-                        "          {\"name\": \"user\", \"value\": \"oam-system\"},\n" +
-                        "          {\"name\": \"description\", \"value\": \"OAM-driven microservice via ComponentDefinition\"},\n" +
-                        "          {\"name\": \"github-org\", \"value\": \"shlapolosa\"},\n" +
-                        "          {\"name\": \"docker-registry\", \"value\": \"" + (*"docker.io/socrates12345" | parameter.registry) + "\"},\n" +
-                        "          {\"name\": \"slack-channel\", \"value\": \"#oam-notifications\"},\n" +
-                        "          {\"name\": \"slack-user-id\", \"value\": \"OAM\"},\n" +
-                        "          {\"name\": \"security-enabled\", \"value\": \"true\"},\n" +
-                        "          {\"name\": \"observability-enabled\", \"value\": \"true\"},\n" +
-                        "          {\"name\": \"backup-enabled\", \"value\": \"false\"},\n" +
-                        "          {\"name\": \"environment-tier\", \"value\": \"development\"},\n" +
-                        "          {\"name\": \"auto-create-dependencies\", \"value\": \"true\"},\n" +
-                        "          {\"name\": \"resource-size\", \"value\": \"medium\"},\n" +
-                        "          {\"name\": \"microservice-language\", \"value\": \"" + parameter.language + "\"},\n" +
-                        "          {\"name\": \"microservice-framework\", \"value\": \"" + parameter.framework + "\"},\n" +
-                        "          {\"name\": \"microservice-database\", \"value\": \"" + (*"none" | parameter.database) + "\"},\n" +
-                        "          {\"name\": \"microservice-cache\", \"value\": \"" + (*"none" | parameter.cache) + "\"},\n" +
-                        "          {\"name\": \"microservice-expose-api\", \"value\": \"false\"},\n" +
-                        "          {\"name\": \"target-vcluster\", \"value\": \"\"},\n" +
-                        "          {\"name\": \"parent-appcontainer\", \"value\": \"\"},\n" +
-                        "          {\"name\": \"repository-name\", \"value\": \"" + (*parameter.repository | context.appName) + "\"}\n" +
-                        "        ]\n" +
-                        "      }\n" +
-                        "    }\n" +
-                        "  }\n" +
-                        "}\n" +
-                        "WORKFLOW_EOF\n" +
-                        "echo '📋 Workflow JSON created, submitting to Argo...'\n" +
-                        "cat /tmp/workflow.json\n" +
-                        "RESPONSE=$(curl -s -k -w 'HTTPSTATUS:%{http_code}' -X POST -H \"Authorization: Bearer $(cat /var/run/secrets/argo/token)\" -H 'Content-Type: application/json' -H 'Accept: application/json' -d @/tmp/workflow.json https://argo-server.argo.svc.cluster.local:2746/api/v1/workflows/argo)\n" +
-                        "HTTP_STATUS=$(echo $RESPONSE | tr -d '\\n' | sed -e 's/.*HTTPSTATUS://')\n" +
-                        "BODY=$(echo $RESPONSE | sed -e 's/HTTPSTATUS:.*//g')\n" +
-                        "echo '📊 HTTP Status:' $HTTP_STATUS\n" +
-                        "echo '📄 Response:' $BODY\n" +
-                        "if [ \"$HTTP_STATUS\" -eq 200 ] || [ \"$HTTP_STATUS\" -eq 201 ]; then\n" +
-                        "  echo '✅ Workflow submission successful!'\n" +
-                        "  echo \"$BODY\" | grep -o '\"name\":\"[^\"]*\"' | head -1\n" +
-                        "else\n" +
-                        "  echo '❌ Workflow submission failed with status:' $HTTP_STATUS\n" +
-                        "  echo 'Response:' $BODY\n" +
-                        "  exit 1\n" +
-                        "fi"
-                      ]
-                    }]
-                  }
-                }
-              }
-            }
-            
-            // Create application secrets configuration
-            "app-secrets": {
-              apiVersion: "v1"
-              kind: "Secret"
-              metadata: {
-                name: context.name + "-config"
-                namespace: context.namespace
-                labels: {
-                  "app.kubernetes.io/name": context.name
-                  "app.kubernetes.io/component": "configuration"
-                }
-              }
-              type: "Opaque"
-              stringData: {
-                "SERVICE_NAME": context.name
-                "SERVICE_PORT": "\(parameter.port)"
-                "SERVICE_VERSION": parameter.version
-                if parameter.database != _|_ {
-                  "DATABASE_TYPE": parameter.database
-                }
-                if parameter.cache != _|_ {
-                  "CACHE_TYPE": parameter.cache
-                }
-              }
-            }
-          }
-        }
-        
         parameter: {
           // Required Parameters
           image: string
-          
-          // Optional Infrastructure Bootstrap
-          language?: string     // Triggers bootstrap: python, nodejs, java, go
-          framework?: string    // fastapi, express, spring, gin
-          repository?: string   // Git repository template name
-          registry?: string     // Container registry (default: docker.io)
-          source?: string       // Source detection: api-driven, oam-driven, analyzer-driven
-          
-          // Service Configuration
           port: *8080 | int
           version: *"latest" | string
           healthPath: *"/health" | string
-          
-          // Resource Management
           resources: *{
             cpu: "500m"
             memory: "512Mi"
@@ -289,20 +195,16 @@ spec:
             cpu?: string
             memory?: string
           }
-          
-          // Environment Variables
           environment: *{} | {[string]: string}
-          
-          // Environment Variables from Secrets
           envFrom?: [...{
             secretRef: {
               name: string
             }
           }]
-          
-          // Infrastructure Dependencies (optional)
-          database?: string     // postgres, mysql, mongodb
-          cache?: string        // redis, memcached
+          language?: string
+          framework?: string
+          source?: string
+          realtime?: string
         }
 
 ---

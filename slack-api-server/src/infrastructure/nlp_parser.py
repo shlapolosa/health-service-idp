@@ -242,6 +242,27 @@ class EnhancedNLPParser(CommandParserInterface):
         ]
         self.matcher.add("MICROSERVICE_CACHE", cache_patterns)
 
+        # Realtime platform patterns
+        realtime_patterns = [
+            [
+                {"LOWER": "realtime"},
+                {"TEXT": {"REGEX": r"[a-z0-9-]+"}},
+            ],
+            [
+                {"LOWER": "platform"},
+                {"TEXT": {"REGEX": r"[a-z0-9-]+"}},
+            ],
+            [
+                {"LOWER": {"IN": ["streaming", "stream"]}},
+                {"TEXT": {"REGEX": r"[a-z0-9-]+"}},
+            ],
+            [
+                {"LOWER": {"IN": ["iot", "mqtt"]}},
+                {"TEXT": {"REGEX": r"[a-z0-9-]+"}},
+            ],
+        ]
+        self.matcher.add("MICROSERVICE_REALTIME", realtime_patterns)
+
         # Repository patterns
         repository_patterns = [
             [
@@ -514,6 +535,7 @@ class EnhancedNLPParser(CommandParserInterface):
             microservice_language=parsed.get("microservice_language", MicroserviceLanguage.PYTHON),
             microservice_database=parsed.get("microservice_database", MicroserviceDatabase.NONE),
             microservice_cache=parsed.get("microservice_cache", MicroserviceCache.NONE),
+            microservice_realtime=parsed.get("microservice_realtime"),
             parsing_method=parsed["parsing_method"],
         )
 
@@ -539,6 +561,7 @@ class EnhancedNLPParser(CommandParserInterface):
             "microservice_language": MicroserviceLanguage.PYTHON,
             "microservice_database": MicroserviceDatabase.NONE,
             "microservice_cache": MicroserviceCache.NONE,
+            "microservice_realtime": None,
         }
 
         # Process spaCy matches
@@ -602,6 +625,13 @@ class EnhancedNLPParser(CommandParserInterface):
                     elif action_word == "with" and cache_text == "cache":
                         extracted["microservice_cache"] = MicroserviceCache.REDIS
 
+            elif label == "MICROSERVICE_REALTIME":
+                if len(span) > 1:
+                    realtime_name = span[-1].text.lower()
+                    # Extract realtime platform name from patterns like:
+                    # "realtime health-streaming", "platform my-platform", "streaming iot-platform"
+                    extracted["microservice_realtime"] = realtime_name
+
             elif label == "MICROSERVICE_REPOSITORY" and len(span) > 1:
                 extracted["repository"] = span[-1].text.lower()
 
@@ -633,6 +663,7 @@ class EnhancedNLPParser(CommandParserInterface):
             "microservice_language": MicroserviceLanguage.PYTHON,
             "microservice_database": MicroserviceDatabase.NONE,
             "microservice_cache": MicroserviceCache.NONE,
+            "microservice_realtime": None,
         }
         
         # Extract Microservice name - look for various patterns
@@ -711,6 +742,22 @@ class EnhancedNLPParser(CommandParserInterface):
             extracted["microservice_cache"] = MicroserviceCache.NONE
         elif "redis" in text or "with cache" in text:
             extracted["microservice_cache"] = MicroserviceCache.REDIS
+        
+        # Extract realtime platform integration
+        realtime_patterns = [
+            r"realtime\s+([a-z0-9-]+)",          # "realtime health-streaming"
+            r"platform\s+([a-z0-9-]+)",         # "platform my-platform"
+            r"streaming\s+([a-z0-9-]+)",        # "streaming iot-platform"
+            r"stream\s+([a-z0-9-]+)",           # "stream data-platform"
+            r"iot\s+([a-z0-9-]+)",              # "iot sensor-platform"
+            r"mqtt\s+([a-z0-9-]+)",             # "mqtt device-platform"
+        ]
+        
+        for pattern in realtime_patterns:
+            realtime_match = re.search(pattern, text)
+            if realtime_match:
+                extracted["microservice_realtime"] = realtime_match.group(1)
+                break  # Take the first match
             
         # Extract repository
         repo_match = re.search(r"(?:repository|repo|app)\s+([a-z0-9-]+)", text)

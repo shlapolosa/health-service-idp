@@ -1,0 +1,175 @@
+apiVersion: core.oam.dev/v1beta1
+kind: WorkloadDefinition
+metadata:
+  name: webservice
+  annotations:
+    definition.oam.dev/description: "Webservice workload for Knative Services with realtime integration support"
+spec:
+  definitionRef:
+    name: services.serving.knative.dev
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "serving.knative.dev/v1"
+          kind: "Service"
+          metadata: {
+            name: context.name
+            namespace: context.namespace
+            labels: {
+              "app.kubernetes.io/name": context.name
+              "app.kubernetes.io/component": "web-service"
+              "app.kubernetes.io/managed-by": "kubevela"
+            }
+            annotations: {
+              if parameter.bootstrap != _|_ {
+                "webservice.oam.dev/bootstrap": "true"
+                "webservice.oam.dev/language": parameter.bootstrap.language
+                "webservice.oam.dev/framework": parameter.bootstrap.framework
+                "webservice.oam.dev/source": parameter.bootstrap.source
+              }
+              if parameter.realtimePlatform != _|_ {
+                "realtime.platform.example.org/integration": parameter.realtimePlatform
+                "webservice.oam.dev/secret-discovery": "enabled"
+                "webservice.oam.dev/secret-pattern": parameter.realtimePlatform + "-*-secret"
+              }
+            }
+          }
+          spec: {
+            template: {
+              metadata: {
+                annotations: {
+                  "autoscaling.knative.dev/minScale": "0"
+                  "autoscaling.knative.dev/maxScale": "10"
+                  "run.googleapis.com/execution-environment": "gen2"
+                }
+                labels: {
+                  "app.kubernetes.io/name": context.name
+                  "app.kubernetes.io/version": parameter.version
+                }
+              }
+              spec: {
+                serviceAccountName: "knative-docker-sa"
+                if parameter.realtimePlatform != _|_ {
+                  // Add init container for secret validation when realtime integration is enabled
+                  initContainers: [{
+                    name: "secret-validator"
+                    image: "bitnami/kubectl:latest"
+                    command: ["/bin/sh", "-c"]
+                    args: [
+                      "echo 'Validating realtime platform secrets...' && " +
+                      "KAFKA_SECRET=" + parameter.realtimePlatform + "-kafka-secret && " +
+                      "DB_SECRET=" + parameter.realtimePlatform + "-db-secret && " +
+                      "echo 'Checking for essential secrets:' && " +
+                      "kubectl get secret $DB_SECRET -n " + context.namespace + " --ignore-not-found || echo 'Warning: Database secret not found' && " +
+                      "kubectl get secret $KAFKA_SECRET -n " + context.namespace + " --ignore-not-found || echo 'Warning: Kafka secret not found' && " +
+                      "echo 'Secret validation completed - proceeding with startup'"
+                    ]
+                    env: [
+                      {
+                        name: "REALTIME_PLATFORM_NAME"
+                        value: parameter.realtimePlatform
+                      }
+                    ]
+                  }]
+                }
+                containers: [{
+                  image: parameter.image
+                  ports: [{
+                    containerPort: parameter.port
+                    name: "http1"
+                  }]
+                  resources: {
+                    limits: {
+                      cpu: parameter.resources.cpu
+                      memory: parameter.resources.memory
+                    }
+                    requests: {
+                      cpu: "100m"
+                      memory: "128Mi"
+                    }
+                  }
+                  env: [
+                    // Add base environment variables
+                    for k, v in parameter.environment {
+                      name: k
+                      value: v
+                    },
+                    // Add realtime environment variables if enabled
+                    if parameter.realtimeEnv != _|_ {
+                      for k, v in parameter.realtimeEnv {
+                        name: k
+                        value: v
+                      }
+                    }
+                  ]
+                  envFrom: [
+                    // Add base envFrom references
+                    if parameter.envFrom != _|_ {
+                      for envRef in parameter.envFrom {
+                        envRef
+                      }
+                    },
+                    // Auto-inject realtime platform secrets if enabled
+                    if parameter.realtimeSecrets != _|_ {
+                      for secretName in parameter.realtimeSecrets {
+                        secretRef: {
+                          name: secretName
+                          optional: true
+                        }
+                      }
+                    }
+                  ]
+                  // Health checks for robust deployment
+                  livenessProbe: {
+                    httpGet: {
+                      path: parameter.healthPath
+                      port: parameter.port
+                    }
+                    initialDelaySeconds: 30
+                    periodSeconds: 10
+                  }
+                  readinessProbe: {
+                    httpGet: {
+                      path: parameter.healthPath
+                      port: parameter.port
+                    }
+                    initialDelaySeconds: 5
+                    periodSeconds: 5
+                  }
+                }]
+              }
+            }
+          }
+        }
+        
+        parameter: {
+          // Required Parameters
+          image: string
+          port: *8080 | int
+          version: *"latest" | string
+          healthPath: *"/health" | string
+          resources: *{
+            cpu: "500m"
+            memory: "512Mi"
+          } | {
+            cpu?: string
+            memory?: string
+          }
+          environment: *{} | {[string]: string}
+          
+          // Optional Parameters
+          envFrom?: [...]
+          
+          // Realtime Integration Parameters (from ComponentDefinition)
+          realtimePlatform?: string
+          realtimeSecrets?: [...string]
+          realtimeEnv?: {[string]: string}
+          
+          // Bootstrap Parameters (from ComponentDefinition)
+          bootstrap?: {
+            language: string
+            framework: string
+            source: string
+          }
+        }

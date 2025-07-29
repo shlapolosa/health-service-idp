@@ -1,11 +1,13 @@
 """
-Platform secret loading utilities for real-time platform integration
+Enhanced platform secret loading utilities for real-time platform integration
+with cross-component discovery and standardized naming conventions
 """
 
 import os
 import json
 import logging
-from typing import Dict, Any, Optional
+import time
+from typing import Dict, Any, Optional, List
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -20,6 +22,58 @@ class PlatformSecretLoader:
     def __init__(self, platform_name: Optional[str] = None):
         self.platform_name = platform_name
         self.secret_mount_path = "/var/secrets"  # Standard Kubernetes secret mount path
+        self.webservice_name = os.getenv("WEBSERVICE_NAME")  # For cross-component discovery
+    
+    def generate_secret_name(self, component_name: str, service_name: str) -> str:
+        """
+        Generate standardized secret name using the {name}-{service}-secret pattern
+        
+        Args:
+            component_name: Name of the component/platform
+            service_name: Name of the service (kafka, mqtt, db, etc.)
+            
+        Returns:
+            Standardized secret name
+        """
+        return f"{component_name}-{service_name}-secret"
+    
+    async def discover_realtime_platform_secrets(self, realtime_name: str) -> List[Dict[str, Any]]:
+        """
+        Cross-component secret discovery mechanism that allows webservices to
+        discover secrets from realtime-platform components
+        
+        Args:
+            realtime_name: Name of the realtime platform to discover secrets from
+            
+        Returns:
+            List of discovered secrets with their metadata
+        """
+        discovered_secrets = []
+        
+        # Standard realtime platform service types
+        service_types = ['kafka', 'mqtt', 'db', 'metabase', 'lenses']
+        
+        for service_type in service_types:
+            secret_name = self.generate_secret_name(realtime_name, service_type)
+            secret_data = await self._load_mounted_secret(secret_name)
+            
+            if secret_data:
+                discovered_secrets.append({
+                    'name': secret_name,
+                    'service_type': service_type,
+                    'platform': realtime_name,
+                    'data': secret_data,
+                    'labels': {
+                        'app.kubernetes.io/part-of': 'realtime-platform',
+                        'realtime.platform.example.org/name': realtime_name,
+                        'app.kubernetes.io/managed-by': 'crossplane',
+                        'app.kubernetes.io/discoverable': 'true'
+                    }
+                })
+                logger.info(f"Discovered secret: {secret_name} for service: {service_type}")
+        
+        logger.info(f"Discovered {len(discovered_secrets)} secrets for realtime platform: {realtime_name}")
+        return discovered_secrets
     
     async def load_platform_secrets(self, platform_name: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -50,8 +104,8 @@ class PlatformSecretLoader:
         return secrets
     
     async def _load_kafka_secrets(self, platform_name: str) -> Dict[str, Any]:
-        """Load Kafka connection secrets"""
-        secret_name = f"{platform_name}-kafka-secret"
+        """Load Kafka connection secrets using standardized naming"""
+        secret_name = self.generate_secret_name(platform_name, "kafka")
         
         # Try mounted secret first
         kafka_secrets = await self._load_mounted_secret(secret_name)
@@ -76,8 +130,8 @@ class PlatformSecretLoader:
         }
     
     async def _load_mqtt_secrets(self, platform_name: str) -> Dict[str, Any]:
-        """Load MQTT connection secrets"""
-        secret_name = f"{platform_name}-mqtt-secret"
+        """Load MQTT connection secrets using standardized naming"""
+        secret_name = self.generate_secret_name(platform_name, "mqtt")
         
         # Try mounted secret first
         mqtt_secrets = await self._load_mounted_secret(secret_name)
@@ -102,8 +156,8 @@ class PlatformSecretLoader:
         }
     
     async def _load_database_secrets(self, platform_name: str) -> Dict[str, Any]:
-        """Load database connection secrets"""
-        secret_name = f"{platform_name}-db-secret"
+        """Load database connection secrets using standardized naming"""
+        secret_name = self.generate_secret_name(platform_name, "db")
         
         # Try mounted secret first
         db_secrets = await self._load_mounted_secret(secret_name)
@@ -130,8 +184,8 @@ class PlatformSecretLoader:
         }
     
     async def _load_analytics_secrets(self, platform_name: str) -> Dict[str, Any]:
-        """Load analytics dashboard secrets (Metabase)"""
-        secret_name = f"{platform_name}-metabase-secret"
+        """Load analytics dashboard secrets (Metabase) using standardized naming"""
+        secret_name = self.generate_secret_name(platform_name, "metabase")
         
         # Try mounted secret first
         analytics_secrets = await self._load_mounted_secret(secret_name)
@@ -154,8 +208,8 @@ class PlatformSecretLoader:
         }
     
     async def _load_streaming_secrets(self, platform_name: str) -> Dict[str, Any]:
-        """Load stream processing secrets (Lenses)"""
-        secret_name = f"{platform_name}-lenses-secret"
+        """Load stream processing secrets (Lenses) using standardized naming"""
+        secret_name = self.generate_secret_name(platform_name, "lenses")
         
         # Try mounted secret first
         streaming_secrets = await self._load_mounted_secret(secret_name)
@@ -225,6 +279,74 @@ class PlatformSecretLoader:
             Dictionary of secret keys and values, or None if not found
         """
         return await self._load_mounted_secret(secret_name)
+    
+    async def inject_secrets_to_webservice(self, webservice_config: Dict[str, Any], secrets: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Secret injection capability for webservice components
+        
+        Args:
+            webservice_config: Webservice configuration dictionary
+            secrets: List of discovered secrets to inject
+            
+        Returns:
+            Updated webservice configuration with injected secrets
+        """
+        if not secrets:
+            logger.info("No secrets to inject")
+            return webservice_config
+        
+        # Initialize envFrom list if it doesn't exist
+        if 'envFrom' not in webservice_config:
+            webservice_config['envFrom'] = []
+        
+        # Add environment variables from each secret
+        for secret in secrets:
+            secret_ref = {
+                'secretRef': {
+                    'name': secret['name']
+                }
+            }
+            
+            # Add secret reference if not already present
+            if secret_ref not in webservice_config['envFrom']:
+                webservice_config['envFrom'].append(secret_ref)
+                logger.info(f"Injected secret reference: {secret['name']} for service: {secret['service_type']}")
+        
+        # Add realtime platform discovery annotation
+        if 'annotations' not in webservice_config:
+            webservice_config['annotations'] = {}
+        
+        webservice_config['annotations']['realtime.platform.example.org/secrets-injected'] = 'true'
+        webservice_config['annotations']['realtime.platform.example.org/injection-timestamp'] = str(int(time.time()))
+        
+        logger.info(f"Successfully injected {len(secrets)} secret references into webservice configuration")
+        return webservice_config
+    
+    async def create_secret_environment_map(self, secrets: List[Dict[str, Any]]) -> Dict[str, str]:
+        """
+        Create environment variable mapping for all discovered secrets
+        
+        Args:
+            secrets: List of discovered secrets
+            
+        Returns:
+            Dictionary mapping environment variable names to their values
+        """
+        env_map = {}
+        
+        for secret in secrets:
+            service_type = secret['service_type']
+            data = secret['data']
+            
+            # Create service-specific environment variable prefixes
+            prefix = service_type.upper()
+            
+            for key, value in data.items():
+                env_var_name = f"{prefix}_{key}"
+                env_map[env_var_name] = value
+        
+        logger.info(f"Created environment map with {len(env_map)} variables from {len(secrets)} secrets")
+        return env_map
     
     def validate_required_secrets(self, secrets: Dict[str, Any], required_services: List[str]) -> bool:
         """
@@ -358,3 +480,139 @@ def configure_agent_from_secrets(config: 'AgentConfig', secrets: Dict[str, Any])
     
     logger.info(f"AgentConfig updated with platform secrets")
     return config
+
+
+# Enhanced convenience functions for webservice integration
+async def load_and_inject_realtime_secrets(webservice_name: str, realtime_platform_name: str) -> Dict[str, Any]:
+    """
+    Convenience function to discover and inject realtime platform secrets into a webservice
+    
+    Args:
+        webservice_name: Name of the webservice component
+        realtime_platform_name: Name of the realtime platform to discover secrets from
+        
+    Returns:
+        Dictionary containing injected configuration and discovered secrets
+    """
+    loader = PlatformSecretLoader()
+    
+    # Discover realtime platform secrets
+    discovered_secrets = await loader.discover_realtime_platform_secrets(realtime_platform_name)
+    
+    if not discovered_secrets:
+        logger.warning(f"No secrets discovered for realtime platform: {realtime_platform_name}")
+        return {
+            'webservice_config': {},
+            'discovered_secrets': [],
+            'injection_successful': False
+        }
+    
+    # Create basic webservice configuration
+    webservice_config = {
+        'envFrom': [],
+        'annotations': {
+            'realtime.platform.example.org/integration': realtime_platform_name,
+            'webservice.example.org/name': webservice_name
+        }
+    }
+    
+    # Inject secrets into webservice configuration
+    updated_config = await loader.inject_secrets_to_webservice(webservice_config, discovered_secrets)
+    
+    return {
+        'webservice_config': updated_config,
+        'discovered_secrets': discovered_secrets,
+        'injection_successful': True,
+        'secret_count': len(discovered_secrets)
+    }
+
+
+async def validate_webservice_realtime_integration(webservice_name: str, realtime_platform_name: str) -> Dict[str, Any]:
+    """
+    Validate that a webservice can successfully integrate with a realtime platform
+    
+    Args:
+        webservice_name: Name of the webservice component
+        realtime_platform_name: Name of the realtime platform
+        
+    Returns:
+        Validation results with status and recommendations
+    """
+    loader = PlatformSecretLoader()
+    
+    # Discover available secrets
+    discovered_secrets = await loader.discover_realtime_platform_secrets(realtime_platform_name)
+    
+    validation_results = {
+        'webservice': webservice_name,
+        'realtime_platform': realtime_platform_name,
+        'validation_timestamp': int(time.time()),
+        'status': 'unknown',
+        'available_services': [],
+        'missing_services': [],
+        'recommendations': []
+    }
+    
+    # Check for essential realtime platform services
+    essential_services = ['kafka', 'mqtt', 'db']
+    discovered_service_types = [secret['service_type'] for secret in discovered_secrets]
+    
+    validation_results['available_services'] = discovered_service_types
+    validation_results['missing_services'] = [service for service in essential_services if service not in discovered_service_types]
+    
+    # Determine validation status
+    if len(discovered_secrets) == 0:
+        validation_results['status'] = 'failed'
+        validation_results['recommendations'].append(f"No secrets found for realtime platform '{realtime_platform_name}'. Ensure the platform is deployed and secrets are created.")
+    elif len(validation_results['missing_services']) > 0:
+        validation_results['status'] = 'partial'
+        validation_results['recommendations'].append(f"Missing essential services: {', '.join(validation_results['missing_services'])}")
+    else:
+        validation_results['status'] = 'ready'
+        validation_results['recommendations'].append("All essential services available for integration")
+    
+    # Add service-specific recommendations
+    if 'kafka' in discovered_service_types:
+        validation_results['recommendations'].append("Kafka available: Enable event streaming and message processing")
+    if 'mqtt' in discovered_service_types:
+        validation_results['recommendations'].append("MQTT available: Enable IoT device communication")
+    if 'db' in discovered_service_types:
+        validation_results['recommendations'].append("Database available: Enable persistent data storage")
+    
+    logger.info(f"Validation completed for {webservice_name} → {realtime_platform_name}: {validation_results['status']}")
+    return validation_results
+
+
+def generate_webservice_secret_configuration(realtime_platform_name: str) -> Dict[str, Any]:
+    """
+    Generate Kubernetes secret configuration for webservice integration
+    
+    Args:
+        realtime_platform_name: Name of the realtime platform
+        
+    Returns:
+        Kubernetes configuration for secret discovery and injection
+    """
+    return {
+        'apiVersion': 'v1',
+        'kind': 'Secret',
+        'metadata': {
+            'name': f'webservice-{realtime_platform_name}-integration',
+            'labels': {
+                'app.kubernetes.io/managed-by': 'webservice-secret-injector',
+                'realtime.platform.example.org/integration': realtime_platform_name,
+                'app.kubernetes.io/component': 'secret-integration'
+            },
+            'annotations': {
+                'realtime.platform.example.org/source-platform': realtime_platform_name,
+                'webservice.example.org/secret-type': 'cross-component-integration',
+                'webservice.example.org/discovery-pattern': f'{realtime_platform_name}-*-secret'
+            }
+        },
+        'type': 'Opaque',
+        'data': {
+            'REALTIME_PLATFORM_NAME': realtime_platform_name,
+            'INTEGRATION_ENABLED': 'true',
+            'SECRET_DISCOVERY_PATTERN': f'{realtime_platform_name}-*-secret'
+        }
+    }

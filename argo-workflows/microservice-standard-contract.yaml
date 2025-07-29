@@ -255,6 +255,8 @@ spec:
             value: "{{inputs.parameters.user}}"
           - name: slack-channel
             value: "{{inputs.parameters.slack-channel}}"
+          - name: repository-name
+            value: "{{steps.ensure-repositories.outputs.parameters.repository-name}}"
         when: "{{steps.ensure-repositories.status}} == Succeeded"
     - - name: wait-for-microservice-ready
         template: wait-for-microservice-ready
@@ -283,6 +285,8 @@ spec:
             value: "{{inputs.parameters.microservice-database}}"
           - name: microservice-cache
             value: "{{inputs.parameters.microservice-cache}}"
+          - name: repository-name
+            value: "{{steps.ensure-repositories.outputs.parameters.repository-name}}"
         when: "{{steps.wait-for-microservice-ready.status}} == Succeeded"
     - - name: notify-success
         templateRef:
@@ -301,7 +305,7 @@ spec:
           - name: slack-user-id
             value: "{{inputs.parameters.slack-user-id}}"
           - name: message
-            value: "{{inputs.parameters.microservice-language}} microservice '{{inputs.parameters.resource-name}}' created successfully!\n\n{{steps.extract-microservice-info.outputs.parameters.endpoints-summary}}\n\n🚀 {{inputs.parameters.microservice-framework}} Service\n📊 {{inputs.parameters.microservice-database}} Database\n💾 {{inputs.parameters.microservice-cache}} Cache\n🔄 GitOps (ArgoCD)\n📦 Knative Deployment"
+            value: "{{inputs.parameters.microservice-language}} microservice '{{inputs.parameters.resource-name}}' created successfully!\n\n📦 **Created Artifacts:**\n{{steps.extract-microservice-info.outputs.parameters.artifacts-summary}}\n\n🌐 **External Access:**\n{{steps.extract-microservice-info.outputs.parameters.external-endpoints}}\n\n🔗 **Internal Endpoints:**\n{{steps.extract-microservice-info.outputs.parameters.endpoints-summary}}\n\n🚀 **Configuration:**\n• Framework: {{inputs.parameters.microservice-framework}}\n• Database: {{inputs.parameters.microservice-database}}\n• Cache: {{inputs.parameters.microservice-cache}}\n• Repository: {{steps.ensure-repositories.outputs.parameters.repository-name}}\n• Deployment: GitOps (ArgoCD) + Knative"
           - name: notification-type
             value: "success"
         when: "{{steps.extract-microservice-info.status}} == Succeeded"
@@ -532,6 +536,7 @@ spec:
       - name: microservice-expose-api
       - name: user
       - name: slack-channel
+      - name: repository-name
     script:
       image: bitnami/kubectl:1.28
       command: [sh]
@@ -557,11 +562,8 @@ spec:
         # Sanitize slack channel for label
         SLACK_CHANNEL_LABEL=$(echo "{{inputs.parameters.slack-channel}}" | sed 's/#//g' | tr '[:upper:]' '[:lower:]')
         
-        # Determine repository name (remove -service suffix)
-        REPO_NAME="{{inputs.parameters.resource-name}}"
-        if echo "$REPO_NAME" | grep -q -- "-service$"; then
-          REPO_NAME=$(echo "$REPO_NAME" | sed 's/-service$//')
-        fi
+        # Use the repository name that was determined in ensure-repositories step
+        REPO_NAME="{{inputs.parameters.repository-name}}"
         
         # Create ApplicationClaim manifest that references the AppContainer
         cat <<EOF | kubectl apply -f -
@@ -668,22 +670,30 @@ spec:
       - name: microservice-language
       - name: microservice-database
       - name: microservice-cache
+      - name: microservice-realtime
+      - name: repository-name
     outputs:
       parameters:
       - name: endpoints-summary
         valueFrom:
           path: /tmp/endpoints.txt
+      - name: artifacts-summary
+        valueFrom:
+          path: /tmp/artifacts.txt
+      - name: external-endpoints
+        valueFrom:
+          path: /tmp/external-endpoints.txt
     script:
       image: bitnami/kubectl:1.28
       command: [sh]
       source: |
-        echo "🔍 Extracting microservice connection information..."
+        echo "🔍 Extracting comprehensive microservice artifacts and endpoints..."
         
-        # Determine repository name (remove -service suffix)
-        REPO_NAME="{{inputs.parameters.resource-name}}"
-        if echo "$REPO_NAME" | grep -q -- "-service$"; then
-          REPO_NAME=$(echo "$REPO_NAME" | sed 's/-service$//')
-        fi
+        # Use the repository name that was determined in ensure-repositories step
+        REPO_NAME="{{inputs.parameters.repository-name}}"
+        MICROSERVICE_NAME="{{inputs.parameters.resource-name}}"
+        NAMESPACE="{{inputs.parameters.namespace}}"
+        REALTIME_PLATFORM="{{inputs.parameters.microservice-realtime}}"
         
         TARGET_VCLUSTER="{{inputs.parameters.target-vcluster}}"
         if [ -z "$TARGET_VCLUSTER" ]; then
@@ -691,45 +701,235 @@ spec:
         fi
         
         echo "Repository name: $REPO_NAME"
+        echo "Microservice name: $MICROSERVICE_NAME"
+        echo "Namespace: $NAMESPACE"
         echo "Target VCluster: $TARGET_VCLUSTER"
+        echo "Realtime Platform: ${REALTIME_PLATFORM:-'None'}"
         
-        # Build comprehensive endpoints summary
+        # =============================================================================
+        # DETECT CREATED ARTIFACTS
+        # =============================================================================
+        echo "📦 Detecting created Kubernetes artifacts..."
+        
+        ARTIFACTS_SUMMARY=""
+        EXTERNAL_ENDPOINTS=""
         ENDPOINTS_SUMMARY=""
+        
+        # Check for Knative Service (primary microservice)
+        if kubectl get ksvc "$MICROSERVICE_NAME" -n "$NAMESPACE" >/dev/null 2>&1; then
+          ARTIFACTS_SUMMARY="${ARTIFACTS_SUMMARY}✅ Knative Service: $MICROSERVICE_NAME\\n"
+          
+          # Get Knative Service URL
+          KNATIVE_URL=$(kubectl get ksvc "$MICROSERVICE_NAME" -n "$NAMESPACE" -o jsonpath='{.status.url}' 2>/dev/null || echo "")
+          if [ ! -z "$KNATIVE_URL" ]; then
+            ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}🚀 Microservice API: $KNATIVE_URL\\n"
+            
+            # Check if externally accessible
+            if echo "$KNATIVE_URL" | grep -v "\.local" | grep -v "cluster\.local" >/dev/null; then
+              EXTERNAL_ENDPOINTS="${EXTERNAL_ENDPOINTS}🌐 External API: $KNATIVE_URL\\n"
+            fi
+          fi
+        fi
+        
+        # Check for Application (OAM)
+        if kubectl get application "$MICROSERVICE_NAME" -n "$NAMESPACE" >/dev/null 2>&1; then
+          ARTIFACTS_SUMMARY="${ARTIFACTS_SUMMARY}✅ OAM Application: $MICROSERVICE_NAME\\n"
+        fi
+        
+        # Check for ApplicationClaim (if created via ApplicationClaim workflow)
+        if kubectl get applicationclaim "$MICROSERVICE_NAME" -n "$NAMESPACE" >/dev/null 2>&1; then
+          ARTIFACTS_SUMMARY="${ARTIFACTS_SUMMARY}✅ ApplicationClaim: $MICROSERVICE_NAME\\n"
+        fi
+        
+        # Check for Deployment (traditional K8s)
+        if kubectl get deployment "$MICROSERVICE_NAME" -n "$NAMESPACE" >/dev/null 2>&1; then
+          ARTIFACTS_SUMMARY="${ARTIFACTS_SUMMARY}✅ Deployment: $MICROSERVICE_NAME\\n"
+        fi
+        
+        # Check for Services
+        SERVICES=$(kubectl get svc -n "$NAMESPACE" -l "app.kubernetes.io/name=$MICROSERVICE_NAME" --no-headers 2>/dev/null | awk '{print $1}' || echo "")
+        if [ ! -z "$SERVICES" ]; then
+          for SVC in $SERVICES; do
+            ARTIFACTS_SUMMARY="${ARTIFACTS_SUMMARY}✅ Service: $SVC\\n"
+            
+            # Check for LoadBalancer services with external IPs
+            SVC_TYPE=$(kubectl get svc "$SVC" -n "$NAMESPACE" -o jsonpath='{.spec.type}' 2>/dev/null)
+            if [ "$SVC_TYPE" = "LoadBalancer" ]; then
+              EXTERNAL_IP=$(kubectl get svc "$SVC" -n "$NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+              EXTERNAL_HOSTNAME=$(kubectl get svc "$SVC" -n "$NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+              
+              if [ ! -z "$EXTERNAL_IP" ]; then
+                EXTERNAL_ENDPOINTS="${EXTERNAL_ENDPOINTS}🌐 LoadBalancer IP: $EXTERNAL_IP\\n"
+              fi
+              if [ ! -z "$EXTERNAL_HOSTNAME" ]; then
+                EXTERNAL_ENDPOINTS="${EXTERNAL_ENDPOINTS}🌐 LoadBalancer: $EXTERNAL_HOSTNAME\\n"
+              fi
+            fi
+          done
+        fi
+        
+        # Check for Ingress/Gateway resources
+        INGRESSES=$(kubectl get ingress -n "$NAMESPACE" -l "app.kubernetes.io/name=$MICROSERVICE_NAME" --no-headers 2>/dev/null | awk '{print $1}' || echo "")
+        if [ ! -z "$INGRESSES" ]; then
+          for ING in $INGRESSES; do
+            ARTIFACTS_SUMMARY="${ARTIFACTS_SUMMARY}✅ Ingress: $ING\\n"
+            
+            # Extract ingress hostnames
+            INGRESS_HOSTS=$(kubectl get ingress "$ING" -n "$NAMESPACE" -o jsonpath='{.spec.rules[*].host}' 2>/dev/null)
+            for HOST in $INGRESS_HOSTS; do
+              EXTERNAL_ENDPOINTS="${EXTERNAL_ENDPOINTS}🌐 Ingress Host: https://$HOST\\n"
+            done
+          done
+        fi
+        
+        # Check for Istio Gateway
+        if kubectl get gateway -n "$NAMESPACE" -l "app.kubernetes.io/name=$MICROSERVICE_NAME" --no-headers >/dev/null 2>&1; then
+          GATEWAY_NAME=$(kubectl get gateway -n "$NAMESPACE" -l "app.kubernetes.io/name=$MICROSERVICE_NAME" --no-headers | awk '{print $1}' | head -1)
+          ARTIFACTS_SUMMARY="${ARTIFACTS_SUMMARY}✅ Istio Gateway: $GATEWAY_NAME\\n"
+        fi
+        
+        # Check for secrets created
+        SECRETS=$(kubectl get secrets -n "$NAMESPACE" -l "app.kubernetes.io/name=$MICROSERVICE_NAME" --no-headers 2>/dev/null | awk '{print $1}' || echo "")
+        if [ ! -z "$SECRETS" ]; then
+          SECRET_COUNT=$(echo "$SECRETS" | wc -l)
+          ARTIFACTS_SUMMARY="${ARTIFACTS_SUMMARY}✅ Secrets: $SECRET_COUNT created\\n"
+        fi
+        
+        # =============================================================================
+        # INFRASTRUCTURE ENDPOINTS  
+        # =============================================================================
         
         # GitHub repositories
         SOURCE_URL="https://github.com/{{inputs.parameters.github-org}}/$REPO_NAME"
         GITOPS_URL="https://github.com/{{inputs.parameters.github-org}}/$REPO_NAME-gitops"
-        ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}📚 Source Repository: $SOURCE_URL\\\\n"
-        ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}🔄 GitOps Repository: $GITOPS_URL\\\\n"
-        
-        # Service endpoints
-        SERVICE_URL="http://{{inputs.parameters.resource-name}}.{{inputs.parameters.namespace}}.local"
-        ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}🚀 Microservice Endpoint: $SERVICE_URL\\\\n"
+        ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}📚 Source Repository: $SOURCE_URL\\n"
+        ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}🔄 GitOps Repository: $GITOPS_URL\\n"
         
         # VCluster management endpoints
-        ARGOCD_URL="http://${TARGET_VCLUSTER}-argocd.{{inputs.parameters.namespace}}.local"
-        ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}🔄 ArgoCD (GitOps): $ARGOCD_URL\\\\n"
+        ARGOCD_URL="http://${TARGET_VCLUSTER}-argocd.$NAMESPACE.local"
+        ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}🔄 ArgoCD (GitOps): $ARGOCD_URL\\n"
         
-        # Add database endpoint if enabled
+        # Database endpoints (if enabled)
         if [ "{{inputs.parameters.microservice-database}}" != "none" ]; then
-          DB_URL="{{inputs.parameters.microservice-database}}://{{inputs.parameters.resource-name}}-db.{{inputs.parameters.namespace}}.local"
-          ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}🗄️ Database: $DB_URL\\\\n"
+          DB_SECRET_NAME="${MICROSERVICE_NAME}-db-secret"
+          if kubectl get secret "$DB_SECRET_NAME" -n "$NAMESPACE" >/dev/null 2>&1; then
+            ARTIFACTS_SUMMARY="${ARTIFACTS_SUMMARY}✅ Database Secret: $DB_SECRET_NAME\\n"
+            
+            # Extract database host from secret
+            DB_HOST=$(kubectl get secret "$DB_SECRET_NAME" -n "$NAMESPACE" -o jsonpath='{.data.DB_HOST}' 2>/dev/null | base64 -d || echo "${MICROSERVICE_NAME}-postgres")
+            DB_PORT=$(kubectl get secret "$DB_SECRET_NAME" -n "$NAMESPACE" -o jsonpath='{.data.DB_PORT}' 2>/dev/null | base64 -d || echo "5432")
+            ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}🗄️ Database: postgresql://$DB_HOST:$DB_PORT\\n"
+          fi
         fi
         
-        # Add cache endpoint if enabled
+        # Cache endpoints (if enabled)
         if [ "{{inputs.parameters.microservice-cache}}" != "none" ]; then
-          CACHE_URL="{{inputs.parameters.microservice-cache}}://{{inputs.parameters.resource-name}}-cache.{{inputs.parameters.namespace}}.local"
-          ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}💾 Cache: $CACHE_URL\\\\n"
+          CACHE_SECRET_NAME="${MICROSERVICE_NAME}-redis-secret"
+          if kubectl get secret "$CACHE_SECRET_NAME" -n "$NAMESPACE" >/dev/null 2>&1; then
+            ARTIFACTS_SUMMARY="${ARTIFACTS_SUMMARY}✅ Cache Secret: $CACHE_SECRET_NAME\\n"
+            
+            # Extract cache host from secret
+            CACHE_HOST=$(kubectl get secret "$CACHE_SECRET_NAME" -n "$NAMESPACE" -o jsonpath='{.data.REDIS_HOST}' 2>/dev/null | base64 -d || echo "${MICROSERVICE_NAME}-redis")
+            CACHE_PORT=$(kubectl get secret "$CACHE_SECRET_NAME" -n "$NAMESPACE" -o jsonpath='{.data.REDIS_PORT}' 2>/dev/null | base64 -d || echo "6379")
+            ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}💾 Cache: redis://$CACHE_HOST:$CACHE_PORT\\n"
+          fi
         fi
         
-        # Write output to file
+        # =============================================================================
+        # REALTIME PLATFORM INTEGRATION
+        # =============================================================================
+        
+        if [ ! -z "$REALTIME_PLATFORM" ] && [ "$REALTIME_PLATFORM" != "" ]; then
+          echo "🔍 Checking realtime platform integration: $REALTIME_PLATFORM"
+          
+          # Check for realtime platform secrets using standardized naming
+          REALTIME_SECRETS=""
+          for SERVICE_TYPE in kafka mqtt db metabase lenses; do
+            SECRET_NAME="${REALTIME_PLATFORM}-${SERVICE_TYPE}-secret"
+            if kubectl get secret "$SECRET_NAME" -n "$NAMESPACE" >/dev/null 2>&1; then
+              REALTIME_SECRETS="${REALTIME_SECRETS}$SECRET_NAME "
+              
+              case $SERVICE_TYPE in
+                kafka)
+                  KAFKA_HOST=$(kubectl get secret "$SECRET_NAME" -n "$NAMESPACE" -o jsonpath='{.data.KAFKA_BOOTSTRAP_SERVERS}' 2>/dev/null | base64 -d || echo "${REALTIME_PLATFORM}-kafka:9092")
+                  ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}📡 Kafka: $KAFKA_HOST\\n"
+                  ;;
+                mqtt)
+                  MQTT_HOST=$(kubectl get secret "$SECRET_NAME" -n "$NAMESPACE" -o jsonpath='{.data.MQTT_HOST}' 2>/dev/null | base64 -d || echo "${REALTIME_PLATFORM}-mqtt")
+                  MQTT_PORT=$(kubectl get secret "$SECRET_NAME" -n "$NAMESPACE" -o jsonpath='{.data.MQTT_PORT}' 2>/dev/null | base64 -d || echo "1883")
+                  ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}📱 MQTT: mqtt://$MQTT_HOST:$MQTT_PORT\\n"
+                  ;;
+                metabase)
+                  METABASE_URL=$(kubectl get secret "$SECRET_NAME" -n "$NAMESPACE" -o jsonpath='{.data.METABASE_URL}' 2>/dev/null | base64 -d || echo "http://${REALTIME_PLATFORM}-metabase:3000")
+                  ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}📊 Analytics: $METABASE_URL\\n"
+                  ;;
+                lenses)
+                  LENSES_URL=$(kubectl get secret "$SECRET_NAME" -n "$NAMESPACE" -o jsonpath='{.data.LENSES_URL}' 2>/dev/null | base64 -d || echo "http://${REALTIME_PLATFORM}-lenses-hq:9991")
+                  ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}🌊 Stream Processing: $LENSES_URL\\n"
+                  ;;
+              esac
+            fi
+          done
+          
+          if [ ! -z "$REALTIME_SECRETS" ]; then
+            SECRET_COUNT=$(echo $REALTIME_SECRETS | wc -w)
+            ARTIFACTS_SUMMARY="${ARTIFACTS_SUMMARY}✅ Realtime Integration: $SECRET_COUNT secrets discovered\\n"
+            ENDPOINTS_SUMMARY="${ENDPOINTS_SUMMARY}🔗 Realtime Platform: $REALTIME_PLATFORM\\n"
+          fi
+          
+          # Check for integration secret
+          INTEGRATION_SECRET="${MICROSERVICE_NAME}-${REALTIME_PLATFORM}-integration"
+          if kubectl get secret "$INTEGRATION_SECRET" -n "$NAMESPACE" >/dev/null 2>&1; then
+            ARTIFACTS_SUMMARY="${ARTIFACTS_SUMMARY}✅ Integration Secret: $INTEGRATION_SECRET\\n"
+          fi
+        fi
+        
+        # =============================================================================
+        # CHECK FOR EXTERNAL ACCESS POINTS
+        # =============================================================================
+        
+        # Check for Istio Gateway external access
+        ISTIO_LB_IP=$(kubectl get svc istio-ingressgateway -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+        ISTIO_LB_HOSTNAME=$(kubectl get svc istio-ingressgateway -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+        
+        if [ ! -z "$ISTIO_LB_IP" ] || [ ! -z "$ISTIO_LB_HOSTNAME" ]; then
+          GATEWAY_ENDPOINT="${ISTIO_LB_HOSTNAME:-$ISTIO_LB_IP}"
+          if kubectl get gateway -n "$NAMESPACE" >/dev/null 2>&1; then
+            EXTERNAL_ENDPOINTS="${EXTERNAL_ENDPOINTS}🌐 Istio Gateway: http://$GATEWAY_ENDPOINT\\n"
+          fi
+        fi
+        
+        # =============================================================================
+        # WRITE OUTPUT FILES
+        # =============================================================================
+        
+        # Write endpoints summary
         echo -e "$ENDPOINTS_SUMMARY" > /tmp/endpoints.txt
         
-        echo "✅ Microservice connection information extracted"
-        echo "Language: {{inputs.parameters.microservice-language}}"
-        echo "Database: {{inputs.parameters.microservice-database}}"
-        echo "Cache: {{inputs.parameters.microservice-cache}}"
-        echo "Endpoints: $ENDPOINTS_SUMMARY"
+        # Write artifacts summary  
+        echo -e "$ARTIFACTS_SUMMARY" > /tmp/artifacts.txt
+        
+        # Write external endpoints
+        echo -e "$EXTERNAL_ENDPOINTS" > /tmp/external-endpoints.txt
+        
+        # =============================================================================
+        # LOGGING
+        # =============================================================================
+        
+        echo "✅ Comprehensive artifact and endpoint extraction completed"
+        echo ""
+        echo "📦 CREATED ARTIFACTS:"
+        echo -e "$ARTIFACTS_SUMMARY"
+        echo ""
+        echo "🔗 INTERNAL ENDPOINTS:"
+        echo -e "$ENDPOINTS_SUMMARY" 
+        echo ""
+        echo "🌐 EXTERNAL ENDPOINTS:"
+        if [ ! -z "$EXTERNAL_ENDPOINTS" ]; then
+          echo -e "$EXTERNAL_ENDPOINTS"
+        else
+          echo "None detected (services are internal-only)"
+        fi
 
   - name: determine-repository-name
     inputs:

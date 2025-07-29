@@ -249,6 +249,7 @@ class MicroserviceRequest:
     language: MicroserviceLanguage = MicroserviceLanguage.PYTHON
     database: MicroserviceDatabase = MicroserviceDatabase.NONE
     cache: MicroserviceCache = MicroserviceCache.NONE
+    realtime: Optional[str] = None  # Name of realtime platform to integrate with
     description: str = "CLAUDE.md-compliant microservice"
     github_org: str = "shlapolosa"
     docker_registry: str = "docker.io/socrates12345"
@@ -305,6 +306,7 @@ class MicroserviceRequest:
             "language": self.language.value,
             "database": database_value,
             "cache": self.cache.value,
+            "realtime": self.realtime or "",
             "description": self.description,
             "github-org": self.github_org,
             "docker-registry": self.docker_registry,
@@ -360,6 +362,7 @@ class ParsedCommand:
     microservice_language: MicroserviceLanguage = MicroserviceLanguage.PYTHON
     microservice_database: MicroserviceDatabase = MicroserviceDatabase.NONE
     microservice_cache: MicroserviceCache = MicroserviceCache.NONE
+    microservice_realtime: Optional[str] = None  # Name of realtime platform to integrate with
     parsing_method: str = "regex"
 
     def __post_init__(self):

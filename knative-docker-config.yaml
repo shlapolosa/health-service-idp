@@ -6,3 +6,13 @@ metadata:
   namespace: default
 imagePullSecrets:
 - name: docker-registry-secret
+
+---
+# ServiceAccount for test-realtime-working namespace
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: knative-docker-sa
+  namespace: test-realtime-working
+imagePullSecrets:
+- name: docker-registry-secret
