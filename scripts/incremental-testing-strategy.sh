@@ -227,12 +227,12 @@ spec:
   - name: custom-api
     type: webservice
     properties:
-      image: httpd:alpine  # Use a known working image for test
-      port: 80
+      image: docker.io/socrates12345/custom-api:latest  # This will trigger repository creation
+      port: 8080
       version: "test-2.0"
       language: python
       framework: fastapi
-      healthPath: "/"  # Use root path for httpd
+      healthPath: "/health"  # Use standard health path
       environment:
         ENVIRONMENT: "test"
         SERVICE_NAME: "custom-api"
@@ -286,13 +286,13 @@ spec:
   - name: streaming-platform
     type: realtime-platform
     properties:
-      image: httpd:alpine  # Use a known working image for test
-      port: 80
+      image: docker.io/socrates12345/streaming-platform:latest  # This will trigger repository creation
+      port: 8080
       version: "test-3.0"
       database: postgres
       visualization: metabase
       iot: true
-      healthPath: "/"  # Use root path for httpd
+      healthPath: "/health"  # Use standard health path
       environment:
         ENVIRONMENT: "test"
         PLATFORM_NAME: "streaming-platform"

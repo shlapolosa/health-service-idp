@@ -229,26 +229,30 @@ graph TD
 
 ## 📋 OAM Components Reference
 
-### Table 1: OAM ComponentDefinitions
+### Table 1: Main OAM ComponentDefinitions
 
-All components that can be added to OAM applications (`oam/applications/application.yaml`):
+Primary components for application development:
 
-| Component | Use Case | Crossplane Mapping | Kubernetes Artifact |
-|-----------|----------|-------------------|---------------------|
-| **Application Components (OAM-Compliant)** | | | |
-| `webservice` | Auto-scaling web applications, microservices, APIs | Optional: `ApplicationClaim` for infrastructure | **Knative Service** + Optional Argo Workflow ⭐ |
-| `rasa-chatbot` | Conversational AI chatbots with NLP | None (direct) | **2x Knative Services** (Rasa + Actions) + Optional Istio Gateway ⭐ |
-| `kafka` | Event streaming, message queues | None (direct) | Helm Release (Bitnami Kafka Chart) |
-| `redis` | In-memory caching, session storage | None (direct) | Helm Release (Bitnami Redis Chart) |
-| `mongodb` | Document database, NoSQL storage | None (direct) | Helm Release (Bitnami MongoDB Chart) |
-| **Infrastructure Components (Crossplane-Managed)** | | | |
-| `application-infrastructure` | Complete application setup with repos | `ApplicationClaim` | Multiple: Repos + Infrastructure + Secrets |
-| `realtime-platform` | Complete streaming infrastructure | `RealtimePlatformClaim` | **Knative Service** + Kafka + MQTT + Lenses + Metabase + PostgreSQL ⭐ |
-| `vcluster` | Virtual Kubernetes environments | `VClusterEnvironmentClaim` | vCluster + Istio + Knative + ArgoCD + Observability |
-| `neon-postgres` | Managed PostgreSQL database | None (direct) | Secret with connection details |
-| `auth0-idp` | Identity provider integration, SSO | None (direct) | ExternalSecret from AWS Secrets Manager |
+| Component | Options | Use Case | Crossplane Mapping | Kubernetes Artifact |
+|-----------|---------|----------|-------------------|---------------------|
+| **webservice** | `image`, `port`, `language`, `framework`, `source`, `realtime`, `env`, `resources` | Auto-scaling web applications, microservices, REST APIs | Optional: `ApplicationClaim` for infrastructure | **Knative Service** + Optional Argo Workflow |
+| **realtime-platform** | `name`, `database`, `visualization`, `kafka.replicas`, `mqtt.enabled`, `lenses.enabled`, `resources` | Complete streaming infrastructure, IoT platforms, real-time analytics | `RealtimePlatformClaim` | **Knative Service** + Kafka + MQTT + Lenses + Metabase + PostgreSQL |
+| **neon-postgres** | `database`, `version`, `storageSize`, `replicas`, `backup`, `security`, `resources` | Managed PostgreSQL database, persistent data storage | None (direct) | Secret with connection details |
+| **auth0-idp** | `domain`, `clientId`, `clientSecret`, `audience`, `scopes`, `compliance` | Identity provider integration, SSO, user authentication | None (direct) | ExternalSecret from AWS Secrets Manager |
 
-### Table 2: Crossplane Claims (Beyond OAM)
+### Table 2: Supporting OAM ComponentDefinitions
+
+Additional components for specific use cases:
+
+| Component | Options | Use Case | Crossplane Mapping | Kubernetes Artifact |
+|-----------|---------|----------|-------------------|---------------------|
+| **kafka** | `replicas`, `storageSize`, `topics`, `resources` | Event streaming, message queues | None (direct) | Helm Release (Bitnami Kafka Chart) |
+| **redis** | `replicas`, `storageSize`, `password`, `persistence`, `resources` | In-memory caching, session storage | None (direct) | Helm Release (Bitnami Redis Chart) |
+| **mongodb** | `replicas`, `storageSize`, `database`, `auth`, `backup`, `resources` | Document database, NoSQL storage | None (direct) | Helm Release (Bitnami MongoDB Chart) |
+| **application-infrastructure** | `name`, `language`, `framework`, `database`, `cache`, `repository` | Complete application setup with repositories | `ApplicationClaim` | Multiple: Repos + Infrastructure + Secrets |
+| **vcluster** | `size`, `kubernetes.version`, `networking`, `resources`, `features` | Virtual Kubernetes environments, isolated development | `VClusterEnvironmentClaim` | vCluster + Istio + Knative + ArgoCD + Observability |
+
+### Table 3: Crossplane Claims (Beyond OAM)
 
 Additional Crossplane claims available for direct use, not mapped to OAM components:
 

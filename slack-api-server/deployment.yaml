@@ -23,7 +23,7 @@ spec:
       volumes:
       - name: argo-token
         secret:
-          secretName: slack-api-argo-token-copy
+          secretName: slack-api-server-argo-token
       containers:
       - name: slack-api-server
         image: socrates12345/slack-api-server:latest-auth-fix

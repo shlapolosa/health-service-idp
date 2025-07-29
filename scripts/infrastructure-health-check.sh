@@ -142,15 +142,23 @@ echo
 # 2. Check Essential Secrets
 log_info "🔐 Checking Essential Secrets..."
 check_resource "secret" "docker-registry-secret" "default" "Docker registry secret" || ((HEALTH_ISSUES++))
-check_resource "secret" "slack-api-argo-token-copy" "default" "Slack API Argo token" || ((HEALTH_ISSUES++))
+check_resource "secret" "slack-api-server-argo-token" "default" "Slack API Argo token" || ((HEALTH_ISSUES++))
 check_resource "secret" "slack-credentials" "default" "Slack credentials" || ((HEALTH_ISSUES++))
+check_resource "secret" "github-credentials" "default" "GitHub credentials" || ((HEALTH_ISSUES++))
+check_resource "secret" "github-provider-secret" "crossplane-system" "GitHub provider secret" || ((HEALTH_ISSUES++))
 echo
 
-# 3. Check Service Accounts
-log_info "👤 Checking Service Accounts..."
+# 3. Check Service Accounts and RBAC
+log_info "👤 Checking Service Accounts and RBAC..."
 check_resource "serviceaccount" "knative-docker-sa" "default" "Knative Docker service account" || ((HEALTH_ISSUES++))
 check_resource "serviceaccount" "argo-workflows-client" "default" "Argo workflows client (default)" || ((HEALTH_ISSUES++))
 check_resource "serviceaccount" "argo-workflows-client" "vela-system" "Argo workflows client (vela-system)" || ((HEALTH_ISSUES++))
+check_resource "serviceaccount" "slack-api-server" "default" "Slack API server service account" || ((HEALTH_ISSUES++))
+check_resource "serviceaccount" "slack-api-argo-access" "argo" "Slack API Argo access service account" || ((HEALTH_ISSUES++))
+
+# Check RBAC for Slack API server
+check_resource "role" "argo-workflow-api-access" "argo" "Argo workflow API access role" || ((HEALTH_ISSUES++))
+check_resource "rolebinding" "slack-api-server-argo-access" "argo" "Slack API server Argo access role binding" || ((HEALTH_ISSUES++))
 echo
 
 # 4. Check ComponentDefinitions
@@ -186,6 +194,10 @@ CROSSPLANE_CRDS=("xapplicationclaims.platform.example.org" "xappcontainerclaims.
 for crd in "${CROSSPLANE_CRDS[@]}"; do
     check_resource "compositeresourcedefinition" "$crd" "" "Crossplane CRD: $crd" || ((HEALTH_ISSUES++))
 done
+
+# Check Crossplane providers
+check_pod_health "pkg.crossplane.io/provider=provider-upjet-github" "crossplane-system" "GitHub provider pods" || ((HEALTH_ISSUES++))
+check_resource "providerconfig.github.upbound.io" "github-provider" "" "GitHub provider configuration" || ((HEALTH_ISSUES++))
 echo
 
 # 8. Check Istio/Service Mesh
