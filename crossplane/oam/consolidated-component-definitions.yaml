@@ -874,3 +874,193 @@ spec:
           name: string
         }
 
+---
+# ClickHouse Analytics Database ComponentDefinition
+# Optimized for healthcare analytics and time-series data
+# Supports OLAP queries for demand forecasting and reporting
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: clickhouse
+  annotations:
+    definition.oam.dev/description: "ClickHouse analytical database for time-series data and OLAP queries with healthcare compliance"
+spec:
+  workload:
+    definition:
+      apiVersion: helm.crossplane.io/v1beta1
+      kind: Release
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "helm.crossplane.io/v1beta1"
+          kind: "Release"
+          metadata: {
+            name: parameter.name + "-clickhouse"
+            namespace: context.namespace
+            labels: {
+              "app.kubernetes.io/name": parameter.name + "-clickhouse"
+              "app.kubernetes.io/component": "analytics-database"
+              "app.kubernetes.io/managed-by": "kubevela"
+            }
+          }
+          spec: {
+            forProvider: {
+              chart: {
+                name: "clickhouse"
+                repository: "https://charts.bitnami.com/bitnami"
+                version: "4.1.15"
+              }
+              namespace: context.namespace
+              skipCreateNamespace: false
+              values: {
+                architecture: parameter.architecture
+                auth: {
+                  username: parameter.auth.username
+                  password: parameter.auth.password
+                  database: parameter.auth.database
+                }
+                persistence: {
+                  enabled: true
+                  size: parameter.storage
+                  storageClass: parameter.storageClass
+                }
+                resources: {
+                  requests: {
+                    cpu: parameter.resources.cpu
+                    memory: parameter.resources.memory
+                  }
+                  limits: {
+                    cpu: parameter.resources.cpu
+                    memory: parameter.resources.memory
+                  }
+                }
+                if parameter.architecture == "replication" {
+                  replicaCount: parameter.replicas
+                  shards: parameter.shards
+                }
+                service: {
+                  type: "ClusterIP"
+                  ports: {
+                    http: 8123
+                    tcp: 9000
+                    mysql: 9004
+                    postgresql: 9005
+                  }
+                }
+                configuration: {
+                  // Healthcare-specific optimizations
+                  maxMemoryUsage: "8000000000"  // 8GB for analytics queries
+                  maxBytesBeforeExternalGroupBy: "2000000000"  // 2GB
+                  maxBytesBeforeExternalSort: "2000000000"     // 2GB
+                  httpPort: 8123
+                  tcpPort: 9000
+                  // Timezone for South African operations
+                  timezone: "Africa/Johannesburg"
+                  // Custom settings for healthcare compliance
+                  queryLogRetentionTime: "7776000"  // 90 days for audit compliance
+                  partLogRetentionTime: "7776000"   // 90 days
+                  // Performance optimizations for stock analytics
+                  backgroundPoolSize: 16
+                  backgroundSchedulePoolSize: 16
+                  maxConcurrentQueries: 100
+                  maxConnections: 1000
+                }
+                metrics: {
+                  enabled: true
+                  serviceMonitor: {
+                    enabled: true
+                  }
+                }
+                // Healthcare data encryption
+                tls: {
+                  enabled: parameter.security.tlsEnabled
+                  if parameter.security.tlsEnabled {
+                    certificatesSecret: parameter.security.certificateSecret
+                  }
+                }
+                // Backup configuration for compliance
+                backup: {
+                  enabled: parameter.backup.enabled
+                  if parameter.backup.enabled {
+                    schedule: parameter.backup.schedule
+                    retention: parameter.backup.retentionDays
+                  }
+                }
+                // Network policies for healthcare security
+                networkPolicy: {
+                  enabled: parameter.security.networkPolicyEnabled
+                  if parameter.security.networkPolicyEnabled {
+                    allowExternal: false
+                    ingressRules: {
+                      accessOnlyFrom: {
+                        enabled: true
+                        namespaceSelector: {
+                          "healthcare.org/access": "analytics"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            providerConfigRef: {
+              name: "default"
+            }
+          }
+        }
+        
+        parameter: {
+          // Required
+          name: string
+          
+          // Database configuration
+          auth: *{
+            username: "clickhouse"
+            password: "secure-clickhouse-password"
+            database: "healthcare_analytics"
+          } | {
+            username: string
+            password: string
+            database: string
+          }
+          
+          // Infrastructure configuration
+          architecture: *"standalone" | "replication"
+          replicas: *1 | int
+          shards: *1 | int
+          storage: *"20Gi" | string
+          storageClass: *"gp2" | string
+          
+          // Resource allocation
+          resources: *{
+            cpu: "2000m"
+            memory: "4Gi"
+          } | {
+            cpu: string
+            memory: string
+          }
+          
+          // Security configuration
+          security: *{
+            tlsEnabled: true
+            networkPolicyEnabled: true
+            certificateSecret: "clickhouse-tls-cert"
+          } | {
+            tlsEnabled: bool
+            networkPolicyEnabled?: bool
+            certificateSecret?: string
+          }
+          
+          // Backup configuration for healthcare compliance
+          backup: *{
+            enabled: true
+            schedule: "0 2 * * *"  // Daily at 2 AM
+            retentionDays: 2555    // 7 years for healthcare compliance
+          } | {
+            enabled: bool
+            schedule?: string
+            retentionDays?: int
+          }
+        }
+
