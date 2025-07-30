@@ -130,12 +130,28 @@ check_pod_health "app=slack-api-server" "default" "Slack API pods" || ((HEALTH_I
 check_resource "service" "slack-api-server" "default" "Slack API service" || ((HEALTH_ISSUES++))
 check_resource "deployment" "slack-api-server" "default" "Slack API deployment" || ((HEALTH_ISSUES++))
 
-# Test external access
-INGRESS_IP=$(kubectl get service istio-ingressgateway -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+# Test external access with improved endpoint detection
+INGRESS_IP=$(kubectl get service istio-ingressgateway -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+if [ -z "$INGRESS_IP" ]; then
+    INGRESS_IP=$(kubectl get service istio-ingressgateway -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+fi
+
 if [ -n "$INGRESS_IP" ]; then
-    test_external_access "http://$INGRESS_IP/health" "Slack API external access" || ((HEALTH_ISSUES++))
+    # Try multiple endpoints for health check
+    ENDPOINTS=("/health" "/api/health" "/")
+    ACCESS_WORKING=false
+    for endpoint in "${ENDPOINTS[@]}"; do
+        if test_external_access "http://$INGRESS_IP$endpoint" "Slack API external access ($endpoint)"; then
+            ACCESS_WORKING=true
+            break
+        fi
+    done
+    if [ "$ACCESS_WORKING" = "false" ]; then
+        ((HEALTH_ISSUES++))
+    fi
 else
     log_warning "Cannot determine ingress IP for external testing"
+    log_warning "Remediation: kubectl get svc -n istio-system istio-ingressgateway"
 fi
 echo
 
@@ -163,11 +179,11 @@ echo
 
 # 4. Check ComponentDefinitions
 log_info "🧩 Checking OAM ComponentDefinitions..."
-check_resource_count "componentdefinitions" "default" 9 "ComponentDefinitions in default" || ((HEALTH_ISSUES++))
+check_resource_count "componentdefinitions" "default" 10 "ComponentDefinitions in default" || ((HEALTH_ISSUES++))
 
-# List specific critical ComponentDefinitions
-CRITICAL_COMPONENTS=("webservice" "realtime-platform" "application-infrastructure" "kafka" "redis" "mongodb")
-for component in "${CRITICAL_COMPONENTS[@]}"; do
+# List all available ComponentDefinitions
+ALL_COMPONENTS=("webservice" "realtime-platform" "kafka" "redis" "mongodb" "application-infrastructure" "vcluster" "neon-postgres" "auth0-idp" "clickhouse")
+for component in "${ALL_COMPONENTS[@]}"; do
     check_resource "componentdefinition" "$component" "default" "ComponentDefinition: $component" || ((HEALTH_ISSUES++))
 done
 echo
@@ -175,6 +191,19 @@ echo
 # 5. Check WorkloadDefinitions
 log_info "⚙️  Checking WorkloadDefinitions..."
 check_resource "workloaddefinition" "webservice" "default" "Webservice WorkloadDefinition" || ((HEALTH_ISSUES++))
+echo
+
+# 5b. Check TraitDefinitions and PolicyDefinitions
+log_info "🎯 Checking OAM TraitDefinitions and PolicyDefinitions..."
+TRAIT_DEFINITIONS=("ingress" "autoscaler" "kafka-producer" "kafka-consumer")
+for trait in "${TRAIT_DEFINITIONS[@]}"; do
+    check_resource "traitdefinition" "$trait" "default" "TraitDefinition: $trait" || ((HEALTH_ISSUES++))
+done
+
+POLICY_DEFINITIONS=("health" "security-policy" "override")
+for policy in "${POLICY_DEFINITIONS[@]}"; do
+    check_resource "policydefinition" "$policy" "default" "PolicyDefinition: $policy" || ((HEALTH_ISSUES++))
+done
 echo
 
 # 6. Check Argo Workflows Infrastructure
@@ -227,7 +256,20 @@ else
     echo
     echo "Next steps:"
     echo "1. Review the issues identified above"
-    echo "2. Apply missing manifests or fix configurations"
-    echo "3. Re-run this script to verify fixes"
+    echo "2. For comprehensive auto-remediation, use:"
+    echo "   ./scripts/infrastructure-health-check-enhanced.sh"
+    echo "   AUTO_REMEDIATE=true ./scripts/infrastructure-health-check-enhanced.sh"
+    echo "3. Or apply missing manifests manually:"
+    echo "   - Secrets: ./setup-secrets.sh"
+    echo "   - ComponentDefinitions: kubectl apply -f crossplane/oam/consolidated-component-definitions.yaml"
+    echo "   - Realtime Platform: kubectl apply -f crossplane/oam/realtime-platform-component-definition.yaml"
+    echo "   - WorkloadDefinitions: kubectl apply -f webservice-workload-definition.yaml"
+    echo "   - TraitDefinitions/PolicyDefinitions: kubectl apply -f crossplane/oam/traits-and-policies.yaml"
+    echo "   - Slack API: kubectl apply -f slack-api-server/deployment.yaml"
+    echo "   - RBAC: kubectl apply -f slack-api-server/rbac.yaml"
+    echo "   - Workflows: kubectl apply -f argo-workflows/microservice-standard-contract.yaml"
+    echo "   - Crossplane XRDs: kubectl apply -f crossplane/*-xrd.yaml"
+    echo "   - Istio Gateway: kubectl apply -f slack-api-server/istio-gateway.yaml"
+    echo "4. Re-run this script to verify fixes"
     exit 1
 fi

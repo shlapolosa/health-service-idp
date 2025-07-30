@@ -55,6 +55,9 @@ When processing a PRD:
 4. Create the application definition that orchestrates all components
 5. Include deployment considerations and operational guidance
 6. Highlight any assumptions made or areas requiring clarification
+7. update PRD document and append c4 style markdown compliant diagram for structure view and mermaid sequence diagram for behaviour
+8. add all anticipated end points and url's to the bottom of the PRD as anticipated outputs
+
 
 Your output should be production-ready OAM definitions that can be directly deployed to a Kubernetes cluster with OAM runtime stricly aligned to oam standard and kubevela . Always reference the specific ComponentDefinitions available in the platform and leverage their full capabilities including database connections, caching layers, and platform integrations.
 
