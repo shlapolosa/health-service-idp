@@ -51,57 +51,103 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
         return headers
 
     def trigger_vcluster_creation(self, payload: Dict) -> Tuple[bool, str]:
-        """Trigger VCluster creation via Argo Workflows."""
+        """Trigger VCluster creation via Argo Workflows using standardized parameter contract."""
         client_payload = payload.get("client_payload", {})
         vcluster_name = client_payload.get("vcluster_name", "unknown")
         
-        # Create workflow submission
+        # Create workflow submission using vcluster-standard-contract template
         workflow_spec = {
             "namespace": self.namespace,
             "serverDryRun": False,
             "workflow": {
                 "metadata": {
-                    "generateName": "vcluster-creation-",
+                    "generateName": "vcluster-standard-",
                     "namespace": self.namespace,
                     "labels": {
                         "created-by": "slack-api",
                         "vcluster-name": vcluster_name,
-                        "user": client_payload.get("user", "unknown")
+                        "user": client_payload.get("user", "unknown"),
+                        "template-version": "v1.0"
                     }
                 },
                 "spec": {
                     "workflowTemplateRef": {
-                        "name": "vcluster-creation"
+                        "name": "vcluster-standard-contract"
                     },
                     "arguments": {
                         "parameters": [
+                            # === TIER 1: UNIVERSAL PARAMETERS (Required) ===
                             {
-                                "name": "vcluster-name",
+                                "name": "resource-name",
                                 "value": vcluster_name
+                            },
+                            {
+                                "name": "resource-type",
+                                "value": "vcluster"
                             },
                             {
                                 "name": "namespace",
                                 "value": client_payload.get("namespace", "default")
                             },
                             {
-                                "name": "size",
-                                "value": self._extract_size_from_resources(client_payload)
-                            },
-                            {
-                                "name": "capabilities",
-                                "value": json.dumps(client_payload.get("capabilities", {}))
-                            },
-                            {
                                 "name": "user",
                                 "value": client_payload.get("user", "unknown")
                             },
                             {
+                                "name": "description",
+                                "value": f"VCluster {vcluster_name} created via Slack API"
+                            },
+                            {
+                                "name": "github-org",
+                                "value": "shlapolosa"
+                            },
+                            {
+                                "name": "docker-registry",
+                                "value": "docker.io/socrates12345"
+                            },
+                            {
                                 "name": "slack-channel",
-                                "value": client_payload.get("slack_channel", "unknown")
+                                "value": client_payload.get("slack_channel", "#all-internal-developer-platform")
                             },
                             {
                                 "name": "slack-user-id",
-                                "value": client_payload.get("slack_user_id", "unknown")
+                                "value": client_payload.get("slack_user_id", "UNKNOWN")
+                            },
+                            
+                            # === TIER 2: PLATFORM PARAMETERS (Common) ===
+                            {
+                                "name": "security-enabled",
+                                "value": "true"
+                            },
+                            {
+                                "name": "observability-enabled",
+                                "value": "true"
+                            },
+                            {
+                                "name": "backup-enabled",
+                                "value": "false"
+                            },
+                            {
+                                "name": "environment-tier",
+                                "value": "development"
+                            },
+                            {
+                                "name": "auto-create-dependencies",
+                                "value": "true"
+                            },
+                            {
+                                "name": "resource-size",
+                                "value": self._extract_size_from_resources(client_payload)
+                            },
+                            
+                            # === TIER 3: VCLUSTER-SPECIFIC PARAMETERS ===
+                            {
+                                "name": "vcluster-size",
+                                "value": self._extract_size_from_resources(client_payload)
+                            },
+                            {
+                                "name": "vcluster-capabilities",
+                                "value": json.dumps(self._build_capabilities_with_defaults(client_payload.get("capabilities", {})))
                             }
                         ]
                     }
@@ -373,6 +419,28 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
             return "xlarge"
         else:
             return "medium"
+
+    def _build_capabilities_with_defaults(self, capabilities: Dict) -> Dict[str, str]:
+        """Build capabilities with defaults, converting boolean values to strings."""
+        # Default capabilities (strings as expected by the workflow template)
+        default_capabilities = {
+            "observability": "true",
+            "security": "true", 
+            "gitops": "true",
+            "logging": "true",
+            "networking": "true",
+            "autoscaling": "true",
+            "backup": "false"
+        }
+        
+        # Override with provided capabilities, ensuring string values
+        for key, value in capabilities.items():
+            if isinstance(value, bool):
+                default_capabilities[key] = "true" if value else "false"
+            elif isinstance(value, str):
+                default_capabilities[key] = value.lower()
+            
+        return default_capabilities
 
     def validate_configuration(self) -> Tuple[bool, str]:
         """Validate Argo Workflows client configuration."""

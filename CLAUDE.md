@@ -424,3 +424,8 @@ The platform is designed for minimal cost:
 - Karpenter auto-scaling only provisions nodes when needed
 - Single t3.medium managed node hosts control plane components
 - Complete infrastructure shutdown capability via `./cluster-lifecycle.sh down`
+
+## Slack Testing Notes
+
+* When testing slack, find the ingress external url, gateway, vs to the slack service and always use that. 
+* The endpoint is `slack/command`

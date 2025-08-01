@@ -118,7 +118,7 @@ spec:
             value: "{{inputs.parameters.github-org}}"
     - - name: notify-starting
         templateRef:
-          name: simple-slack-notifications
+          name: slack-standard-notifications
           template: send-notification
         arguments:
           parameters:
@@ -168,7 +168,7 @@ spec:
         when: "{{steps.validate-parameters.status}} == Succeeded"
     - - name: notify-vcluster-ready
         templateRef:
-          name: simple-slack-notifications
+          name: slack-standard-notifications
           template: send-notification
         arguments:
           parameters:
@@ -243,7 +243,7 @@ spec:
         when: "{{steps.wait-for-repositories.status}} == Succeeded"
     - - name: notify-success
         templateRef:
-          name: simple-slack-notifications
+          name: slack-standard-notifications
           template: send-notification
         arguments:
           parameters:
@@ -264,7 +264,7 @@ spec:
         when: "{{steps.extract-appcontainer-info.status}} == Succeeded"
     - - name: notify-failure
         templateRef:
-          name: simple-slack-notifications
+          name: slack-standard-notifications
           template: send-notification
         arguments:
           parameters:
