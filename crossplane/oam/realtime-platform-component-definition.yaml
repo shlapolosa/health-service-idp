@@ -30,6 +30,10 @@ spec:
               "app.kubernetes.io/part-of": "realtime-platform"
             }
             annotations: {
+              // Multi-cluster deployment support
+              if parameter.targetEnvironment != _|_ {
+                "app.oam.dev/cluster": parameter.targetEnvironment
+              }
               "realtime-platform.oam.dev/bootstrap": "true"
               "realtime-platform.oam.dev/database": parameter.database
               "realtime-platform.oam.dev/visualization": parameter.visualization
@@ -325,4 +329,5 @@ spec:
             username: string
             password: string
           }]
+          targetEnvironment?: string  // vCluster deployment target
         }

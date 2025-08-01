@@ -21,6 +21,10 @@ spec:
             name: context.name + "-ingress"
             namespace: context.namespace
             annotations: {
+              // Inherit cluster routing from parent component
+              if context.appAnnotations["app.oam.dev/cluster"] != _|_ {
+                "app.oam.dev/cluster": context.appAnnotations["app.oam.dev/cluster"]
+              }
               "kubernetes.io/ingress.class": "istio"
               if parameter.enableTLS {
                 "cert-manager.io/cluster-issuer": parameter.clusterIssuer

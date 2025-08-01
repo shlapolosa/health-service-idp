@@ -35,6 +35,10 @@ spec:
               "app.kubernetes.io/managed-by": "kubevela"
             }
             annotations: {
+              // Multi-cluster deployment support
+              if parameter.targetEnvironment != _|_ {
+                "app.oam.dev/cluster": parameter.targetEnvironment
+              }
               if parameter.language != _|_ {
                 "webservice.oam.dev/bootstrap": "true"
                 "webservice.oam.dev/language": parameter.language
@@ -331,6 +335,7 @@ spec:
           source?: string
           realtime?: string
           repository?: string
+          targetEnvironment?: string  // vCluster deployment target
         }
 
 ---
@@ -355,6 +360,12 @@ spec:
           metadata: {
             name: parameter.name + "-kafka"
             namespace: context.namespace
+            // Multi-cluster deployment support
+            if parameter.targetEnvironment != _|_ {
+              annotations: {
+                "app.oam.dev/cluster": parameter.targetEnvironment
+              }
+            }
           }
           spec: {
             forProvider: {
@@ -420,6 +431,7 @@ spec:
             replicas?: int
             storage?: string
           }
+          targetEnvironment?: string  // vCluster deployment target
         }
 
 ---
@@ -444,6 +456,12 @@ spec:
           metadata: {
             name: parameter.name + "-redis"
             namespace: context.namespace
+            // Multi-cluster deployment support
+            if parameter.targetEnvironment != _|_ {
+              annotations: {
+                "app.oam.dev/cluster": parameter.targetEnvironment
+              }
+            }
           }
           spec: {
             forProvider: {
@@ -529,6 +547,7 @@ spec:
             cpu: string
             memory: string
           }
+          targetEnvironment?: string  // vCluster deployment target
         }
 
 ---
@@ -553,6 +572,12 @@ spec:
           metadata: {
             name: parameter.name + "-mongodb"
             namespace: context.namespace
+            // Multi-cluster deployment support
+            if parameter.targetEnvironment != _|_ {
+              annotations: {
+                "app.oam.dev/cluster": parameter.targetEnvironment
+              }
+            }
           }
           spec: {
             forProvider: {
@@ -631,6 +656,7 @@ spec:
             cpu: string
             memory: string
           }
+          targetEnvironment?: string  // vCluster deployment target
         }
 
 ---
@@ -783,6 +809,10 @@ spec:
             name: parameter.name + "-db-credentials" 
             namespace: context.namespace
             annotations: {
+              // Multi-cluster deployment support
+              if parameter.targetEnvironment != _|_ {
+                "app.oam.dev/cluster": parameter.targetEnvironment
+              }
               "neon-postgres.oam.dev/source-secret": "neon-postgres-credentials"
               "neon-postgres.oam.dev/component-scoped": "true"
             }
@@ -801,6 +831,7 @@ spec:
           
           // Optional
           database: *"postgres" | string
+          targetEnvironment?: string  // vCluster deployment target
         }
 
 ---
@@ -825,6 +856,12 @@ spec:
           metadata: {
             name: parameter.name + "-auth0-credentials"
             namespace: context.namespace
+            // Multi-cluster deployment support
+            if parameter.targetEnvironment != _|_ {
+              annotations: {
+                "app.oam.dev/cluster": parameter.targetEnvironment
+              }
+            }
           }
           spec: {
             refreshInterval: "1h"
@@ -872,6 +909,9 @@ spec:
         parameter: {
           // Required
           name: string
+          
+          // Optional
+          targetEnvironment?: string  // vCluster deployment target
         }
 
 ---
@@ -902,6 +942,12 @@ spec:
               "app.kubernetes.io/name": parameter.name + "-clickhouse"
               "app.kubernetes.io/component": "analytics-database"
               "app.kubernetes.io/managed-by": "kubevela"
+            }
+            // Multi-cluster deployment support
+            if parameter.targetEnvironment != _|_ {
+              annotations: {
+                "app.oam.dev/cluster": parameter.targetEnvironment
+              }
             }
           }
           spec: {
@@ -1062,5 +1108,6 @@ spec:
             schedule?: string
             retentionDays?: int
           }
+          targetEnvironment?: string  // vCluster deployment target
         }
 

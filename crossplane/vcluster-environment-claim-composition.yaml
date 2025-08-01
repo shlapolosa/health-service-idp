@@ -10,14 +10,6 @@ spec:
   compositeTypeRef:
     apiVersion: platform.example.org/v1alpha1
     kind: XVClusterEnvironmentClaim
-  environment:
-    environmentRefs:
-    - type: Selector
-      selector:
-        matchLabels:
-        - key: environment
-          type: Value
-          value: default
   resources:
   # Create namespace for the vCluster
   - name: vcluster-namespace
@@ -196,6 +188,130 @@ spec:
       policy:
         fromFieldPath: Optional
   
+  # Create ServiceAccount for KubeVela access in vCluster
+  - name: kubevela-access-serviceaccount
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: ServiceAccount
+            metadata:
+              name: kubevela-access
+              namespace: default
+        providerConfigRef:
+          name: placeholder-vcluster
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.providerConfigRef.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-vcluster"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-kubevela-sa"
+
+  # Create ClusterRoleBinding for KubeVela access in vCluster
+  - name: kubevela-access-clusterrolebinding
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: ClusterRoleBinding
+            metadata:
+              name: kubevela-access
+            roleRef:
+              apiGroup: rbac.authorization.k8s.io
+              kind: ClusterRole
+              name: cluster-admin
+            subjects:
+            - kind: ServiceAccount
+              name: kubevela-access
+              namespace: default
+        providerConfigRef:
+          name: placeholder-vcluster
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.providerConfigRef.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-vcluster"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-kubevela-crb"
+
+  # Create ConfigMap for KubeVela cluster gateway configuration
+  - name: kubevela-cluster-gateway-config
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: placeholder-gateway-config
+              namespace: vela-system
+              labels:
+                app.kubernetes.io/name: vcluster-gateway
+                app.kubernetes.io/part-of: kubevela-multicluster
+                vcluster.io/cluster-name: placeholder
+            data:
+              cluster-type: "vcluster"
+              endpoint: ""
+              kubeconfig-secret: ""
+        providerConfigRef:
+          name: default  
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-gateway-config"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.labels["vcluster.io/cluster-name"]
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.data.endpoint
+      transforms:
+      - type: string
+        string:
+          fmt: "https://%s.%s.svc.cluster.local:443"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.data.kubeconfig-secret
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-vcluster-connection"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-gateway-configmap"
 
   # Install Crossplane in vCluster
   - name: vcluster-crossplane-install
