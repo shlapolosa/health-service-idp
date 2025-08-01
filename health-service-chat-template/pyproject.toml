@@ -1,0 +1,37 @@
+[tool.poetry]
+name = "chat-service"
+version = "0.1.0"
+description = ""
+authors = ["Socrates Hlapolosa <socrates.hlapolosa@ghdlogistics.co.za>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.11"
+blis = "0.7.9"
+rasa-plus = "3.7.10"
+beautifulsoup4 = "^4.12.3"
+lxml = "^5.3.0"
+html5lib = "^1.1"
+aiohttp = ">=3.9.2,<3.10"
+aiokafka = "^0.8.1"
+asyncio = "^3.4.3"
+aiofiles = "^24.1.0"
+aiodns = "^3.2.0"
+cchardet = "^2.1.7"
+uvloop = "^0.21.0"
+fhir-resources = "7.0.0"                                                                                                                                                   
+pydantic = "<1.10.10"
+certifi = "^2024.12.14"
+infermedica-api= "^1.0.0"
+google-api-python-client="2.90.0"
+watchtower = "^3.4.0"
+kafka-python = "2.0.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[[tool.poetry.source]]
+name = "rasa-plus"
+url = "https://europe-west3-python.pkg.dev/rasa-releases/rasa-plus-py/simple"
+priority = "supplemental"

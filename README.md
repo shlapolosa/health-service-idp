@@ -112,9 +112,147 @@ spec:
 
 ## 🏗️ Architecture Overview
 
-### High-Level Architecture
+### Multi-Cluster vCluster Architecture
+
+The platform implements a sophisticated multi-cluster architecture that separates platform management from application runtime:
+
+#### Host Cluster (Platform Management Layer)
+- **ArgoCD**: GitOps orchestration and application management
+- **Crossplane**: Infrastructure provisioning and composition management  
+- **KubeVela Control Plane**: OAM Application processing and workload routing
+- **Platform Monitoring**: Prometheus, Grafana for infrastructure metrics
+- **Secret Management**: Platform-level secrets and configurations
+- **vCluster Lifecycle**: Creation, scaling, and management of vClusters
+
+#### vCluster (Application Runtime Layer)
+- **Knative Serving**: Serverless application runtime with auto-scaling
+- **Istio Data Plane**: Service mesh for application networking and security
+- **Application Workloads**: Actual microservices, APIs, and user applications
+- **Application Secrets**: Service-specific configurations and credentials
+- **Application Monitoring**: Application-level metrics and observability
+- **Development Tools**: Optional development and debugging utilities
+
+#### `targetEnvironment` Parameter Support
+
+All OAM ComponentDefinitions support the `targetEnvironment` parameter for multi-cluster deployment:
+
+```yaml
+# Deploy to vCluster environment
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+spec:
+  components:
+  - name: user-service
+    type: webservice
+    properties:
+      image: user-service:latest
+      targetEnvironment: development-env  # Routes to vCluster
+      
+  - name: data-platform
+    type: realtime-platform
+    properties:
+      name: streaming-backend
+      targetEnvironment: production-env   # Routes to different vCluster
+      
+  # No targetEnvironment = deploys to host cluster
+  - name: platform-service
+    type: webservice
+    properties:
+      image: platform-service:latest
+```
+
+#### Multi-Cluster Workload Flow
+
+```mermaid
+graph TD
+    A[OAM Application] --> B[KubeVela Processing]
+    B --> C{targetEnvironment specified?}
+    C -->|Yes| D[Add app.oam.dev/cluster annotation]
+    C -->|No| E[Deploy to Host Cluster]
+    D --> F[Route to vCluster via ClusterGateway]
+    F --> G[vCluster Knative Service]
+    E --> H[Host Cluster Knative Service]
+```
+
+#### Benefits of Multi-Cluster Architecture
+
+- **🔒 Workload Isolation**: Applications run in dedicated vCluster environments
+- **🎯 Centralized Management**: Platform components remain centrally managed
+- **⚡ Flexible Deployment**: Parameter-driven routing without architectural changes
+- **🔄 Backward Compatibility**: Existing applications continue working unchanged
+- **👥 Multi-tenancy Support**: Different teams can have isolated vClusters
+- **📈 Resource Optimization**: Host cluster focused on platform management
+
+#### Component Multi-Cluster Support
+
+All 10 ComponentDefinitions support `targetEnvironment` parameter:
+- ✅ `webservice` - Web applications and APIs
+- ✅ `kafka` - Message streaming platform  
+- ✅ `redis` - Caching and session storage
+- ✅ `mongodb` - Document database
+- ✅ `realtime-platform` - Comprehensive streaming infrastructure
+- ✅ `clickhouse` - Analytics database
+- ✅ `neon-postgres` - Managed PostgreSQL
+- ✅ `auth0-idp` - Identity provider integration
+- ✅ `application-infrastructure` - Complete application stack
+- ✅ `vcluster` - Virtual cluster provisioning
+
+#### Component Monitoring Architecture
+
+The multi-cluster architecture implements a **"Host Watches, vCluster Monitored"** pattern:
+
+**Host Cluster Monitoring Responsibilities:**
+- **📊 Infrastructure Health**: EKS cluster, Crossplane, ArgoCD, KubeVela status
+- **🔄 GitOps Operations**: ArgoCD sync status, OAM Application processing
+- **🏗️ Platform Components**: vCluster lifecycle, ClusterGateway connectivity
+- **🚨 System Alerts**: Platform-level failures, resource constraints, security events
+- **📈 Capacity Planning**: Node utilization, resource allocation across vClusters
+
+**vCluster Monitoring Responsibilities:**
+- **⚙️ Application Workloads**: Knative Service health, pod status, scaling events
+- **🌐 Service Mesh**: Istio data plane metrics, traffic flow, security policies
+- **📋 Application Logs**: Service-specific logs, error tracking, performance metrics
+- **🔐 Application Secrets**: Service-specific configuration and credential management
+- **📊 Business Metrics**: Application-specific KPIs, user metrics, feature usage
+
+**Cross-Cluster Monitoring Flow:**
+```mermaid
+graph TD
+    A[Host Cluster Prometheus] --> B[Scrapes Platform Metrics]
+    C[vCluster Prometheus] --> D[Scrapes Application Metrics]
+    B --> E[Platform Grafana Dashboard]
+    D --> F[Application Grafana Dashboard]
+    E --> G[Platform Operations Team]
+    F --> H[Development Teams]
+    
+    I[ArgoCD Monitoring] --> J[Watches vCluster OAM Applications]
+    J --> K[Reports Status to Host Cluster]
+    K --> L[Platform Health Dashboard]
+```
+
+**Monitoring Boundary Examples:**
+
+| **Monitored Artifact** | **Host Cluster** | **vCluster** |
+|-------------------------|------------------|--------------|
+| OAM Application Status | ✅ Creation/Processing | ✅ Runtime Health |
+| Knative Service Health | ❌ No visibility | ✅ Full metrics |
+| ArgoCD Sync Status | ✅ GitOps operations | ❌ Not applicable |
+| Crossplane Claims | ✅ Infrastructure provisioning | ❌ Not visible |
+| Application Logs | ❌ Platform logs only | ✅ Service logs |
+| Istio Control Plane | ✅ Management plane | ❌ Data plane only |
+| Prometheus Metrics | ✅ Platform + Node metrics | ✅ Application metrics |
+| Pod Resource Usage | ✅ Aggregate across vClusters | ✅ Per-application detail |
+
+**Key Monitoring Principles:**
+- **🎯 Separation of Concerns**: Platform monitoring vs. application monitoring
+- **📊 Federated Metrics**: Each layer monitors what it directly manages
+- **🚨 Alert Routing**: Platform alerts → Operations, Application alerts → Dev teams
+- **🔍 Drill-down Capability**: Platform teams can access vCluster metrics when needed
+- **📈 Resource Attribution**: Host cluster tracks vCluster resource consumption
+
+### High-Level Infrastructure Stack
 - **EKS Cluster**: Minimal managed control plane with Karpenter-managed workload nodes
-- **vCluster**: Virtual Kubernetes environment for workload isolation (`architecture-visualization`)
+- **vCluster**: Virtual Kubernetes environments for workload isolation and multi-tenancy
 - **Knative + Istio**: Service mesh for microservices with automatic scaling
 - **ArgoCD**: GitOps deployment watching `health-service-idp-gitops` repository
 - **KubeVela**: OAM application management and infrastructure orchestration

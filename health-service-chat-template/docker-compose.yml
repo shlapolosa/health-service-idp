@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # Rasa server
+  rasa:
+    build:
+      context: .
+      dockerfile: docker/rasa/Dockerfile
+    image: rasa-chatbot-template:latest
+    container_name: rasa-server
+    ports:
+      - "5005:5005"
+    environment:
+      - RASA_ACTION_ENDPOINT=http://rasa-actions:5055/webhook
+      - ACTIONS_SERVER_HOST=rasa-actions
+      - ACTIONS_SERVER_PORT=5055
+      - ACTION_ENDPOINT_URL=http://rasa-actions:5055/webhook
+      - RASA_WEBHOOK_URL=http://rasa:5005/webhooks/rest/webhook
+      - LOG_LEVEL=DEBUG
+      - BOT_NAME=Development Bot
+    volumes:
+      - ./models:/app/models
+      - ./domain.yml:/app/domain.yml
+      - ./config.yml:/app/config.yml
+      - ./endpoints.yml:/app/endpoints.yml
+      - ./credentials.yml:/app/credentials.yml
+      - ./data:/app/data
+    depends_on:
+      - rasa-actions
+    networks:
+      - rasa-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5005/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Rasa Actions server
+  rasa-actions:
+    build:
+      context: .
+      dockerfile: docker/rasa-actions/Dockerfile
+    image: rasa-actions-template:latest
+    container_name: rasa-actions
+    ports:
+      - "5055:5055"
+    environment:
+      - RASA_URL=http://rasa:5005
+      - RASA_WEBHOOK_URL=http://rasa:5005/webhooks/rest/webhook
+      - LOG_LEVEL=DEBUG
+      - PYTHONPATH=/app
+    volumes:
+      - ./actions:/app/actions
+    networks:
+      - rasa-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5055/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  rasa-network:
+    driver: bridge
+
+volumes:
+  rasa-models:

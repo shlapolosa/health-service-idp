@@ -1131,3 +1131,122 @@ spec:
       - type: string
         string:
           fmt: "%s"
+
+  # Create Chat Service Repository (conditional on language=rasa and framework=chatbot)
+  - name: create-chat-service-repository
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: placeholder
+              namespace: default
+            spec:
+              template:
+                spec:
+                  serviceAccountName: crossplane-github-provider
+                  restartPolicy: OnFailure
+                  containers:
+                  - name: chat-repo-creator
+                    image: alpine/git:latest
+                    command:
+                    - /bin/sh
+                    - -c
+                    - |
+                      set -e
+                      echo "Creating Rasa chatbot repository for $SERVICE_NAME..."
+                      
+                      # Clone health-service-chat-template
+                      TEMP_DIR="/tmp/chat-repo-$SERVICE_NAME"
+                      mkdir -p $TEMP_DIR
+                      cd $TEMP_DIR
+                      
+                      git clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/health-service-chat-template.git .
+                      rm -rf .git
+                      
+                      # Customize for the specific service
+                      sed -i "s/chat-template/$SERVICE_NAME/g" README.md
+                      sed -i "s/Development Bot/$SERVICE_NAME Bot/g" docker-compose.yml
+                      
+                      # Update domain.yml with service-specific bot name
+                      sed -i "s/Customer Support Bot/$SERVICE_NAME Support Bot/g" domain.yml
+                      
+                      # Create new repository
+                      git init
+                      git config user.name "ApplicationClaim Chat Creator"
+                      git config user.email "applicationclaim@platform.local"
+                      git add .
+                      git commit -m "Initial Rasa chatbot setup for $SERVICE_NAME
+                      
+                      - Based on health-service-chat-template
+                      - Includes dual-container Dockerfile setup
+                      - Ready for chat-gitops.yml pipeline
+                      - Configured for OAM rasa-chatbot ComponentDefinition"
+                      
+                      # Create GitHub repository and push
+                      curl -X POST \
+                        -H "Authorization: token $GITHUB_TOKEN" \
+                        -H "Content-Type: application/json" \
+                        -d "{\"name\":\"$SERVICE_NAME\",\"description\":\"Rasa chatbot for $SERVICE_NAME\",\"private\":false}" \
+                        https://api.github.com/user/repos
+                      
+                      git remote add origin https://github.com/$GITHUB_USER/$SERVICE_NAME.git
+                      git push -u origin main
+                      
+                      echo "Rasa chatbot repository $SERVICE_NAME created successfully"
+                    env:
+                    - name: SERVICE_NAME
+                      value: placeholder
+                    - name: GITHUB_TOKEN
+                      valueFrom:
+                        secretKeyRef:
+                          name: github-credentials
+                          key: token
+                    - name: GITHUB_USER
+                      valueFrom:
+                        secretKeyRef:
+                          name: github-credentials
+                          key: user
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-chat-repo-creator"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-chat-repo-creator"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[0].value
+    # Only deploy if language is rasa and framework is chatbot
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.language
+      toFieldPath: metadata.labels["crossplane.io/enable"]
+      transforms:
+      - type: map
+        map:
+          "rasa": "true"
+          "python": "false"
+          "java": "false"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.framework
+      toFieldPath: metadata.labels["crossplane.io/chatbot-enable"]
+      transforms:
+      - type: map
+        map:
+          "chatbot": "true"
+          "fastapi": "false"
+          "springboot": "false"

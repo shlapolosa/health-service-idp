@@ -1,0 +1,428 @@
+---
+# Rasa Chatbot ComponentDefinition
+# Architecturally follows realtime-platform pattern: OAM Component → Dual Knative Services + Optional Infrastructure
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: rasa-chatbot
+  annotations:
+    definition.oam.dev/description: "Complete Rasa chatbot with dual-container pattern (Rasa server + Actions server) and automatic service discovery"
+spec:
+  workload:
+    definition:
+      apiVersion: serving.knative.dev/v1
+      kind: Service
+    type: services.serving.knative.dev
+  schematic:
+    cue:
+      template: |
+        // Primary Output: Rasa Server Knative Service (OAM-compliant workload)
+        output: {
+          apiVersion: "serving.knative.dev/v1"
+          kind: "Service"
+          metadata: {
+            name: context.name + "-rasa"
+            namespace: context.namespace
+            labels: {
+              "app.kubernetes.io/name": context.name
+              "app.kubernetes.io/component": "rasa-server"
+              "app.kubernetes.io/managed-by": "kubevela"
+              "app.kubernetes.io/part-of": "rasa-chatbot"
+            }
+            annotations: {
+              // Multi-cluster deployment support
+              if parameter.targetEnvironment != _|_ {
+                "app.oam.dev/cluster": parameter.targetEnvironment
+              }
+              "rasa-chatbot.oam.dev/bootstrap": "true"
+              "rasa-chatbot.oam.dev/actions-service": context.name + "-actions"
+              "rasa-chatbot.oam.dev/component-type": "rasa-server"
+            }
+          }
+          spec: {
+            template: {
+              metadata: {
+                annotations: {
+                  "autoscaling.knative.dev/minScale": "\(parameter.minScale)"
+                  "autoscaling.knative.dev/maxScale": "\(parameter.maxScale)"
+                  if parameter.targetConcurrency != _|_ {
+                    "autoscaling.knative.dev/target": "\(parameter.targetConcurrency)"
+                  }
+                  "run.googleapis.com/execution-environment": "gen2"
+                }
+                labels: {
+                  "app.kubernetes.io/name": context.name
+                  "app.kubernetes.io/version": parameter.version
+                  "app.kubernetes.io/part-of": "rasa-chatbot"
+                }
+              }
+              spec: {
+                serviceAccountName: "knative-docker-sa"
+                containers: [{
+                  image: parameter.rasaImage
+                  ports: [{
+                    containerPort: 5005
+                    name: "http1"
+                  }]
+                  resources: {
+                    limits: {
+                      cpu: parameter.resources.cpu
+                      memory: parameter.resources.memory
+                    }
+                    requests: {
+                      cpu: "250m"
+                      memory: "512Mi"
+                    }
+                  }
+                  env: [
+                    {
+                      name: "RASA_ACTION_ENDPOINT"
+                      value: "http://" + context.name + "-actions." + context.namespace + ".svc.cluster.local:5055/webhook"
+                    },
+                    {
+                      name: "ACTIONS_SERVER_HOST"
+                      value: context.name + "-actions." + context.namespace + ".svc.cluster.local"
+                    },
+                    {
+                      name: "ACTIONS_SERVER_PORT"
+                      value: "5055"
+                    },
+                    {
+                      name: "ACTION_ENDPOINT_URL"
+                      value: "http://" + context.name + "-actions." + context.namespace + ".svc.cluster.local:5055/webhook"
+                    },
+                    {
+                      name: "RASA_WEBHOOK_URL"
+                      value: "http://" + context.name + "-rasa." + context.namespace + ".svc.cluster.local:5005/webhooks/rest/webhook"
+                    },
+                    {
+                      name: "AGENT_TYPE"
+                      value: "rasa-chatbot"
+                    },
+                    {
+                      name: "LOG_LEVEL"
+                      value: "INFO"
+                    },
+                    {
+                      name: "RASA_TELEMETRY_ENABLED"
+                      value: "false"
+                    }
+                  ] + [
+                    for k, v in parameter.environment {
+                      name: k
+                      value: v
+                    }
+                  ]
+                  if parameter.envFrom != _|_ {
+                    envFrom: parameter.envFrom
+                  }
+                  // Health checks for robust deployment
+                  livenessProbe: {
+                    httpGet: {
+                      path: "/api/status"
+                      port: 5005
+                    }
+                    initialDelaySeconds: 30
+                    periodSeconds: 10
+                  }
+                  readinessProbe: {
+                    httpGet: {
+                      path: "/api/status"
+                      port: 5005
+                    }
+                    initialDelaySeconds: 5
+                    periodSeconds: 5
+                  }
+                }]
+              }
+            }
+          }
+        }
+        
+        // Secondary Outputs: Actions Server + Optional Infrastructure
+        outputs: {
+          // Actions Server Knative Service (always created)
+          "actions-server": {
+            apiVersion: "serving.knative.dev/v1"
+            kind: "Service"
+            metadata: {
+              name: context.name + "-actions"
+              namespace: context.namespace
+              labels: {
+                "app.kubernetes.io/name": context.name
+                "app.kubernetes.io/component": "actions-server"
+                "app.kubernetes.io/managed-by": "kubevela"
+                "app.kubernetes.io/part-of": "rasa-chatbot"
+              }
+              annotations: {
+                // Multi-cluster deployment support
+                if parameter.targetEnvironment != _|_ {
+                  "app.oam.dev/cluster": parameter.targetEnvironment
+                }
+                "rasa-chatbot.oam.dev/component-type": "actions-server"
+                "rasa-chatbot.oam.dev/rasa-service": context.name + "-rasa"
+              }
+            }
+            spec: {
+              template: {
+                metadata: {
+                  annotations: {
+                    "autoscaling.knative.dev/minScale": "\(parameter.actionsMinScale)"
+                    "autoscaling.knative.dev/maxScale": "\(parameter.actionsMaxScale)"
+                    if parameter.actionsTargetConcurrency != _|_ {
+                      "autoscaling.knative.dev/target": "\(parameter.actionsTargetConcurrency)"
+                    }
+                    "run.googleapis.com/execution-environment": "gen2"
+                  }
+                  labels: {
+                    "app.kubernetes.io/name": context.name
+                    "app.kubernetes.io/version": parameter.version
+                    "app.kubernetes.io/part-of": "rasa-chatbot"
+                  }
+                }
+                spec: {
+                  serviceAccountName: "knative-docker-sa"
+                  containers: [{
+                    image: parameter.actionsImage
+                    ports: [{
+                      containerPort: 5055
+                      name: "http1"
+                    }]
+                    resources: {
+                      limits: {
+                        cpu: parameter.actionsResources.cpu
+                        memory: parameter.actionsResources.memory
+                      }
+                      requests: {
+                        cpu: "100m"
+                        memory: "256Mi"
+                      }
+                    }
+                    env: [
+                      {
+                        name: "RASA_URL"
+                        value: "http://" + context.name + "-rasa." + context.namespace + ".svc.cluster.local:5005"
+                      },
+                      {
+                        name: "RASA_WEBHOOK_URL"
+                        value: "http://" + context.name + "-rasa." + context.namespace + ".svc.cluster.local:5005/webhooks/rest/webhook"
+                      },
+                      {
+                        name: "AGENT_TYPE"
+                        value: "rasa-actions"
+                      },
+                      {
+                        name: "LOG_LEVEL"
+                        value: "INFO"
+                      },
+                      {
+                        name: "PYTHONUNBUFFERED"
+                        value: "1"
+                      }
+                    ] + [
+                      for k, v in parameter.environment {
+                        name: k
+                        value: v
+                      }
+                    ]
+                    if parameter.envFrom != _|_ {
+                      envFrom: parameter.envFrom
+                    }
+                    // Health checks for robust deployment
+                    livenessProbe: {
+                      httpGet: {
+                        path: "/health"
+                        port: 5055
+                      }
+                      initialDelaySeconds: 30
+                      periodSeconds: 10
+                    }
+                    readinessProbe: {
+                      httpGet: {
+                        path: "/health"
+                        port: 5055
+                      }
+                      initialDelaySeconds: 5
+                      periodSeconds: 5
+                    }
+                  }]
+                }
+              }
+            }
+          }
+        }
+        
+        // Repository Creation Workflow (conditional - same pattern as webservice and realtime-platform)
+        if parameter.language != _|_ {
+          outputs: {
+            // Always include actions server
+            "actions-server": outputs["actions-server"]
+            
+            // Add workflow trigger when language specified
+            "workflow-trigger": {
+              apiVersion: "batch/v1"
+              kind: "Job"
+              metadata: {
+                name: context.name + "-workflow-trigger"
+                namespace: context.namespace
+                labels: {
+                  "app.kubernetes.io/name": context.name
+                  "app.kubernetes.io/component": "workflow-trigger"
+                  "app.kubernetes.io/managed-by": "kubevela"
+                  "app.kubernetes.io/part-of": "rasa-chatbot"
+                }
+                annotations: {
+                  "rasa-chatbot.oam.dev/trigger-type": "argo-workflow"
+                  "rasa-chatbot.oam.dev/workflow-template": "microservice-standard-contract"
+                  "rasa-chatbot.oam.dev/source": "oam-driven"
+                  "rasa-chatbot.oam.dev/platform-type": "chatbot"
+                }
+              }
+              spec: {
+                template: {
+                  spec: {
+                    serviceAccountName: "argo-workflows-client"
+                    restartPolicy: "Never"
+                    volumes: [
+                      {
+                        name: "argo-token"
+                        secret: {
+                          secretName: "slack-api-argo-token-copy"
+                        }
+                      }
+                    ]
+                    containers: [{
+                      name: "workflow-trigger"
+                      image: "curlimages/curl:7.85.0"
+                      command: ["sh", "-c"]
+                      args: [
+                        """
+                        echo "Triggering Argo Workflow for Rasa chatbot repository creation..."
+                        echo "Service: $(SERVICE_NAME)"
+                        echo "Language: $(LANGUAGE)"
+                        echo "Framework: $(FRAMEWORK)"
+                        echo "Repository: $(REPOSITORY)"
+                        
+                        # Create parameters for Argo Workflows
+                        cat > /tmp/workflow-params.json << EOF
+                        {
+                          "serviceName": "$(SERVICE_NAME)",
+                          "language": "$(LANGUAGE)",
+                          "framework": "$(FRAMEWORK)",
+                          "repository": "$(REPOSITORY)",
+                          "appContainer": "$(REPOSITORY)",
+                          "platformType": "chatbot",
+                          "sourceType": "oam-driven",
+                          "chatbotType": "rasa"
+                        }
+                        EOF
+                        
+                        echo "Workflow parameters:"
+                        cat /tmp/workflow-params.json
+                        
+                        # Submit to Argo Workflows
+                        curl -X POST \
+                          -H "Authorization: Bearer $(cat /var/run/secrets/argo-token/token)" \
+                          -H "Content-Type: application/json" \
+                          -d @/tmp/workflow-params.json \
+                          "http://argo-workflows-server.argo.svc.cluster.local:2746/api/v1/workflows/argo/submit" \
+                          --connect-timeout 30 \
+                          --max-time 60 \
+                          --retry 3 \
+                          --fail \
+                          || echo "Workflow submission failed, but continuing..."
+                        
+                        echo "Rasa chatbot workflow trigger completed"
+                        """
+                      ]
+                      env: [
+                        {
+                          name: "SERVICE_NAME"
+                          value: context.name
+                        },
+                        {
+                          name: "LANGUAGE"
+                          value: parameter.language
+                        },
+                        {
+                          name: "FRAMEWORK"
+                          value: parameter.framework
+                        },
+                        {
+                          name: "REPOSITORY"
+                          value: (*parameter.repository | context.name)
+                        }
+                      ]
+                      volumeMounts: [
+                        {
+                          name: "argo-token"
+                          mountPath: "/var/run/secrets/argo-token"
+                          readOnly: true
+                        }
+                      ]
+                    }]
+                  }
+                }
+              }
+            }
+          }
+        }
+        
+        parameter: {
+          // Required (following realtime-platform pattern)
+          rasaImage: string
+          actionsImage: string
+          
+          // Service Configuration  
+          version: *"latest" | string
+          
+          // Resource Management (Rasa Server)
+          resources: *{
+            cpu: "500m"
+            memory: "1Gi"
+          } | {
+            cpu?: string
+            memory?: string
+          }
+          
+          // Resource Management (Actions Server)
+          actionsResources: *{
+            cpu: "250m"
+            memory: "512Mi"
+          } | {
+            cpu?: string
+            memory?: string
+          }
+          
+          // Scaling Configuration (Rasa Server)
+          minScale: *1 | int
+          maxScale: *10 | int
+          targetConcurrency?: int
+          
+          // Scaling Configuration (Actions Server)
+          actionsMinScale: *0 | int
+          actionsMaxScale: *5 | int
+          actionsTargetConcurrency?: int
+          
+          // Environment Variables
+          environment: *{} | {[string]: string}
+          
+          // Environment Variables from Secrets
+          envFrom?: [...{
+            secretRef: {
+              name: string
+            }
+          }]
+          
+          // Optional Infrastructure Bootstrap (for repository creation equivalence)
+          language?: string     // Triggers bootstrap: rasa
+          framework?: string    // chatbot
+          repository?: string   // Git repository template name (defaults to name)
+          
+          // External Access Configuration (optional)
+          enableIstioGateway?: bool
+          chatbotHost?: string
+          enableTLS?: bool
+          
+          targetEnvironment?: string  // vCluster deployment target
+        }

@@ -1,0 +1,173 @@
+# Sample OAM Applications demonstrating rasa-chatbot ComponentDefinition usage
+# Use these as templates for your own chat services
+
+---
+# Basic chatbot without external access
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: basic-chatbot
+  namespace: default
+  annotations:
+    app.oam.dev/description: "Basic Rasa chatbot for internal use"
+spec:
+  components:
+  - name: support-bot
+    type: rasa-chatbot
+    properties:
+      name: support-bot
+      rasaImage: "socrates12345/support-bot-rasa:latest"
+      actionsImage: "socrates12345/support-bot-actions:latest"
+      minScale: 1
+      maxScale: 5
+      actionsMinScale: 0
+      actionsMaxScale: 3
+      environment:
+        LOG_LEVEL: "INFO"
+        BOT_NAME: "Support Assistant"
+
+---
+# Advanced chatbot with external access and custom configuration
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: customer-service-chatbot
+  namespace: default
+  annotations:
+    app.oam.dev/description: "Customer service chatbot with external access"
+spec:
+  components:
+  - name: customer-service-chat
+    type: rasa-chatbot
+    properties:
+      name: customer-service-chat
+      rasaImage: "socrates12345/customer-service-rasa:latest"
+      actionsImage: "socrates12345/customer-service-actions:latest"
+      
+      # Scaling configuration for high availability
+      minScale: 2
+      maxScale: 10
+      targetConcurrency: 5
+      actionsMinScale: 1
+      actionsMaxScale: 5
+      actionsTargetConcurrency: 3
+      
+      # External access configuration
+      enableIstioGateway: true
+      chatbotHost: "chat.example.com"
+      enableTLS: true
+      
+      # Custom resource requirements
+      resources:
+        requests:
+          memory: "1Gi"
+          cpu: "500m"
+        limits:
+          memory: "2Gi"
+          cpu: "1000m"
+      
+      actionsResources:
+        requests:
+          memory: "512Mi"
+          cpu: "250m"
+        limits:
+          memory: "1Gi"
+          cpu: "500m"
+      
+      # Environment variables
+      environment:
+        LOG_LEVEL: "DEBUG"
+        BOT_NAME: "Customer Service Assistant"
+        ENABLE_ANALYTICS: "true"
+        DATABASE_URL: "postgresql://user:pass@db:5432/chatbot"
+
+---
+# Multi-cluster deployment example
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: production-chatbot
+  namespace: default
+  annotations:
+    app.oam.dev/description: "Production chatbot deployed to dedicated vCluster"
+spec:
+  components:
+  - name: production-chat
+    type: rasa-chatbot
+    properties:
+      name: production-chat
+      rasaImage: "socrates12345/production-chat-rasa:latest"
+      actionsImage: "socrates12345/production-chat-actions:latest"
+      
+      # Deploy to dedicated vCluster environment
+      targetEnvironment: production-env
+      
+      # Production-ready scaling
+      minScale: 3
+      maxScale: 20
+      targetConcurrency: 10
+      actionsMinScale: 2
+      actionsMaxScale: 10
+      
+      # External access with TLS
+      enableIstioGateway: true
+      chatbotHost: "chat.production.com"
+      enableTLS: true
+      
+      # Production environment variables
+      environment:
+        LOG_LEVEL: "INFO"
+        BOT_NAME: "Production Assistant"
+        ENVIRONMENT: "production"
+        ENABLE_MONITORING: "true"
+
+---
+# Development chatbot with minimal resources
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: dev-chatbot
+  namespace: default
+  annotations:
+    app.oam.dev/description: "Development chatbot with minimal resource usage"
+spec:
+  components:
+  - name: dev-chat
+    type: rasa-chatbot
+    properties:
+      name: dev-chat
+      rasaImage: "socrates12345/dev-chat-rasa:latest"
+      actionsImage: "socrates12345/dev-chat-actions:latest"
+      
+      # Deploy to development vCluster
+      targetEnvironment: dev-env
+      
+      # Minimal scaling for development
+      minScale: 1
+      maxScale: 2
+      actionsMinScale: 0
+      actionsMaxScale: 1
+      
+      # Minimal resources for cost optimization
+      resources:
+        requests:
+          memory: "256Mi"
+          cpu: "100m"
+        limits:
+          memory: "512Mi"
+          cpu: "250m"
+      
+      actionsResources:
+        requests:
+          memory: "128Mi"
+          cpu: "50m"
+        limits:
+          memory: "256Mi"
+          cpu: "100m"
+      
+      # Development environment variables
+      environment:
+        LOG_LEVEL: "DEBUG"
+        BOT_NAME: "Dev Assistant"
+        ENVIRONMENT: "development"
+        DEBUG_MODE: "true"

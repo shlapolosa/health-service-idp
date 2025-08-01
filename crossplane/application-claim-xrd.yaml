@@ -36,11 +36,11 @@ spec:
               language:
                 type: string
                 description: Programming language for the application
-                enum: [python, java]
+                enum: [python, java, rasa]
               framework:
                 type: string
                 description: Application framework to use
-                enum: [fastapi, springboot]
+                enum: [fastapi, springboot, chatbot]
               hasFrontend:
                 type: boolean
                 description: Whether the application includes a frontend component
@@ -93,6 +93,54 @@ spec:
                     description: Kafka consumer auto offset reset strategy
                     enum: [earliest, latest, none]
                     default: latest
+              chatbot:
+                type: object
+                description: Chatbot-specific configuration for Rasa-based chat services
+                properties:
+                  type:
+                    type: string
+                    description: Type of chatbot framework
+                    enum: [rasa]
+                    default: rasa
+                  rasaImage:
+                    type: string
+                    description: Docker image for Rasa server
+                    pattern: '^[a-z0-9]+([\.\-]?[a-z0-9]+)*\/[a-z0-9]+([\._\-]?[a-z0-9]+)*:[a-zA-Z0-9_\.\-]+$'
+                  actionsImage:
+                    type: string
+                    description: Docker image for Rasa actions server
+                    pattern: '^[a-z0-9]+([\.\-]?[a-z0-9]+)*\/[a-z0-9]+([\._\-]?[a-z0-9]+)*:[a-zA-Z0-9_\.\-]+$'
+                  channels:
+                    type: array
+                    description: Messaging channels to enable
+                    items:
+                      type: string
+                      enum: [rest, socketio, twilio, telegram, facebook, slack]
+                    default: [rest]
+                  enableActions:
+                    type: boolean
+                    description: Whether to deploy custom actions server
+                    default: true
+                  minScale:
+                    type: integer
+                    description: Minimum number of Rasa server replicas
+                    minimum: 0
+                    default: 1
+                  maxScale:
+                    type: integer
+                    description: Maximum number of Rasa server replicas
+                    minimum: 1
+                    default: 10
+                  actionsMinScale:
+                    type: integer
+                    description: Minimum number of actions server replicas
+                    minimum: 0
+                    default: 0
+                  actionsMaxScale:
+                    type: integer
+                    description: Maximum number of actions server replicas
+                    minimum: 1
+                    default: 5
             required:
             - name
             - language
@@ -196,6 +244,41 @@ spec:
                           streaming:
                             type: string
                             description: Secret name for streaming platform credentials
+                  chatbot:
+                    type: object
+                    description: Chatbot deployment information
+                    properties:
+                      rasaServerEndpoint:
+                        type: string
+                        description: Rasa server REST API endpoint
+                      actionsServerEndpoint:
+                        type: string
+                        description: Actions server webhook endpoint
+                      webhookEndpoint:
+                        type: string
+                        description: Chat webhook endpoint for external integrations
+                      channels:
+                        type: array
+                        description: Enabled messaging channels
+                        items:
+                          type: string
+                      modelVersion:
+                        type: string
+                        description: Currently deployed Rasa model version
+                      trainingStatus:
+                        type: string
+                        description: Model training status
+                        enum: [trained, training, failed, unknown]
+                      healthStatus:
+                        type: object
+                        description: Health status of chatbot components
+                        properties:
+                          rasaServer:
+                            type: string
+                            enum: [healthy, unhealthy, unknown]
+                          actionsServer:
+                            type: string
+                            enum: [healthy, unhealthy, unknown]
               cicd:
                 type: object
                 description: CI/CD pipeline information
