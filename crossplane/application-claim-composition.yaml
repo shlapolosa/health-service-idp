@@ -1038,6 +1038,16 @@ spec:
                     - -c
                     - |
                       set -e
+                      
+                      # Check if this is a RASA chatbot service
+                      if [ "$LANGUAGE" != "rasa" ] || [ "$FRAMEWORK" != "chatbot" ]; then
+                        echo "❌ Skipping chat repository creation - not a RASA chatbot service"
+                        echo "   Language: $LANGUAGE (expected: rasa)"  
+                        echo "   Framework: $FRAMEWORK (expected: chatbot)"
+                        echo "✅ Chat repository creation skipped successfully"
+                        exit 0
+                      fi
+                      
                       # Install git, curl, and jq
                       apk add --no-cache git curl jq
                       echo "Creating Rasa chatbot repository for $SERVICE_NAME..."
@@ -1103,6 +1113,10 @@ spec:
                     env:
                     - name: SERVICE_NAME
                       value: placeholder
+                    - name: LANGUAGE
+                      value: placeholder
+                    - name: FRAMEWORK
+                      value: placeholder
                     - name: GITHUB_TOKEN
                       valueFrom:
                         secretKeyRef:
@@ -1133,6 +1147,12 @@ spec:
     - type: FromCompositeFieldPath
       fromFieldPath: spec.name
       toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[0].value
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.language
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[1].value
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.framework
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[2].value
     # Only deploy if language is rasa and framework is chatbot
     - type: FromCompositeFieldPath
       fromFieldPath: spec.language
