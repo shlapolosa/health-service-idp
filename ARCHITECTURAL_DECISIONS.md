@@ -117,9 +117,77 @@ Crossplane Resources (VClusterEnvironmentClaim)
 
 ---
 
-### Phase 3: Notification System Evolution
+### Phase 3: OAM Component Integration Strategy
 
-#### ADR-004: Migrate from Complex to Simple Slack Notifications
+#### ADR-004: Unified Component Architecture for Multiple Service Types
+**Date**: Current implementation  
+**Decision**: Implement unified OAM component architecture supporting webservice, rasa-chatbot, and realtime-platform in single applications
+
+**Problem**: Need to support three distinct service types with different characteristics:
+- **webservice**: Standard Python/FastAPI services
+- **rasa-chatbot**: RASA chatbots with dual-container pattern (rasa + actions)
+- **realtime-platform**: Streaming services with complex infrastructure (Kafka, MQTT, PostgreSQL)
+
+**Options Considered**:
+- Option A: Separate OAM applications for each service type
+- Option B: Single unified ComponentDefinition with complex conditional logic
+- Option C: Multiple ComponentDefinitions with shared integration patterns
+
+**Decision**: Option C - Multiple ComponentDefinitions with unified integration via ApplicationClaim
+
+**Implementation Strategy**:
+
+1. **Component Type Integration Patterns**:
+   ```yaml
+   webservice:          Knative Service + Optional ApplicationClaim
+   rasa-chatbot:        Dual Knative Services + ApplicationClaim (chat-template)
+   realtime-platform:   Knative Service + Infrastructure + Argo Workflow → ApplicationClaim (onion-template)
+   ```
+
+2. **Template Repository Strategy**:
+   - `onion-architecture-template`: Python/FastAPI services (webservice + realtime-platform)
+   - `chat-template`: RASA chatbots with 3-tier Docker architecture
+
+3. **Single AppContainer Repository Result**:
+   ```
+   single-app-container/
+   ├── microservices/
+   │   ├── user-service/          ← webservice (Python/FastAPI)
+   │   ├── support-chat/          ← rasa-chatbot (RASA)
+   │   └── analytics-platform/    ← realtime-platform (Python/FastAPI + streaming)
+   ├── .github/workflows/
+   │   ├── comprehensive-gitops.yml   ← Python services detection & build
+   │   └── chat-gitops.yml           ← RASA services detection & build
+   ```
+
+4. **realtime-platform Integration Flow**:
+   ```
+   OAM Application → realtime-platform ComponentDefinition → 
+   → Knative Service + RealtimePlatformClaim + Argo Workflow Trigger →
+   → microservice-standard-contract → ApplicationClaim → 
+   → Repository Creation with onion-architecture-template
+   ```
+
+**Rationale**:
+- **Unified Developer Experience**: Single OAM Application can define complete platforms
+- **Template Reuse**: Both webservice and realtime-platform use onion-architecture-template
+- **Intelligent CI/CD**: GitHub Actions automatically routes builds based on service detection
+- **Infrastructure Sharing**: All components in same AppContainer share PostgreSQL, Redis, networking
+- **Independent Scaling**: Each Knative service scales independently
+
+**Consequences**:
+- ✅ Single OAM file creates complete platforms with multiple service types
+- ✅ Consistent repository structure across all service types
+- ✅ Shared infrastructure reduces resource costs
+- ✅ Template-based approach ensures CLAUDE.md compliance
+- ❌ Complex internal flow (realtime-platform → Argo → ApplicationClaim)
+- ❌ Service type detection logic required in CI/CD pipelines
+
+---
+
+### Phase 4: Notification System Evolution
+
+#### ADR-005: Migrate from Complex to Simple Slack Notifications
 **Date**: Mid-development  
 **Decision**: Replace `slack-standard-notifications` with `simple-slack-notifications`
 

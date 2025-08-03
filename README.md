@@ -65,50 +65,78 @@ spec:
       image: nginx:alpine
       port: 80
 
-# Complex application with infrastructure
+# ✨ UNIFIED MICROSERVICE ARCHITECTURE ✨
+# Single OAM Application → Single AppContainer → Multiple Service Types
 apiVersion: core.oam.dev/v1beta1
 kind: Application
 metadata:
-  name: complex-app
+  name: complete-healthcare-platform
 spec:
   components:
-  # OAM-compliant webservice → Knative Service (minimal artifacts)
-  - name: health-api
+  # 1. Standard Python/FastAPI WebService
+  - name: user-service
     type: webservice
     properties:
-      image: health-api:latest
+      image: socrates12345/user-service:latest
       port: 8080
-      
-  # Complete infrastructure → Crossplane ApplicationClaim  
-  - name: app-infrastructure
-    type: application-infrastructure
-    properties:
-      name: health-api
-      language: python
+      language: python           # ← Triggers ApplicationClaim → onion-architecture-template
       framework: fastapi
       database: postgres
       cache: redis
-      repository: custom-repo-name  # Optional: specify target repository
       
-  # Real-time platform → Complete streaming infrastructure
-  - name: streaming-platform
-    type: realtime-platform
-    properties:
-      name: health-streaming
-      database: postgres
-      visualization: metabase
-
-  # Chat services → Rasa chatbot with Actions server
-  - name: customer-support-chat
+  # 2. RASA Chatbot (Dual-Container Pattern)  
+  - name: support-chat
     type: rasa-chatbot
     properties:
-      rasaImage: "socrates12345/customer-support-rasa:latest"
-      actionsImage: "socrates12345/customer-support-actions:latest"
+      rasaImage: "socrates12345/support-chat-rasa:latest"
+      actionsImage: "socrates12345/support-chat-actions:latest"
       enableIstioGateway: true
-      chatbotHost: "chat.example.com"
+      # ← Generates ApplicationClaim → chat-template (3-tier Docker)
+      
+  # 3. Real-time Streaming Platform
+  - name: analytics-platform
+    type: realtime-platform
+    properties:
+      database: postgres
+      visualization: metabase
+      iot: true
+      language: python          # ← Triggers Argo Workflow → ApplicationClaim → onion-architecture-template
+      framework: fastapi
+      
+# RESULT: Single AppContainer Repository (complete-healthcare-platform)
+# ├── microservices/
+# │   ├── user-service/          ← Python/FastAPI (comprehensive-gitops.yml)
+# │   ├── support-chat/          ← RASA chatbot (chat-gitops.yml)  
+# │   └── analytics-platform/    ← Python/FastAPI + realtime (comprehensive-gitops.yml)
+# ├── .github/workflows/
+# │   ├── comprehensive-gitops.yml   ← Handles Python services
+# │   └── chat-gitops.yml           ← Handles RASA services (3-tier builds)
+# └── Infrastructure: PostgreSQL, Redis, Kafka, MQTT, Metabase
 
-# Flow: Manual Edit → ArgoCD → KubeVela → Mixed Resources (Knative Services + Crossplane Claims)
+# Flow: OAM Application → KubeVela → Multiple ComponentDefinitions → 
+#       → Mixed Knative Services + Infrastructure Claims + Repository Creation
 ```
+
+## 🧩 **Unified Component Architecture**
+
+The platform implements a **unified architectural pattern** where all three component types integrate seamlessly:
+
+### Component Integration Flow:
+1. **`webservice`** → Direct Knative Service + Optional ApplicationClaim
+2. **`rasa-chatbot`** → Dual Knative Services + ApplicationClaim  
+3. **`realtime-platform`** → Knative Service + Infrastructure Claims + **Argo Workflow** → ApplicationClaim
+
+### Key Architectural Insights:
+- **Single OAM Application** can contain all three component types
+- **Single AppContainer Repository** houses all microservices
+- **Template-Based Generation**: Each component type uses specific templates
+  - `webservice` + `realtime-platform` → `onion-architecture-template`
+  - `rasa-chatbot` → `chat-template` (3-tier Docker architecture)
+- **Intelligent CI/CD Routing**: GitHub Actions automatically detects service types
+  - Python services → `comprehensive-gitops.yml`
+  - RASA services → `chat-gitops.yml` (multi-tier builds)
+- **Shared Infrastructure**: Components share PostgreSQL, Redis, networking
+- **Independent Scaling**: Each Knative service scales independently
 
 ## 🏗️ Architecture Overview
 
