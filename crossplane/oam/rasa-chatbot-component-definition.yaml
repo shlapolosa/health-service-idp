@@ -296,25 +296,75 @@ spec:
                         echo "Framework: $(FRAMEWORK)"
                         echo "Repository: $(REPOSITORY)"
                         
-                        # Create parameters for Argo Workflows
-                        cat > /tmp/workflow-params.json << EOF
+                        # Create workflow JSON for Argo submission
+                        cat > /tmp/workflow.json << 'WORKFLOW_EOF'
                         {
-                          "serviceName": "$(SERVICE_NAME)",
-                          "language": "$(LANGUAGE)",
-                          "framework": "$(FRAMEWORK)",
-                          "repository": "$(REPOSITORY)",
-                          "appContainer": "$(REPOSITORY)",
-                          "platformType": "chatbot",
-                          "sourceType": "oam-driven",
-                          "chatbotType": "rasa"
+                          "namespace": "argo",
+                          "serverDryRun": false,
+                          "workflow": {
+                            "metadata": {
+                              "generateName": "rasa-chatbot-creation-",
+                              "namespace": "argo",
+                              "labels": {
+                                "created-by": "oam-componentdefinition",
+                                "service-name": "$(SERVICE_NAME)",
+                                "source": "oam-driven",
+                                "chatbot-type": "rasa"
+                              }
+                            },
+                            "spec": {
+                              "workflowTemplateRef": {
+                                "name": "microservice-standard-contract"
+                              },
+                              "arguments": {
+                                "parameters": [
+                                  {"name": "resource-name", "value": "$(SERVICE_NAME)"},
+                                  {"name": "resource-type", "value": "microservice"},
+                                  {"name": "namespace", "value": "$(NAMESPACE)"},
+                                  {"name": "user", "value": "oam-system"},
+                                  {"name": "description", "value": "OAM-driven RASA chatbot via ComponentDefinition"},
+                                  {"name": "github-org", "value": "shlapolosa"},
+                                  {"name": "docker-registry", "value": "docker.io/socrates12345"},
+                                  {"name": "slack-channel", "value": "#oam-notifications"},
+                                  {"name": "slack-user-id", "value": "OAM"},
+                                  {"name": "security-enabled", "value": "true"},
+                                  {"name": "observability-enabled", "value": "true"},
+                                  {"name": "backup-enabled", "value": "false"},
+                                  {"name": "environment-tier", "value": "development"},
+                                  {"name": "auto-create-dependencies", "value": "true"},
+                                  {"name": "resource-size", "value": "medium"},
+                                  {"name": "microservice-language", "value": "$(LANGUAGE)"},
+                                  {"name": "microservice-framework", "value": "$(FRAMEWORK)"},
+                                  {"name": "microservice-database", "value": "none"},
+                                  {"name": "microservice-cache", "value": "redis"},
+                                  {"name": "microservice-expose-api", "value": "true"},
+                                  {"name": "target-vcluster", "value": ""},
+                                  {"name": "parent-appcontainer", "value": "$(REPOSITORY)"},
+                                  {"name": "repository-name", "value": "$(REPOSITORY)"}
+                                ]
+                              }
+                            }
+                          }
                         }
-                        EOF
+                        WORKFLOW_EOF
                         
-                        echo "Workflow parameters:"
-                        cat /tmp/workflow-params.json
+                        echo "📋 Workflow JSON created, submitting to Argo..."
+                        cat /tmp/workflow.json
                         
                         # Submit to Argo Workflows
-                        curl -X POST -H "Content-Type: application/json" -d @/tmp/workflow-params.json "http://argo-server.argo.svc.cluster.local:2746/api/v1/workflows/argo" --connect-timeout 30 --max-time 60 --retry 3 --fail || echo "Workflow submission failed, but continuing..."
+                        RESPONSE=$(curl -s -w 'HTTPSTATUS:%{http_code}' -X POST -H "Content-Type: application/json" -H "Accept: application/json" -d @/tmp/workflow.json http://argo-server.argo.svc.cluster.local:2746/api/v1/workflows/argo)
+                        HTTP_STATUS=$(echo $RESPONSE | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+                        BODY=$(echo $RESPONSE | sed -e 's/HTTPSTATUS:.*//g')
+                        echo "📊 HTTP Status:" $HTTP_STATUS
+                        echo "📄 Response:" $BODY
+                        if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 201 ]; then
+                          echo "✅ Workflow submission successful!"
+                          echo "$BODY" | grep -o '"name":"[^"]*"' | head -1
+                        else
+                          echo "❌ Workflow submission failed with status:" $HTTP_STATUS
+                          echo "Response:" $BODY
+                          exit 1
+                        fi
                         
                         echo "Rasa chatbot workflow trigger completed"
                         """
@@ -335,6 +385,10 @@ spec:
                         {
                           name: "REPOSITORY"
                           value: (*parameter.repository | context.name)
+                        },
+                        {
+                          name: "NAMESPACE"
+                          value: context.namespace
                         }
                       ]
                       volumeMounts: []

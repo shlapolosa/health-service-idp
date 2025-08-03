@@ -1015,72 +1015,84 @@ spec:
                       
                       # Install git, curl, and jq
                       apk add --no-cache git curl jq
-                      echo "Creating Rasa chatbot repository for $SERVICE_NAME..."
+                      echo "Adding Rasa chatbot microservice $SERVICE_NAME to unified repository $APP_CONTAINER..."
                       
-                      # Clone health-service-chat-template
-                      TEMP_DIR="/tmp/chat-repo-$SERVICE_NAME"
+                      # Clone unified AppContainer repository
+                      TEMP_DIR="/tmp/unified-repo-$SERVICE_NAME"
                       mkdir -p $TEMP_DIR
                       cd $TEMP_DIR
                       
-                      git clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/chat-template.git .
-                      rm -rf .git
-                      
-                      # Rename microservices directory from chat-template to service name
-                      mv microservices/chat-template microservices/$SERVICE_NAME
-                      
-                      # Customize for the specific service
-                      sed -i "s/chat-template/$SERVICE_NAME/g" README.md
-                      sed -i "s/Development Bot/$SERVICE_NAME Bot/g" microservices/$SERVICE_NAME/docker-compose.yml
-                      
-                      # Update domain.yml with service-specific bot name
-                      sed -i "s/Customer Support Bot/$SERVICE_NAME Support Bot/g" microservices/$SERVICE_NAME/domain.yml
-                      
-                      # Update other chat-template references in workflow and OAM files
-                      find .github/workflows/ -name "*.yml" -exec sed -i "s/chat-template/$SERVICE_NAME/g" {} \;
-                      find microservices/$SERVICE_NAME/oam/ -name "*.yaml" -exec sed -i "s/chat-template/$SERVICE_NAME/g" {} \;
-                      
-                      # Check if repository exists and delete it
+                      # First check if AppContainer repository exists
                       REPO_EXISTS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-                        https://api.github.com/repos/$GITHUB_USER/$SERVICE_NAME | jq -r '.name // "null"')
+                        https://api.github.com/repos/$GITHUB_USER/$APP_CONTAINER | jq -r '.name // "null"')
                       
-                      if [ "$REPO_EXISTS" != "null" ]; then
-                        echo "Repository $SERVICE_NAME already exists - deleting it first"
-                        curl -X DELETE \
-                          -H "Authorization: token $GITHUB_TOKEN" \
-                          https://api.github.com/repos/$GITHUB_USER/$SERVICE_NAME
-                        sleep 2
+                      if [ "$REPO_EXISTS" = "null" ]; then
+                        echo "❌ AppContainer repository $APP_CONTAINER does not exist yet"
+                        echo "⏳ Waiting for AppContainer to be created by other jobs..."
+                        exit 1
                       fi
                       
-                      # Create new repository with main branch
-                      git init
-                      git branch -M main
-                      git config user.name "ApplicationClaim Chat Creator"
-                      git config user.email "applicationclaim@platform.local"
-                      git add .
-                      git commit -m "Initial Rasa chatbot setup for $SERVICE_NAME
+                      echo "✅ AppContainer repository exists, cloning..."
+                      git clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/$APP_CONTAINER.git .
                       
-                      - Based on chat-template
-                      - Includes dual-container Dockerfile setup
-                      - Ready for chat-gitops.yml pipeline
-                      - Configured for OAM rasa-chatbot ComponentDefinition"
+                      # Check if microservice already exists
+                      if [ -d "microservices/$SERVICE_NAME" ]; then
+                        echo "⚠️  Microservice $SERVICE_NAME already exists in $APP_CONTAINER"
+                        echo "🔄 Updating existing microservice..."
+                      else
+                        echo "➕ Adding new microservice $SERVICE_NAME to $APP_CONTAINER"
+                        
+                        # Clone chat-template to get the template
+                        TEMPLATE_DIR="/tmp/chat-template"
+                        git clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/chat-template.git $TEMPLATE_DIR
+                        
+                        # Copy template microservice structure
+                        mkdir -p microservices/$SERVICE_NAME
+                        cp -r $TEMPLATE_DIR/microservices/chat-template/* microservices/$SERVICE_NAME/
+                        
+                        # Add chat-specific GitHub Actions workflow if not exists
+                        if [ ! -f ".github/workflows/chat-gitops.yml" ]; then
+                          cp $TEMPLATE_DIR/.github/workflows/chat-gitops.yml .github/workflows/
+                        fi
+                        
+                        rm -rf $TEMPLATE_DIR
+                      fi
                       
-                      # Create GitHub repository and push
-                      curl -X POST \
-                        -H "Authorization: token $GITHUB_TOKEN" \
-                        -H "Content-Type: application/json" \
-                        -d "{\"name\":\"$SERVICE_NAME\",\"description\":\"Rasa chatbot for $SERVICE_NAME\",\"private\":false}" \
-                        https://api.github.com/user/repos
+                      # Customize for the specific service
+                      sed -i "s/chat-template/$SERVICE_NAME/g" microservices/$SERVICE_NAME/docker-compose.yml
+                      sed -i "s/Development Bot/$SERVICE_NAME Bot/g" microservices/$SERVICE_NAME/docker-compose.yml
+                      sed -i "s/Customer Support Bot/$SERVICE_NAME Support Bot/g" microservices/$SERVICE_NAME/domain.yml
                       
-                      git remote add origin https://$GITHUB_TOKEN@github.com/$GITHUB_USER/$SERVICE_NAME.git
-                      git push -u origin main
+                      # Update OAM files with correct service name
+                      find microservices/$SERVICE_NAME/oam/ -name "*.yaml" -exec sed -i "s/chat-template/$SERVICE_NAME/g" {} \;
                       
-                      echo "Rasa chatbot repository $SERVICE_NAME created successfully"
+                      # Set git configuration
+                      git config user.name "Crossplane Bot"
+                      git config user.email "crossplane@health-service-idp.local"
+                      
+                      # Add and commit changes to unified repository
+                      git add microservices/$SERVICE_NAME/
+                      if [ -f ".github/workflows/chat-gitops.yml" ]; then
+                        git add .github/workflows/chat-gitops.yml
+                      fi
+                      
+                      # Check if there are changes to commit
+                      if git diff --staged --quiet; then
+                        echo "⚠️  No changes to commit for $SERVICE_NAME"
+                      else
+                        git commit -m "feat: add RASA chatbot microservice $SERVICE_NAME" -m "- Add complete RASA chatbot implementation with dual-container pattern" -m "- Include Rasa server and Actions server configurations" -m "- Add chat-specific GitHub Actions workflow for Docker builds" -m "- Support for natural language understanding and custom actions" -m "- Ready for OAM deployment with knative services" -m "🤖 Generated with [Claude Code](https://claude.ai/code)" -m "Co-Authored-By: Claude <noreply@anthropic.com>"
+                        
+                        git push origin main
+                        echo "✅ RASA chatbot microservice $SERVICE_NAME added to unified repository $APP_CONTAINER"
+                      fi
                     env:
                     - name: SERVICE_NAME
                       value: placeholder
                     - name: LANGUAGE
                       value: placeholder
                     - name: FRAMEWORK
+                      value: placeholder
+                    - name: APP_CONTAINER
                       value: placeholder
                     - name: GITHUB_TOKEN
                       valueFrom:
@@ -1118,6 +1130,9 @@ spec:
     - type: FromCompositeFieldPath
       fromFieldPath: spec.framework
       toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[2].value
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[3].value
     # Only deploy if language is rasa and framework is chatbot
     - type: FromCompositeFieldPath
       fromFieldPath: spec.language

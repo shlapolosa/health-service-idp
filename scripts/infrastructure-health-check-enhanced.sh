@@ -339,8 +339,8 @@ echo
 # 4. Check ComponentDefinitions
 log_info "🧩 Checking OAM ComponentDefinitions..."
 check_resource_count_with_fix "componentdefinitions" "default" 11 "ComponentDefinitions in default" \
-    "kubectl apply -f $PROJECT_ROOT/crossplane/oam/consolidated-component-definitions.yaml && kubectl apply -f $PROJECT_ROOT/crossplane/oam/realtime-platform-component-definition.yaml" \
-    "Apply consolidated ComponentDefinitions and realtime-platform" || ((HEALTH_ISSUES++))
+    "kubectl apply -f $PROJECT_ROOT/crossplane/oam/consolidated-component-definitions.yaml && kubectl apply -f $PROJECT_ROOT/crossplane/oam/realtime-platform-component-definition.yaml && kubectl apply -f $PROJECT_ROOT/crossplane/oam/rasa-chatbot-component-definition.yaml" \
+    "Apply consolidated ComponentDefinitions, realtime-platform, and rasa-chatbot" || ((HEALTH_ISSUES++))
 
 # List all available ComponentDefinitions
 ALL_COMPONENTS=("webservice" "realtime-platform" "rasa-chatbot" "kafka" "redis" "mongodb" "application-infrastructure" "vcluster" "neon-postgres" "auth0-idp" "clickhouse")
@@ -349,6 +349,10 @@ for component in "${ALL_COMPONENTS[@]}"; do
         check_resource_with_fix "componentdefinition" "$component" "default" "ComponentDefinition: $component" \
             "kubectl apply -f $PROJECT_ROOT/crossplane/oam/realtime-platform-component-definition.yaml" \
             "Apply realtime-platform ComponentDefinition" || ((HEALTH_ISSUES++))
+    elif [ "$component" = "rasa-chatbot" ]; then
+        check_resource_with_fix "componentdefinition" "$component" "default" "ComponentDefinition: $component" \
+            "kubectl apply -f $PROJECT_ROOT/crossplane/oam/rasa-chatbot-component-definition.yaml" \
+            "Apply rasa-chatbot ComponentDefinition" || ((HEALTH_ISSUES++))
     else
         check_resource_with_fix "componentdefinition" "$component" "default" "ComponentDefinition: $component" \
             "kubectl apply -f $PROJECT_ROOT/crossplane/oam/consolidated-component-definitions.yaml" \
