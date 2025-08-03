@@ -304,6 +304,10 @@ check_resource_with_fix "serviceaccount" "slack-api-argo-access" "argo" "Slack A
     "kubectl apply -f $PROJECT_ROOT/argo-workflows/workflow-rbac.yaml" \
     "Apply workflow RBAC" || ((HEALTH_ISSUES++))
 
+check_resource_with_fix "serviceaccount" "crossplane-installer" "crossplane-system" "Crossplane installer service account" \
+    "kubectl create serviceaccount crossplane-installer -n crossplane-system" \
+    "Create crossplane-installer service account" || ((HEALTH_ISSUES++))
+
 # Check RBAC for Slack API server
 check_resource_with_fix "role" "argo-workflow-api-access" "argo" "Argo workflow API access role" \
     "kubectl apply -f $PROJECT_ROOT/argo-workflows/workflow-rbac.yaml" \
@@ -316,12 +320,12 @@ echo
 
 # 4. Check ComponentDefinitions
 log_info "🧩 Checking OAM ComponentDefinitions..."
-check_resource_count_with_fix "componentdefinitions" "default" 10 "ComponentDefinitions in default" \
+check_resource_count_with_fix "componentdefinitions" "default" 11 "ComponentDefinitions in default" \
     "kubectl apply -f $PROJECT_ROOT/crossplane/oam/consolidated-component-definitions.yaml && kubectl apply -f $PROJECT_ROOT/crossplane/oam/realtime-platform-component-definition.yaml" \
     "Apply consolidated ComponentDefinitions and realtime-platform" || ((HEALTH_ISSUES++))
 
 # List all available ComponentDefinitions
-ALL_COMPONENTS=("webservice" "realtime-platform" "kafka" "redis" "mongodb" "application-infrastructure" "vcluster" "neon-postgres" "auth0-idp" "clickhouse")
+ALL_COMPONENTS=("webservice" "realtime-platform" "rasa-chatbot" "kafka" "redis" "mongodb" "application-infrastructure" "vcluster" "neon-postgres" "auth0-idp" "clickhouse")
 for component in "${ALL_COMPONENTS[@]}"; do
     if [ "$component" = "realtime-platform" ]; then
         check_resource_with_fix "componentdefinition" "$component" "default" "ComponentDefinition: $component" \
@@ -333,6 +337,39 @@ for component in "${ALL_COMPONENTS[@]}"; do
             "Apply consolidated ComponentDefinitions" || ((HEALTH_ISSUES++))
     fi
 done
+
+# 4b. Check Rasa Chatbot Template Resources
+log_info "🤖 Checking Rasa Chatbot Template Resources..."
+if [ -d "$PROJECT_ROOT/health-service-chat-template" ]; then
+    log_success "✅ Rasa chatbot template directory exists"
+    
+    # Check essential template files
+    TEMPLATE_FILES=("docker/rasa/Dockerfile" "docker/rasa-actions/Dockerfile" "endpoints.yml" "credentials.yml" "config.yml" "domain.yml" "pyproject.toml")
+    for file in "${TEMPLATE_FILES[@]}"; do
+        if [ -f "$PROJECT_ROOT/health-service-chat-template/$file" ]; then
+            log_success "✅ Template file: $file"
+        else
+            log_error "❌ Missing template file: $file"
+            if [ "$AUTO_REMEDIATE" = "true" ]; then
+                log_remediation "Template file $file would need manual creation"
+            fi
+            ((HEALTH_ISSUES++))
+        fi
+    done
+    
+    # Check OAM sample applications
+    if [ -f "$PROJECT_ROOT/health-service-chat-template/oam/sample-applications.yaml" ]; then
+        log_success "✅ OAM sample applications available"
+    else
+        log_warning "⚠️  OAM sample applications not found (optional)"
+    fi
+else
+    log_error "❌ Rasa chatbot template directory not found at $PROJECT_ROOT/health-service-chat-template"
+    if [ "$AUTO_REMEDIATE" = "true" ]; then
+        log_remediation "Creating rasa chatbot template directory would require manual setup"
+    fi
+    ((HEALTH_ISSUES++))
+fi
 echo
 
 # 5. Check WorkloadDefinitions

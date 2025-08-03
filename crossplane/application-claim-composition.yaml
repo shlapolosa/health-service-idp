@@ -32,12 +32,14 @@ spec:
                   restartPolicy: OnFailure
                   containers:
                   - name: microservice-creator
-                    image: alpine/git:latest
+                    image: alpine:3.18
                     command:
                     - /bin/sh
                     - -c
                     - |
                       set -e
+                      # Install git, curl, and jq
+                      apk add --no-cache git curl jq
                       echo "Adding microservice $SERVICE_NAME to AppContainer $APP_CONTAINER..."
                       
                       TEMP_DIR="/tmp/app-container-$APP_CONTAINER"
@@ -268,6 +270,11 @@ spec:
                           assert "Hello from" in data["message"]
                           assert data["architecture"] == "onion"
                       EOF
+                      elif [ "$LANGUAGE" = "rasa" ] && [ "$FRAMEWORK" = "chatbot" ]; then
+                        # RASA Chatbot - Skip microservice structure, use chat-specific repository
+                        echo "🤖 RASA chatbot detected - relying on chat-repo-creator for repository structure"
+                        echo "ℹ️  Microservice structure not needed for RASA chatbots"
+                        echo "✅ RASA chatbot will be handled by separate chat repository creator"
                       fi
                       
                       # Create service README
@@ -398,6 +405,38 @@ spec:
         string:
           fmt: "%s-microservice-creator"
 
+  # Create GitOps Repository
+  - name: gitops-repository
+    base:
+      apiVersion: repo.github.upbound.io/v1alpha1
+      kind: Repository
+      spec:
+        forProvider:
+          name: placeholder
+          description: "GitOps repository for microservice deployment manifests"
+          private: false
+          autoInit: true
+          gitIgnoreTemplate: "Go"
+          licenseTemplate: mit
+          topics: ["gitops", "argocd", "oam", "kubernetes", "microservice"]
+        providerConfigRef:
+          name: default
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-gitops"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-gitops-repo"
+
   # Add GitOps manifests for the new microservice
   - name: add-gitops-manifests
     base:
@@ -418,12 +457,14 @@ spec:
                   restartPolicy: OnFailure
                   containers:
                   - name: gitops-manifest-creator
-                    image: alpine/git:latest
+                    image: alpine:3.18
                     command:
                     - /bin/sh
                     - -c
                     - |
                       set -e
+                      # Install git, curl, and jq
+                      apk add --no-cache git curl jq
                       echo "Adding GitOps manifests for $SERVICE_NAME in $APP_CONTAINER-gitops..."
                       
                       TEMP_DIR="/tmp/gitops-$APP_CONTAINER"
@@ -940,12 +981,14 @@ spec:
                   restartPolicy: OnFailure
                   containers:
                   - name: oam-updater
-                    image: alpine/git:latest
+                    image: alpine:3.18
                     command:
                     - /bin/sh
                     - -c
                     - |
                       set -e
+                      # Install git, curl, and jq
+                      apk add --no-cache git curl jq
                       echo "Updating OAM Application with webservice component for $SERVICE_NAME..."
                       
                       TEMP_DIR="/tmp/oam-update-$APP_CONTAINER"
@@ -991,16 +1034,24 @@ spec:
                       
                       echo "✅ Component '$SERVICE_NAME' not found - proceeding with addition"
                       
-                      # Create new component definition for enhanced webservice ComponentDefinition
+                      # Create new component definition - choose correct ComponentDefinition based on framework
+                      if [ "$FRAMEWORK" = "chatbot" ]; then
+                        COMPONENT_TYPE="rasa-chatbot"
+                        COMPONENT_PORT="5005"
+                      else
+                        COMPONENT_TYPE="webservice"
+                        COMPONENT_PORT="8080"
+                      fi
+                      
                       COMPONENT_YAML="
                         - name: $SERVICE_NAME
-                          type: webservice
+                          type: $COMPONENT_TYPE
                           properties:
                             name: $SERVICE_NAME
                             image: $SERVICE_NAME:latest
                             language: $LANGUAGE
                             framework: $FRAMEWORK
-                            port: 8080
+                            port: $COMPONENT_PORT
                             healthPath: /health"
                       
                       # Add realtime platform integration if specified
@@ -1152,12 +1203,14 @@ spec:
                   restartPolicy: OnFailure
                   containers:
                   - name: chat-repo-creator
-                    image: alpine/git:latest
+                    image: alpine:3.18
                     command:
                     - /bin/sh
                     - -c
                     - |
                       set -e
+                      # Install git, curl, and jq
+                      apk add --no-cache git curl jq
                       echo "Creating Rasa chatbot repository for $SERVICE_NAME..."
                       
                       # Clone health-service-chat-template
@@ -1165,24 +1218,44 @@ spec:
                       mkdir -p $TEMP_DIR
                       cd $TEMP_DIR
                       
-                      git clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/health-service-chat-template.git .
+                      git clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/chat-template.git .
                       rm -rf .git
+                      
+                      # Rename microservices directory from chat-template to service name
+                      mv microservices/chat-template microservices/$SERVICE_NAME
                       
                       # Customize for the specific service
                       sed -i "s/chat-template/$SERVICE_NAME/g" README.md
-                      sed -i "s/Development Bot/$SERVICE_NAME Bot/g" docker-compose.yml
+                      sed -i "s/Development Bot/$SERVICE_NAME Bot/g" microservices/$SERVICE_NAME/docker-compose.yml
                       
                       # Update domain.yml with service-specific bot name
-                      sed -i "s/Customer Support Bot/$SERVICE_NAME Support Bot/g" domain.yml
+                      sed -i "s/Customer Support Bot/$SERVICE_NAME Support Bot/g" microservices/$SERVICE_NAME/domain.yml
                       
-                      # Create new repository
+                      # Update other chat-template references in workflow and OAM files
+                      find .github/workflows/ -name "*.yml" -exec sed -i "s/chat-template/$SERVICE_NAME/g" {} \;
+                      find microservices/$SERVICE_NAME/oam/ -name "*.yaml" -exec sed -i "s/chat-template/$SERVICE_NAME/g" {} \;
+                      
+                      # Check if repository exists and delete it
+                      REPO_EXISTS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+                        https://api.github.com/repos/$GITHUB_USER/$SERVICE_NAME | jq -r '.name // "null"')
+                      
+                      if [ "$REPO_EXISTS" != "null" ]; then
+                        echo "Repository $SERVICE_NAME already exists - deleting it first"
+                        curl -X DELETE \
+                          -H "Authorization: token $GITHUB_TOKEN" \
+                          https://api.github.com/repos/$GITHUB_USER/$SERVICE_NAME
+                        sleep 2
+                      fi
+                      
+                      # Create new repository with main branch
                       git init
+                      git branch -M main
                       git config user.name "ApplicationClaim Chat Creator"
                       git config user.email "applicationclaim@platform.local"
                       git add .
                       git commit -m "Initial Rasa chatbot setup for $SERVICE_NAME
                       
-                      - Based on health-service-chat-template
+                      - Based on chat-template
                       - Includes dual-container Dockerfile setup
                       - Ready for chat-gitops.yml pipeline
                       - Configured for OAM rasa-chatbot ComponentDefinition"
@@ -1194,7 +1267,7 @@ spec:
                         -d "{\"name\":\"$SERVICE_NAME\",\"description\":\"Rasa chatbot for $SERVICE_NAME\",\"private\":false}" \
                         https://api.github.com/user/repos
                       
-                      git remote add origin https://github.com/$GITHUB_USER/$SERVICE_NAME.git
+                      git remote add origin https://$GITHUB_TOKEN@github.com/$GITHUB_USER/$SERVICE_NAME.git
                       git push -u origin main
                       
                       echo "Rasa chatbot repository $SERVICE_NAME created successfully"

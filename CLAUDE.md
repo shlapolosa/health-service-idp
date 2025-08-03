@@ -429,3 +429,5 @@ The platform is designed for minimal cost:
 
 * When testing slack, find the ingress external url, gateway, vs to the slack service and always use that. 
 * The endpoint is `slack/command`
+* **When testing first run scripts/infrastructure-health-check-enhanced.sh then find istio external ingress url, then go through gateway, vs to find slack api slack/command endpoint, you can look at the model.py and controller to better understand request structure. then submit request and monitor, fixing accordingly**
+```

@@ -123,6 +123,8 @@ spec:
         default: "none"
       - name: microservice-cache
         default: "none"
+      - name: microservice-realtime
+        default: "false"
       - name: microservice-expose-api
         default: "false"
       - name: target-vcluster
@@ -285,6 +287,8 @@ spec:
             value: "{{inputs.parameters.microservice-database}}"
           - name: microservice-cache
             value: "{{inputs.parameters.microservice-cache}}"
+          - name: microservice-realtime
+            value: "{{inputs.parameters.microservice-realtime}}"
           - name: repository-name
             value: "{{steps.ensure-repositories.outputs.parameters.repository-name}}"
         when: "{{steps.wait-for-microservice-ready.status}} == Succeeded"
@@ -397,23 +401,23 @@ spec:
         
         # Validate Tier 3 - Microservice-specific Parameters
         case "{{inputs.parameters.microservice-language}}" in
-          python|java|go|nodejs|rust)
+          python|java|go|nodejs|rust|rasa)
             echo "✅ Valid microservice-language: {{inputs.parameters.microservice-language}}"
             ;;
           *)
             echo "❌ Invalid microservice-language: {{inputs.parameters.microservice-language}}"
-            echo "Must be one of: python, java, go, nodejs, rust"
+            echo "Must be one of: python, java, go, nodejs, rust, rasa"
             exit 1
             ;;
         esac
         
         case "{{inputs.parameters.microservice-framework}}" in
-          fastapi|springboot|gin|express|axum|auto)
+          fastapi|springboot|gin|express|axum|auto|chatbot)
             echo "✅ Valid microservice-framework: {{inputs.parameters.microservice-framework}}"
             ;;
           *)
             echo "❌ Invalid microservice-framework: {{inputs.parameters.microservice-framework}}"
-            echo "Must be one of: fastapi, springboot, gin, express, axum, auto"
+            echo "Must be one of: fastapi, springboot, gin, express, axum, auto, chatbot"
             exit 1
             ;;
         esac
@@ -552,6 +556,7 @@ spec:
             go) FRAMEWORK="gin" ;;
             nodejs) FRAMEWORK="express" ;;
             rust) FRAMEWORK="axum" ;;
+            rasa) FRAMEWORK="chatbot" ;;
             *) FRAMEWORK="fastapi" ;;
           esac
         fi

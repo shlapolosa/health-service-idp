@@ -1,0 +1,16 @@
+apiVersion: platform.example.org/v1alpha1
+kind: ApplicationClaim
+metadata:
+  name: rasa-structure-test
+  namespace: default
+spec:
+  name: rasa-structure-test
+  language: rasa
+  framework: chatbot
+  database: none
+  cache: none
+  chatbot:
+    rasaImage: socrates12345/rasa-base:3.7.10
+    actionsImage: socrates12345/rasa-base:3.7.10
+    minScale: 1
+    maxScale: 5

@@ -219,8 +219,10 @@ class MicroserviceLanguage(Enum):
     
     PYTHON = "python"
     JAVA = "java"
+    RASA = "rasa"
     SPRINGBOOT = "springboot"  # Alias for Java
     FASTAPI = "fastapi"        # Alias for Python
+    CHATBOT = "chatbot"        # Alias for Rasa
 
 
 class MicroserviceDatabase(Enum):
@@ -275,6 +277,8 @@ class MicroserviceRequest:
             object.__setattr__(self, "language", MicroserviceLanguage.PYTHON)
         elif self.language == MicroserviceLanguage.SPRINGBOOT:
             object.__setattr__(self, "language", MicroserviceLanguage.JAVA)
+        elif self.language == MicroserviceLanguage.CHATBOT:
+            object.__setattr__(self, "language", MicroserviceLanguage.RASA)
             
         # Normalize database aliases
         if self.database == MicroserviceDatabase.POSTGRES:

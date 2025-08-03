@@ -1,0 +1,76 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: argo-workflows-ui
+  namespace: argo
+  labels:
+    app: argo-workflows
+    component: ui
+spec:
+  hosts:
+  - "argo-workflows.af433f091b55640038c23af3a641d716-112208284.us-west-2.elb.amazonaws.com"
+  gateways:
+  - default/slack-api-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: argo-server.argo.svc.cluster.local
+        port:
+          number: 2746
+    timeout: 60s
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argo-server
+  namespace: argo
+spec:
+  selector:
+    matchLabels:
+      app: argo-server
+  template:
+    metadata:
+      labels:
+        app: argo-server
+    spec:
+      containers:
+      - args:
+        - server
+        - --secure=false
+        - --auth-mode=server
+        env:
+        - name: ARGO_SECURE
+          value: "false"
+        image: quay.io/argoproj/argocli:v3.5.5
+        name: argo-server
+        ports:
+        - containerPort: 2746
+          name: web
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 2746
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 20
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+        volumeMounts:
+        - mountPath: /tmp
+          name: tmp
+      nodeSelector:
+        kubernetes.io/os: linux
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: argo-server
+      volumes:
+      - emptyDir: {}
+        name: tmp

@@ -728,6 +728,8 @@ class EnhancedNLPParser(CommandParserInterface):
             extracted["microservice_language"] = MicroserviceLanguage.PYTHON
         elif any(lang in text for lang in ["java", "springboot"]):
             extracted["microservice_language"] = MicroserviceLanguage.JAVA
+        elif any(lang in text for lang in ["rasa", "chatbot"]):
+            extracted["microservice_language"] = MicroserviceLanguage.RASA
         
         # Extract database
         if any(phrase in text for phrase in ["no-database", "without database", "without db"]):

@@ -402,7 +402,7 @@ jobs:
           echo "### 📦 Built Containers" >> $GITHUB_STEP_SUMMARY
           
           IFS=',' read -ra SERVICES <<< "${{ needs.detect-chat-services.outputs.changed-services }}"
-          COMMIT_SHA="${GITHUB_SHA:0:7}"
+          COMMIT_SHA="${{ github.sha:0:7 }}"
           
           for service in "${SERVICES[@]}"; do
             SERVICE_BASE="${service%-*}"

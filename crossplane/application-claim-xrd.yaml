@@ -36,11 +36,17 @@ spec:
               language:
                 type: string
                 description: Programming language for the application
-                enum: [python, java, rasa]
+                enum:
+                  - python
+                  - java
+                  - rasa
               framework:
                 type: string
                 description: Application framework to use
-                enum: [fastapi, springboot, chatbot]
+                enum:
+                  - fastapi
+                  - springboot
+                  - chatbot
               hasFrontend:
                 type: boolean
                 description: Whether the application includes a frontend component
