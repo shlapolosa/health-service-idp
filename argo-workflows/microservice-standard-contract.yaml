@@ -1003,7 +1003,7 @@ spec:
           echo "📦 Repositories already created - will add microservice to existing structure"
         else
           echo "🔧 Creating AppContainer claim for repositories..."
-          cat <<EOF | kubectl apply -f -
+          cat <<EOF | kubectl apply --validate=false -f -
         apiVersion: platform.example.org/v1alpha1
         kind: AppContainerClaim
         metadata:

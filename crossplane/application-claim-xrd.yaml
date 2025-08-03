@@ -33,6 +33,12 @@ spec:
                 description: Name of the microservice (must be DNS-1123 compliant)
                 pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
                 maxLength: 63
+              namespace:
+                type: string
+                description: Namespace where the ApplicationClaim resides
+                pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+                maxLength: 63
+                default: "default"
               language:
                 type: string
                 description: Programming language for the application

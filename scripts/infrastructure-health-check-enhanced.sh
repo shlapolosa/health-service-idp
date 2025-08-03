@@ -223,6 +223,24 @@ fi
 log_success "Kubernetes connection: ✅ Connected"
 echo
 
+# 0. Ensure all secrets are properly configured
+log_info "🔐 Ensuring all secrets are properly configured..."
+if [ "$AUTO_REMEDIATE" = "true" ] || [ ! -f "$PROJECT_ROOT/.env" ]; then
+    log_info "Running setup-secrets.sh to ensure proper secret configuration..."
+    if [ -f "$PROJECT_ROOT/setup-secrets.sh" ]; then
+        "$PROJECT_ROOT/setup-secrets.sh"
+        log_success "✅ Secrets configuration completed"
+    else
+        log_error "❌ setup-secrets.sh not found"
+        log_remediation "Ensure setup-secrets.sh exists in project root"
+        ((HEALTH_ISSUES++))
+    fi
+else
+    log_info "Skipping secret setup (AUTO_REMEDIATE=false and .env exists)"
+    log_info "Run with AUTO_REMEDIATE=true to force secret reconfiguration"
+fi
+echo
+
 # 1. Check Slack API Server
 log_info "🤖 Checking Slack API Server..."
 check_pod_health_with_fix "app=slack-api-server" "default" "Slack API pods" \
@@ -437,6 +455,120 @@ check_pod_health_with_fix "pkg.crossplane.io/provider=provider-upjet-github" "cr
 check_resource_with_fix "providerconfig.github.upbound.io" "github-provider" "" "GitHub provider configuration" \
     "kubectl apply -f $PROJECT_ROOT/crossplane/github-provider-config.yaml" \
     "Apply GitHub provider config" || ((HEALTH_ISSUES++))
+
+# Comprehensive GitHub provider validation with remediation
+log_info "🔧 Validating GitHub Provider Configuration..."
+
+# Check if GitHub provider is properly installed
+if ! kubectl get providers.pkg.crossplane.io provider-upjet-github &>/dev/null; then
+    log_error "GitHub provider not installed"
+    log_remediation "Install GitHub provider"
+    if [ "$AUTO_REMEDIATE" = "true" ]; then
+        log_info "Installing GitHub provider..."
+        kubectl apply -f - <<EOF
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-upjet-github
+spec:
+  package: xpkg.upbound.io/upbound/provider-github:v0.4.0
+EOF
+        sleep 10
+    else
+        echo "  Command: kubectl apply -f <github-provider.yaml>"
+    fi
+    ((HEALTH_ISSUES++))
+fi
+
+# Check provider health
+if kubectl get providers.pkg.crossplane.io provider-upjet-github -o jsonpath='{.status.conditions[?(@.type=="Healthy")].status}' 2>/dev/null | grep -q "True"; then
+    log_success "GitHub provider: ✅ Healthy"
+else
+    log_error "GitHub provider: ❌ Not healthy"
+    log_remediation "Check provider logs and restart if needed"
+    if [ "$AUTO_REMEDIATE" = "true" ]; then
+        log_info "Restarting GitHub provider..."
+        kubectl delete pods -n crossplane-system -l pkg.crossplane.io/provider=provider-upjet-github --force --grace-period=0
+        sleep 15
+    else
+        echo "  Command: kubectl delete pods -n crossplane-system -l pkg.crossplane.io/provider=provider-upjet-github"
+    fi
+    ((HEALTH_ISSUES++))
+fi
+
+# Validate GitHub provider config exists and is configured
+if kubectl get providerconfig.github.upbound.io github-provider &>/dev/null; then
+    log_success "GitHub ProviderConfig: ✅ Exists"
+    
+    # Check if the secret referenced by ProviderConfig exists
+    SECRET_NAME=$(kubectl get providerconfig.github.upbound.io github-provider -o jsonpath='{.spec.credentials.secretRef.name}' 2>/dev/null)
+    SECRET_NAMESPACE=$(kubectl get providerconfig.github.upbound.io github-provider -o jsonpath='{.spec.credentials.secretRef.namespace}' 2>/dev/null)
+    
+    if [ -n "$SECRET_NAME" ] && [ -n "$SECRET_NAMESPACE" ]; then
+        if kubectl get secret "$SECRET_NAME" -n "$SECRET_NAMESPACE" &>/dev/null; then
+            log_success "GitHub provider secret: ✅ Found ($SECRET_NAME in $SECRET_NAMESPACE)"
+            
+            # Validate secret has required key
+            if kubectl get secret "$SECRET_NAME" -n "$SECRET_NAMESPACE" -o jsonpath='{.data.token}' | base64 -d | grep -q "^ghp_\|^github_pat_"; then
+                log_success "GitHub token format: ✅ Valid"
+            else
+                log_error "GitHub token format: ❌ Invalid or missing"
+                log_remediation "Ensure GitHub token starts with 'ghp_' or 'github_pat_'"
+                log_remediation "Update secret: kubectl create secret generic $SECRET_NAME -n $SECRET_NAMESPACE --from-literal=token=YOUR_GITHUB_TOKEN --dry-run=client -o yaml | kubectl apply -f -"
+                ((HEALTH_ISSUES++))
+            fi
+        else
+            log_error "GitHub provider secret: ❌ Missing ($SECRET_NAME in $SECRET_NAMESPACE)"
+            log_remediation "Create GitHub provider secret"
+            if [ "$AUTO_REMEDIATE" = "true" ]; then
+                log_info "Creating GitHub provider secret..."
+                if [ -f "$PROJECT_ROOT/setup-secrets.sh" ]; then
+                    "$PROJECT_ROOT/setup-secrets.sh"
+                else
+                    log_error "setup-secrets.sh not found for auto-remediation"
+                fi
+            else
+                echo "  Command: $PROJECT_ROOT/setup-secrets.sh"
+            fi
+            ((HEALTH_ISSUES++))
+        fi
+    else
+        log_error "GitHub ProviderConfig: ❌ No secret reference configured"
+        log_remediation "Configure ProviderConfig with secret reference"
+        ((HEALTH_ISSUES++))
+    fi
+else
+    log_error "GitHub ProviderConfig: ❌ Missing"
+    log_remediation "Create GitHub ProviderConfig"
+    if [ "$AUTO_REMEDIATE" = "true" ]; then
+        log_info "Creating GitHub ProviderConfig..."
+        kubectl apply -f "$PROJECT_ROOT/crossplane/github-provider-config.yaml"
+    else
+        echo "  Command: kubectl apply -f $PROJECT_ROOT/crossplane/github-provider-config.yaml"
+    fi
+    ((HEALTH_ISSUES++))
+fi
+
+# Test GitHub provider functionality by checking if repositories can be managed
+log_info "🧪 Testing GitHub Provider Functionality..."
+TEST_REPO_COUNT=$(kubectl get repositories.repo.github.upbound.io 2>/dev/null | wc -l)
+if [ $TEST_REPO_COUNT -gt 1 ]; then  # Header + at least one repo
+    # Check if any repositories are failing
+    FAILED_REPOS=$(kubectl get repositories.repo.github.upbound.io -o jsonpath='{.items[?(@.status.conditions[0].status=="False")].metadata.name}' 2>/dev/null)
+    if [ -n "$FAILED_REPOS" ]; then
+        log_error "GitHub repositories: ❌ Some repositories failing: $FAILED_REPOS"
+        log_remediation "Check repository status and GitHub provider configuration"
+        for repo in $FAILED_REPOS; do
+            log_info "Checking failed repository: $repo"
+            kubectl describe repository.repo.github.upbound.io "$repo" | grep -A 5 "Conditions:"
+        done
+        ((HEALTH_ISSUES++))
+    else
+        log_success "GitHub repositories: ✅ All repositories healthy"
+    fi
+else
+    log_warning "GitHub repositories: ⚠️  No repositories found (this is normal for new installations)"
+fi
 echo
 
 # 8. Check Istio/Service Mesh
