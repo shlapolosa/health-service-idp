@@ -283,14 +283,7 @@ spec:
                   spec: {
                     serviceAccountName: "argo-workflows-client"
                     restartPolicy: "Never"
-                    volumes: [
-                      {
-                        name: "argo-token"
-                        secret: {
-                          secretName: "slack-api-argo-token"
-                        }
-                      }
-                    ]
+                    volumes: []
                     containers: [{
                       name: "workflow-trigger"
                       image: "curlimages/curl:7.85.0"
@@ -321,16 +314,7 @@ spec:
                         cat /tmp/workflow-params.json
                         
                         # Submit to Argo Workflows
-                        curl -X POST \
-                          -H "Authorization: Bearer $(cat /var/run/secrets/argo-token/token)" \
-                          -H "Content-Type: application/json" \
-                          -d @/tmp/workflow-params.json \
-                          "http://argo-workflows-server.argo.svc.cluster.local:2746/api/v1/workflows/argo/submit" \
-                          --connect-timeout 30 \
-                          --max-time 60 \
-                          --retry 3 \
-                          --fail \
-                          || echo "Workflow submission failed, but continuing..."
+                        curl -X POST -H "Content-Type: application/json" -d @/tmp/workflow-params.json "http://argo-server.argo.svc.cluster.local:2746/api/v1/workflows/argo" --connect-timeout 30 --max-time 60 --retry 3 --fail || echo "Workflow submission failed, but continuing..."
                         
                         echo "Rasa chatbot workflow trigger completed"
                         """
@@ -353,13 +337,7 @@ spec:
                           value: (*parameter.repository | context.name)
                         }
                       ]
-                      volumeMounts: [
-                        {
-                          name: "argo-token"
-                          mountPath: "/var/run/secrets/argo-token"
-                          readOnly: true
-                        }
-                      ]
+                      volumeMounts: []
                     }]
                   }
                 }

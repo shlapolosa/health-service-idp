@@ -1,0 +1,96 @@
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: complete-e2e-test
+  namespace: default
+  labels:
+    test-type: "complete-end-to-end"
+    created-by: "claude-code"
+    version: "all-components"
+  annotations:
+    description: "Complete E2E test with all three component types in unified repository"
+    test-purpose: "Verify webservice, realtime-platform, and rasa-chatbot work together"
+    expected-outcome: "3 Knative services, 3 microservices in folder, 2 GitHub Actions workflows"
+spec:
+  components:
+  
+  # 1. Standard Python/FastAPI WebService
+  - name: user-service
+    type: webservice
+    properties:
+      image: socrates12345/user-service:latest
+      port: 8080
+      language: python           # ← Triggers ApplicationClaim → onion-architecture-template
+      framework: fastapi
+      repository: complete-healthcare-platform
+      
+  # 2. Real-time Streaming Platform  
+  - name: analytics-platform
+    type: realtime-platform
+    properties:
+      database: postgres
+      visualization: metabase
+      iot: true
+      language: python          # ← Triggers Argo Workflow → ApplicationClaim → onion-architecture-template
+      framework: fastapi
+      repository: complete-healthcare-platform
+      
+  # 3. RASA Chatbot (Dual-Container Pattern)
+  - name: support-chat
+    type: rasa-chatbot
+    properties:
+      rasaImage: "socrates12345/support-chat-rasa:latest"
+      actionsImage: "socrates12345/support-chat-actions:latest"
+      enableIstioGateway: true
+      language: rasa            # ← Triggers ApplicationClaim → chat-template (3-tier Docker)
+      framework: chatbot
+      repository: complete-healthcare-platform
+      
+---
+# COMPLETE E2E SUCCESS CRITERIA:
+# 
+# 🏗️ UNIFIED REPOSITORY STRUCTURE:
+# 1. ✅ Single AppContainer: https://github.com/shlapolosa/complete-healthcare-platform
+# 2. ✅ Single AppContainer GitOps: https://github.com/shlapolosa/complete-healthcare-platform-gitops
+# 3. ✅ Repository structure matches README:
+#    ├── microservices/
+#    │   ├── user-service/          ← Python/FastAPI (comprehensive-gitops.yml)
+#    │   ├── support-chat/          ← RASA chatbot (chat-gitops.yml)  
+#    │   └── analytics-platform/    ← Python/FastAPI + realtime (comprehensive-gitops.yml)
+#    ├── .github/workflows/
+#    │   ├── comprehensive-gitops.yml   ← Handles Python services
+#    │   └── chat-gitops.yml           ← Handles RASA services (3-tier builds)
+#    └── Infrastructure: PostgreSQL, Redis, Kafka, MQTT, Metabase
+#
+# 🚀 KNATIVE SERVICES:
+# 4. ✅ user-service (webservice) → image: socrates12345/user-service:latest
+# 5. ✅ analytics-platform-realtime-service → image: socrates12345/analytics-platform:latest
+# 6. ✅ support-chat-rasa → image: socrates12345/support-chat-rasa:latest
+# 7. ✅ support-chat-actions → image: socrates12345/support-chat-actions:latest
+#
+# 🔄 INFRASTRUCTURE COMPONENTS:
+# 8. ✅ PostgreSQL database deployed and healthy
+# 9. ✅ Redis cache deployed and healthy  
+# 10. ✅ Kafka + MQTT + Lenses + Metabase (from realtime-platform)
+# 11. ✅ Database and cache secrets created
+#
+# 🔍 CONDITIONAL LOGIC VERIFICATION:
+# 12. ✅ Chat-repo-creator skips for user-service and analytics-platform (not RASA)
+# 13. ✅ Chat-repo-creator processes support-chat (is RASA service)
+# 14. ✅ Parameter mapping: APP_CONTAINER=complete-healthcare-platform for all services
+# 15. ✅ NO separate service-specific repositories created
+#
+# 🔧 GITOPS VERIFICATION:
+# 16. ✅ GitOps manifests in complete-healthcare-platform-gitops/manifests/
+# 17. ✅ ConfigMaps for all three services created
+# 18. ✅ ArgoCD can discover and deploy all services
+#
+# VERIFICATION COMMANDS:
+# kubectl get ksvc | grep -E "(user-service|analytics-platform|support-chat)"
+# kubectl get applicationclaim | grep -E "(user-service|analytics-platform|support-chat)"
+# kubectl get appcontainerclaim complete-healthcare-platform
+# curl -s https://api.github.com/repos/shlapolosa/complete-healthcare-platform/contents/microservices
+# curl -s https://api.github.com/repos/shlapolosa/complete-healthcare-platform/contents/.github/workflows
+# kubectl logs job/user-service-chat-repo-creator
+# kubectl logs job/analytics-platform-chat-repo-creator  
+# kubectl logs job/support-chat-chat-repo-creator

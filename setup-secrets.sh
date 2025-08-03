@@ -71,7 +71,7 @@ echo "🔐 Copying Argo token to default namespace for workflow triggers..."
 if kubectl get secret slack-api-argo-token -n argo > /dev/null 2>&1; then
     kubectl get secret slack-api-argo-token -n argo -o yaml | \
     sed 's/namespace: argo/namespace: default/' | \
-    sed 's/name: slack-api-argo-token/name: slack-api-argo-token-copy/' | \
+    sed 's/name: slack-api-argo-token/name: slack-api-argo-token/' | \
     kubectl apply -f - && echo "✅ Argo token copied to default namespace"
 else
     echo "⚠️  Argo token not found in argo namespace - workflow triggers may fail"

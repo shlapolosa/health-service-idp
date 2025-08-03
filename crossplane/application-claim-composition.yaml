@@ -227,46 +227,7 @@ spec:
         string:
           fmt: "%s-microservice-creator"
 
-  # Create GitOps Repository
-  - name: gitops-repository
-    base:
-      apiVersion: repo.github.upbound.io/v1alpha1
-      kind: Repository
-      spec:
-        forProvider:
-          name: placeholder
-          description: "GitOps repository for microservice deployment manifests"
-          private: false
-          autoInit: true
-          gitIgnoreTemplate: "Go"
-          licenseTemplate: mit
-          topics: ["gitops", "argocd", "oam", "kubernetes", "microservice"]
-        providerConfigRef:
-          name: default
-    patches:
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.name
-      transforms:
-      - type: string
-        string:
-          fmt: "%s-gitops"
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: metadata.name
-      transforms:
-      - type: string
-        string:
-          fmt: "%s-gitops-repo"
-    # Map GitOps repository URL to composite status
-    - type: ToCompositeFieldPath
-      fromFieldPath: status.atProvider.htmlUrl
-      toFieldPath: status.gitopsRepository.url
-    - type: ToCompositeFieldPath  
-      fromFieldPath: status.atProvider.cloneUrl
-      toFieldPath: status.gitopsRepository.cloneUrl
-
-  # Add GitOps manifests for the new microservice
+  # Add CI/CD workflows to AppContainer repository (unified repository pattern)
   - name: add-gitops-manifests
     base:
       apiVersion: kubernetes.crossplane.io/v1alpha1
@@ -300,13 +261,12 @@ spec:
                       mkdir -p $TEMP_DIR
                       cd $TEMP_DIR
                       
-                      # Clone the GitOps repository using GitHub token
+                      # Clone the AppContainer GitOps repository
                       git clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/$APP_CONTAINER-gitops.git .
                       
                       # Create manifests directory for the service
                       mkdir -p manifests/$SERVICE_NAME
                       cd manifests/$SERVICE_NAME
-                      
                       
                       # Create ConfigMap for environment variables
                       cat > configmap.yaml << EOF
@@ -335,19 +295,24 @@ spec:
                       fi
                       
                       
-                      # Commit and push GitOps changes
-                      cd ..
+                      # Commit and push GitOps manifests
+                      cd ../..
                       git config user.name "ApplicationClaim GitOps"
                       git config user.email "applicationclaim-gitops@platform.local"
-                      git add .
-                      git commit -m "Add GitOps manifests for $SERVICE_NAME microservice
+                      git add manifests/$SERVICE_NAME/
                       
-                      - Add ConfigMap for environment variables  
-                      - Ready for OAM Application inline component definition
-                      - Ready for ArgoCD ApplicationSet deployment"
-                      git push
+                      # Only commit if there are changes
+                      if ! git diff --cached --quiet; then
+                        git commit -m "Add GitOps manifests for $SERVICE_NAME microservice
                       
-                      echo "GitOps manifests for $SERVICE_NAME added successfully"
+                      - Add ConfigMap for environment variables
+                      - Ready for ArgoCD deployment  
+                      - Service: $SERVICE_NAME in AppContainer: $APP_CONTAINER"
+                        git push
+                        echo "✅ GitOps manifests added for $SERVICE_NAME"
+                      else
+                        echo "✅ GitOps manifests already exist for $SERVICE_NAME"
+                      fi
                     env:
                     - name: APP_CONTAINER
                       value: placeholder

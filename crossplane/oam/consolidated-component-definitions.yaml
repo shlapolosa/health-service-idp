@@ -217,25 +217,12 @@ spec:
                   spec: {
                     serviceAccountName: "argo-workflows-client"
                     restartPolicy: "Never"
-                    volumes: [
-                      {
-                        name: "argo-token"
-                        secret: {
-                          secretName: "slack-api-argo-token"
-                        }
-                      }
-                    ]
+                    volumes: []
                     containers: [{
                       name: "workflow-trigger"
                       image: "curlimages/curl:latest"
                       command: ["/bin/sh", "-c"]
-                      volumeMounts: [
-                        {
-                          name: "argo-token"
-                          mountPath: "/var/run/secrets/argo"
-                          readOnly: true
-                        }
-                      ]
+                      volumeMounts: []
                       args: [
                         "echo '🚀 Triggering Argo Workflow for microservice: " + context.name + "'\n" +
                         "cat > /tmp/workflow.json << 'WORKFLOW_EOF'\n" +
@@ -279,8 +266,8 @@ spec:
                         "          {\"name\": \"microservice-cache\", \"value\": \"none\"},\n" +
                         "          {\"name\": \"microservice-expose-api\", \"value\": \"false\"},\n" +
                         "          {\"name\": \"target-vcluster\", \"value\": \"\"},\n" +
-                        "          {\"name\": \"parent-appcontainer\", \"value\": \"" + parameter.appContainer + "\"},\n" +
-                        "          {\"name\": \"repository-name\", \"value\": \"" + parameter.appContainer + "\"}\n" +
+                        "          {\"name\": \"parent-appcontainer\", \"value\": \"" + parameter.repository + "\"},\n" +
+                        "          {\"name\": \"repository-name\", \"value\": \"" + parameter.repository + "\"}\n" +
                         "        ]\n" +
                         "      }\n" +
                         "    }\n" +
@@ -289,7 +276,7 @@ spec:
                         "WORKFLOW_EOF\n" +
                         "echo '📋 Workflow JSON created, submitting to Argo...'\n" +
                         "cat /tmp/workflow.json\n" +
-                        "RESPONSE=$(curl -s -w 'HTTPSTATUS:%{http_code}' -X POST -H \"Authorization: Bearer $(cat /var/run/secrets/argo/token)\" -H 'Content-Type: application/json' -H 'Accept: application/json' -d @/tmp/workflow.json http://argo-server.argo.svc.cluster.local:2746/api/v1/workflows/argo)\n" +
+                        "RESPONSE=$(curl -s -w 'HTTPSTATUS:%{http_code}' -X POST -H 'Content-Type: application/json' -H 'Accept: application/json' -d @/tmp/workflow.json http://argo-server.argo.svc.cluster.local:2746/api/v1/workflows/argo)\n" +
                         "HTTP_STATUS=$(echo $RESPONSE | tr -d '\\n' | sed -e 's/.*HTTPSTATUS://')\n" +
                         "BODY=$(echo $RESPONSE | sed -e 's/HTTPSTATUS:.*//g')\n" +
                         "echo '📊 HTTP Status:' $HTTP_STATUS\n" +
@@ -1396,14 +1383,7 @@ spec:
                   spec: {
                     serviceAccountName: "argo-workflows-client"
                     restartPolicy: "Never"
-                    volumes: [
-                      {
-                        name: "argo-token"
-                        secret: {
-                          secretName: "slack-api-argo-token"
-                        }
-                      }
-                    ]
+                    volumes: []
                     containers: [{
                       name: "workflow-trigger"
                       image: "curlimages/curl:7.85.0"

@@ -187,25 +187,12 @@ spec:
                   spec: {
                     serviceAccountName: "argo-workflows-client"
                     restartPolicy: "Never"
-                    volumes: [
-                      {
-                        name: "argo-token"
-                        secret: {
-                          secretName: "slack-api-argo-token-copy"
-                        }
-                      }
-                    ]
+                    volumes: []
                     containers: [{
                       name: "workflow-trigger"
                       image: "curlimages/curl:latest"
                       command: ["/bin/sh", "-c"]
-                      volumeMounts: [
-                        {
-                          name: "argo-token"
-                          mountPath: "/var/run/secrets/argo"
-                          readOnly: true
-                        }
-                      ]
+                      volumeMounts: []
                       args: [
                         "echo '🚀 Triggering Argo Workflow for realtime platform: " + context.name + "'\n" +
                         "cat > /tmp/workflow.json << 'WORKFLOW_EOF'\n" +
@@ -263,7 +250,7 @@ spec:
                         "WORKFLOW_EOF\n" +
                         "echo '📋 Workflow JSON created, submitting to Argo...'\n" +
                         "cat /tmp/workflow.json\n" +
-                        "RESPONSE=$(curl -s -w 'HTTPSTATUS:%{http_code}' -X POST -H \"Authorization: Bearer $(cat /var/run/secrets/argo/token)\" -H 'Content-Type: application/json' -H 'Accept: application/json' -d @/tmp/workflow.json http://argo-server.argo.svc.cluster.local:2746/api/v1/workflows/argo)\n" +
+                        "RESPONSE=$(curl -s -w 'HTTPSTATUS:%{http_code}' -X POST -H 'Content-Type: application/json' -H 'Accept: application/json' -d @/tmp/workflow.json http://argo-server.argo.svc.cluster.local:2746/api/v1/workflows/argo)\n" +
                         "HTTP_STATUS=$(echo $RESPONSE | tr -d '\\n' | sed -e 's/.*HTTPSTATUS://')\n" +
                         "BODY=$(echo $RESPONSE | sed -e 's/HTTPSTATUS:.*//g')\n" +
                         "echo '📊 HTTP Status:' $HTTP_STATUS\n" +
@@ -287,7 +274,7 @@ spec:
         
         parameter: {
           // Required (following webservice pattern)
-          image: *"socrates12345/realtime-service-template:latest" | string
+          image: *"socrates12345/\(context.name):latest" | string
           
           // Service Configuration
           port: *8080 | int
