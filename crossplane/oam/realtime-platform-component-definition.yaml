@@ -253,8 +253,8 @@ spec:
                         "          {\"name\": \"realtime-kafka-enabled\", \"value\": \"true\"},\n" +
                         "          {\"name\": \"realtime-mqtt-enabled\", \"value\": \"" + (*"true" | parameter.iot) + "\"},\n" +
                         "          {\"name\": \"target-vcluster\", \"value\": \"\"},\n" +
-                        "          {\"name\": \"parent-appcontainer\", \"value\": \"\"},\n" +
-                        "          {\"name\": \"repository-name\", \"value\": \"" + (*parameter.repository | context.appName) + "\"}\n" +
+                        "          {\"name\": \"parent-appcontainer\", \"value\": \"" + parameter.repository + "\"},\n" +
+                        "          {\"name\": \"repository-name\", \"value\": \"" + parameter.repository + "\"}\n" +
                         "        ]\n" +
                         "      }\n" +
                         "    }\n" +
@@ -263,7 +263,7 @@ spec:
                         "WORKFLOW_EOF\n" +
                         "echo '📋 Workflow JSON created, submitting to Argo...'\n" +
                         "cat /tmp/workflow.json\n" +
-                        "RESPONSE=$(curl -s -k -w 'HTTPSTATUS:%{http_code}' -X POST -H \"Authorization: Bearer $(cat /var/run/secrets/argo/token)\" -H 'Content-Type: application/json' -H 'Accept: application/json' -d @/tmp/workflow.json https://argo-server.argo.svc.cluster.local:2746/api/v1/workflows/argo)\n" +
+                        "RESPONSE=$(curl -s -w 'HTTPSTATUS:%{http_code}' -X POST -H \"Authorization: Bearer $(cat /var/run/secrets/argo/token)\" -H 'Content-Type: application/json' -H 'Accept: application/json' -d @/tmp/workflow.json http://argo-server.argo.svc.cluster.local:2746/api/v1/workflows/argo)\n" +
                         "HTTP_STATUS=$(echo $RESPONSE | tr -d '\\n' | sed -e 's/.*HTTPSTATUS://')\n" +
                         "BODY=$(echo $RESPONSE | sed -e 's/HTTPSTATUS:.*//g')\n" +
                         "echo '📊 HTTP Status:' $HTTP_STATUS\n" +

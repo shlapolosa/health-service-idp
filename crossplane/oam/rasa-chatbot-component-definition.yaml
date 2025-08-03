@@ -287,7 +287,7 @@ spec:
                       {
                         name: "argo-token"
                         secret: {
-                          secretName: "slack-api-argo-token-copy"
+                          secretName: "slack-api-argo-token"
                         }
                       }
                     ]

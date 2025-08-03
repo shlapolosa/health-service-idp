@@ -1,0 +1,96 @@
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: unified-platform-e2e-test
+  namespace: default
+  labels:
+    test-type: "e2e-comprehensive"
+    component-types: "webservice-rasa-chatbot-realtime-platform"
+    created-by: "claude-code"
+  annotations:
+    description: "End-to-end test of unified OAM component architecture"
+    test-purpose: "Verify all three component types work together in single AppContainer"
+    expected-outcome: "Single repository with multiple microservices and correct CI/CD pipelines"
+spec:
+  components:
+  
+  # 1. Standard Python/FastAPI WebService
+  # Expected: ApplicationClaim → onion-architecture-template → comprehensive-gitops.yml
+  - name: user-service
+    type: webservice
+    properties:
+      image: socrates12345/user-service:latest
+      port: 8080
+      language: python           # ← Triggers ApplicationClaim with onion-architecture-template
+      framework: fastapi
+      database: postgres
+      cache: redis
+      exposeApi: true
+      appContainer: unified-platform-e2e-test  # ← Shared AppContainer
+      
+  # 2. RASA Chatbot (Dual-Container Pattern)
+  # Expected: Direct dual Knative Services + ApplicationClaim → chat-template → chat-gitops.yml  
+  - name: support-chat
+    type: rasa-chatbot
+    properties:
+      rasaImage: "socrates12345/support-chat-rasa:latest"
+      actionsImage: "socrates12345/support-chat-actions:latest"
+      enableIstioGateway: true
+      chatbotHost: "chat-test.example.com"
+      # ← Should generate ApplicationClaim internally and use chat-template
+      
+  # 3. Real-time Streaming Platform
+  # Expected: Knative Service + RealtimePlatformClaim + Argo Workflow → ApplicationClaim → onion-architecture-template
+  - name: analytics-platform
+    type: realtime-platform
+    properties:
+      database: postgres
+      visualization: metabase
+      iot: true
+      language: python          # ← Triggers Argo Workflow → ApplicationClaim → onion-architecture-template
+      framework: fastapi
+      repository: unified-platform-e2e-test  # ← Same AppContainer as webservice
+      
+---
+# Expected Results After Deployment:
+#
+# 1. KNATIVE SERVICES:
+# kubectl get ksvc -A
+# - user-service (from webservice)
+# - support-chat-rasa (from rasa-chatbot) 
+# - support-chat-actions (from rasa-chatbot)
+# - analytics-platform-realtime-service (from realtime-platform)
+#
+# 2. INFRASTRUCTURE:
+# kubectl get realtimeplatformclaims
+# - unified-platform-e2e-test-infrastructure (from realtime-platform)
+#
+# 3. GITHUB REPOSITORY:
+# https://github.com/shlapolosa/unified-platform-e2e-test
+# unified-platform-e2e-test/
+# ├── microservices/
+# │   ├── user-service/          ← Python/FastAPI (onion architecture)
+# │   ├── support-chat/          ← RASA chatbot (3-tier Docker)
+# │   └── analytics-platform/    ← Python/FastAPI + realtime (onion architecture)
+# ├── .github/workflows/
+# │   ├── comprehensive-gitops.yml   ← Detects and builds user-service + analytics-platform
+# │   └── chat-gitops.yml           ← Detects and builds support-chat (3-tier)
+# └── Infrastructure configs, README, etc.
+#
+# 4. CI/CD PIPELINE ROUTING:
+# - Python services (user-service, analytics-platform) → comprehensive-gitops.yml
+# - RASA service (support-chat) → chat-gitops.yml
+# - Detection based on presence of domain.yml and config.yml files
+#
+# 5. SHARED INFRASTRUCTURE:
+# - PostgreSQL database (shared by all services)
+# - Redis cache (shared by webservice)
+# - Kafka streaming (from realtime-platform)
+# - MQTT broker (from realtime-platform with iot: true)
+# - Metabase visualization (from realtime-platform)
+#
+# 6. VERIFICATION COMMANDS:
+# kubectl get ksvc -A | grep -E "(user-service|support-chat|analytics-platform)"
+# kubectl get realtimeplatformclaims
+# curl -k https://github.com/api/v1/repos/shlapolosa/unified-platform-e2e-test
+# ./scripts/infrastructure-health-check-enhanced.sh

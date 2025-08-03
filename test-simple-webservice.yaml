@@ -1,0 +1,53 @@
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: simple-webservice-test
+  namespace: default
+  labels:
+    test-type: "simple-repository-creation"
+    component-types: "webservice"
+    created-by: "claude-code"
+  annotations:
+    description: "Simple test for repository creation and GitHub Actions"
+    test-purpose: "Verify workflow triggers work and create repositories successfully"
+    expected-outcome: "Single Python/FastAPI repository with successful GitHub Actions"
+spec:
+  components:
+  
+  # Simple Python/FastAPI WebService
+  # Expected: ApplicationClaim → onion-architecture-template → comprehensive-gitops.yml
+  - name: test-service
+    type: webservice
+    properties:
+      image: socrates12345/test-service:latest
+      port: 8080
+      language: python           # ← Triggers ApplicationClaim with onion-architecture-template
+      framework: fastapi
+      database: postgres
+      cache: redis
+      exposeApi: true
+      appContainer: simple-webservice-test  # ← Repository name
+      
+---
+# Expected Results:
+#
+# 1. KNATIVE SERVICE:
+# kubectl get ksvc test-service -n default
+#
+# 2. GITHUB REPOSITORY:
+# https://github.com/shlapolosa/simple-webservice-test
+# simple-webservice-test/
+# ├── microservices/
+# │   └── test-service/          ← Python/FastAPI (onion architecture)
+# ├── .github/workflows/
+# │   └── comprehensive-gitops.yml   ← Builds and deploys test-service
+# └── Infrastructure configs, README, etc.
+#
+# 3. GITHUB ACTIONS:
+# - Workflow runs successfully
+# - Container image built and pushed to docker.io/socrates12345/test-service
+# - OAM manifests updated in gitops repo
+#
+# 4. VERIFICATION COMMANDS:
+# curl -s https://api.github.com/repos/shlapolosa/simple-webservice-test
+# gh run list --repo shlapolosa/simple-webservice-test
