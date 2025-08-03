@@ -208,7 +208,7 @@ spec:
         string:
           fmt: "%s-microservice-creator"
     - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
+      fromFieldPath: spec.appContainer
       toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[0].value
     - type: FromCompositeFieldPath
       fromFieldPath: spec.name
@@ -258,6 +258,13 @@ spec:
       - type: string
         string:
           fmt: "%s-gitops-repo"
+    # Map GitOps repository URL to composite status
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.htmlUrl
+      toFieldPath: status.gitopsRepository.url
+    - type: ToCompositeFieldPath  
+      fromFieldPath: status.atProvider.cloneUrl
+      toFieldPath: status.gitopsRepository.cloneUrl
 
   # Add GitOps manifests for the new microservice
   - name: add-gitops-manifests
@@ -381,7 +388,7 @@ spec:
         string:
           fmt: "%s-gitops-creator"
     - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
+      fromFieldPath: spec.appContainer
       toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[0].value
     - type: FromCompositeFieldPath
       fromFieldPath: spec.name
@@ -981,7 +988,7 @@ spec:
       fromFieldPath: spec.name
       toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[0].value
     - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
+      fromFieldPath: spec.appContainer
       toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[1].value
     - type: FromCompositeFieldPath
       fromFieldPath: spec.language
@@ -1145,3 +1152,124 @@ spec:
           "chatbot": "true"
           "fastapi": "false"
           "springboot": "false"
+
+  # Repository status synchronizer - gets repository URL from AppContainerClaim
+  - name: repository-status-sync
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: placeholder
+              namespace: default
+            spec:
+              template:
+                spec:
+                  serviceAccountName: crossplane-github-provider
+                  restartPolicy: OnFailure
+                  containers:
+                  - name: repository-sync
+                    image: bitnami/kubectl:1.28
+                    command:
+                    - /bin/sh
+                    - -c
+                    - |
+                      set -e
+                      echo "🔄 Synchronizing repository status from AppContainerClaim..."
+                      
+                      # Wait for AppContainerClaim to be ready and get repository URL
+                      APP_CONTAINER="$APP_CONTAINER_NAME"
+                      SERVICE_NAME="$SERVICE_NAME"
+                      NAMESPACE="$NAMESPACE"
+                      
+                      echo "Waiting for AppContainerClaim $APP_CONTAINER to be ready..."
+                      
+                      TIMEOUT=300
+                      ELAPSED=0
+                      
+                      while [ $ELAPSED -lt $TIMEOUT ]; do
+                        # Check if AppContainerClaim exists and get repository URL
+                        REPO_URL=$(kubectl get appcontainerclaim "$APP_CONTAINER" -n "$NAMESPACE" -o jsonpath='{.status.sourceRepository.url}' 2>/dev/null || echo "")
+                        CLONE_URL=$(kubectl get appcontainerclaim "$APP_CONTAINER" -n "$NAMESPACE" -o jsonpath='{.status.sourceRepository.cloneUrl}' 2>/dev/null || echo "")
+                        
+                        if [ -n "$REPO_URL" ]; then
+                          echo "✅ Found repository URL: $REPO_URL"
+                          echo "✅ Found clone URL: $CLONE_URL"
+                          
+                          # Find associated Knative service
+                          KNATIVE_SERVICE=""
+                          if kubectl get ksvc "$SERVICE_NAME" -n "$NAMESPACE" >/dev/null 2>&1; then
+                            KNATIVE_SERVICE="$SERVICE_NAME"
+                          elif kubectl get ksvc "${SERVICE_NAME}-realtime-service" -n "$NAMESPACE" >/dev/null 2>&1; then
+                            KNATIVE_SERVICE="${SERVICE_NAME}-realtime-service"
+                          elif kubectl get ksvc "${SERVICE_NAME}-service" -n "$NAMESPACE" >/dev/null 2>&1; then
+                            KNATIVE_SERVICE="${SERVICE_NAME}-service"
+                          fi
+                          
+                          echo "Found Knative Service: $KNATIVE_SERVICE"
+                          
+                          # Update ApplicationClaim status
+                          kubectl patch applicationclaim "$SERVICE_NAME" -n "$NAMESPACE" --type=merge --subresource=status -p "{
+                            \"status\": {
+                              \"repository\": {
+                                \"url\": \"$REPO_URL\",
+                                \"cloneUrl\": \"$CLONE_URL\"
+                              },
+                              \"application\": {
+                                \"knativeService\": \"$KNATIVE_SERVICE\"
+                              }
+                            }
+                          }"
+                          
+                          echo "✅ ApplicationClaim status synchronized from AppContainerClaim"
+                          exit 0
+                        fi
+                        
+                        echo "Waiting for AppContainerClaim repository status... (${ELAPSED}s/${TIMEOUT}s)"
+                        sleep 10
+                        ELAPSED=$((ELAPSED + 10))
+                      done
+                      
+                      echo "❌ Timeout waiting for AppContainerClaim repository status"
+                      exit 1
+                    env:
+                    - name: SERVICE_NAME
+                      value: placeholder
+                    - name: APP_CONTAINER_NAME
+                      value: placeholder
+                    - name: NAMESPACE
+                      value: placeholder
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-repo-sync"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-repo-sync"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[0].value
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[1].value
+    - type: FromCompositeFieldPath  
+      fromFieldPath: spec.namespace
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[2].value
+    - type: FromCompositeFieldPath
+      fromFieldPath: metadata.namespace  
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+
