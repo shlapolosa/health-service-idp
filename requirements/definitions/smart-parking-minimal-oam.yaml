@@ -1,0 +1,244 @@
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: smart-parking-platform
+  namespace: default
+  labels:
+    app.kubernetes.io/name: smart-parking-platform
+    app.kubernetes.io/version: "1.0.0"
+    parking.platform.io/system-type: "minimal"
+spec:
+  components:
+  
+  # 1. SENSOR DATA INGESTION SERVICE (Real-time IoT Platform) - MINIMAL
+  - name: sensor-data-platform
+    type: realtime-platform
+    properties:
+      image: socrates12345/smart-parking-sensor-ingestion:latest
+      port: 8080
+      language: python
+      framework: fastapi
+      repository: smart-parking-sensor-platform
+      database: postgres
+      visualization: metabase
+      iot: true
+      dataRetention: "7d"  # Minimal retention
+      resources:
+        cpu: "100m"      # Reduced from 2000m
+        memory: "256Mi"   # Reduced from 4Gi
+      environment:
+        SENSOR_BATCH_SIZE: "100"          # Reduced from 1000
+        MQTT_TOPIC_PREFIX: "parking/sensors"
+        KAFKA_TOPIC: "sensor_readings"
+        INFLUXDB_BUCKET: "parking_sensors"
+        MAX_SENSORS_PER_LOT: "50"         # Reduced from 500
+        SENSOR_HEARTBEAT_INTERVAL: "60"   # Increased from 30
+      targetEnvironment: parking-production
+
+  # 2. REAL-TIME AVAILABILITY SERVICE - MINIMAL
+  - name: availability-service
+    type: webservice
+    properties:
+      image: socrates12345/smart-parking-availability:latest
+      port: 8080
+      language: python
+      framework: fastapi
+      repository: smart-parking-availability-service
+      realtime: sensor-data-platform
+      resources:
+        cpu: "50m"       # Reduced from 1000m
+        memory: "128Mi"   # Reduced from 2Gi
+      environment:
+        REDIS_CACHE_TTL: "60"             # Increased from 30
+        MAX_QUERY_CONCURRENT: "50"        # Reduced from 1000
+        RESPONSE_TARGET_MS: "2000"        # Increased from 500
+        CACHE_STRATEGY: "write-through"
+        AVAILABILITY_UPDATE_INTERVAL: "15" # Increased from 5
+      targetEnvironment: parking-production
+    traits:
+    - type: scaler
+      properties:
+        replicas: 1      # Reduced from 3
+        minReplicas: 1   # Reduced from 2
+        maxReplicas: 3   # Reduced from 20
+        targetCPU: 80    # Increased threshold
+        targetMemory: 90 # Increased threshold
+        scaleUpSteps: 1  # Reduced from 2
+        scaleDownSteps: 1
+
+  # 3. CONVERSATIONAL AI CHAT SERVICE - MINIMAL
+  - name: parking-chat-assistant
+    type: rasa-chatbot
+    properties:
+      rasaImage: socrates12345/smart-parking-chat-rasa:latest
+      actionsImage: socrates12345/smart-parking-chat-actions:latest
+      language: rasa
+      framework: chatbot
+      repository: smart-parking-chat-service
+      minScale: 1      # Reduced from 2
+      maxScale: 3      # Reduced from 10
+      targetConcurrency: 10    # Increased from 5
+      actionsMinScale: 1
+      actionsMaxScale: 2       # Reduced from 8
+      actionsTargetConcurrency: 20  # Increased from 10
+      resources:
+        cpu: "100m"    # Reduced from 500m
+        memory: "256Mi" # Reduced from 1Gi
+      actionsResources:
+        cpu: "50m"     # Reduced from 250m
+        memory: "128Mi" # Reduced from 512Mi
+      environment:
+        NLP_MODEL_PATH: "/app/models"
+        CONVERSATION_TIMEOUT: "900"       # Reduced from 1800
+        MAX_HISTORY_LENGTH: "5"           # Reduced from 10
+        PARKING_API_ENDPOINT: "http://availability-service:8080"
+        MAPS_API_INTEGRATION: "false"     # Disabled for minimal
+      enableIstioGateway: true
+      chatbotHost: "chat.smartparking.local"
+      enableTLS: false  # Disabled for minimal
+      targetEnvironment: parking-production
+
+  # 4. ADMIN MANAGEMENT DASHBOARD - MINIMAL
+  - name: admin-dashboard
+    type: webservice
+    properties:
+      image: socrates12345/smart-parking-admin:latest
+      port: 8080
+      language: python
+      framework: fastapi
+      repository: smart-parking-admin-dashboard
+      resources:
+        cpu: "50m"       # Reduced from 500m
+        memory: "128Mi"   # Reduced from 1Gi
+      environment:
+        DASHBOARD_REFRESH_INTERVAL: "60"  # Increased from 30
+        MAX_CONCURRENT_ADMINS: "10"       # Reduced from 50
+        SESSION_TIMEOUT: "1800"           # Reduced from 3600
+        EXPORT_FORMATS: "csv"             # Reduced from pdf,excel,csv
+        ALERT_THRESHOLD_SENSORS_OFFLINE: "10"  # Increased from 5
+        ALERT_THRESHOLD_REVENUE_DROP: "30"     # Increased from 20
+      targetEnvironment: parking-production
+    traits:
+    - type: gateway
+      properties:
+        host: admin.smartparking.local
+        http:
+          "/": 8080
+        tls:
+          disabled: true  # Disabled for minimal
+
+  # 5. DYNAMIC PRICING SERVICE - MINIMAL
+  - name: pricing-engine
+    type: webservice
+    properties:
+      image: socrates12345/smart-parking-pricing:latest
+      port: 8080
+      language: python
+      framework: fastapi
+      repository: smart-parking-pricing-engine
+      realtime: sensor-data-platform
+      resources:
+        cpu: "50m"       # Reduced from 750m
+        memory: "128Mi"   # Reduced from 1.5Gi
+      environment:
+        PRICING_ALGORITHM: "static"       # Changed from demand_based
+        PRICE_UPDATE_INTERVAL: "3600"     # Increased from 300
+        MAX_PRICE_INCREASE_PERCENT: "25"  # Reduced from 50
+        MIN_PRICE_DECREASE_PERCENT: "10"  # Reduced from 20
+        PEAK_HOURS_START: "08:00"
+        PEAK_HOURS_END: "18:00"
+        EVENT_SURGE_MULTIPLIER: "1.5"    # Reduced from 2.0
+        A_B_TEST_ENABLED: "false"         # Disabled for minimal
+      targetEnvironment: parking-production
+
+  # 6. NOTIFICATION SERVICE - MINIMAL
+  - name: notification-service
+    type: webservice
+    properties:
+      image: socrates12345/smart-parking-notifications:latest
+      port: 8080
+      language: python
+      framework: fastapi
+      repository: smart-parking-notification-service
+      resources:
+        cpu: "25m"       # Reduced from 300m
+        memory: "64Mi"    # Reduced from 512Mi
+      environment:
+        NOTIFICATION_CHANNELS: "email"    # Reduced from sms,email,push,slack
+        BATCH_SIZE: "50"                  # Reduced from 100
+        RETRY_ATTEMPTS: "2"               # Reduced from 3
+        RATE_LIMIT_PER_USER: "5"          # Reduced from 10
+        ALERT_ESCALATION_MINUTES: "30"    # Increased from 15
+      targetEnvironment: parking-production
+    traits:
+    - type: scaler
+      properties:
+        replicas: 1
+        minReplicas: 1
+        maxReplicas: 2    # Reduced from 5
+        targetCPU: 80     # Increased threshold
+        scaleUpSteps: 1
+        scaleDownSteps: 1
+
+  # 7. ANALYTICS & REPORTING SERVICE - MINIMAL
+  - name: analytics-service
+    type: webservice
+    properties:
+      image: socrates12345/smart-parking-analytics:latest
+      port: 8080
+      language: python
+      framework: fastapi
+      repository: smart-parking-analytics-service
+      realtime: sensor-data-platform
+      resources:
+        cpu: "100m"      # Reduced from 1000m
+        memory: "256Mi"   # Reduced from 2Gi
+      environment:
+        ANALYTICS_BATCH_INTERVAL: "86400"  # Daily instead of hourly
+        PREDICTION_MODEL_PATH: "/app/models/demand_forecasting"
+        REPORT_GENERATION_SCHEDULE: "0 6 * * 1"  # Weekly instead of daily
+        ML_TRAINING_SCHEDULE: "0 2 * * 0"  # Keep weekly
+        FORECAST_HORIZON_DAYS: "7"         # Reduced from 30
+      targetEnvironment: parking-production
+
+  # 8. SUPPORTING INFRASTRUCTURE - MINIMAL
+  
+  # Redis Cache - minimal configuration
+  - name: parking-cache
+    type: redis
+    properties:
+      name: parking-cache
+      architecture: standalone  # Changed from replication
+      replicas: 1              # Reduced from 3
+      storage: 1Gi             # Reduced from 20Gi
+      auth:
+        enabled: false         # Disabled for minimal
+      resources:
+        cpu: "25m"             # Reduced from 500m
+        memory: "128Mi"        # Reduced from 2Gi
+      targetEnvironment: parking-production
+
+  # MongoDB for configurations - minimal
+  - name: parking-config-db
+    type: mongodb
+    properties:
+      name: parking-config
+      architecture: standalone  # Changed from replicaset
+      replicas: 1             # Reduced from 3
+      storage: 5Gi            # Reduced from 50Gi
+      auth:
+        enabled: false        # Disabled for minimal
+      resources:
+        cpu: "50m"            # Reduced from 750m
+        memory: "256Mi"       # Reduced from 1.5Gi
+      targetEnvironment: parking-production
+
+  # PostgreSQL for transactional data - keep neon (managed)
+  - name: parking-transactional-db
+    type: neon-postgres
+    properties:
+      name: parking-transactions
+      database: parking_system
+      targetEnvironment: parking-production
+
+

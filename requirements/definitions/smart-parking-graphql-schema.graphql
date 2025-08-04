@@ -1,0 +1,469 @@
+# Smart Parking System - Unified GraphQL Schema
+# Schema-first design for Hasura federation of REST microservices
+
+# ============================================================================
+# CORE TYPES - Parking Infrastructure
+# ============================================================================
+
+type ParkingLot {
+  id: ID!
+  name: String!
+  location: Location!
+  totalCapacity: Int!
+  availableSpaces: Int!
+  floors: [Floor!]!
+  operatingHours: OperatingHours!
+  pricing: PricingRule!
+  features: [String!]! # EV charging, disabled access, etc.
+  status: LotStatus!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Floor {
+  id: ID!
+  lotId: ID!
+  floorNumber: Int!
+  name: String # Ground, Level 1, Basement, etc.
+  totalSpaces: Int!
+  availableSpaces: Int!
+  sensors: [Sensor!]!
+  lastUpdated: DateTime!
+}
+
+type Sensor {
+  id: ID!
+  floorId: ID!
+  bayNumber: String!
+  isOccupied: Boolean!
+  status: SensorStatus!
+  batteryLevel: Float # 0.0 to 1.0
+  lastHeartbeat: DateTime!
+  installationDate: DateTime!
+}
+
+type Location {
+  address: String!
+  city: String!
+  latitude: Float!
+  longitude: Float!
+  zipCode: String
+  landmarks: [String!]
+}
+
+type OperatingHours {
+  monday: DaySchedule!
+  tuesday: DaySchedule!
+  wednesday: DaySchedule!
+  thursday: DaySchedule!
+  friday: DaySchedule!
+  saturday: DaySchedule!
+  sunday: DaySchedule!
+}
+
+type DaySchedule {
+  isOpen: Boolean!
+  openTime: Time
+  closeTime: Time
+}
+
+# ============================================================================
+# PRICING & PAYMENTS
+# ============================================================================
+
+type PricingRule {
+  id: ID!
+  lotId: ID!
+  baseRate: Money!
+  peakRate: Money
+  weekendRate: Money
+  peakHours: TimeRange
+  currency: String!
+  billingInterval: BillingInterval!
+  maxDailyRate: Money
+}
+
+type Money {
+  amount: Float!
+  currency: String!
+}
+
+type TimeRange {
+  start: Time!
+  end: Time!
+}
+
+# ============================================================================
+# CHAT & NOTIFICATIONS
+# ============================================================================
+
+type ChatQuery {
+  id: ID!
+  userId: String
+  query: String!
+  response: ChatResponse!
+  timestamp: DateTime!
+  location: Location
+}
+
+type ChatResponse {
+  message: String!
+  suggestions: [ParkingLot!]
+  availabilityData: [AvailabilityInfo!]
+  pricingInfo: [PricingInfo!]
+  navigationLinks: [NavigationLink!]
+}
+
+type AvailabilityInfo {
+  lotId: ID!
+  lotName: String!
+  totalSpaces: Int!
+  availableSpaces: Int!
+  floorBreakdown: [FloorAvailability!]!
+  estimatedWalkTime: Int # minutes
+  distance: Float # kilometers
+}
+
+type FloorAvailability {
+  floorNumber: Int!
+  floorName: String!
+  availableSpaces: Int!
+  totalSpaces: Int!
+}
+
+type PricingInfo {
+  lotId: ID!
+  currentRate: Money!
+  upcomingRateChange: RateChange
+  estimatedCost: Money # for predicted duration
+}
+
+type RateChange {
+  newRate: Money!
+  effectiveTime: DateTime!
+  reason: String # peak hours, weekend, event
+}
+
+type NavigationLink {
+  type: NavigationType!
+  url: String!
+  deepLink: String
+}
+
+type Notification {
+  id: ID!
+  userId: String
+  type: NotificationType!
+  title: String!
+  message: String!
+  data: JSON
+  isRead: Boolean!
+  createdAt: DateTime!
+}
+
+# ============================================================================
+# ANALYTICS & REPORTING
+# ============================================================================
+
+type UsageReport {
+  lotId: ID!
+  period: ReportPeriod!
+  totalRevenue: Money!
+  averageOccupancy: Float! # 0.0 to 1.0
+  peakUtilizationTime: DateTime!
+  totalSessions: Int!
+  averageSessionDuration: Int! # minutes
+  popularFloors: [FloorUsage!]!
+}
+
+type FloorUsage {
+  floorNumber: Int!
+  occupancyRate: Float!
+  revenue: Money!
+  averageSessionDuration: Int!
+}
+
+type SensorHealth {
+  totalSensors: Int!
+  activeSensors: Int!
+  faultySensors: Int!
+  lowBatterySensors: Int!
+  offlineSensors: Int!
+  lastUpdated: DateTime!
+}
+
+# ============================================================================
+# ENUMS
+# ============================================================================
+
+enum LotStatus {
+  ACTIVE
+  MAINTENANCE
+  TEMPORARILY_CLOSED
+  PERMANENTLY_CLOSED
+}
+
+enum SensorStatus {
+  ACTIVE
+  OFFLINE
+  LOW_BATTERY
+  FAULTY
+  MAINTENANCE
+}
+
+enum BillingInterval {
+  HOURLY
+  HALF_HOURLY
+  DAILY
+  FLAT_RATE
+}
+
+enum NavigationType {
+  GOOGLE_MAPS
+  APPLE_MAPS
+  WAZE
+  WALKING_DIRECTIONS
+}
+
+enum NotificationType {
+  SPACE_AVAILABLE
+  PRICE_CHANGE
+  MAINTENANCE_ALERT
+  SENSOR_OFFLINE
+  PAYMENT_DUE
+  BOOKING_CONFIRMATION
+}
+
+enum ReportPeriod {
+  HOURLY
+  DAILY  
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+# ============================================================================
+# SCALAR TYPES
+# ============================================================================
+
+scalar DateTime
+scalar Time
+scalar JSON
+
+# ============================================================================
+# QUERIES - Real-time Data Access
+# ============================================================================
+
+type Query {
+  # Parking Lot Operations
+  parkingLots(
+    location: LocationInput
+    radius: Float # kilometers
+    availableSpacesMin: Int
+    features: [String!]
+  ): [ParkingLot!]!
+  
+  parkingLot(id: ID!): ParkingLot
+  
+  # Real-time Availability
+  availability(
+    lotIds: [ID!]
+    location: LocationInput
+    radius: Float
+  ): [AvailabilityInfo!]!
+  
+  # Floor-level Details
+  floorAvailability(
+    lotId: ID!
+    floorNumber: Int
+  ): [FloorAvailability!]!
+  
+  # Sensor Monitoring
+  sensorStatus(
+    lotId: ID!
+    floorNumber: Int
+    status: SensorStatus
+  ): [Sensor!]!
+  
+  sensorHealth(lotId: ID): SensorHealth!
+  
+  # Pricing Information
+  currentPricing(
+    lotIds: [ID!]!
+    duration: Int # estimated parking duration in minutes
+  ): [PricingInfo!]!
+  
+  # Chat Interface
+  chatQuery(
+    query: String!
+    location: LocationInput
+    userId: String
+  ): ChatResponse!
+  
+  chatHistory(
+    userId: String!
+    limit: Int = 50
+  ): [ChatQuery!]!
+  
+  # Analytics & Reporting (Admin)
+  usageReport(
+    lotId: ID!
+    period: ReportPeriod!
+    startDate: DateTime!
+    endDate: DateTime!
+  ): UsageReport!
+  
+  # Notifications
+  notifications(
+    userId: String!
+    unreadOnly: Boolean = false
+    limit: Int = 100
+  ): [Notification!]!
+}
+
+# ============================================================================
+# MUTATIONS - Data Modification
+# ============================================================================
+
+type Mutation {
+  # Admin Operations
+  createParkingLot(input: CreateParkingLotInput!): ParkingLot!
+  updateParkingLot(id: ID!, input: UpdateParkingLotInput!): ParkingLot!
+  deleteParkingLot(id: ID!): Boolean!
+  
+  # Pricing Management
+  updatePricing(lotId: ID!, input: PricingRuleInput!): PricingRule!
+  
+  # Manual Overrides
+  overrideAvailability(
+    lotId: ID!
+    floorNumber: Int
+    availableSpaces: Int!
+    reason: String!
+  ): Floor!
+  
+  # Sensor Management
+  updateSensorStatus(
+    sensorId: ID!
+    status: SensorStatus!
+    notes: String
+  ): Sensor!
+  
+  # Notifications
+  markNotificationRead(id: ID!): Notification!
+  markAllNotificationsRead(userId: String!): Boolean!
+  
+  # Chat Operations
+  sendChatMessage(
+    query: String!
+    location: LocationInput
+    userId: String
+  ): ChatResponse!
+}
+
+# ============================================================================
+# SUBSCRIPTIONS - Real-time Updates
+# ============================================================================
+
+type Subscription {
+  # Real-time availability updates
+  availabilityUpdates(
+    lotIds: [ID!]
+    location: LocationInput
+    radius: Float
+  ): AvailabilityInfo!
+  
+  # Sensor status changes
+  sensorUpdates(
+    lotId: ID!
+    floorNumber: Int
+  ): Sensor!
+  
+  # Price changes
+  pricingUpdates(lotIds: [ID!]!): PricingInfo!
+  
+  # Notifications
+  notificationStream(userId: String!): Notification!
+  
+  # Chat responses (for real-time chat)
+  chatUpdates(userId: String!): ChatResponse!
+}
+
+# ============================================================================
+# INPUT TYPES
+# ============================================================================
+
+input LocationInput {
+  latitude: Float!
+  longitude: Float!
+  radius: Float # search radius in kilometers
+}
+
+input CreateParkingLotInput {
+  name: String!
+  location: LocationDataInput!
+  totalCapacity: Int!
+  floors: [FloorInput!]!
+  operatingHours: OperatingHoursInput!
+  pricing: PricingRuleInput!
+  features: [String!]
+}
+
+input UpdateParkingLotInput {
+  name: String
+  location: LocationDataInput
+  totalCapacity: Int
+  operatingHours: OperatingHoursInput
+  features: [String!]
+  status: LotStatus
+}
+
+input LocationDataInput {
+  address: String!
+  city: String!
+  latitude: Float!
+  longitude: Float!
+  zipCode: String
+  landmarks: [String!]
+}
+
+input FloorInput {
+  floorNumber: Int!
+  name: String!
+  totalSpaces: Int!
+}
+
+input OperatingHoursInput {
+  monday: DayScheduleInput!
+  tuesday: DayScheduleInput!
+  wednesday: DayScheduleInput!
+  thursday: DayScheduleInput!
+  friday: DayScheduleInput!
+  saturday: DayScheduleInput!
+  sunday: DayScheduleInput!
+}
+
+input DayScheduleInput {
+  isOpen: Boolean!
+  openTime: Time
+  closeTime: Time
+}
+
+input PricingRuleInput {
+  baseRate: MoneyInput!
+  peakRate: MoneyInput
+  weekendRate: MoneyInput
+  peakHours: TimeRangeInput
+  billingInterval: BillingInterval!
+  maxDailyRate: MoneyInput
+}
+
+input MoneyInput {
+  amount: Float!
+  currency: String!
+}
+
+input TimeRangeInput {
+  start: Time!
+  end: Time!
+}

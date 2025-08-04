@@ -1,0 +1,37 @@
+# Four Outstanding TODOs from CLAUDE.md
+
+## 1. Default Unified Repository Pattern (🔴 HIGH PRIORITY)
+**Current Issue**: Each OAM component creates separate ApplicationClaim → separate repositories by default
+**Target**: Unified repo unless user explicitly specifies separate repositories
+**Implementation**: 
+- Modify `crossplane/application-claim-composition.yaml` (lines 1018-1086)
+- Extract `repository` property from OAM Application level → auto-populate `APP_CONTAINER` env var
+- Default to shared repository pattern like `healthcare-quality-platform` example
+
+## 2. Advanced Traits & Policies Support (🟡 MEDIUM PRIORITY)
+**Issue**: Custom traits (sensor-burst-scaler, parking-circuit-breaker, parking-monitoring, parking-security) cause parsing failures
+**Current**: Only 4 basic TraitDefinitions, 1 WorkloadDefinition (webservice)
+**Solution**: 
+- Create missing TraitDefinitions for circuit breakers, monitoring, security policies
+- Expand WorkloadDefinition support beyond just Knative Services
+- Add PolicyDefinition implementations that don't cause parsing errors
+
+## 3. Multi-Namespace OAM Deployment (🟡 MEDIUM PRIORITY)
+**Blocker**: ComponentDefinitions are namespace-scoped, only exist in `default` namespace
+**Impact**: OAM Applications can only deploy where ComponentDefinitions exist
+**Options**: 
+- Make ComponentDefinitions cluster-scoped (breaking change)
+- Auto-replicate ComponentDefinitions to target namespaces
+- Multi-tenancy strategy with namespace isolation
+
+## 4. GraphQL API Aggregation Integration (🟢 LOW PRIORITY)
+**Decision**: Hasura wins over Apollo Server
+**Rationale**: 
+- ✅ Auto-generates GraphQL from PostgreSQL (zero-code)
+- ✅ Real-time subscriptions out-of-the-box
+- ✅ Built-in admin UI and role-based permissions
+- ✅ Schema-first development without database dependency
+**Implementation**: 
+- Create `hasura` ComponentDefinition
+- Auto-add to ApplicationClaims that request GraphQL exposure
+- Use Remote Schemas to federate existing REST endpoints (port 8080)

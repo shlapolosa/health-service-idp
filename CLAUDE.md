@@ -224,6 +224,91 @@ manifest/
 
 ---
 
+## 📋 TODOs: Platform Improvements & Findings
+
+### **🔧 Critical OAM Platform Fixes**
+
+#### **1. Default Unified Repository Pattern**
+- **Status**: 🔴 HIGH PRIORITY  
+- **Issue**: Each OAM component creates separate ApplicationClaim → separate repositories by default
+- **Current**: Separate repos unless user explicitly specifies same `repository` property
+- **Target**: Unified repo unless user explicitly specifies separate repositories  
+- **Implementation**: 
+  - Modify `crossplane/application-claim-composition.yaml` (lines 1018-1086)
+  - Extract `repository` property from OAM Application level → auto-populate `APP_CONTAINER` env var
+  - Default to shared repository pattern like `healthcare-quality-platform` example
+
+#### **2. Advanced Traits & Policies Support**
+- **Status**: 🟡 MEDIUM PRIORITY
+- **Issue**: Custom traits (sensor-burst-scaler, parking-circuit-breaker, parking-monitoring, parking-security) cause parsing failures
+- **Current**: Only 4 basic TraitDefinitions, 1 WorkloadDefinition (webservice)
+- **Gap**: Missing TraitDefinitions for advanced OAM features
+- **Solution**: 
+  - Create missing TraitDefinitions for circuit breakers, monitoring, security policies
+  - Expand WorkloadDefinition support beyond just Knative Services
+  - Add PolicyDefinition implementations that don't cause parsing errors
+
+#### **3. Multi-Namespace OAM Deployment**
+- **Status**: 🟡 MEDIUM PRIORITY  
+- **Blocker**: ComponentDefinitions are namespace-scoped, only exist in `default` namespace
+- **Impact**: OAM Applications can only deploy where ComponentDefinitions exist
+- **Analysis Required**:
+  - Cluster-scoped ComponentDefinitions vs replicate to each namespace
+  - RBAC implications, network policies, resource quotas per namespace
+  - Service accounts, secrets, roles must exist in target namespace
+- **Options**: 
+  - Make ComponentDefinitions cluster-scoped (breaking change)
+  - Auto-replicate ComponentDefinitions to target namespaces
+  - Multi-tenancy strategy with namespace isolation
+
+#### **4. GraphQL API Aggregation Integration**
+- **Status**: 🟢 LOW PRIORITY - ENHANCEMENT
+- **Decision**: **Hasura wins over Apollo Server**
+- **Rationale**: 
+  - ✅ Auto-generates GraphQL from PostgreSQL (zero-code)
+  - ✅ Real-time subscriptions out-of-the-box  
+  - ✅ Built-in admin UI and role-based permissions
+  - ✅ Simpler setup and maintenance
+- **Integration Point**: Add Hasura component to ApplicationClaim creation process
+- **Dependency**: Requires PostgreSQL connection (already provided by neon-postgres ComponentDefinition)
+- **Implementation**: 
+  - Create `hasura` ComponentDefinition
+  - Auto-add to ApplicationClaims that request GraphQL exposure
+  - Configure auto-schema generation from existing PostgreSQL databases
+
+#### **5. OAM Standard Compliance Assessment**
+- **Status**: 🟡 MEDIUM PRIORITY - ANALYSIS
+- **Current Compliance**: ~60% with vanilla OAM specification
+- **Compliant Areas**:
+  - ✅ Using core.oam.dev/v1beta1 APIs correctly
+  - ✅ CUE templates for component definitions follow standard
+  - ✅ Basic trait composition works
+- **Non-Compliant Areas**:
+  - ❌ Custom ApplicationClaim XRD (not standard OAM)
+  - ❌ Crossplane infrastructure integration dependencies
+  - ❌ Custom ComponentDefinitions (realtime-platform, rasa-chatbot, application-infrastructure)
+- **Path Forward**:
+  - Create "Standard OAM Mode" alongside current enhanced mode
+  - Remove Crossplane dependencies for vanilla compatibility
+  - Maintain backward compatibility with current enhanced features
+
+### **📊 Current Platform State Analysis**
+- **ComponentDefinitions**: 11 total, all in default namespace only
+- **WorkloadDefinitions**: 1 (webservice), only supports Knative Services  
+- **TraitDefinitions**: 4 basic traits (autoscaler, ingress, kafka-consumer, kafka-producer)
+- **OAM Applications**: 3 running successfully, all in default namespace
+- **Repository Pattern**: APP_CONTAINER env var in ApplicationClaim composition controls unified repos
+- **Cross-namespace Deployment**: Blocked by ComponentDefinition namespace scoping
+
+### **🎯 Implementation Priority Order**
+1. **Default Unified Repository Pattern** - Critical for developer experience
+2. **Advanced Traits & Policies Support** - Enable complex OAM features  
+3. **Multi-Namespace Deployment** - Enterprise multi-tenancy support
+4. **OAM Standard Compliance** - Industry standard compatibility
+5. **GraphQL Integration** - API aggregation enhancement
+
+---
+
 
 ## Cloud-Native Architecture Visualization Platform
 
