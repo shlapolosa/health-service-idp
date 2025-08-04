@@ -1,0 +1,102 @@
+---
+# GraphQLPlatformClaim XRD - Following RealtimePlatformClaim pattern
+# Manages GraphQL gateway infrastructure including schema discovery and Hasura deployment
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xgraphqlplatformclaims.platform.example.org
+spec:
+  group: platform.example.org
+  names:
+    kind: XGraphQLPlatformClaim
+    plural: xgraphqlplatformclaims
+  claimNames:
+    kind: GraphQLPlatformClaim
+    plural: graphqlplatformclaims
+  connectionSecretKeys:
+  - hasura-admin-secret
+  - graphql-endpoint
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              name:
+                type: string
+                description: "Name for the GraphQL platform instance"
+              serviceSelector:
+                type: object
+                description: "Label selector for services to expose via GraphQL"
+                additionalProperties:
+                  type: string
+              autoSchema:
+                type: boolean
+                default: true
+                description: "Enable automatic schema generation from discovered services"
+              schemaRefreshInterval:
+                type: string
+                default: "5m"
+                description: "How often to refresh the auto-generated schema"
+              exposeIntrospection:
+                type: boolean
+                default: false
+                description: "Enable GraphQL introspection in production"
+              adminSecret:
+                type: string
+                description: "Hasura admin secret (generated if empty)"
+              enableConsole:
+                type: boolean
+                default: true
+                description: "Enable Hasura console UI"
+              enableAllowList:
+                type: boolean
+                default: false
+                description: "Enable GraphQL query allow-listing"
+              customResolvers:
+                type: array
+                description: "Custom GraphQL resolvers"
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    endpoint:
+                      type: string
+                    headers:
+                      type: object
+                      additionalProperties:
+                        type: string
+              resources:
+                type: object
+                description: "Resource requirements for Hasura"
+                properties:
+                  cpu:
+                    type: string
+                    default: "500m"
+                  memory:
+                    type: string
+                    default: "512Mi"
+              targetEnvironment:
+                type: string
+                description: "Target vCluster environment"
+            required:
+            - name
+          status:
+            type: object
+            properties:
+              ready:
+                type: string
+              endpoint:
+                type: string
+              schemaVersion:
+                type: string
+              discoveredServices:
+                type: integer
+              lastSchemaUpdate:
+                type: string

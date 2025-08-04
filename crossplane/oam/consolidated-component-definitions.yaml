@@ -4,6 +4,17 @@
 # 2. ComponentDefinition-only (no Claims for basic components)
 # 3. Embedded workflows for complex orchestration
 # 4. KubeVela orchestrates, Crossplane executes
+#
+# Component Types:
+# - webservice: Standard microservices with optional infrastructure
+# - graphql-gateway: Auto-discovering GraphQL API aggregation with Hasura
+# - realtime-platform: Complete streaming infrastructure with Kafka/MQTT
+# - rasa-chatbot: Dual-container chatbot with Rasa + Actions
+# - kafka/redis/mongodb: Direct infrastructure components via Helm
+# - application-infrastructure: Complex application setup via Claims
+# - vcluster: Virtual Kubernetes environments
+# - neon-postgres/auth0-idp: External service integrations
+# - clickhouse: Analytics database for time-series data
 
 ---
 # Enhanced WebService ComponentDefinition with Parameter Transformation

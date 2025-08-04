@@ -1,0 +1,144 @@
+---
+# Example OAM Application with GraphQL Gateway
+# This demonstrates auto-discovery and federation of multiple services
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: platform-with-graphql
+  namespace: default
+spec:
+  components:
+  # Existing microservices
+  - name: user-service
+    type: webservice
+    properties:
+      image: socrates12345/user-service:latest
+      port: 8080
+      environment:
+        SERVICE_NAME: "user-service"
+        OPENAPI_ENABLED: "true"
+      # Mark service for GraphQL exposure
+      annotations:
+        "graphql.oam.dev/exposed": "true"
+        "graphql.oam.dev/path-prefix": "/api/v1/users"
+        
+  - name: order-service
+    type: webservice
+    properties:
+      image: socrates12345/order-service:latest
+      port: 8080
+      environment:
+        SERVICE_NAME: "order-service"
+        OPENAPI_ENABLED: "true"
+      annotations:
+        "graphql.oam.dev/exposed": "true"
+        "graphql.oam.dev/path-prefix": "/api/v1/orders"
+        
+  - name: product-service
+    type: webservice
+    properties:
+      image: socrates12345/product-service:latest
+      port: 8080
+      environment:
+        SERVICE_NAME: "product-service"
+        OPENAPI_ENABLED: "true"
+      annotations:
+        "graphql.oam.dev/exposed": "true"
+        "graphql.oam.dev/path-prefix": "/api/v1/products"
+        
+  # GraphQL Gateway - automatically discovers and federates above services
+  - name: api-gateway
+    type: graphql-gateway
+    properties:
+      # Service discovery configuration
+      serviceSelector:
+        "app.kubernetes.io/part-of": "platform-with-graphql"
+        "graphql.oam.dev/exposed": "true"
+      
+      # Schema management
+      autoSchema: true
+      schemaRefreshInterval: "5m"
+      exposeIntrospection: true  # Enable for development
+      
+      # Hasura configuration
+      enableConsole: true
+      enableAllowList: false
+      
+      # Custom resolvers for cross-service queries
+      customResolvers:
+      - name: "userOrders"
+        endpoint: "http://order-service:8080/graphql/user/{userId}/orders"
+        headers:
+          "X-GraphQL-Gateway": "true"
+      - name: "orderProducts"
+        endpoint: "http://product-service:8080/graphql/order/{orderId}/products"
+        headers:
+          "X-GraphQL-Gateway": "true"
+          
+      # Resources
+      resources:
+        cpu: "500m"
+        memory: "512Mi"
+
+---
+# Example with repository creation for custom schema extensions
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: ecommerce-graphql
+  namespace: default
+spec:
+  components:
+  # GraphQL Gateway with repository
+  - name: ecommerce-api
+    type: graphql-gateway
+    properties:
+      # This triggers repository creation with GraphQL schema templates
+      language: "typescript"
+      framework: "apollo-server"
+      repository: "ecommerce-platform"
+      
+      # Auto-discover all services in namespace
+      serviceSelector:
+        "app.kubernetes.io/instance": "ecommerce"
+        
+      # Enable all features
+      autoSchema: true
+      schemaRefreshInterval: "10m"
+      exposeIntrospection: false  # Disable for production
+      enableConsole: false
+      enableAllowList: true  # Enable query whitelisting
+      
+      # Production configuration
+      adminSecret: "super-secret-admin-key"
+      resources:
+        cpu: "1000m"
+        memory: "1Gi"
+
+---
+# Example with multi-namespace discovery
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: multi-tenant-graphql
+  namespace: default
+spec:
+  components:
+  - name: tenant-api-gateway
+    type: graphql-gateway
+    properties:
+      # Discover services across multiple namespaces
+      serviceSelector:
+        "platform.example.org/tenant": "true"
+        
+      # Schema configuration
+      autoSchema: true
+      schemaRefreshInterval: "1h"  # Less frequent for stability
+      
+      # Multi-tenant configuration
+      environment:
+        HASURA_GRAPHQL_UNAUTHORIZED_ROLE: "tenant_user"
+        HASURA_GRAPHQL_JWT_SECRET: '{"type":"HS256","key":"tenant-secret-key"}'
+        
+      # Deploy to specific vCluster
+      targetEnvironment: "production-env"

@@ -1,0 +1,480 @@
+---
+# GraphQLPlatformClaim Composition - Creates all infrastructure for GraphQL gateway
+# Following the pattern of realtime-platform-claim-composition.yaml
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xgraphqlplatformclaims.platform.example.org
+  labels:
+    crossplane.io/xrd: xgraphqlplatformclaims.platform.example.org
+spec:
+  compositeTypeRef:
+    apiVersion: platform.example.org/v1alpha1
+    kind: XGraphQLPlatformClaim
+  resources:
+    # 1. Create dedicated namespace for GraphQL infrastructure
+    - name: graphql-namespace
+      base:
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          labels:
+            platform.example.org/type: "graphql"
+      patches:
+      - type: CombineFromComposite
+        combine:
+          variables:
+          - fromFieldPath: spec.name
+          strategy: string
+          string:
+            fmt: "%s-graphql"
+        toFieldPath: metadata.name
+        
+    # 2. Schema ConfigMaps (Auto-generated, Custom, Merged)
+    - name: schema-configmap-generated
+      base:
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: graphql-schema-generated
+          namespace: default
+        data:
+          schema.graphql: |
+            # Auto-generated GraphQL schema
+            # This will be populated by the schema discovery job
+            type Query {
+              _placeholder: String
+            }
+      patches:
+      - fromFieldPath: spec.name
+        toFieldPath: metadata.name
+        transforms:
+        - type: string
+          string:
+            fmt: "%s-graphql-schema-generated"
+      - type: CombineFromComposite
+        combine:
+          variables:
+          - fromFieldPath: spec.name
+          strategy: string
+          string:
+            fmt: "%s-graphql"
+        toFieldPath: metadata.namespace
+        
+    - name: schema-configmap-custom
+      base:
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: graphql-schema-custom
+          namespace: default
+        data:
+          schema.graphql: |
+            # Custom GraphQL schema extensions
+            # Add your custom types, queries, and mutations here
+      patches:
+      - fromFieldPath: spec.name
+        toFieldPath: metadata.name
+        transforms:
+        - type: string
+          string:
+            fmt: "%s-graphql-schema-custom"
+      - type: CombineFromComposite
+        combine:
+          variables:
+          - fromFieldPath: spec.name
+          strategy: string
+          string:
+            fmt: "%s-graphql"
+        toFieldPath: metadata.namespace
+        
+    - name: schema-configmap-merged
+      base:
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: graphql-schema-merged
+          namespace: default
+        data:
+          schema.graphql: |
+            # Merged GraphQL schema (auto-generated + custom)
+            # This is the final schema used by Hasura
+            type Query {
+              _placeholder: String
+            }
+      patches:
+      - fromFieldPath: spec.name
+        toFieldPath: metadata.name
+        transforms:
+        - type: string
+          string:
+            fmt: "%s-graphql-schema-merged"
+      - type: CombineFromComposite
+        combine:
+          variables:
+          - fromFieldPath: spec.name
+          strategy: string
+          string:
+            fmt: "%s-graphql"
+        toFieldPath: metadata.namespace
+        
+    # 3. ServiceAccount for schema discovery
+    - name: schema-discovery-sa
+      base:
+        apiVersion: v1
+        kind: ServiceAccount
+        metadata:
+          name: graphql-schema-discovery
+          namespace: default
+      patches:
+      - fromFieldPath: spec.name
+        toFieldPath: metadata.name
+        transforms:
+        - type: string
+          string:
+            fmt: "%s-schema-discovery"
+      - type: CombineFromComposite
+        combine:
+          variables:
+          - fromFieldPath: spec.name
+          strategy: string
+          string:
+            fmt: "%s-graphql"
+        toFieldPath: metadata.namespace
+        
+    # 4. ClusterRole for reading services and configmaps
+    - name: schema-discovery-role
+      base:
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRole
+        metadata:
+          name: graphql-schema-discovery
+        rules:
+        - apiGroups: [""]
+          resources: ["services", "endpoints"]
+          verbs: ["get", "list", "watch"]
+        - apiGroups: ["serving.knative.dev"]
+          resources: ["services"]
+          verbs: ["get", "list", "watch"]
+        - apiGroups: [""]
+          resources: ["configmaps"]
+          verbs: ["get", "list", "watch", "create", "update", "patch"]
+      patches:
+      - fromFieldPath: spec.name
+        toFieldPath: metadata.name
+        transforms:
+        - type: string
+          string:
+            fmt: "%s-schema-discovery"
+            
+    # 5. ClusterRoleBinding
+    - name: schema-discovery-binding
+      base:
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: graphql-schema-discovery
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: graphql-schema-discovery
+        subjects:
+        - kind: ServiceAccount
+          name: graphql-schema-discovery
+          namespace: default
+      patches:
+      - fromFieldPath: spec.name
+        toFieldPath: metadata.name
+        transforms:
+        - type: string
+          string:
+            fmt: "%s-schema-discovery"
+      - fromFieldPath: spec.name
+        toFieldPath: roleRef.name
+        transforms:
+        - type: string
+          string:
+            fmt: "%s-schema-discovery"
+      - fromFieldPath: spec.name
+        toFieldPath: subjects[0].name
+        transforms:
+        - type: string
+          string:
+            fmt: "%s-schema-discovery"
+      - type: CombineFromComposite
+        combine:
+          variables:
+          - fromFieldPath: spec.name
+          strategy: string
+          string:
+            fmt: "%s-graphql"
+        toFieldPath: subjects[0].namespace
+        
+    # 6. Schema Discovery CronJob
+    - name: schema-discovery-cronjob
+      base:
+        apiVersion: batch/v1
+        kind: CronJob
+        metadata:
+          name: graphql-schema-discovery
+          namespace: default
+        spec:
+          schedule: "*/5 * * * *"  # Every 5 minutes by default
+          jobTemplate:
+            spec:
+              template:
+                spec:
+                  serviceAccountName: graphql-schema-discovery
+                  restartPolicy: OnFailure
+                  containers:
+                  - name: schema-discovery
+                    image: socrates12345/graphql-schema-discovery:latest
+                    env:
+                    - name: NAMESPACE
+                      valueFrom:
+                        fieldRef:
+                          fieldPath: metadata.namespace
+                    - name: GRAPHQL_PLATFORM_NAME
+                      value: "placeholder"
+                    - name: SERVICE_SELECTOR
+                      value: '{"app.kubernetes.io/managed-by":"kubevela"}'
+                    - name: SCHEMA_CONFIGMAP_GENERATED
+                      value: "graphql-schema-generated"
+                    - name: SCHEMA_CONFIGMAP_CUSTOM
+                      value: "graphql-schema-custom"
+                    - name: SCHEMA_CONFIGMAP_MERGED
+                      value: "graphql-schema-merged"
+                    command: ["/app/discover-schema.sh"]
+      patches:
+      - fromFieldPath: spec.name
+        toFieldPath: metadata.name
+        transforms:
+        - type: string
+          string:
+            fmt: "%s-schema-discovery"
+      - type: CombineFromComposite
+        combine:
+          variables:
+          - fromFieldPath: spec.name
+          strategy: string
+          string:
+            fmt: "%s-graphql"
+        toFieldPath: metadata.namespace
+      - fromFieldPath: spec.schemaRefreshInterval
+        toFieldPath: spec.schedule
+        transforms:
+        - type: map
+          map:
+            "1m": "* * * * *"
+            "5m": "*/5 * * * *"
+            "10m": "*/10 * * * *"
+            "30m": "*/30 * * * *"
+            "1h": "0 * * * *"
+      - fromFieldPath: spec.name
+        toFieldPath: spec.jobTemplate.spec.template.spec.serviceAccountName
+        transforms:
+        - type: string
+          string:
+            fmt: "%s-schema-discovery"
+      - fromFieldPath: spec.name
+        toFieldPath: spec.jobTemplate.spec.template.spec.containers[0].env[1].value
+      - fromFieldPath: spec.serviceSelector
+        toFieldPath: spec.jobTemplate.spec.template.spec.containers[0].env[2].value
+        transforms:
+        - type: string
+          string:
+            type: Convert
+            convert: ToJson
+      - fromFieldPath: spec.name
+        toFieldPath: spec.jobTemplate.spec.template.spec.containers[0].env[3].value
+        transforms:
+        - type: string
+          string:
+            fmt: "%s-graphql-schema-generated"
+      - fromFieldPath: spec.name
+        toFieldPath: spec.jobTemplate.spec.template.spec.containers[0].env[4].value
+        transforms:
+        - type: string
+          string:
+            fmt: "%s-graphql-schema-custom"
+      - fromFieldPath: spec.name
+        toFieldPath: spec.jobTemplate.spec.template.spec.containers[0].env[5].value
+        transforms:
+        - type: string
+          string:
+            fmt: "%s-graphql-schema-merged"
+            
+    # 7. Hasura Admin Secret
+    - name: hasura-admin-secret
+      base:
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: hasura-admin-secret
+          namespace: default
+        type: Opaque
+        data:
+          admin-secret: "Z3JhcGhxbC1hZG1pbi1zZWNyZXQ="  # Base64 encoded default
+      patches:
+      - fromFieldPath: spec.name
+        toFieldPath: metadata.name
+        transforms:
+        - type: string
+          string:
+            fmt: "%s-hasura-admin-secret"
+      - type: CombineFromComposite
+        combine:
+          variables:
+          - fromFieldPath: spec.name
+          strategy: string
+          string:
+            fmt: "%s-graphql"
+        toFieldPath: metadata.namespace
+      - fromFieldPath: spec.adminSecret
+        toFieldPath: data.admin-secret
+        transforms:
+        - type: string
+          string:
+            type: Convert
+            convert: ToBase64
+            
+    # 8. Hasura Metadata ConfigMap
+    - name: hasura-metadata
+      base:
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: hasura-metadata
+          namespace: default
+        data:
+          metadata.json: |
+            {
+              "version": 3,
+              "sources": [],
+              "remote_schemas": []
+            }
+      patches:
+      - fromFieldPath: spec.name
+        toFieldPath: metadata.name
+        transforms:
+        - type: string
+          string:
+            fmt: "%s-hasura-metadata"
+      - type: CombineFromComposite
+        combine:
+          variables:
+          - fromFieldPath: spec.name
+          strategy: string
+          string:
+            fmt: "%s-graphql"
+        toFieldPath: metadata.namespace
+        
+    # 9. NetworkPolicy for Hasura
+    - name: hasura-network-policy
+      base:
+        apiVersion: networking.k8s.io/v1
+        kind: NetworkPolicy
+        metadata:
+          name: hasura-network-policy
+          namespace: default
+        spec:
+          podSelector:
+            matchLabels:
+              app: hasura
+          policyTypes:
+          - Ingress
+          - Egress
+          ingress:
+          - from:
+            - namespaceSelector:
+                matchLabels:
+                  name: istio-system
+            ports:
+            - protocol: TCP
+              port: 8080
+          egress:
+          - to:
+            - namespaceSelector: {}
+            ports:
+            - protocol: TCP
+              port: 8080
+          - to:
+            - namespaceSelector: {}
+              podSelector:
+                matchLabels:
+                  k8s-app: kube-dns
+            ports:
+            - protocol: UDP
+              port: 53
+      patches:
+      - fromFieldPath: spec.name
+        toFieldPath: metadata.name
+        transforms:
+        - type: string
+          string:
+            fmt: "%s-hasura-network-policy"
+      - type: CombineFromComposite
+        combine:
+          variables:
+          - fromFieldPath: spec.name
+          strategy: string
+          string:
+            fmt: "%s-graphql"
+        toFieldPath: metadata.namespace
+      - fromFieldPath: spec.name
+        toFieldPath: spec.podSelector.matchLabels.app
+        transforms:
+        - type: string
+          string:
+            fmt: "%s-hasura"
+            
+    # 10. Output Secret for connection details
+    - name: connection-secret
+      base:
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: graphql-connection
+          namespace: default
+        type: Opaque
+        data:
+          hasura-admin-secret: ""
+          graphql-endpoint: ""
+      patches:
+      - fromFieldPath: spec.name
+        toFieldPath: metadata.name
+        transforms:
+        - type: string
+          string:
+            fmt: "%s-graphql-connection"
+      - type: CombineFromComposite
+        combine:
+          variables:
+          - fromFieldPath: spec.name
+          strategy: string
+          string:
+            fmt: "%s-graphql"
+        toFieldPath: metadata.namespace
+      - fromFieldPath: spec.adminSecret
+        toFieldPath: data.hasura-admin-secret
+        transforms:
+        - type: string
+          string:
+            type: Convert
+            convert: ToBase64
+      - type: CombineFromComposite
+        combine:
+          variables:
+          - fromFieldPath: spec.name
+          strategy: string
+          string:
+            fmt: "http://%s-hasura.%s-graphql.svc.cluster.local:8080/v1/graphql"
+        toFieldPath: data.graphql-endpoint
+        transforms:
+        - type: string
+          string:
+            type: Convert
+            convert: ToBase64
+      connectionDetails:
+      - fromConnectionSecretKey: hasura-admin-secret
+      - fromConnectionSecretKey: graphql-endpoint
