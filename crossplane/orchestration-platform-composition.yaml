@@ -1,0 +1,651 @@
+---
+# OrchestrationPlatform Composition
+# Creates infrastructure for Camunda orchestrator including database, messaging, and service accounts
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: orchestration-platform-composition
+  labels:
+    provider: kubernetes
+    service: orchestration-platform
+spec:
+  compositeTypeRef:
+    apiVersion: platform.example.org/v1alpha1
+    kind: XOrchestrationPlatformClaim
+  
+  resources:
+  # Service Account for Camunda Orchestrator
+  - name: camunda-orchestrator-serviceaccount
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        providerConfigRef:
+          name: kubernetes-provider
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: ServiceAccount
+            metadata:
+              name: camunda-orchestrator-sa
+              namespace: default
+            automountServiceAccountToken: true
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.orchestratorName
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-sa"
+
+  # RBAC for Camunda Orchestrator (service discovery)
+  - name: camunda-orchestrator-clusterrole
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        providerConfigRef:
+          name: kubernetes-provider
+        forProvider:
+          manifest:
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: ClusterRole
+            metadata:
+              name: camunda-orchestrator-role
+            rules:
+            - apiGroups: [""]
+              resources: ["services", "endpoints", "pods"]
+              verbs: ["get", "list", "watch"]
+            - apiGroups: ["serving.knative.dev"]
+              resources: ["services", "configurations", "revisions"]
+              verbs: ["get", "list", "watch"]
+            - apiGroups: ["apps"]
+              resources: ["deployments", "replicasets"]
+              verbs: ["get", "list", "watch"]
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.orchestratorName
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-role"
+
+  # RBAC Binding for Camunda Orchestrator
+  - name: camunda-orchestrator-clusterrolebinding
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        providerConfigRef:
+          name: kubernetes-provider
+        forProvider:
+          manifest:
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: ClusterRoleBinding
+            metadata:
+              name: camunda-orchestrator-binding
+            subjects:
+            - kind: ServiceAccount
+              name: camunda-orchestrator-sa
+              namespace: default
+            roleRef:
+              kind: ClusterRole
+              name: camunda-orchestrator-role
+              apiGroup: rbac.authorization.k8s.io
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.orchestratorName
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-binding"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.orchestratorName
+      toFieldPath: spec.forProvider.manifest.subjects[0].name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-sa"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.orchestratorName
+      toFieldPath: spec.forProvider.manifest.roleRef.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-role"
+
+  # PostgreSQL Database for Camunda (when embedded mode)
+  - name: camunda-postgresql
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        providerConfigRef:
+          name: kubernetes-provider
+        forProvider:
+          manifest:
+            apiVersion: postgresql.cnpg.io/v1
+            kind: Cluster
+            metadata:
+              name: camunda-postgres
+              namespace: default
+            spec:
+              instances: 1
+              postgresql:
+                parameters:
+                  max_connections: "100"
+                  shared_buffers: "128MB"
+                  effective_cache_size: "512MB"
+              bootstrap:
+                initdb:
+                  database: camunda
+                  owner: camunda
+                  secret:
+                    name: camunda-postgres-credentials
+              storage:
+                size: 10Gi
+                storageClass: "gp2"
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.orchestratorName
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-postgres"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.orchestratorName
+      toFieldPath: spec.forProvider.manifest.spec.bootstrap.initdb.secret.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-postgres-credentials"
+
+  # PostgreSQL Credentials Secret
+  - name: camunda-postgres-secret
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        providerConfigRef:
+          name: kubernetes-provider
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: camunda-postgres-credentials
+              namespace: default
+            type: Opaque
+            stringData:
+              username: camunda
+              password: camunda-secure-password
+              database: camunda
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.orchestratorName
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-postgres-credentials"
+
+  # Elasticsearch for Camunda UI components (Operate, Tasklist, Optimize)
+  - name: camunda-elasticsearch-deployment
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        providerConfigRef:
+          name: kubernetes-provider
+        forProvider:
+          manifest:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: camunda-elasticsearch
+              namespace: default
+            spec:
+              replicas: 1
+              selector:
+                matchLabels:
+                  app: camunda-elasticsearch
+              template:
+                metadata:
+                  labels:
+                    app: camunda-elasticsearch
+                spec:
+                  containers:
+                  - name: elasticsearch
+                    image: elasticsearch:8.11.1
+                    ports:
+                    - containerPort: 9200
+                      name: http
+                    - containerPort: 9300
+                      name: transport
+                    env:
+                    - name: discovery.type
+                      value: single-node
+                    - name: xpack.security.enabled
+                      value: "false"
+                    - name: ES_JAVA_OPTS
+                      value: "-Xms512m -Xmx512m"
+                    resources:
+                      limits:
+                        cpu: "1000m"
+                        memory: "1Gi"
+                      requests:
+                        cpu: "500m"
+                        memory: "512Mi"
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.orchestratorName
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-elasticsearch"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.orchestratorName
+      toFieldPath: spec.forProvider.manifest.spec.selector.matchLabels.app
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-elasticsearch"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.orchestratorName
+      toFieldPath: spec.forProvider.manifest.spec.template.metadata.labels.app
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-elasticsearch"
+
+  # Elasticsearch Service
+  - name: camunda-elasticsearch-service
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        providerConfigRef:
+          name: kubernetes-provider
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: camunda-elasticsearch
+              namespace: default
+            spec:
+              type: ClusterIP
+              ports:
+              - port: 9200
+                targetPort: 9200
+                name: http
+              - port: 9300
+                targetPort: 9300
+                name: transport
+              selector:
+                app: camunda-elasticsearch
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.orchestratorName
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-elasticsearch"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.orchestratorName
+      toFieldPath: spec.forProvider.manifest.spec.selector.app
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-elasticsearch"
+
+  # Redis for Camunda State Management
+  - name: camunda-redis
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        providerConfigRef:
+          name: kubernetes-provider
+        forProvider:
+          manifest:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: camunda-redis
+              namespace: default
+            spec:
+              replicas: 1
+              selector:
+                matchLabels:
+                  app: camunda-redis
+              template:
+                metadata:
+                  labels:
+                    app: camunda-redis
+                spec:
+                  containers:
+                  - name: redis
+                    image: redis:7-alpine
+                    ports:
+                    - containerPort: 6379
+                    resources:
+                      requests:
+                        memory: "128Mi"
+                        cpu: "100m"
+                      limits:
+                        memory: "256Mi"
+                        cpu: "200m"
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.orchestratorName
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-redis"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.orchestratorName
+      toFieldPath: spec.forProvider.manifest.spec.selector.matchLabels.app
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-redis"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.orchestratorName
+      toFieldPath: spec.forProvider.manifest.spec.template.metadata.labels.app
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-redis"
+
+  # Redis Service
+  - name: camunda-redis-service
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        providerConfigRef:
+          name: kubernetes-provider
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: camunda-redis
+              namespace: default
+            spec:
+              selector:
+                app: camunda-redis
+              ports:
+              - port: 6379
+                targetPort: 6379
+                protocol: TCP
+              type: ClusterIP
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.orchestratorName
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-redis"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.orchestratorName
+      toFieldPath: spec.forProvider.manifest.spec.selector.app
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-redis"
+
+  # Default Orchestrator Configuration ConfigMap
+  - name: orchestrator-config
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        providerConfigRef:
+          name: kubernetes-provider
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: orchestrator-config
+              namespace: default
+            data:
+              application.yaml: |
+                server:
+                  port: 8080
+                
+                camunda:
+                  bpm:
+                    admin-user:
+                      id: admin
+                      password: admin
+                    deployment-aware: true
+                    job-execution:
+                      enabled: true
+                      core-pool-size: 10
+                      max-pool-size: 20
+                
+                spring:
+                  datasource:
+                    url: jdbc:postgresql://camunda-postgres:5432/camunda
+                    username: camunda
+                    password: camunda-secure-password
+                    driver-class-name: org.postgresql.Driver
+                  
+                  redis:
+                    host: camunda-redis
+                    port: 6379
+                    timeout: 2000ms
+                
+                management:
+                  endpoints:
+                    web:
+                      exposure:
+                        include: health,info,metrics,prometheus
+                  endpoint:
+                    health:
+                      show-details: always
+                
+                orchestration:
+                  patterns:
+                    saga:
+                      enabled: true
+                      compensation-timeout: 300000
+                    choreography:
+                      enabled: true
+                      event-timeout: 60000
+                  
+                  event-streaming:
+                    enabled: true
+                    kafka:
+                      bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+                      topics:
+                        prefix: ${KAFKA_TOPICS_PREFIX:orchestration}
+                        
+                  microservice-discovery:
+                    enabled: true
+                    selector: "orchestration.platform/managed=true"
+                    refresh-interval: 30000
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.orchestratorName
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-config"
+
+  # Default BPMN Models ConfigMap
+  - name: bpmn-models-config
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        providerConfigRef:
+          name: kubernetes-provider
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: orchestrator-bpmn
+              namespace: default
+            data:
+              microservice-orchestration.bpmn: |
+                <?xml version="1.0" encoding="UTF-8"?>
+                <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" 
+                                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" 
+                                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" 
+                                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" 
+                                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI" 
+                                  id="Definitions_microservice_orchestration" 
+                                  targetNamespace="http://bpmn.io/schema/bpmn">
+                  <bpmn:process id="microservice-orchestration" name="Microservice Orchestration" isExecutable="true">
+                    
+                    <bpmn:startEvent id="StartEvent_1" name="Request Received">
+                      <bpmn:outgoing>Flow_to_discover</bpmn:outgoing>
+                    </bpmn:startEvent>
+                    
+                    <bpmn:serviceTask id="ServiceTask_Discover" name="Discover Services">
+                      <bpmn:extensionElements>
+                        <zeebe:taskDefinition type="discover-microservices" />
+                      </bpmn:extensionElements>
+                      <bpmn:incoming>Flow_to_discover</bpmn:incoming>
+                      <bpmn:outgoing>Flow_to_parallel</bpmn:outgoing>
+                    </bpmn:serviceTask>
+                    
+                    <bpmn:parallelGateway id="ParallelGateway_Split" name="Split">
+                      <bpmn:incoming>Flow_to_parallel</bpmn:incoming>
+                      <bpmn:outgoing>Flow_to_service_a</bpmn:outgoing>
+                      <bpmn:outgoing>Flow_to_service_b</bpmn:outgoing>
+                    </bpmn:parallelGateway>
+                    
+                    <bpmn:serviceTask id="ServiceTask_A" name="Call Service A">
+                      <bpmn:extensionElements>
+                        <zeebe:taskDefinition type="call-microservice-a" />
+                      </bpmn:extensionElements>
+                      <bpmn:incoming>Flow_to_service_a</bpmn:incoming>
+                      <bpmn:outgoing>Flow_from_service_a</bpmn:outgoing>
+                    </bpmn:serviceTask>
+                    
+                    <bpmn:serviceTask id="ServiceTask_B" name="Call Service B">
+                      <bpmn:extensionElements>
+                        <zeebe:taskDefinition type="call-microservice-b" />
+                      </bpmn:extensionElements>
+                      <bpmn:incoming>Flow_to_service_b</bpmn:incoming>
+                      <bpmn:outgoing>Flow_from_service_b</bpmn:outgoing>
+                    </bpmn:serviceTask>
+                    
+                    <bpmn:parallelGateway id="ParallelGateway_Join" name="Join">
+                      <bpmn:incoming>Flow_from_service_a</bpmn:incoming>
+                      <bpmn:incoming>Flow_from_service_b</bpmn:incoming>
+                      <bpmn:outgoing>Flow_to_aggregate</bpmn:outgoing>
+                    </bpmn:parallelGateway>
+                    
+                    <bpmn:serviceTask id="ServiceTask_Aggregate" name="Aggregate Results">
+                      <bpmn:extensionElements>
+                        <zeebe:taskDefinition type="aggregate-results" />
+                      </bpmn:extensionElements>
+                      <bpmn:incoming>Flow_to_aggregate</bpmn:incoming>
+                      <bpmn:outgoing>Flow_to_end</bpmn:outgoing>
+                    </bpmn:serviceTask>
+                    
+                    <bpmn:endEvent id="EndEvent_1" name="Process Complete">
+                      <bpmn:incoming>Flow_to_end</bpmn:incoming>
+                    </bpmn:endEvent>
+                    
+                    <!-- Sequence Flows -->
+                    <bpmn:sequenceFlow id="Flow_to_discover" sourceRef="StartEvent_1" targetRef="ServiceTask_Discover" />
+                    <bpmn:sequenceFlow id="Flow_to_parallel" sourceRef="ServiceTask_Discover" targetRef="ParallelGateway_Split" />
+                    <bpmn:sequenceFlow id="Flow_to_service_a" sourceRef="ParallelGateway_Split" targetRef="ServiceTask_A" />
+                    <bpmn:sequenceFlow id="Flow_to_service_b" sourceRef="ParallelGateway_Split" targetRef="ServiceTask_B" />
+                    <bpmn:sequenceFlow id="Flow_from_service_a" sourceRef="ServiceTask_A" targetRef="ParallelGateway_Join" />
+                    <bpmn:sequenceFlow id="Flow_from_service_b" sourceRef="ServiceTask_B" targetRef="ParallelGateway_Join" />
+                    <bpmn:sequenceFlow id="Flow_to_aggregate" sourceRef="ParallelGateway_Join" targetRef="ServiceTask_Aggregate" />
+                    <bpmn:sequenceFlow id="Flow_to_end" sourceRef="ServiceTask_Aggregate" targetRef="EndEvent_1" />
+                    
+                  </bpmn:process>
+                </bpmn:definitions>
+                
+              saga-compensation.bpmn: |
+                <?xml version="1.0" encoding="UTF-8"?>
+                <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" 
+                                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" 
+                                  id="Definitions_saga_compensation" 
+                                  targetNamespace="http://bpmn.io/schema/bpmn">
+                  <bpmn:process id="saga-compensation" name="SAGA with Compensation" isExecutable="true">
+                    
+                    <bpmn:startEvent id="StartEvent_Saga" name="Start SAGA">
+                      <bpmn:outgoing>Flow_to_step1</bpmn:outgoing>
+                    </bpmn:startEvent>
+                    
+                    <bpmn:serviceTask id="Step1" name="Execute Step 1">
+                      <bpmn:extensionElements>
+                        <zeebe:taskDefinition type="saga-step-1" />
+                      </bpmn:extensionElements>
+                      <bpmn:incoming>Flow_to_step1</bpmn:incoming>
+                      <bpmn:outgoing>Flow_to_step2</bpmn:outgoing>
+                    </bpmn:serviceTask>
+                    
+                    <bpmn:serviceTask id="Step2" name="Execute Step 2">
+                      <bpmn:extensionElements>
+                        <zeebe:taskDefinition type="saga-step-2" />
+                      </bpmn:extensionElements>
+                      <bpmn:incoming>Flow_to_step2</bpmn:incoming>
+                      <bpmn:outgoing>Flow_to_step3</bpmn:outgoing>
+                    </bpmn:serviceTask>
+                    
+                    <bpmn:serviceTask id="Step3" name="Execute Step 3">
+                      <bpmn:extensionElements>
+                        <zeebe:taskDefinition type="saga-step-3" />
+                      </bpmn:extensionElements>
+                      <bpmn:incoming>Flow_to_step3</bpmn:incoming>
+                      <bpmn:outgoing>Flow_to_end_saga</bpmn:outgoing>
+                    </bpmn:serviceTask>
+                    
+                    <bpmn:endEvent id="EndEvent_Saga" name="SAGA Complete">
+                      <bpmn:incoming>Flow_to_end_saga</bpmn:incoming>
+                    </bpmn:endEvent>
+                    
+                    <!-- Compensation Tasks -->
+                    <bpmn:serviceTask id="Compensate1" name="Compensate Step 1" isForCompensation="true">
+                      <bpmn:extensionElements>
+                        <zeebe:taskDefinition type="compensate-step-1" />
+                      </bpmn:extensionElements>
+                    </bpmn:serviceTask>
+                    
+                    <bpmn:serviceTask id="Compensate2" name="Compensate Step 2" isForCompensation="true">
+                      <bpmn:extensionElements>
+                        <zeebe:taskDefinition type="compensate-step-2" />
+                      </bpmn:extensionElements>
+                    </bpmn:serviceTask>
+                    
+                    <!-- Compensation Associations -->
+                    <bpmn:association id="Association_1" sourceRef="Step1" targetRef="Compensate1" />
+                    <bpmn:association id="Association_2" sourceRef="Step2" targetRef="Compensate2" />
+                    
+                    <bpmn:sequenceFlow id="Flow_to_step1" sourceRef="StartEvent_Saga" targetRef="Step1" />
+                    <bpmn:sequenceFlow id="Flow_to_step2" sourceRef="Step1" targetRef="Step2" />
+                    <bpmn:sequenceFlow id="Flow_to_step3" sourceRef="Step2" targetRef="Step3" />
+                    <bpmn:sequenceFlow id="Flow_to_end_saga" sourceRef="Step3" targetRef="EndEvent_Saga" />
+                    
+                  </bpmn:process>
+                </bpmn:definitions>
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.orchestratorName
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-bpmn"

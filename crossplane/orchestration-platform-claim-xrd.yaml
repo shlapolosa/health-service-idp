@@ -1,0 +1,80 @@
+---
+# OrchestrationPlatformClaim XRD
+# Defines the schema for orchestration platform infrastructure claims
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xorchestrationplatformclaims.platform.example.org
+spec:
+  group: platform.example.org
+  names:
+    kind: XOrchestrationPlatformClaim
+    plural: xorchestrationplatformclaims
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              orchestratorName:
+                type: string
+                description: "Name of the orchestrator service"
+              realtimePlatformService:
+                type: string
+                description: "Name of the associated realtime platform service"
+              camundaMode:
+                type: string
+                enum: ["embedded", "remote"]
+                default: "embedded"
+                description: "Camunda deployment mode"
+              enableEventStreaming:
+                type: boolean
+                default: true
+                description: "Enable event streaming integration"
+              enableUI:
+                type: boolean
+                default: true
+                description: "Enable Camunda UI components (Operate, Tasklist)"
+              sagaPatterns:
+                type: array
+                items:
+                  type: string
+                default: ["compensation", "timeout", "retry"]
+                description: "Supported SAGA patterns"
+              resources:
+                type: object
+                properties:
+                  cpu:
+                    type: string
+                    default: "1000m"
+                  memory:
+                    type: string
+                    default: "1Gi"
+              targetEnvironment:
+                type: string
+                description: "Target deployment environment"
+          status:
+            type: object
+            properties:
+              camundaEndpoint:
+                type: string
+                description: "Camunda engine endpoint"
+              eventStreamingEndpoint:
+                type: string
+                description: "Event streaming endpoint"
+              workflowEngineReady:
+                type: boolean
+                description: "Workflow engine readiness status"
+  claimNames:
+    kind: OrchestrationPlatformClaim
+    plural: orchestrationplatformclaims
+  connectionSecretKeys:
+  - camunda-endpoint
+  - camunda-client-id
+  - camunda-client-secret
+  - kafka-bootstrap-servers

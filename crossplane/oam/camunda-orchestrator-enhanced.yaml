@@ -1,0 +1,857 @@
+---
+# Enhanced Camunda Orchestrator ComponentDefinition with Full UI Stack
+# Includes Camunda Operate (monitoring), Tasklist (human tasks), and optional Optimize (analytics)
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: camunda-orchestrator
+  annotations:
+    definition.oam.dev/description: "Camunda 8 orchestrator with full UI stack for process design, monitoring, and human task management"
+spec:
+  workload:
+    definition:
+      apiVersion: serving.knative.dev/v1
+      kind: Service
+    type: services.serving.knative.dev
+  schematic:
+    cue:
+      template: |
+        // Primary Output: Camunda Orchestrator (Zeebe) Knative Service
+        output: {
+          apiVersion: "serving.knative.dev/v1"
+          kind: "Service"
+          metadata: {
+            name: context.name
+            namespace: context.namespace
+            labels: {
+              "app.kubernetes.io/name": context.name
+              "app.kubernetes.io/component": "camunda-orchestrator"
+              "app.kubernetes.io/managed-by": "kubevela"
+              "app.kubernetes.io/part-of": "orchestration-platform"
+              "orchestration.platform/type": "camunda"
+              "camunda.io/component": "zeebe"
+            }
+            annotations: {
+              if parameter.targetEnvironment != _|_ {
+                "app.oam.dev/cluster": parameter.targetEnvironment
+              }
+              "orchestrator.oam.dev/realtime-platform": parameter.realtimePlatform
+              "orchestrator.oam.dev/workflow-patterns": "saga,choreography,orchestration"
+              "orchestrator.oam.dev/ui-enabled": "\(parameter.enableUI)"
+              if parameter.repository != _|_ {
+                "orchestrator.oam.dev/repository": parameter.repository
+                "orchestrator.oam.dev/trigger-repo-creation": "true"
+              }
+            }
+          }
+          spec: {
+            template: {
+              metadata: {
+                annotations: {
+                  "autoscaling.knative.dev/minScale": "\(parameter.minScale)"
+                  "autoscaling.knative.dev/maxScale": "\(parameter.maxScale)"
+                  if parameter.targetConcurrency != _|_ {
+                    "autoscaling.knative.dev/target": "\(parameter.targetConcurrency)"
+                  }
+                }
+                labels: {
+                  "app.kubernetes.io/name": context.name
+                  "app.kubernetes.io/version": parameter.version
+                  "orchestration.platform/type": "camunda"
+                  "camunda.io/component": "zeebe"
+                }
+              }
+              spec: {
+                serviceAccountName: "camunda-orchestrator-sa"
+                volumes: [
+                  {
+                    name: "workflow-config"
+                    configMap: {
+                      name: (*parameter.configMapName | context.name + "-config")
+                    }
+                  },
+                  {
+                    name: "bpmn-models"
+                    configMap: {
+                      name: (*parameter.bpmnConfigMapName | context.name + "-bpmn")
+                    }
+                  }
+                ]
+                containers: [{
+                  image: (*parameter.zeebeImage | "camunda/zeebe:8.3.3")
+                  name: "zeebe"
+                  ports: [{
+                    containerPort: 9600
+                    name: "grpc"
+                  }, {
+                    containerPort: 8080
+                    name: "http"
+                  }]
+                  resources: {
+                    limits: {
+                      cpu: parameter.resources.cpu
+                      memory: parameter.resources.memory
+                    }
+                    requests: {
+                      cpu: "500m"
+                      memory: "512Mi"
+                    }
+                  }
+                  volumeMounts: [
+                    {
+                      name: "workflow-config"
+                      mountPath: "/app/config"
+                    },
+                    {
+                      name: "bpmn-models"
+                      mountPath: "/app/bpmn"
+                    }
+                  ]
+                  env: [
+                    {
+                      name: "ZEEBE_BROKER_CLUSTER_NODEID"
+                      value: "0"
+                    },
+                    {
+                      name: "ZEEBE_BROKER_CLUSTER_PARTITIONSCOUNT"
+                      value: "1"
+                    },
+                    {
+                      name: "ZEEBE_BROKER_CLUSTER_REPLICATIONFACTOR"
+                      value: "1"
+                    },
+                    {
+                      name: "ZEEBE_BROKER_CLUSTER_CLUSTERSIZE"
+                      value: "1"
+                    },
+                    {
+                      name: "ZEEBE_BROKER_GATEWAY_ENABLE"
+                      value: "true"
+                    },
+                    {
+                      name: "REALTIME_PLATFORM_SERVICE"
+                      value: parameter.realtimePlatform + "." + context.namespace + ".svc.cluster.local"
+                    },
+                    {
+                      name: "EVENT_STREAMING_ENABLED"
+                      value: "\(parameter.enableEventStreaming)"
+                    },
+                    {
+                      name: "KAFKA_TOPICS_PREFIX"
+                      value: parameter.topicsPrefix
+                    },
+                    {
+                      name: "ZEEBE_BROKER_EXPORTERS_ELASTICSEARCH_CLASSNAME"
+                      value: "io.camunda.zeebe.exporter.ElasticsearchExporter"
+                    },
+                    {
+                      name: "ZEEBE_BROKER_EXPORTERS_ELASTICSEARCH_ARGS_URL"
+                      value: "http://" + context.name + "-elasticsearch:9200"
+                    }
+                  ] + [
+                    for k, v in parameter.environment {
+                      name: k
+                      value: v
+                    },
+                  ]
+                  if parameter.envFrom != _|_ {
+                    envFrom: parameter.envFrom
+                  }
+                  livenessProbe: {
+                    httpGet: {
+                      path: "/ready"
+                      port: 9600
+                    }
+                    initialDelaySeconds: 30
+                    periodSeconds: 30
+                  }
+                  readinessProbe: {
+                    httpGet: {
+                      path: "/health"
+                      port: 9600
+                    }
+                    initialDelaySeconds: 30
+                    periodSeconds: 30
+                  }
+                }]
+              }
+            }
+          }
+        }
+        
+        // Base outputs always include infrastructure
+        outputs: {
+          "orchestration-infrastructure": {
+            apiVersion: "platform.example.org/v1alpha1"
+            kind: "OrchestrationPlatformClaim"
+            metadata: {
+              name: context.name + "-infrastructure"
+              namespace: context.namespace
+              labels: {
+                "app.kubernetes.io/name": context.name
+                "app.kubernetes.io/component": "orchestration-infrastructure"
+                "app.kubernetes.io/part-of": "orchestration-platform"
+              }
+            }
+            spec: {
+              orchestratorName: context.name
+              realtimePlatformService: parameter.realtimePlatform
+              camundaMode: parameter.camundaMode
+              enableEventStreaming: parameter.enableEventStreaming
+              sagaPatterns: parameter.sagaPatterns
+              enableUI: parameter.enableUI
+              resources: {
+                cpu: parameter.resources.cpu
+                memory: parameter.resources.memory
+              }
+              if parameter.targetEnvironment != _|_ {
+                targetEnvironment: parameter.targetEnvironment
+              }
+            }
+          }
+        }
+        
+        // Conditional outputs based on UI enablement
+        if parameter.enableUI != _|_ && parameter.enableUI == true {
+          outputs: {
+            // Always include infrastructure
+            "orchestration-infrastructure": outputs["orchestration-infrastructure"]
+            
+            // Camunda Operate - Process Monitoring UI
+            "camunda-operate": {
+              apiVersion: "serving.knative.dev/v1"
+              kind: "Service"
+              metadata: {
+                name: context.name + "-operate"
+                namespace: context.namespace
+                labels: {
+                  "app.kubernetes.io/name": context.name + "-operate"
+                  "app.kubernetes.io/component": "camunda-operate"
+                  "app.kubernetes.io/part-of": "orchestration-platform"
+                  "camunda.io/component": "operate"
+                }
+                annotations: {
+                  if parameter.targetEnvironment != _|_ {
+                    "app.oam.dev/cluster": parameter.targetEnvironment
+                  }
+                }
+              }
+              spec: {
+                template: {
+                  metadata: {
+                    annotations: {
+                      "autoscaling.knative.dev/minScale": "1"
+                      "autoscaling.knative.dev/maxScale": "3"
+                    }
+                  }
+                  spec: {
+                    serviceAccountName: "camunda-orchestrator-sa"
+                    containers: [{
+                      image: (*parameter.operateImage | "camunda/operate:8.3.3")
+                      name: "operate"
+                      ports: [{
+                        containerPort: 8080
+                        name: "http"
+                      }]
+                      resources: {
+                        limits: {
+                          cpu: "500m"
+                          memory: "1Gi"
+                        }
+                        requests: {
+                          cpu: "200m"
+                          memory: "512Mi"
+                        }
+                      }
+                      env: [
+                        {
+                          name: "CAMUNDA_OPERATE_ZEEBE_GATEWAYADDRESS"
+                          value: context.name + "." + context.namespace + ".svc.cluster.local:9600"
+                        },
+                        {
+                          name: "CAMUNDA_OPERATE_ELASTICSEARCH_URL"
+                          value: "http://" + context.name + "-elasticsearch:9200"
+                        },
+                        {
+                          name: "CAMUNDA_OPERATE_ELASTICSEARCH_HOST"
+                          value: context.name + "-elasticsearch"
+                        },
+                        {
+                          name: "CAMUNDA_OPERATE_ELASTICSEARCH_PORT"
+                          value: "9200"
+                        },
+                        {
+                          name: "SPRING_PROFILES_ACTIVE"
+                          value: "dev"
+                        },
+                        {
+                          name: "LOGGING_LEVEL_IO_CAMUNDA"
+                          value: "INFO"
+                        }
+                      ]
+                      livenessProbe: {
+                        httpGet: {
+                          path: "/actuator/health"
+                          port: 8080
+                        }
+                        initialDelaySeconds: 60
+                        periodSeconds: 30
+                      }
+                      readinessProbe: {
+                        httpGet: {
+                          path: "/actuator/health/readiness"
+                          port: 8080
+                        }
+                        initialDelaySeconds: 30
+                        periodSeconds: 30
+                      }
+                    }]
+                  }
+                }
+              }
+            }
+            
+            // Camunda Tasklist - Human Task Management UI
+            "camunda-tasklist": {
+              apiVersion: "serving.knative.dev/v1"
+              kind: "Service"
+              metadata: {
+                name: context.name + "-tasklist"
+                namespace: context.namespace
+                labels: {
+                  "app.kubernetes.io/name": context.name + "-tasklist"
+                  "app.kubernetes.io/component": "camunda-tasklist"
+                  "app.kubernetes.io/part-of": "orchestration-platform"
+                  "camunda.io/component": "tasklist"
+                }
+                annotations: {
+                  if parameter.targetEnvironment != _|_ {
+                    "app.oam.dev/cluster": parameter.targetEnvironment
+                  }
+                }
+              }
+              spec: {
+                template: {
+                  metadata: {
+                    annotations: {
+                      "autoscaling.knative.dev/minScale": "1"
+                      "autoscaling.knative.dev/maxScale": "3"
+                    }
+                  }
+                  spec: {
+                    serviceAccountName: "camunda-orchestrator-sa"
+                    containers: [{
+                      image: (*parameter.tasklistImage | "camunda/tasklist:8.3.3")
+                      name: "tasklist"
+                      ports: [{
+                        containerPort: 8080
+                        name: "http"
+                      }]
+                      resources: {
+                        limits: {
+                          cpu: "500m"
+                          memory: "1Gi"
+                        }
+                        requests: {
+                          cpu: "200m"
+                          memory: "512Mi"
+                        }
+                      }
+                      env: [
+                        {
+                          name: "CAMUNDA_TASKLIST_ZEEBE_GATEWAYADDRESS"
+                          value: context.name + "." + context.namespace + ".svc.cluster.local:9600"
+                        },
+                        {
+                          name: "CAMUNDA_TASKLIST_ELASTICSEARCH_URL"
+                          value: "http://" + context.name + "-elasticsearch:9200"
+                        },
+                        {
+                          name: "CAMUNDA_TASKLIST_ELASTICSEARCH_HOST"
+                          value: context.name + "-elasticsearch"
+                        },
+                        {
+                          name: "CAMUNDA_TASKLIST_ELASTICSEARCH_PORT"
+                          value: "9200"
+                        },
+                        {
+                          name: "SPRING_PROFILES_ACTIVE"
+                          value: "dev"
+                        },
+                        {
+                          name: "GRAPHQL_PLAYGROUND_ENABLED"
+                          value: "true"
+                        }
+                      ]
+                      livenessProbe: {
+                        httpGet: {
+                          path: "/actuator/health"
+                          port: 8080
+                        }
+                        initialDelaySeconds: 60
+                        periodSeconds: 30
+                      }
+                      readinessProbe: {
+                        httpGet: {
+                          path: "/actuator/health/readiness"
+                          port: 8080
+                        }
+                        initialDelaySeconds: 30
+                        periodSeconds: 30
+                      }
+                    }]
+                  }
+                }
+              }
+            }
+          }
+        }
+        
+        // Optional: Camunda Optimize for analytics (when explicitly enabled)
+        if parameter.enableOptimize != _|_ && parameter.enableOptimize == true && parameter.enableUI == true {
+          outputs: {
+            // Include all previous outputs
+            "orchestration-infrastructure": outputs["orchestration-infrastructure"]
+            "camunda-operate": outputs["camunda-operate"]
+            "camunda-tasklist": outputs["camunda-tasklist"]
+            
+            // Add Optimize
+            "camunda-optimize": {
+              apiVersion: "serving.knative.dev/v1"
+              kind: "Service"
+              metadata: {
+                name: context.name + "-optimize"
+                namespace: context.namespace
+                labels: {
+                  "app.kubernetes.io/name": context.name + "-optimize"
+                  "app.kubernetes.io/component": "camunda-optimize"
+                  "app.kubernetes.io/part-of": "orchestration-platform"
+                  "camunda.io/component": "optimize"
+                }
+              }
+              spec: {
+                template: {
+                  spec: {
+                    serviceAccountName: "camunda-orchestrator-sa"
+                    containers: [{
+                      image: (*parameter.optimizeImage | "camunda/optimize:3.11.0")
+                      name: "optimize"
+                      ports: [{
+                        containerPort: 8090
+                        name: "http"
+                      }]
+                      resources: {
+                        limits: {
+                          cpu: "1000m"
+                          memory: "2Gi"
+                        }
+                        requests: {
+                          cpu: "500m"
+                          memory: "1Gi"
+                        }
+                      }
+                      env: [
+                        {
+                          name: "CAMUNDA_OPTIMIZE_ZEEBE_ENABLED"
+                          value: "true"
+                        },
+                        {
+                          name: "CAMUNDA_OPTIMIZE_ZEEBE_NAME"
+                          value: context.name
+                        },
+                        {
+                          name: "CAMUNDA_OPTIMIZE_ZEEBE_CONTACTPOINT"
+                          value: context.name + "." + context.namespace + ".svc.cluster.local:9600"
+                        },
+                        {
+                          name: "CAMUNDA_OPTIMIZE_ELASTICSEARCH_HOST"
+                          value: context.name + "-elasticsearch"
+                        }
+                      ]
+                    }]
+                  }
+                }
+              }
+            }
+          }
+        }
+        
+        // Optional: Istio Gateway for external UI access
+        if parameter.enableIstioGateway != _|_ && parameter.enableIstioGateway == true {
+          outputs: {
+            // Include all previous outputs
+            "orchestration-infrastructure": outputs["orchestration-infrastructure"]
+            if parameter.enableUI {
+              "camunda-operate": outputs["camunda-operate"]
+              "camunda-tasklist": outputs["camunda-tasklist"]
+              if parameter.enableOptimize {
+                "camunda-optimize": outputs["camunda-optimize"]
+              }
+            }
+            
+            "istio-gateway": {
+              apiVersion: "networking.istio.io/v1beta1"
+              kind: "Gateway"
+              metadata: {
+                name: context.name + "-gateway"
+                namespace: context.namespace
+                labels: {
+                  "app.kubernetes.io/name": context.name
+                  "app.kubernetes.io/component": "istio-gateway"
+                }
+              }
+              spec: {
+                selector: {
+                  istio: "ingressgateway"
+                }
+                servers: [{
+                  port: {
+                    number: 80
+                    name: "http"
+                    protocol: "HTTP"
+                  }
+                  hosts: [(*parameter.gatewayHost | context.name + ".orchestration.local")]
+                }]
+              }
+            }
+            
+            "istio-virtualservice": {
+              apiVersion: "networking.istio.io/v1beta1"
+              kind: "VirtualService"
+              metadata: {
+                name: context.name + "-vs"
+                namespace: context.namespace
+                labels: {
+                  "app.kubernetes.io/name": context.name
+                  "app.kubernetes.io/component": "istio-virtualservice"
+                }
+              }
+              spec: {
+                hosts: [(*parameter.gatewayHost | context.name + ".orchestration.local")]
+                gateways: [context.name + "-gateway"]
+                http: [
+                  // Zeebe API route
+                  {
+                    match: [{
+                      uri: {
+                        prefix: "/zeebe"
+                      }
+                    }]
+                    rewrite: {
+                      uri: "/"
+                    }
+                    route: [{
+                      destination: {
+                        host: context.name + "." + context.namespace + ".svc.cluster.local"
+                        port: {
+                          number: 80
+                        }
+                      }
+                    }]
+                  },
+                  // Operate UI route
+                  if parameter.enableUI {
+                    {
+                      match: [{
+                        uri: {
+                          prefix: "/operate"
+                        }
+                      }]
+                      rewrite: {
+                        uri: "/"
+                      }
+                      route: [{
+                        destination: {
+                          host: context.name + "-operate." + context.namespace + ".svc.cluster.local"
+                          port: {
+                            number: 80
+                          }
+                        }
+                      }]
+                    }
+                  },
+                  // Tasklist UI route
+                  if parameter.enableUI {
+                    {
+                      match: [{
+                        uri: {
+                          prefix: "/tasklist"
+                        }
+                      }]
+                      rewrite: {
+                        uri: "/"
+                      }
+                      route: [{
+                        destination: {
+                          host: context.name + "-tasklist." + context.namespace + ".svc.cluster.local"
+                          port: {
+                            number: 80
+                          }
+                        }
+                      }]
+                    }
+                  },
+                  // Optimize UI route
+                  if parameter.enableOptimize && parameter.enableUI {
+                    {
+                      match: [{
+                        uri: {
+                          prefix: "/optimize"
+                        }
+                      }]
+                      rewrite: {
+                        uri: "/"
+                      }
+                      route: [{
+                        destination: {
+                          host: context.name + "-optimize." + context.namespace + ".svc.cluster.local"
+                          port: {
+                            number: 80
+                          }
+                        }
+                      }]
+                    }
+                  },
+                  // Default route
+                  {
+                    match: [{
+                      uri: {
+                        prefix: "/"
+                      }
+                    }]
+                    route: [{
+                      destination: {
+                        host: context.name + "." + context.namespace + ".svc.cluster.local"
+                        port: {
+                          number: 80
+                        }
+                      }
+                    }]
+                  }
+                ]
+              }
+            }
+          }
+        }
+        
+        // Optional: Repository Creation Workflow (when language specified)
+        if parameter.language != _|_ {
+          outputs: {
+            // Include all previous outputs
+            "orchestration-infrastructure": outputs["orchestration-infrastructure"]
+            if parameter.enableUI {
+              "camunda-operate": outputs["camunda-operate"]
+              "camunda-tasklist": outputs["camunda-tasklist"]
+              if parameter.enableOptimize {
+                "camunda-optimize": outputs["camunda-optimize"]
+              }
+            }
+            if parameter.enableIstioGateway {
+              "istio-gateway": outputs["istio-gateway"]
+              "istio-virtualservice": outputs["istio-virtualservice"]
+            }
+            
+            // Add workflow trigger
+            "workflow-trigger": {
+              apiVersion: "batch/v1"
+              kind: "Job"
+              metadata: {
+                name: context.name + "-workflow-trigger"
+                namespace: context.namespace
+                labels: {
+                  "app.kubernetes.io/name": context.name
+                  "app.kubernetes.io/component": "workflow-trigger"
+                }
+              }
+              spec: {
+                template: {
+                  spec: {
+                    serviceAccountName: "argo-workflows-client"
+                    restartPolicy: "Never"
+                    containers: [{
+                      name: "workflow-trigger"
+                      image: "curlimages/curl:7.85.0"
+                      command: ["/bin/sh", "-c"]
+                      args: [
+                        """
+                        echo "Triggering Argo Workflow for Camunda orchestrator repository creation..."
+                        echo "Service: $(SERVICE_NAME)"
+                        echo "Language: $(LANGUAGE)"
+                        echo "Framework: $(FRAMEWORK)"
+                        echo "Repository: $(REPOSITORY)"
+                        
+                        # Create workflow JSON for Argo submission
+                        cat > /tmp/workflow.json << 'WORKFLOW_EOF'
+                        {
+                          "namespace": "argo",
+                          "serverDryRun": false,
+                          "workflow": {
+                            "metadata": {
+                              "generateName": "camunda-orchestrator-creation-",
+                              "namespace": "argo",
+                              "labels": {
+                                "created-by": "oam-componentdefinition",
+                                "service-name": "$(SERVICE_NAME)",
+                                "source": "oam-driven",
+                                "platform-type": "camunda-orchestrator"
+                              }
+                            },
+                            "spec": {
+                              "workflowTemplateRef": {
+                                "name": "microservice-standard-contract"
+                              },
+                              "arguments": {
+                                "parameters": [
+                                  {"name": "resource-name", "value": "$(SERVICE_NAME)"},
+                                  {"name": "resource-type", "value": "microservice"},
+                                  {"name": "namespace", "value": "$(NAMESPACE)"},
+                                  {"name": "user", "value": "oam-system"},
+                                  {"name": "description", "value": "OAM-driven Camunda orchestrator with UI stack"},
+                                  {"name": "github-org", "value": "shlapolosa"},
+                                  {"name": "docker-registry", "value": "docker.io/socrates12345"},
+                                  {"name": "slack-channel", "value": "#oam-notifications"},
+                                  {"name": "slack-user-id", "value": "OAM"},
+                                  {"name": "security-enabled", "value": "true"},
+                                  {"name": "observability-enabled", "value": "true"},
+                                  {"name": "backup-enabled", "value": "false"},
+                                  {"name": "environment-tier", "value": "development"},
+                                  {"name": "auto-create-dependencies", "value": "true"},
+                                  {"name": "resource-size", "value": "large"},
+                                  {"name": "microservice-language", "value": "$(LANGUAGE)"},
+                                  {"name": "microservice-framework", "value": "$(FRAMEWORK)"},
+                                  {"name": "microservice-database", "value": "postgres"},
+                                  {"name": "microservice-cache", "value": "redis"},
+                                  {"name": "microservice-expose-api", "value": "true"},
+                                  {"name": "target-vcluster", "value": ""},
+                                  {"name": "parent-appcontainer", "value": "$(REPOSITORY)"},
+                                  {"name": "repository-name", "value": "$(REPOSITORY)"}
+                                ]
+                              }
+                            }
+                          }
+                        }
+                        WORKFLOW_EOF
+                        
+                        echo "📋 Workflow JSON created, submitting to Argo..."
+                        
+                        # Submit to Argo Workflows
+                        RESPONSE=$(curl -s -w 'HTTPSTATUS:%{http_code}' -X POST -H "Content-Type: application/json" -H "Accept: application/json" -d @/tmp/workflow.json http://argo-server.argo.svc.cluster.local:2746/api/v1/workflows/argo)
+                        HTTP_STATUS=$(echo $RESPONSE | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+                        BODY=$(echo $RESPONSE | sed -e 's/HTTPSTATUS:.*//g')
+                        echo "📊 HTTP Status:" $HTTP_STATUS
+                        echo "📄 Response:" $BODY
+                        if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 201 ]; then
+                          echo "✅ Workflow submission successful!"
+                          echo "$BODY" | grep -o '"name":"[^"]*"' | head -1
+                        else
+                          echo "❌ Workflow submission failed with status:" $HTTP_STATUS
+                          echo "Response:" $BODY
+                          exit 1
+                        fi
+                        
+                        echo "Camunda orchestrator workflow trigger completed"
+                        """
+                      ]
+                      env: [
+                        {
+                          name: "SERVICE_NAME"
+                          value: context.name
+                        },
+                        {
+                          name: "LANGUAGE"
+                          value: parameter.language
+                        },
+                        {
+                          name: "FRAMEWORK"
+                          value: parameter.framework
+                        },
+                        {
+                          name: "REPOSITORY"
+                          value: (*parameter.repository | context.name)
+                        },
+                        {
+                          name: "NAMESPACE"
+                          value: context.namespace
+                        }
+                      ]
+                    }]
+                  }
+                }
+              }
+            }
+          }
+        }
+        
+        parameter: {
+          // Camunda Configuration
+          camundaMode: *"embedded" | "remote" // embedded: Camunda 8 Self-Managed, remote: Camunda SaaS
+          
+          // Realtime Platform Integration (required)
+          realtimePlatform: string  // Name of realtime-platform service for event streaming
+          
+          // UI Configuration  
+          enableUI: *true | bool           // Enable Operate & Tasklist UIs
+          enableOptimize: *false | bool    // Enable Optimize analytics (requires license)
+          
+          // Event-Driven Architecture
+          enableEventStreaming: *true | bool
+          topicsPrefix: *"orchestration" | string
+          
+          // Orchestration Patterns
+          sagaPatterns: *["compensation", "timeout", "retry"] | [...string]
+          
+          // Service Discovery
+          microserviceSelector: *{
+            "orchestration.platform/managed": "true"
+          } | {[string]: string}
+          
+          // Scaling Configuration
+          minScale: *1 | int
+          maxScale: *10 | int
+          targetConcurrency?: int
+          
+          // Resource Management
+          resources: *{
+            cpu: "2000m"     // Increased for UI components
+            memory: "2Gi"    // Increased for UI components
+          } | {
+            cpu?: string
+            memory?: string
+          }
+          
+          // Service Configuration
+          version: *"8.3.3" | string
+          
+          // Custom Images (optional)
+          zeebeImage?: string      // Override Zeebe image
+          operateImage?: string    // Override Operate image
+          tasklistImage?: string   // Override Tasklist image
+          optimizeImage?: string   // Override Optimize image
+          
+          // Environment Variables
+          environment: *{} | {[string]: string}
+          
+          // Environment Variables from Secrets
+          envFrom?: [...{
+            secretRef: {
+              name: string
+            }
+          }]
+          
+          // Optional Infrastructure Bootstrap (for repository creation)
+          language?: string     // Triggers bootstrap: nodejs, java, python
+          framework?: string    // camunda-orchestrator
+          repository?: string   // Git repository template name (defaults to name)
+          
+          // Multi-cluster support
+          targetEnvironment?: string  // vCluster deployment target
+          
+          // External access (optional)
+          enableIstioGateway?: bool
+          gatewayHost?: string
+          enableTLS?: bool
+          
+          // Configuration
+          configMapName?: string     // ConfigMap name for orchestrator configuration
+          bpmnConfigMapName?: string // ConfigMap name for BPMN workflow models
+        }

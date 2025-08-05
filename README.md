@@ -138,6 +138,98 @@ The platform implements a **unified architectural pattern** where all three comp
 - **Shared Infrastructure**: Components share PostgreSQL, Redis, networking
 - **Independent Scaling**: Each Knative service scales independently
 
+## 🎼 Camunda Orchestrator Component
+
+The **camunda-orchestrator** ComponentDefinition provides enterprise-grade BPMN workflow orchestration with a full UI stack for process design, monitoring, and human task management.
+
+### Features
+
+- **Camunda 8 Engine (Zeebe)**: Core workflow execution engine with BPMN 2.0 support
+- **Camunda Operate UI**: Process monitoring dashboard for operations teams
+- **Camunda Tasklist UI**: Human task management interface
+- **Camunda Optimize** (optional): Process analytics and optimization platform
+- **Event-Driven Architecture**: Integration with realtime-platform for event streaming
+- **SAGA Pattern Support**: Built-in compensation, timeout, and retry patterns
+
+### Usage Example
+
+```yaml
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: order-processing-system
+spec:
+  components:
+  # Event streaming platform
+  - name: order-events
+    type: realtime-platform
+    properties:
+      database: postgres
+      cache: redis
+      
+  # Camunda orchestrator with UI
+  - name: order-orchestrator
+    type: camunda-orchestrator
+    properties:
+      realtimePlatform: "order-events"      # Connect to event platform
+      enableUI: true                        # Enable Operate & Tasklist
+      enableIstioGateway: true             # External access
+      gatewayHost: "workflows.company.com"
+      sagaPatterns: ["compensation", "timeout"]
+      language: "java"                      # Triggers repository creation
+      repository: "order-workflows"
+      
+  # Microservices connected via events
+  - name: payment-service
+    type: webservice
+    properties:
+      language: java
+      realtime: "order-events"              # Same event platform
+      labels:
+        orchestration.platform/managed: "true"
+```
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                 Istio Gateway                           │
+│  /operate    /tasklist    /optimize    /zeebe          │
+└─────┬──────────┬──────────┬──────────┬─────────────────┘
+      │          │          │          │
+┌─────▼────┐┌────▼─────┐┌──▼───────┐┌─▼──────┐
+│ Operate  ││ Tasklist ││ Optimize ││ Zeebe  │ ← Knative Services
+│    UI    ││    UI    ││    UI    ││ Engine │
+└─────┬────┘└────┬─────┘└──┬───────┘└─┬──────┘
+      └──────────┴──────────┴──────────┘
+                        │
+              ┌─────────▼─────────┐
+              │  Elasticsearch    │ ← Process History
+              └─────────┬─────────┘
+                        │
+   ┌────────────────────┼────────────────────┐
+   │                    │                    │
+┌──▼─────┐    ┌─────────▼─────────┐    ┌────▼────┐
+│ Redis  │    │ Realtime Platform │    │ Postgres│
+│ Cache  │    │ (Event Streaming) │    │   DB    │
+└────────┘    └───────────────────┘    └─────────┘
+```
+
+### Access Points
+
+When `enableIstioGateway: true`:
+- `http://{gatewayHost}/operate` - Process monitoring dashboard
+- `http://{gatewayHost}/tasklist` - Human task interface
+- `http://{gatewayHost}/optimize` - Analytics (if enabled)
+- `http://{gatewayHost}/zeebe` - API endpoint
+
+### Event-Driven Coordination
+
+Services coordinate through the shared realtime-platform using Kafka topics:
+- **No direct service discovery** - Everything flows through events
+- **Automatic secret injection** - Services get Kafka/MQTT credentials
+- **Loose coupling** - Services can be added/removed independently
+
 ## 🏗️ Architecture Overview
 
 ### Multi-Cluster vCluster Architecture
@@ -403,6 +495,7 @@ Primary components for application development:
 |-----------|---------|----------|-------------------|---------------------|
 | **webservice** | `image`, `port`, `language`, `framework`, `source`, `realtime`, `env`, `resources` | Auto-scaling web applications, microservices, REST APIs | Optional: `ApplicationClaim` for infrastructure | **Knative Service** + Optional Argo Workflow |
 | **graphql-gateway** | `name`, `language`, `framework`, `database`, `cache`, `configMapName` | GraphQL federation gateway with automatic service discovery | Optional: `ApplicationClaim` for infrastructure | **Knative Service** + ConfigMap + GraphQL Mesh |
+| **camunda-orchestrator** | `realtimePlatform`, `enableUI`, `enableOptimize`, `sagaPatterns`, `language`, `enableIstioGateway` | BPMN workflow orchestration with full UI stack for process monitoring | `OrchestrationPlatformClaim` | **Knative Services** (Zeebe + Operate + Tasklist) + Elasticsearch + PostgreSQL |
 | **realtime-platform** | `name`, `database`, `visualization`, `kafka.replicas`, `mqtt.enabled`, `lenses.enabled`, `resources` | Complete streaming infrastructure, IoT platforms, real-time analytics | `RealtimePlatformClaim` | **Knative Service** + Kafka + MQTT + Lenses + Metabase + PostgreSQL |
 | **neon-postgres** | `database`, `version`, `storageSize`, `replicas`, `backup`, `security`, `resources` | Managed PostgreSQL database, persistent data storage | None (direct) | Secret with connection details |
 | **auth0-idp** | `domain`, `clientId`, `clientSecret`, `audience`, `scopes`, `compliance` | Identity provider integration, SSO, user authentication | None (direct) | ExternalSecret from AWS Secrets Manager |
@@ -427,6 +520,7 @@ Additional Crossplane claims available for direct use, not mapped to OAM compone
 |-------|----------|---------|---------------------|
 | `ApplicationClaim` | Guided application creation with infrastructure | Creating complete app stack via Slack/API | Multiple: OAM Application + Infrastructure Claims |
 | `RealtimePlatformClaim` | Complete streaming infrastructure | Real-time analytics platform | Namespace + Kafka + MQTT + Lenses + Metabase + PostgreSQL + Secrets |
+| `OrchestrationPlatformClaim` | Workflow orchestration infrastructure | BPMN process management | PostgreSQL + Redis + Elasticsearch + ServiceAccounts + ConfigMaps |
 | `VClusterEnvironmentClaim` | Virtual Kubernetes environments | Isolated development environments | vCluster + Istio + Knative + ArgoCD + Observability Stack |
 
 ### Component Categories
