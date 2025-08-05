@@ -46,6 +46,7 @@ spec:
                   - python
                   - java
                   - rasa
+                  - nodejs
               framework:
                 type: string
                 description: Application framework to use
@@ -53,6 +54,7 @@ spec:
                   - fastapi
                   - springboot
                   - chatbot
+                  - graphql-gateway
               hasFrontend:
                 type: boolean
                 description: Whether the application includes a frontend component

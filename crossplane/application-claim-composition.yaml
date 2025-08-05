@@ -56,6 +56,9 @@ spec:
                       elif [ "$LANGUAGE" = "rasa" ] && [ "$FRAMEWORK" = "chatbot" ]; then
                         TEMPLATE_REPO="chat-template"
                         echo "🤖 Using chat template for RASA chatbot service"
+                      elif [ "$LANGUAGE" = "nodejs" ] && [ "$FRAMEWORK" = "graphql-gateway" ]; then
+                        TEMPLATE_REPO="graphql-federation-gateway-template"
+                        echo "🌐 Using GraphQL federation gateway template for Node.js/GraphQL service"
                       else
                         echo "❌ Unsupported service type: $LANGUAGE/$FRAMEWORK"
                         exit 1
@@ -97,6 +100,22 @@ spec:
                         find oam/ -name "*.yaml" -exec sed -i "s/chat-template/$SERVICE_NAME/g" {} \;
                         
                         echo "✅ Successfully created RASA chatbot microservice from template"
+                      elif [ "$LANGUAGE" = "nodejs" ] && [ "$FRAMEWORK" = "graphql-gateway" ]; then
+                        # Copy GraphQL gateway template structure
+                        cp -r $TEMPLATE_DIR/microservices/graphql-gateway/* microservices/$SERVICE_NAME/
+                        cd microservices/$SERVICE_NAME
+                        
+                        # Customize template for the specific service (handle missing files gracefully)
+                        [ -f "package.json" ] && sed -i "s/graphql-gateway/$SERVICE_NAME/g" package.json
+                        [ -f "README.md" ] && sed -i "s/graphql-gateway/$SERVICE_NAME/g" README.md && sed -i "s/GraphQL Gateway/$SERVICE_NAME Gateway/g" README.md
+                        [ -f "docker-compose.yml" ] && sed -i "s/graphql-gateway/$SERVICE_NAME/g" docker-compose.yml
+                        [ -f "package.json" ] && sed -i "s/Federation Gateway/$SERVICE_NAME Federation Gateway/g" package.json
+                        
+                        # Update Kubernetes manifests
+                        find . -name "*.yaml" -exec sed -i "s/graphql-gateway/$SERVICE_NAME/g" {} \;
+                        find . -name "*.yaml" -exec sed -i "s/APP_CONTAINER_PLACEHOLDER/$APP_CONTAINER/g" {} \;
+                        
+                        echo "✅ Successfully created GraphQL federation gateway microservice from template"
                       fi
                       
                       # Create service README
@@ -1143,6 +1162,7 @@ spec:
           "rasa": "true"
           "python": "false"
           "java": "false"
+          "nodejs": "false"
     - type: FromCompositeFieldPath
       fromFieldPath: spec.framework
       toFieldPath: metadata.labels["crossplane.io/chatbot-enable"]
@@ -1152,6 +1172,7 @@ spec:
           "chatbot": "true"
           "fastapi": "false"
           "springboot": "false"
+          "graphql-gateway": "false"
 
   # Repository status synchronizer - gets repository URL from AppContainerClaim
   - name: repository-status-sync

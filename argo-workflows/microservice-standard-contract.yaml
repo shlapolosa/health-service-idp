@@ -412,12 +412,12 @@ spec:
         esac
         
         case "{{inputs.parameters.microservice-framework}}" in
-          fastapi|springboot|gin|express|axum|auto|chatbot)
+          fastapi|springboot|gin|express|axum|auto|chatbot|graphql-gateway)
             echo "✅ Valid microservice-framework: {{inputs.parameters.microservice-framework}}"
             ;;
           *)
             echo "❌ Invalid microservice-framework: {{inputs.parameters.microservice-framework}}"
-            echo "Must be one of: fastapi, springboot, gin, express, axum, auto, chatbot"
+            echo "Must be one of: fastapi, springboot, gin, express, axum, auto, chatbot, graphql-gateway"
             exit 1
             ;;
         esac

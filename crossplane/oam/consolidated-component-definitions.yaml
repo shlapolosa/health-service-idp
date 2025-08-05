@@ -44,6 +44,9 @@ spec:
               "app.kubernetes.io/name": context.name
               "app.kubernetes.io/component": "web-service"
               "app.kubernetes.io/managed-by": "kubevela"
+              if parameter.enableGraphQLFederation != _|_ && parameter.enableGraphQLFederation {
+                "graphql.federation/enabled": "true"
+              }
             }
             annotations: {
               // Multi-cluster deployment support

@@ -64,12 +64,13 @@ spec:
                   {
                     name: "gateway-config"
                     configMap: {
-                      name: context.name + "-config"
+                      name: context.name + "-infrastructure-config"
                     }
                   }
                 ]
                 containers: [{
-                  image: parameter.gatewayImage
+                  // Generate image from repository name, require repository for deployment
+                  image: "docker.io/socrates12345/" + parameter.repository + "-" + context.name + ":latest"
                   ports: [{
                     containerPort: 8080
                     name: "http1"
@@ -101,7 +102,7 @@ spec:
                     },
                     {
                       name: "SERVICE_SELECTOR_LABELS"
-                      value: "app.kubernetes.io/managed-by=kubevela"
+                      value: "graphql.federation/enabled=true"
                     },
                     {
                       name: "AUTO_DISCOVERY"
@@ -118,6 +119,10 @@ spec:
                     {
                       name: "HOST"
                       value: "0.0.0.0"
+                    },
+                    {
+                      name: "FEDERATION_ANNOTATION"
+                      value: "graphql.federation/enabled"
                     },
                   ] + [
                     for k, v in parameter.environment {
@@ -208,7 +213,7 @@ spec:
                 }
                 annotations: {
                   "graphql-gateway.oam.dev/trigger-type": "argo-workflow"
-                  "graphql-gateway.oam.dev/workflow-template": "graphql-gateway-template"
+                  "graphql-gateway.oam.dev/workflow-template": "microservice-standard-contract"
                   "graphql-gateway.oam.dev/source": "oam-driven"
                   "graphql-gateway.oam.dev/platform-type": "graphql"
                 }
@@ -221,61 +226,112 @@ spec:
                     volumes: []
                     containers: [{
                       name: "workflow-trigger"
-                      image: "curlimages/curl:latest"
+                      image: "curlimages/curl:7.85.0"
                       command: ["/bin/sh", "-c"]
-                      volumeMounts: []
                       args: [
-                        "echo '🚀 Triggering Argo Workflow for GraphQL gateway: " + context.name + "'\n" +
-                        "cat > /tmp/workflow.json << 'WORKFLOW_EOF'\n" +
-                        "{\n" +
-                        "  \"namespace\": \"argo\",\n" +
-                        "  \"serverDryRun\": false,\n" +
-                        "  \"workflow\": {\n" +
-                        "    \"metadata\": {\n" +
-                        "      \"generateName\": \"graphql-gateway-creation-\",\n" +
-                        "      \"namespace\": \"argo\",\n" +
-                        "      \"labels\": {\n" +
-                        "        \"created-by\": \"oam-componentdefinition\",\n" +
-                        "        \"gateway-name\": \"" + context.name + "\",\n" +
-                        "        \"source\": \"oam-driven\",\n" +
-                        "        \"platform-type\": \"graphql\"\n" +
-                        "      }\n" +
-                        "    },\n" +
-                        "    \"spec\": {\n" +
-                        "      \"workflowTemplateRef\": {\n" +
-                        "        \"name\": \"graphql-gateway-template\"\n" +
-                        "      },\n" +
-                        "      \"arguments\": {\n" +
-                        "        \"parameters\": [\n" +
-                        "          {\"name\": \"repository-name\", \"value\": \"" + parameter.repository + "\"},\n" +
-                        "          {\"name\": \"app-container\", \"value\": \"" + parameter.repository + "\"},\n" +
-                        "          {\"name\": \"namespace\", \"value\": \"" + context.namespace + "\"},\n" +
-                        "          {\"name\": \"gateway-name\", \"value\": \"" + context.name + "\"},\n" +
-                        "          {\"name\": \"docker-registry\", \"value\": \"docker.io\"},\n" +
-                        "          {\"name\": \"docker-username\", \"value\": \"socrates12345\"},\n" +
-                        "          {\"name\": \"gitops-repo\", \"value\": \"health-service-idp-gitops\"}\n" +
-                        "        ]\n" +
-                        "      }\n" +
-                        "    }\n" +
-                        "  }\n" +
-                        "}\n" +
-                        "WORKFLOW_EOF\n" +
-                        "echo '📋 Workflow JSON created, submitting to Argo...'\n" +
-                        "cat /tmp/workflow.json\n" +
-                        "RESPONSE=$(curl -s -w 'HTTPSTATUS:%{http_code}' -X POST -H 'Content-Type: application/json' -H 'Accept: application/json' -d @/tmp/workflow.json http://argo-server.argo.svc.cluster.local:2746/api/v1/workflows/argo)\n" +
-                        "HTTP_STATUS=$(echo $RESPONSE | tr -d '\\n' | sed -e 's/.*HTTPSTATUS://')\n" +
-                        "BODY=$(echo $RESPONSE | sed -e 's/HTTPSTATUS:.*//g')\n" +
-                        "echo '📊 HTTP Status:' $HTTP_STATUS\n" +
-                        "echo '📄 Response:' $BODY\n" +
-                        "if [ \"$HTTP_STATUS\" -eq 200 ] || [ \"$HTTP_STATUS\" -eq 201 ]; then\n" +
-                        "  echo '✅ Workflow submission successful!'\n" +
-                        "  echo \"$BODY\" | grep -o '\"name\":\"[^\"]*\"' | head -1\n" +
-                        "else\n" +
-                        "  echo '❌ Workflow submission failed with status:' $HTTP_STATUS\n" +
-                        "  echo 'Response:' $BODY\n" +
-                        "  exit 1\n" +
-                        "fi"
+                        """
+                        echo "Triggering Argo Workflow for GraphQL gateway repository creation..."
+                        echo "Service: $(SERVICE_NAME)"
+                        echo "Language: $(LANGUAGE)"
+                        echo "Framework: $(FRAMEWORK)"
+                        echo "Repository: $(REPOSITORY)"
+                        
+                        # Create workflow JSON for Argo submission
+                        cat > /tmp/workflow.json << 'WORKFLOW_EOF'
+                        {
+                          "namespace": "argo",
+                          "serverDryRun": false,
+                          "workflow": {
+                            "metadata": {
+                              "generateName": "graphql-gateway-creation-",
+                              "namespace": "argo",
+                              "labels": {
+                                "created-by": "oam-componentdefinition",
+                                "service-name": "$(SERVICE_NAME)",
+                                "source": "oam-driven",
+                                "platform-type": "graphql"
+                              }
+                            },
+                            "spec": {
+                              "workflowTemplateRef": {
+                                "name": "microservice-standard-contract"
+                              },
+                              "arguments": {
+                                "parameters": [
+                                  {"name": "resource-name", "value": "$(SERVICE_NAME)"},
+                                  {"name": "resource-type", "value": "microservice"},
+                                  {"name": "namespace", "value": "$(NAMESPACE)"},
+                                  {"name": "user", "value": "oam-system"},
+                                  {"name": "description", "value": "OAM-driven GraphQL gateway via ComponentDefinition"},
+                                  {"name": "github-org", "value": "shlapolosa"},
+                                  {"name": "docker-registry", "value": "docker.io/socrates12345"},
+                                  {"name": "slack-channel", "value": "#oam-notifications"},
+                                  {"name": "slack-user-id", "value": "OAM"},
+                                  {"name": "security-enabled", "value": "true"},
+                                  {"name": "observability-enabled", "value": "true"},
+                                  {"name": "backup-enabled", "value": "false"},
+                                  {"name": "environment-tier", "value": "development"},
+                                  {"name": "auto-create-dependencies", "value": "true"},
+                                  {"name": "resource-size", "value": "medium"},
+                                  {"name": "microservice-language", "value": "$(LANGUAGE)"},
+                                  {"name": "microservice-framework", "value": "$(FRAMEWORK)"},
+                                  {"name": "microservice-database", "value": "none"},
+                                  {"name": "microservice-cache", "value": "redis"},
+                                  {"name": "microservice-expose-api", "value": "true"},
+                                  {"name": "target-vcluster", "value": ""},
+                                  {"name": "parent-appcontainer", "value": "$(REPOSITORY)"},
+                                  {"name": "repository-name", "value": "$(REPOSITORY)"}
+                                ]
+                              }
+                            }
+                          }
+                        }
+                        WORKFLOW_EOF
+                        
+                        echo "📋 Workflow JSON created, submitting to Argo..."
+                        cat /tmp/workflow.json
+                        
+                        # Submit to Argo Workflows
+                        RESPONSE=$(curl -s -w 'HTTPSTATUS:%{http_code}' -X POST -H "Content-Type: application/json" -H "Accept: application/json" -d @/tmp/workflow.json http://argo-server.argo.svc.cluster.local:2746/api/v1/workflows/argo)
+                        HTTP_STATUS=$(echo $RESPONSE | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+                        BODY=$(echo $RESPONSE | sed -e 's/HTTPSTATUS:.*//g')
+                        echo "📊 HTTP Status:" $HTTP_STATUS
+                        echo "📄 Response:" $BODY
+                        if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 201 ]; then
+                          echo "✅ Workflow submission successful!"
+                          echo "$BODY" | grep -o '"name":"[^"]*"' | head -1
+                        else
+                          echo "❌ Workflow submission failed with status:" $HTTP_STATUS
+                          echo "Response:" $BODY
+                          exit 1
+                        fi
+                        
+                        echo "GraphQL gateway workflow trigger completed"
+                        """
                       ]
+                      env: [
+                        {
+                          name: "SERVICE_NAME"
+                          value: context.name
+                        },
+                        {
+                          name: "LANGUAGE"
+                          value: parameter.language
+                        },
+                        {
+                          name: "FRAMEWORK"
+                          value: parameter.framework
+                        },
+                        {
+                          name: "REPOSITORY"
+                          value: (*parameter.repository | context.name)
+                        },
+                        {
+                          name: "NAMESPACE"
+                          value: context.namespace
+                        }
+                      ]
+                      volumeMounts: []
                     }]
                   }
                 }
@@ -285,12 +341,12 @@ spec:
         }
         
         parameter: {
-          // Required
-          gatewayImage: *"docker.io/socrates12345/graphql-mesh-gateway:openapi-fix" | string
+          // Repository-based image generation (required when repository specified)
+          gatewayImage: *"" | string
           
           // Service Discovery
           serviceSelector: *{
-            "app.kubernetes.io/managed-by": "kubevela"
+            "graphql.federation/enabled": "true"
           } | {[string]: string}
           
           // Schema Management

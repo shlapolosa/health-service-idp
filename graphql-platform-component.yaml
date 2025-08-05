@@ -1,0 +1,31 @@
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: graphql-platform
+  namespace: default
+  annotations:
+    definition.oam.dev/description: "GraphQL platform infrastructure with Redis and ConfigMap"
+spec:
+  workload:
+    type: autodetects.core.oam.dev
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "platform.example.org/v1alpha1"
+          kind: "GraphQLPlatformClaim"
+          metadata: {
+            name: context.name
+            namespace: context.namespace
+          }
+          spec: {
+            compositionRef: {
+              name: "graphql-platform-composition"
+            }
+            resourceRef: {
+              apiVersion: "platform.example.org/v1alpha1"
+              kind: "XGraphQLPlatform"
+              name: context.name
+            }
+          }
+        }
