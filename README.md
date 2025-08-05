@@ -402,6 +402,7 @@ Primary components for application development:
 | Component | Options | Use Case | Crossplane Mapping | Kubernetes Artifact |
 |-----------|---------|----------|-------------------|---------------------|
 | **webservice** | `image`, `port`, `language`, `framework`, `source`, `realtime`, `env`, `resources` | Auto-scaling web applications, microservices, REST APIs | Optional: `ApplicationClaim` for infrastructure | **Knative Service** + Optional Argo Workflow |
+| **graphql-gateway** | `name`, `language`, `framework`, `database`, `cache`, `configMapName` | GraphQL federation gateway with automatic service discovery | Optional: `ApplicationClaim` for infrastructure | **Knative Service** + ConfigMap + GraphQL Mesh |
 | **realtime-platform** | `name`, `database`, `visualization`, `kafka.replicas`, `mqtt.enabled`, `lenses.enabled`, `resources` | Complete streaming infrastructure, IoT platforms, real-time analytics | `RealtimePlatformClaim` | **Knative Service** + Kafka + MQTT + Lenses + Metabase + PostgreSQL |
 | **neon-postgres** | `database`, `version`, `storageSize`, `replicas`, `backup`, `security`, `resources` | Managed PostgreSQL database, persistent data storage | None (direct) | Secret with connection details |
 | **auth0-idp** | `domain`, `clientId`, `clientSecret`, `audience`, `scopes`, `compliance` | Identity provider integration, SSO, user authentication | None (direct) | ExternalSecret from AWS Secrets Manager |
@@ -618,6 +619,261 @@ Source Code Changes → Version Manager → GitOps Repo → ArgoCD → KubeVela 
                                                Prevents Circular Dependencies
 ```
 
+## 🕸️ GraphQL Federation Gateway
+
+The platform includes comprehensive GraphQL federation capabilities that automatically discover and federate microservices into a unified API gateway.
+
+### Creating GraphQL Federation Gateways
+
+#### Option 1: Direct OAM Application
+```yaml
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: api-federation
+spec:
+  components:
+  - name: main-gateway
+    type: graphql-gateway
+    properties:
+      # Service configuration
+      name: main-gateway
+      description: "Main GraphQL federation gateway"
+      language: nodejs
+      framework: graphql-gateway
+      database: none
+      cache: none
+      
+      # ConfigMap for service discovery configuration
+      configMapName: main-gateway-config
+```
+
+#### Option 2: Using Slack Commands
+```slack
+/microservice create api-gateway language nodejs framework graphql-gateway
+```
+
+### GraphQL Federation Architecture
+
+**Automatic Service Discovery:**
+- Gateway discovers Knative services with `graphql.federation/enabled=true` annotation
+- Supports OpenAPI specification auto-detection from common endpoints
+- Real-time schema federation based on discovered services
+
+**Federation Logic:**
+- **Service Filtering**: Only federates services explicitly marked with federation annotation
+- **Schema Generation**: Converts OpenAPI specs to GraphQL schemas using GraphQL Mesh
+- **Auto-Prefixing**: Service schemas prefixed to prevent naming conflicts
+- **Federation Updates**: Dynamic service discovery with configurable refresh intervals
+
+**GraphQL Mesh Integration:**
+- Uses GraphQL Mesh runtime for OpenAPI-to-GraphQL transformation
+- Supports schema stitching and federation
+- Configurable transforms (prefixing, naming conventions)
+- Built-in caching and optimization
+
+### Service Discovery Configuration
+
+Services must opt-in to federation by adding the annotation:
+
+```yaml
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: user-service
+  annotations:
+    graphql.federation/enabled: "true"
+    openapi.path: "/api/openapi.json"  # Optional: custom OpenAPI endpoint
+spec:
+  template:
+    spec:
+      containers:
+      - image: socrates12345/user-service:latest
+        ports:
+        - containerPort: 8080
+```
+
+### Federation Gateway Features
+
+**Service Discovery:**
+- **Knative Services**: Primary discovery mechanism
+- **Regular K8s Services**: Fallback discovery with port detection
+- **Label Selectors**: Optional filtering by labels
+- **Health Checking**: Only federates ready/healthy services
+
+**OpenAPI Detection:**
+- Auto-discovers OpenAPI specs from common endpoints:
+  - `/openapi.json`, `/swagger.json`
+  - `/api/openapi.json`, `/docs/openapi.json`
+  - `/.well-known/openapi.json`
+- Custom endpoint support via `openapi.path` annotation
+- Validates OpenAPI 3.x and Swagger 2.0 specifications
+
+**GraphQL Schema Generation:**
+```mermaid
+graph TD
+    A[Service Discovery] --> B[OpenAPI Detection]
+    B --> C[GraphQL Mesh Processing]
+    C --> D[Schema Transformation]
+    D --> E[Federation Stitching]
+    E --> F[Unified GraphQL API]
+    
+    G[Service Annotation] --> A
+    H[Health Check] --> A
+    I[OpenAPI Validation] --> C
+    J[Prefix Transform] --> D
+    K[Naming Convention] --> D
+```
+
+**Gateway Endpoints:**
+- `GET /graphql` - GraphQL Playground interface
+- `POST /graphql` - GraphQL API endpoint
+- `GET /schema` - Current federated schema
+- `GET /services` - Discovered services status
+- `GET /health` - Gateway health check
+
+### Development Workflow
+
+**1. Create Federation Gateway:**
+```bash
+# Via OAM Application
+kubectl apply -f graphql-federation-gateway.yaml
+
+# Via Slack
+/microservice create api-gateway language nodejs framework graphql-gateway
+```
+
+**2. Mark Services for Federation:**
+```yaml
+# Add to existing services
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  annotations:
+    graphql.federation/enabled: "true"
+    openapi.path: "/api/v1/openapi.json"  # Custom endpoint
+```
+
+**3. Test Federation:**
+```bash
+# Get gateway URL
+GATEWAY_URL=$(kubectl get ksvc api-gateway -o jsonpath='{.status.url}')
+
+# Access GraphQL Playground
+curl -X GET $GATEWAY_URL/graphql
+
+# Execute federated query
+curl -X POST $GATEWAY_URL/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query": "{ UserService_users { id name } OrderService_orders { id total } }"}'
+```
+
+### Federation Configuration
+
+**Gateway Configuration (ConfigMap):**
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-config
+data:
+  discovery.yaml: |
+    # Service discovery settings
+    namespaces: ["default", "production"]
+    labelSelector: "app.tier=api"
+    refreshInterval: "30s"
+    
+    # Federation settings
+    enableIntrospection: true
+    enablePlayground: true
+    
+    # Schema settings
+    prefixServices: true
+    namingConvention: "PascalCase"
+```
+
+**Service-Specific Configuration:**
+```yaml
+# Per-service federation settings
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    graphql.federation/enabled: "true"
+    graphql.federation/prefix: "Users"
+    graphql.federation/exclude-fields: "password,secret"
+    openapi.path: "/api/v2/openapi.json"
+```
+
+### Advanced Federation Features
+
+**Schema Transforms:**
+- **Prefix Transform**: Prevents naming conflicts between services
+- **Naming Convention**: Consistent field and type naming
+- **Field Filtering**: Exclude sensitive fields from federation
+- **Type Mapping**: Custom type transformations
+
+**Caching:**
+- **Schema Caching**: Cached federated schemas with TTL
+- **Query Caching**: GraphQL query result caching
+- **Service Discovery Caching**: Cached service metadata
+
+**Monitoring:**
+- **Service Health**: Tracks federated service availability
+- **Query Metrics**: GraphQL query performance tracking
+- **Federation Stats**: Schema generation and update metrics
+- **Error Tracking**: Service discovery and federation error logging
+
+### GraphQL Federation Examples
+
+**Basic Federation Query:**
+```graphql
+{
+  # Query from multiple services
+  UserService_users {
+    id
+    name
+    email
+  }
+  
+  OrderService_orders {
+    id
+    total
+    userId
+  }
+  
+  # Cross-service relationship
+  ProductService_products {
+    id
+    name
+    price
+  }
+}
+```
+
+**Federation with Variables:**
+```graphql
+query GetUserData($userId: ID!) {
+  UserService_user(id: $userId) {
+    id
+    name
+    profile {
+      avatar
+      preferences
+    }
+  }
+  
+  OrderService_userOrders(userId: $userId) {
+    id
+    status
+    items {
+      product
+      quantity
+    }
+  }
+}
+```
+
 ## 🤖 Chat Services Development
 
 The platform includes comprehensive chatbot capabilities through Rasa integration with dual CI/CD pipelines:
@@ -816,6 +1072,7 @@ The platform supports microservice creation directly from Slack using natural la
 #### Language Options
 - `python` or `fastapi` - Python with FastAPI framework
 - `java` or `springboot` - Java with Spring Boot framework
+- `nodejs` or `graphql-gateway` - Node.js GraphQL federation gateway
 
 #### Infrastructure Options
 - `with database` or `with postgresql` - PostgreSQL database
@@ -845,6 +1102,12 @@ The platform supports microservice creation directly from Slack using natural la
 ```slack
 /microservice create sensor-platform language python database postgres iot true
 /microservice create analytics-stream python with database iot true
+```
+
+**GraphQL Federation Gateway:**
+```slack
+/microservice create api-gateway nodejs graphql-gateway
+/microservice create federation-api language nodejs framework graphql-gateway
 ```
 
 **Advanced Options:**
@@ -1057,6 +1320,9 @@ The platform includes a comprehensive GitOps pipeline:
 
 # With database  
 /microservice create api-service python with database
+
+# GraphQL federation gateway
+/microservice create api-gateway nodejs graphql-gateway
 
 # IoT/Real-time platform
 /microservice create iot-processor language python database postgres iot true

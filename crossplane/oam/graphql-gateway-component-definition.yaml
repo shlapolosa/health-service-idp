@@ -64,13 +64,13 @@ spec:
                   {
                     name: "gateway-config"
                     configMap: {
-                      name: context.name + "-infrastructure-config"
+                      name: (*parameter.configMapName | context.name + "-config")
                     }
                   }
                 ]
                 containers: [{
-                  // Generate image from repository name, require repository for deployment
-                  image: "docker.io/socrates12345/" + parameter.repository + "-" + context.name + ":latest"
+                  // Generate image from service name, require repository for deployment
+                  image: "docker.io/socrates12345/" + context.name + ":latest"
                   ports: [{
                     containerPort: 8080
                     name: "http1"
@@ -394,4 +394,7 @@ spec:
           
           // Multi-cluster support
           targetEnvironment?: string  // vCluster deployment target
+          
+          // Configuration
+          configMapName?: string  // ConfigMap name for gateway configuration
         }

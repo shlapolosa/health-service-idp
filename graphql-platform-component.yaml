@@ -19,13 +19,53 @@ spec:
             namespace: context.namespace
           }
           spec: {
-            compositionRef: {
-              name: "graphql-platform-composition"
+            name: parameter.name
+            serviceSelector: parameter.serviceSelector
+            autoSchema: parameter.autoSchema
+            schemaRefreshInterval: parameter.schemaRefreshInterval
+            exposeIntrospection: parameter.exposeIntrospection
+            enableConsole: parameter.enableConsole
+            enableAllowList: parameter.enableAllowList
+            if parameter.customResolvers != _|_ {
+              customResolvers: parameter.customResolvers
             }
-            resourceRef: {
-              apiVersion: "platform.example.org/v1alpha1"
-              kind: "XGraphQLPlatform"
-              name: context.name
+            resources: parameter.resources
+            if parameter.targetEnvironment != _|_ {
+              targetEnvironment: parameter.targetEnvironment
             }
           }
+        }
+        
+        parameter: {
+          // Core Configuration
+          name: string
+          serviceSelector: {[string]: string}
+          
+          // Schema Management
+          autoSchema: *true | bool
+          schemaRefreshInterval: *"5m" | string
+          exposeIntrospection: *false | bool
+          
+          // Hasura Features
+          enableConsole: *true | bool
+          enableAllowList: *false | bool
+          
+          // Advanced Configuration
+          customResolvers?: [...{
+            name: string
+            endpoint: string
+            headers?: {[string]: string}
+          }]
+          
+          // Resource Management
+          resources: *{
+            cpu: "500m"
+            memory: "512Mi"
+          } | {
+            cpu?: string
+            memory?: string
+          }
+          
+          // Multi-cluster support
+          targetEnvironment?: string
         }
