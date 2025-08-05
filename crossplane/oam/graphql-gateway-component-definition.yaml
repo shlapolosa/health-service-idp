@@ -6,7 +6,7 @@ kind: ComponentDefinition
 metadata:
   name: graphql-gateway
   annotations:
-    definition.oam.dev/description: "Auto-generating GraphQL API gateway with Hasura that discovers and federates Knative services"
+    definition.oam.dev/description: "Auto-generating GraphQL API gateway that discovers and federates Knative services"
 spec:
   workload:
     definition:
@@ -16,19 +16,19 @@ spec:
   schematic:
     cue:
       template: |
-        // Primary Output: Hasura Knative Service (OAM-compliant workload)
+        // Primary Output: GraphQL Gateway Knative Service (OAM-compliant workload)
         output: {
           apiVersion: "serving.knative.dev/v1"
           kind: "Service"
           metadata: {
-            name: context.name + "-hasura"
+            name: context.name + "-gateway"
             namespace: context.namespace
             labels: {
               "app.kubernetes.io/name": context.name
               "app.kubernetes.io/component": "graphql-gateway"
               "app.kubernetes.io/managed-by": "kubevela"
               "app.kubernetes.io/part-of": "graphql-platform"
-              "app": context.name + "-hasura"
+              "app": context.name + "-gateway"
             }
             annotations: {
               // Multi-cluster deployment support
@@ -37,7 +37,6 @@ spec:
               }
               "graphql-gateway.oam.dev/bootstrap": "true"
               "graphql-gateway.oam.dev/auto-schema": "\(parameter.autoSchema)"
-              "graphql-gateway.oam.dev/service-selector": "\(parameter.serviceSelector)"
             }
           }
           spec: {
@@ -52,27 +51,21 @@ spec:
                   "app.kubernetes.io/name": context.name
                   "app.kubernetes.io/version": parameter.version
                   "app.kubernetes.io/part-of": "graphql-platform"
-                  "app": context.name + "-hasura"
+                  "app": context.name + "-gateway"
                 }
               }
               spec: {
                 serviceAccountName: "knative-docker-sa"
                 volumes: [
                   {
-                    name: "graphql-schema"
+                    name: "gateway-config"
                     configMap: {
-                      name: context.name + "-graphql-schema-merged"
-                    }
-                  },
-                  {
-                    name: "hasura-metadata"
-                    configMap: {
-                      name: context.name + "-hasura-metadata"
+                      name: context.name + "-gateway-config"
                     }
                   }
                 ]
                 containers: [{
-                  image: parameter.hasuraImage
+                  image: parameter.gatewayImage
                   ports: [{
                     containerPort: 8080
                     name: "http1"
@@ -89,71 +82,42 @@ spec:
                   }
                   volumeMounts: [
                     {
-                      name: "graphql-schema"
-                      mountPath: "/hasura-metadata/schema"
-                    },
-                    {
-                      name: "hasura-metadata"
-                      mountPath: "/hasura-metadata/config"
+                      name: "gateway-config"
+                      mountPath: "/app/config"
                     }
                   ]
                   env: [
                     {
-                      name: "HASURA_GRAPHQL_DATABASE_URL"
-                      value: "postgres://postgres:postgres@postgres:5432/postgres"
-                    },
-                    {
-                      name: "HASURA_GRAPHQL_METADATA_DATABASE_URL"
-                      value: "postgres://postgres:postgres@postgres:5432/postgres"
-                    },
-                    {
-                      name: "HASURA_GRAPHQL_ENABLE_CONSOLE"
-                      value: "\(parameter.enableConsole)"
-                    },
-                    {
-                      name: "HASURA_GRAPHQL_DEV_MODE"
-                      value: "false"
-                    },
-                    {
-                      name: "HASURA_GRAPHQL_ENABLED_LOG_TYPES"
-                      value: "startup, http-log, webhook-log, websocket-log, query-log"
-                    },
-                    {
-                      name: "HASURA_GRAPHQL_ENABLE_TELEMETRY"
-                      value: "false"
-                    },
-                    {
-                      name: "HASURA_GRAPHQL_ADMIN_SECRET"
-                      valueFrom: {
-                        secretKeyRef: {
-                          name: context.name + "-hasura-admin-secret"
-                          key: "admin-secret"
-                        }
-                      }
-                    },
-                    {
-                      name: "HASURA_GRAPHQL_ENABLE_ALLOWLIST"
-                      value: "\(parameter.enableAllowList)"
-                    },
-                    {
-                      name: "HASURA_GRAPHQL_ENABLE_SCHEMA_INTROSPECTION"
-                      value: "\(parameter.exposeIntrospection)"
-                    },
-                    {
-                      name: "HASURA_GRAPHQL_SERVER_PORT"
-                      value: "8080"
-                    },
-                    {
-                      name: "HASURA_GRAPHQL_UNAUTHORIZED_ROLE"
-                      value: "anonymous"
-                    },
-                    {
-                      name: "GRAPHQL_GATEWAY_NAME"
+                      name: "GATEWAY_NAME"
                       value: context.name
                     },
                     {
+                      name: "NAMESPACE"
+                      value: context.namespace
+                    },
+                    {
+                      name: "SERVICE_SELECTOR"
+                      value: "\(parameter.serviceSelector | json)"
+                    },
+                    {
+                      name: "AUTO_DISCOVERY"
+                      value: "\(parameter.autoSchema)"
+                    },
+                    {
+                      name: "DISCOVERY_INTERVAL"
+                      value: parameter.schemaRefreshInterval
+                    },
+                    {
+                      name: "PORT"
+                      value: "8080"
+                    },
+                    {
+                      name: "HOST"
+                      value: "0.0.0.0"
+                    },
+                    {
                       name: "LOG_LEVEL"
-                      value: "INFO"
+                      value: "info"
                     }
                   ] + [
                     for k, v in parameter.environment {
@@ -207,9 +171,8 @@ spec:
               autoSchema: parameter.autoSchema
               schemaRefreshInterval: parameter.schemaRefreshInterval
               exposeIntrospection: parameter.exposeIntrospection
-              adminSecret: parameter.adminSecret
-              enableConsole: parameter.enableConsole
-              enableAllowList: parameter.enableAllowList
+              exposePlayground: parameter.exposePlayground
+              enableCors: parameter.enableCors
               if parameter.customResolvers != _|_ {
                 customResolvers: parameter.customResolvers
               }
@@ -339,7 +302,7 @@ spec:
         
         parameter: {
           // Required
-          hasuraImage: *"hasura/graphql-engine:v2.36.0" | string
+          gatewayImage: *"docker.io/socrates12345/graphql-gateway:latest" | string
           
           // Service Discovery
           serviceSelector: *{
@@ -351,10 +314,9 @@ spec:
           schemaRefreshInterval: *"5m" | string
           exposeIntrospection: *false | bool
           
-          // Hasura Configuration
-          adminSecret: *"" | string  // Generated if empty
-          enableConsole: *true | bool
-          enableAllowList: *false | bool
+          // GraphQL Gateway Configuration
+          exposePlayground: *true | bool
+          enableCors: *true | bool
           
           // Resource Management
           resources: *{
