@@ -1,30 +1,72 @@
 # GraphQL Mesh Gateway Docker Image
-# Lightweight Node.js container for service discovery and GraphQL federation
-FROM node:18-alpine
+# Multi-stage build for optimized production image with proper native dependency compilation
+FROM node:18-alpine AS builder
 
-# Install system dependencies
-RUN apk add --no-cache \
+# Install build dependencies for node-gyp compilation
+RUN apk add --no-cache --virtual .build-deps \
     bash \
     curl \
     jq \
-    kubectl
+    git \
+    python3 \
+    make \
+    g++ \
+    libc6-compat \
+    libstdc++ \
+    pkgconfig \
+    autoconf \
+    automake \
+    libtool \
+    nasm \
+    build-base
 
 # Set working directory
 WORKDIR /app
 
-# Copy package files first for better caching
+# Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install --omit=dev --legacy-peer-deps && npm cache clean --force
+# Install ALL dependencies for building (including native compilation)
+RUN npm install --legacy-peer-deps
 
-# Copy application files
+# Copy application source
+COPY src/ ./src/
 COPY mesh-config-template.yaml ./
 COPY generate-mesh-config.sh ./
 COPY server.js ./
 COPY start.sh ./
 
 # Make scripts executable
+RUN chmod +x generate-mesh-config.sh start.sh
+
+# Clean up build dependencies to reduce image size
+RUN apk del .build-deps
+
+# Production stage
+FROM node:18-alpine AS production
+
+# Install only runtime dependencies
+RUN apk add --no-cache \
+    bash \
+    curl \
+    jq \
+    kubectl \
+    git \
+    libc6-compat
+
+# Set working directory
+WORKDIR /app
+
+# Copy built application and compiled dependencies from builder stage
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/mesh-config-template.yaml ./
+COPY --from=builder /app/generate-mesh-config.sh ./
+COPY --from=builder /app/server.js ./
+COPY --from=builder /app/start.sh ./
+COPY --from=builder /app/package*.json ./
+
+# Ensure scripts are executable
 RUN chmod +x generate-mesh-config.sh start.sh
 
 # Create non-root user

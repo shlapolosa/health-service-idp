@@ -1,0 +1,379 @@
+---
+# Example OAM Application with GraphQL Federation
+# This demonstrates:
+# 1. GraphQL Gateway component with repository generation
+# 2. Multiple webservices with federation enabled
+# 3. Services without federation (excluded from GraphQL)
+# 4. Infrastructure components (Redis, MongoDB)
+
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: e-commerce-platform
+  namespace: default
+spec:
+  components:
+  # GraphQL Gateway - Auto-discovers and federates enabled services
+  - name: api-gateway
+    type: graphql-gateway
+    properties:
+      gatewayImage: "docker.io/socrates12345/graphql-gateway:latest"
+      # Repository creation - creates shlapolosa/e-commerce-platform repo
+      language: "nodejs"
+      framework: "graphql-gateway"
+      repository: "e-commerce-platform"
+      # Gateway configuration
+      autoSchema: true
+      schemaRefreshInterval: "2m"
+      exposePlayground: true
+      exposeIntrospection: false
+      enableCors: true
+      resources:
+        cpu: "1000m"
+        memory: "1Gi"
+      environment:
+        NODE_ENV: "production"
+        LOG_LEVEL: "info"
+    traits:
+    - type: ingress
+      properties:
+        domain: "api.example.com"
+        http:
+          "/graphql": 8080
+    - type: autoscaler
+      properties:
+        minReplicas: 2
+        maxReplicas: 10
+        cpuPercent: 70
+  
+  # User Service - Federated into GraphQL
+  - name: user-service
+    type: webservice
+    properties:
+      image: "docker.io/socrates12345/user-service:latest"
+      port: 8080
+      # These enable GraphQL federation
+      enableGraphQLFederation: true
+      openApiPath: "/api/v1/openapi.json"
+      apiVersion: "v1"
+      # Repository creation
+      language: "python"
+      framework: "fastapi"
+      repository: "e-commerce-platform"
+      resources:
+        cpu: "500m"
+        memory: "512Mi"
+      environment:
+        SERVICE_NAME: "user-service"
+        DATABASE_URL: "postgresql://postgres:password@postgres:5432/users"
+    traits:
+    - type: autoscaler
+      properties:
+        minReplicas: 1
+        maxReplicas: 5
+  
+  # Product Catalog Service - Federated into GraphQL
+  - name: product-service
+    type: webservice
+    properties:
+      image: "docker.io/socrates12345/product-service:latest"
+      port: 8080
+      # GraphQL federation enabled
+      enableGraphQLFederation: true
+      openApiPath: "/api/v2/openapi.json"
+      apiVersion: "v2"
+      # Repository creation
+      language: "java"
+      framework: "spring-boot"
+      repository: "e-commerce-platform"
+      resources:
+        cpu: "1000m"
+        memory: "1Gi"
+      environment:
+        SPRING_PROFILES_ACTIVE: "production"
+        MONGODB_URI: "mongodb://mongodb:27017/products"
+      envFrom:
+      - secretRef:
+          name: "product-service-secrets"
+    traits:
+    - type: autoscaler
+      properties:
+        minReplicas: 2
+        maxReplicas: 10
+  
+  # Order Service - Federated into GraphQL
+  - name: order-service
+    type: webservice
+    properties:
+      image: "docker.io/socrates12345/order-service:latest"
+      port: 8080
+      # GraphQL federation with custom path
+      enableGraphQLFederation: true
+      openApiPath: "/swagger/v1/swagger.json"
+      apiVersion: "v1"
+      # Repository creation
+      language: "go"
+      framework: "gin"
+      repository: "e-commerce-platform"
+      resources:
+        cpu: "500m"
+        memory: "256Mi"
+      environment:
+        GIN_MODE: "release"
+        REDIS_URL: "redis:6379"
+    traits:
+    - type: kafka-producer
+      properties:
+        topic: "orders"
+        brokers: ["kafka:9092"]
+  
+  # Payment Processing Service - NOT federated (sensitive operations)
+  - name: payment-processor
+    type: webservice
+    properties:
+      image: "docker.io/socrates12345/payment-processor:latest"
+      port: 8443
+      # NO GraphQL federation - handles sensitive payment data
+      # Repository creation
+      language: "rust"
+      framework: "actix-web"
+      repository: "e-commerce-platform"
+      resources:
+        cpu: "2000m"
+        memory: "2Gi"
+      environment:
+        RUST_LOG: "info"
+        TLS_ENABLED: "true"
+    traits:
+    - type: autoscaler
+      properties:
+        minReplicas: 3
+        maxReplicas: 20
+        memoryPercent: 80
+  
+  # Background Worker - NOT federated (internal service)
+  - name: order-processor
+    type: webservice
+    properties:
+      image: "docker.io/socrates12345/order-processor:latest"
+      port: 8080
+      # NO GraphQL federation - internal worker
+      resources:
+        cpu: "1000m"
+        memory: "1Gi"
+      environment:
+        WORKER_CONCURRENCY: "10"
+    traits:
+    - type: kafka-consumer
+      properties:
+        topic: "orders"
+        brokers: ["kafka:9092"]
+        consumerGroup: "order-processors"
+  
+  # Infrastructure Components
+  - name: redis-cache
+    type: redis
+    properties:
+      name: "redis-cache"
+      architecture: "standalone"
+      storage: "10Gi"
+      auth:
+        enabled: true
+        password: "redis-secure-password"
+      resources:
+        cpu: "500m"
+        memory: "1Gi"
+  
+  - name: mongodb-products
+    type: mongodb
+    properties:
+      name: "mongodb-products"
+      architecture: "replicaset"
+      replicas: 3
+      storage: "20Gi"
+      auth:
+        enabled: true
+        rootPassword: "mongo-root-password"
+        username: "products"
+        password: "products-password"
+        database: "products"
+      resources:
+        cpu: "1000m"
+        memory: "2Gi"
+  
+  - name: postgres-users
+    type: neon-postgres
+    properties:
+      name: "postgres-users"
+      database: "users"
+  
+  # External Service Integration
+  - name: auth-provider
+    type: auth0-idp
+    properties:
+      name: "auth-provider"
+
+---
+# Example showing realtime-platform with GraphQL
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: iot-monitoring-platform
+  namespace: iot
+spec:
+  components:
+  # GraphQL Gateway for IoT APIs
+  - name: iot-api-gateway
+    type: graphql-gateway
+    properties:
+      gatewayImage: "docker.io/socrates12345/graphql-gateway:latest"
+      repository: "iot-monitoring-platform"
+      language: "typescript"
+      framework: "graphql-gateway"
+      autoSchema: true
+      schemaRefreshInterval: "1m"
+      resources:
+        cpu: "2000m"
+        memory: "2Gi"
+    traits:
+    - type: ingress
+      properties:
+        domain: "api.iot.example.com"
+        http:
+          "/graphql": 8080
+  
+  # Device Management Service - Federated
+  - name: device-service
+    type: webservice
+    properties:
+      image: "docker.io/socrates12345/device-service:latest"
+      enableGraphQLFederation: true
+      openApiPath: "/api/docs/openapi.json"
+      apiVersion: "v1"
+      repository: "iot-monitoring-platform"
+      language: "python"
+      framework: "fastapi"
+      # Integration with realtime platform
+      realtime: "iot-streaming"
+      environment:
+        SERVICE_NAME: "device-service"
+    traits:
+    - type: autoscaler
+      properties:
+        minReplicas: 2
+        maxReplicas: 20
+  
+  # Telemetry Service - Federated
+  - name: telemetry-service
+    type: webservice
+    properties:
+      image: "docker.io/socrates12345/telemetry-service:latest"
+      enableGraphQLFederation: true
+      openApiPath: "/v1/api-docs"
+      repository: "iot-monitoring-platform"
+      language: "go"
+      framework: "fiber"
+      realtime: "iot-streaming"
+      environment:
+        SERVICE_NAME: "telemetry-service"
+        CLICKHOUSE_URL: "clickhouse:8123"
+    traits:
+    - type: kafka-consumer
+      properties:
+        topic: "device-telemetry"
+        brokers: ["kafka:9092"]
+  
+  # Realtime Platform - Creates Kafka, MQTT, Lenses
+  # Lenses services are NOT federated (internal UI)
+  - name: iot-streaming
+    type: realtime-platform
+    properties:
+      kafkaReplicas: 5
+      kafkaStorage: "50Gi"
+      mqttReplicas: 3
+      enableKafka: true
+      enableMQTT: true
+      enableLenses: true
+      enableKafkaConnect: true
+      enableSchemaRegistry: true
+      resources:
+        kafka:
+          cpu: "2000m"
+          memory: "4Gi"
+        mqtt:
+          cpu: "1000m"
+          memory: "2Gi"
+  
+  # Analytics Database
+  - name: telemetry-analytics
+    type: clickhouse
+    properties:
+      name: "telemetry-analytics"
+      architecture: "replication"
+      replicas: 3
+      shards: 2
+      storage: "100Gi"
+      resources:
+        cpu: "4000m"
+        memory: "8Gi"
+      auth:
+        username: "analytics"
+        password: "secure-analytics-password"
+        database: "iot_telemetry"
+
+---
+# Example with RASA chatbot (chatbot services NOT federated)
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: customer-support-platform
+  namespace: support
+spec:
+  components:
+  # GraphQL Gateway for support APIs
+  - name: support-api
+    type: graphql-gateway
+    properties:
+      repository: "customer-support-platform"
+      language: "nodejs"
+      framework: "graphql-gateway"
+  
+  # Ticket Service - Federated
+  - name: ticket-service
+    type: webservice
+    properties:
+      image: "docker.io/socrates12345/ticket-service:latest"
+      enableGraphQLFederation: true
+      openApiPath: "/api/openapi.yaml"
+      repository: "customer-support-platform"
+      language: "python"
+      framework: "django"
+  
+  # Knowledge Base Service - Federated
+  - name: knowledge-base
+    type: webservice
+    properties:
+      image: "docker.io/socrates12345/knowledge-base:latest"
+      enableGraphQLFederation: true
+      openApiPath: "/docs/openapi.json"
+      repository: "customer-support-platform"
+      language: "javascript"
+      framework: "express"
+  
+  # RASA Chatbot - Creates multiple services (NOT federated)
+  - name: support-chatbot
+    type: rasa-chatbot
+    properties:
+      rasaImage: "docker.io/socrates12345/support-rasa:latest"
+      actionsImage: "docker.io/socrates12345/support-actions:latest"
+      repository: "customer-support-platform"
+      language: "python"
+      enableDuckling: true
+      enableRedis: true
+      resources:
+        rasa:
+          cpu: "2000m"
+          memory: "4Gi"
+        actions:
+          cpu: "1000m"
+          memory: "2Gi"

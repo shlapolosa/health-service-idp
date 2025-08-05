@@ -21,14 +21,14 @@ spec:
           apiVersion: "serving.knative.dev/v1"
           kind: "Service"
           metadata: {
-            name: context.name + "-gateway"
+            name: context.name
             namespace: context.namespace
             labels: {
               "app.kubernetes.io/name": context.name
               "app.kubernetes.io/component": "graphql-gateway"
               "app.kubernetes.io/managed-by": "kubevela"
               "app.kubernetes.io/part-of": "graphql-platform"
-              "app": context.name + "-gateway"
+              "app": context.name
             }
             annotations: {
               // Multi-cluster deployment support
@@ -37,6 +37,10 @@ spec:
               }
               "graphql-gateway.oam.dev/bootstrap": "true"
               "graphql-gateway.oam.dev/auto-schema": "\(parameter.autoSchema)"
+              if parameter.repository != _|_ {
+                "graphql-gateway.oam.dev/repository": parameter.repository
+                "graphql-gateway.oam.dev/trigger-repo-creation": "true"
+              }
             }
           }
           spec: {
@@ -51,16 +55,16 @@ spec:
                   "app.kubernetes.io/name": context.name
                   "app.kubernetes.io/version": parameter.version
                   "app.kubernetes.io/part-of": "graphql-platform"
-                  "app": context.name + "-gateway"
+                  "app": context.name
                 }
               }
               spec: {
-                serviceAccountName: "knative-docker-sa"
+                serviceAccountName: "graphql-gateway-sa"
                 volumes: [
                   {
                     name: "gateway-config"
                     configMap: {
-                      name: context.name + "-gateway-config"
+                      name: context.name + "-config"
                     }
                   }
                 ]
@@ -76,8 +80,8 @@ spec:
                       memory: parameter.resources.memory
                     }
                     requests: {
-                      cpu: "250m"
-                      memory: "256Mi"
+                      cpu: "100m"
+                      memory: "128Mi"
                     }
                   }
                   volumeMounts: [
@@ -96,8 +100,8 @@ spec:
                       value: context.namespace
                     },
                     {
-                      name: "SERVICE_SELECTOR"
-                      value: "\(parameter.serviceSelector | json)"
+                      name: "SERVICE_SELECTOR_LABELS"
+                      value: "app.kubernetes.io/managed-by=kubevela"
                     },
                     {
                       name: "AUTO_DISCOVERY"
@@ -108,7 +112,7 @@ spec:
                       value: parameter.schemaRefreshInterval
                     },
                     {
-                      name: "PORT"
+                      name: "GATEWAY_PORT"
                       value: "8080"
                     },
                     {
@@ -208,7 +212,7 @@ spec:
                 }
                 annotations: {
                   "graphql-gateway.oam.dev/trigger-type": "argo-workflow"
-                  "graphql-gateway.oam.dev/workflow-template": "microservice-standard-contract"
+                  "graphql-gateway.oam.dev/workflow-template": "graphql-gateway-template"
                   "graphql-gateway.oam.dev/source": "oam-driven"
                   "graphql-gateway.oam.dev/platform-type": "graphql"
                 }
@@ -243,33 +247,17 @@ spec:
                         "    },\n" +
                         "    \"spec\": {\n" +
                         "      \"workflowTemplateRef\": {\n" +
-                        "        \"name\": \"microservice-standard-contract\"\n" +
+                        "        \"name\": \"graphql-gateway-template\"\n" +
                         "      },\n" +
                         "      \"arguments\": {\n" +
                         "        \"parameters\": [\n" +
-                        "          {\"name\": \"resource-name\", \"value\": \"" + context.name + "\"},\n" +
-                        "          {\"name\": \"resource-type\", \"value\": \"graphql-gateway\"},\n" +
+                        "          {\"name\": \"repository-name\", \"value\": \"" + parameter.repository + "\"},\n" +
+                        "          {\"name\": \"app-container\", \"value\": \"" + parameter.repository + "\"},\n" +
                         "          {\"name\": \"namespace\", \"value\": \"" + context.namespace + "\"},\n" +
-                        "          {\"name\": \"user\", \"value\": \"oam-system\"},\n" +
-                        "          {\"name\": \"description\", \"value\": \"OAM-driven GraphQL gateway via ComponentDefinition\"},\n" +
-                        "          {\"name\": \"github-org\", \"value\": \"shlapolosa\"},\n" +
-                        "          {\"name\": \"docker-registry\", \"value\": \"docker.io/socrates12345\"},\n" +
-                        "          {\"name\": \"slack-channel\", \"value\": \"#oam-notifications\"},\n" +
-                        "          {\"name\": \"slack-user-id\", \"value\": \"OAM\"},\n" +
-                        "          {\"name\": \"security-enabled\", \"value\": \"true\"},\n" +
-                        "          {\"name\": \"observability-enabled\", \"value\": \"true\"},\n" +
-                        "          {\"name\": \"backup-enabled\", \"value\": \"false\"},\n" +
-                        "          {\"name\": \"environment-tier\", \"value\": \"development\"},\n" +
-                        "          {\"name\": \"auto-create-dependencies\", \"value\": \"true\"},\n" +
-                        "          {\"name\": \"resource-size\", \"value\": \"medium\"},\n" +
-                        "          {\"name\": \"microservice-language\", \"value\": \"" + parameter.language + "\"},\n" +
-                        "          {\"name\": \"microservice-framework\", \"value\": \"" + (*"nodejs" | parameter.framework) + "\"},\n" +
-                        "          {\"name\": \"microservice-database\", \"value\": \"none\"},\n" +
-                        "          {\"name\": \"microservice-cache\", \"value\": \"none\"},\n" +
-                        "          {\"name\": \"microservice-expose-api\", \"value\": \"true\"},\n" +
-                        "          {\"name\": \"target-vcluster\", \"value\": \"\"},\n" +
-                        "          {\"name\": \"parent-appcontainer\", \"value\": \"" + parameter.repository + "\"},\n" +
-                        "          {\"name\": \"repository-name\", \"value\": \"" + parameter.repository + "\"}\n" +
+                        "          {\"name\": \"gateway-name\", \"value\": \"" + context.name + "\"},\n" +
+                        "          {\"name\": \"docker-registry\", \"value\": \"docker.io\"},\n" +
+                        "          {\"name\": \"docker-username\", \"value\": \"socrates12345\"},\n" +
+                        "          {\"name\": \"gitops-repo\", \"value\": \"health-service-idp-gitops\"}\n" +
                         "        ]\n" +
                         "      }\n" +
                         "    }\n" +
@@ -302,7 +290,7 @@ spec:
         
         parameter: {
           // Required
-          gatewayImage: *"docker.io/socrates12345/graphql-gateway:latest" | string
+          gatewayImage: *"docker.io/socrates12345/graphql-mesh-gateway:openapi-fix" | string
           
           // Service Discovery
           serviceSelector: *{

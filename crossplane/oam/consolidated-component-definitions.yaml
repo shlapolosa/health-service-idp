@@ -66,6 +66,15 @@ spec:
                 "webservice.oam.dev/secret-discovery": "enabled"
                 "webservice.oam.dev/secret-pattern": parameter.realtime + "-*-secret"
               }
+              if parameter.enableGraphQLFederation != _|_ && parameter.enableGraphQLFederation {
+                "graphql.federation/enabled": "true"
+                if parameter.openApiPath != _|_ {
+                  "graphql.federation/openapi-path": parameter.openApiPath
+                }
+                if parameter.apiVersion != _|_ {
+                  "graphql.federation/api-version": parameter.apiVersion
+                }
+              }
             }
           }
           spec: {
@@ -334,6 +343,11 @@ spec:
           realtime?: string
           repository?: string
           targetEnvironment?: string  // vCluster deployment target
+          
+          // GraphQL Federation Support
+          enableGraphQLFederation?: bool  // Mark service for GraphQL federation
+          openApiPath?: string           // Custom OpenAPI spec path (e.g., "/api/v1/openapi.json")
+          apiVersion?: string            // API version for GraphQL federation (e.g., "v1", "v2")
         }
 
 ---

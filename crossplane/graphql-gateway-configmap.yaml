@@ -1,0 +1,46 @@
+---
+# Manual ConfigMap for GraphQL Gateway
+# Temporary workaround for Crossplane composition issues
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: graphql-gateway-config
+  namespace: default
+  labels:
+    app.kubernetes.io/name: graphql-gateway
+    app.kubernetes.io/component: configuration
+    app.kubernetes.io/part-of: graphql-platform
+data:
+  gateway.yaml: |
+    server:
+      port: 8080
+      host: "0.0.0.0"
+      cors:
+        enabled: true
+        origin: "*"
+        methods: ["GET", "POST", "OPTIONS"]
+        headers: ["Content-Type", "Authorization", "X-API-Key"]
+    
+    discovery:
+      namespace: "default"
+      labelSelector: "app.kubernetes.io/managed-by=kubevela"
+      interval: "5m"
+      autoDiscovery: true
+      retryDelay: "30s"
+      maxRetries: 3
+    
+    graphql:
+      playground: true
+      introspection: false
+      endpoint: "/graphql"
+      
+    security:
+      rateLimit:
+        windowMs: 900000  # 15 minutes
+        max: 1000
+      helmet:
+        enabled: true
+        
+    logging:
+      level: "info"
+      format: "json"

@@ -70,35 +70,30 @@ spec:
           string:
             fmt: "%s-graphql"
         toFieldPath: metadata.namespace
-      - fromFieldPath: spec.serviceSelector
-        toFieldPath: data.config\.yaml
-        transforms:
-        - type: string
+      - fromFieldPath: spec.name
+        toFieldPath: data.gateway-name
+      - type: CombineFromComposite
+        combine:
+          variables:
+          - fromFieldPath: spec.name
+          strategy: string
           string:
             fmt: |
               # GraphQL Gateway Configuration
               gateway:
                 name: "%s"
-                autoDiscovery: %t
-                refreshInterval: "%s"
+                autoDiscovery: true
+                refreshInterval: "5m"
               serviceDiscovery:
-                selector: %s
+                selector:
+                  app.kubernetes.io/managed-by: kubevela
                 namespaces: ["default"]
               cors:
-                enabled: %t
+                enabled: true
                 origin: "*"
               playground:
-                enabled: %t
-        - type: CombineFromComposite
-          combine:
-            variables:
-            - fromFieldPath: spec.name
-            - fromFieldPath: spec.autoSchema
-            - fromFieldPath: spec.schemaRefreshInterval  
-            - fromFieldPath: spec.serviceSelector
-            - fromFieldPath: spec.enableCors
-            - fromFieldPath: spec.exposePlayground
-            strategy: string
+                enabled: true
+        toFieldPath: data.config\.yaml
             
     # 3. Service Account for service discovery
     - name: graphql-service-account
@@ -240,16 +235,3 @@ spec:
         
   # Connection details for applications to use
   writeConnectionSecretsToNamespace: crossplane-system
-  connectionSecretTemplate:
-    type: Opaque
-    metadata:
-      name: ""
-      namespace: crossplane-system
-    data:
-      endpoint: ""
-      gateway-name: ""
-      namespace: ""
-  connectionSecretKeys:
-  - endpoint
-  - gateway-name  
-  - namespace

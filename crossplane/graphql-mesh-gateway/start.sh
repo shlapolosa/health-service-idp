@@ -1,23 +1,58 @@
 #!/bin/bash
 set -e
 
-echo "🚀 Starting GraphQL Mesh Gateway"
-echo "===================================="
+echo "🚀 Starting GraphQL Mesh Gateway (Production Version)"
+echo "====================================================="
 
-# Environment variables with defaults
+echo "🔍 DEBUGGING: Original Environment Variables"
+echo "=============================================="
+echo "Raw GATEWAY_NAME: '$GATEWAY_NAME' (length: $(echo -n "$GATEWAY_NAME" | wc -c) chars)"
+echo "Raw NAMESPACE: '$NAMESPACE' (length: $(echo -n "$NAMESPACE" | wc -c) chars)"
+echo "Raw SERVICE_SELECTOR: '$SERVICE_SELECTOR' (length: $(echo -n "$SERVICE_SELECTOR" | wc -c) chars)"
+echo "Raw AUTO_DISCOVERY: '$AUTO_DISCOVERY' (length: $(echo -n "$AUTO_DISCOVERY" | wc -c) chars)"
+echo "Raw DISCOVERY_INTERVAL: '$DISCOVERY_INTERVAL' (length: $(echo -n "$DISCOVERY_INTERVAL" | wc -c) chars)"
+echo ""
+
+# Environment variables with defaults and comprehensive logging
+echo "🔍 DEBUGGING: Processing Defaults"
+echo "=================================="
+
+echo "Processing GATEWAY_NAME..."
 GATEWAY_NAME="${GATEWAY_NAME:-api-gateway}"
-NAMESPACE="${NAMESPACE:-default}"
-SERVICE_SELECTOR="${SERVICE_SELECTOR:-{\"app.kubernetes.io/managed-by\":\"kubevela\"}}"
-MESH_CONFIG_FILE="${MESH_CONFIG_FILE:-/app/.meshrc.yaml}"
-AUTO_DISCOVERY="${AUTO_DISCOVERY:-true}"
-DISCOVERY_INTERVAL="${DISCOVERY_INTERVAL:-300}"  # 5 minutes
+echo "  Result: '$GATEWAY_NAME'"
 
-echo "📋 Configuration:"
-echo "  Gateway Name: $GATEWAY_NAME"
-echo "  Namespace: $NAMESPACE"
-echo "  Service Selector: $SERVICE_SELECTOR"
+echo "Processing NAMESPACE..."
+NAMESPACE="${NAMESPACE:-default}"
+echo "  Result: '$NAMESPACE'"
+
+echo "Processing SERVICE_SELECTOR..."
+echo "  Before: '$SERVICE_SELECTOR'"
+SERVICE_SELECTOR="${SERVICE_SELECTOR:-{\"app.kubernetes.io/managed-by\":\"kubevela\"}}"
+echo "  After: '$SERVICE_SELECTOR'"
+echo "  Length: $(echo -n "$SERVICE_SELECTOR" | wc -c) characters"
+echo "  Open braces: $(echo -n "$SERVICE_SELECTOR" | grep -o '{' | wc -l || echo 0)"
+echo "  Close braces: $(echo -n "$SERVICE_SELECTOR" | grep -o '}' | wc -l || echo 0)"
+
+echo "Processing MESH_CONFIG_FILE..."
+MESH_CONFIG_FILE="${MESH_CONFIG_FILE:-/app/.meshrc.yaml}"
+echo "  Result: '$MESH_CONFIG_FILE'"
+
+echo "Processing AUTO_DISCOVERY..."
+AUTO_DISCOVERY="${AUTO_DISCOVERY:-true}"
+echo "  Result: '$AUTO_DISCOVERY'"
+
+echo "Processing DISCOVERY_INTERVAL..."
+DISCOVERY_INTERVAL="${DISCOVERY_INTERVAL:-5m}"
+echo "  Result: '$DISCOVERY_INTERVAL'"
+
+echo ""
+echo "📋 Final Configuration:"
+echo "======================"
+echo "  Gateway Name: '$GATEWAY_NAME'"
+echo "  Namespace: '$NAMESPACE'"
+echo "  Service Selector: \"$SERVICE_SELECTOR\""
 echo "  Auto Discovery: $AUTO_DISCOVERY"
-echo "  Discovery Interval: ${DISCOVERY_INTERVAL}s"
+echo "  Discovery Interval: $DISCOVERY_INTERVAL"
 echo ""
 
 # Function to run service discovery
@@ -84,16 +119,35 @@ EOF
     echo "✅ Fallback configuration created"
 }
 
+# Function to convert time duration to seconds
+duration_to_seconds() {
+    local duration="$1"
+    case "$duration" in
+        *s) echo "${duration%s}" ;;
+        *m) echo "$((${duration%m} * 60))" ;;
+        *h) echo "$((${duration%h} * 3600))" ;;
+        *d) echo "$((${duration%d} * 86400))" ;;
+        *) 
+            if [[ "$duration" =~ ^[0-9]+$ ]]; then
+                echo "$duration"
+            else
+                echo "300"  # Default 5 minutes
+            fi
+            ;;
+    esac
+}
+
 # Function to run background discovery
 run_background_discovery() {
+    local interval_seconds=$(duration_to_seconds "$DISCOVERY_INTERVAL")
     while true; do
-        echo "🔄 Running scheduled service discovery (every ${DISCOVERY_INTERVAL}s)"
+        echo "🔄 Running scheduled service discovery (every ${DISCOVERY_INTERVAL})"
         if run_discovery; then
             echo "📊 Discovery successful, configuration updated"
         else
             echo "⚠️  Discovery failed, keeping current configuration"
         fi
-        sleep "$DISCOVERY_INTERVAL"
+        sleep "$interval_seconds"
     done
 }
 
@@ -125,7 +179,7 @@ else
 fi
 
 # Start background discovery if enabled
-if [[ "$AUTO_DISCOVERY" == "true" ]] && [[ "$DISCOVERY_INTERVAL" -gt 0 ]]; then
+if [[ "$AUTO_DISCOVERY" == "true" ]] && [[ -n "$DISCOVERY_INTERVAL" ]]; then
     echo "🔄 Starting background service discovery..."
     run_background_discovery &
     DISCOVERY_PID=$!
@@ -179,9 +233,18 @@ echo ""
 echo "🚀 Starting GraphQL Mesh Gateway Server..."
 echo "===================================="
 
-# Start the main server
-node server.js &
-SERVER_PID=$!
+# Determine which server to use
+SERVER_TYPE="${SERVER_TYPE:-production}"
+
+if [[ "$SERVER_TYPE" == "production" ]]; then
+    echo "🏭 Starting production GraphQL Gateway Server..."
+    node src/index.js &
+    SERVER_PID=$!
+else
+    echo "🧪 Starting legacy server (fallback mode)..."
+    node server.js &
+    SERVER_PID=$!
+fi
 
 echo "📡 Server started (PID: $SERVER_PID)"
 echo "🏥 Health endpoint: http://localhost:8080/healthz"

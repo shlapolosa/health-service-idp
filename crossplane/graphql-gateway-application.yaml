@@ -1,0 +1,32 @@
+---
+# GraphQL Gateway OAM Application
+# Using the updated graphql-gateway ComponentDefinition with proper service naming
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: graphql-gateway
+  namespace: default
+  labels:
+    app.kubernetes.io/name: graphql-gateway
+    app.kubernetes.io/component: graphql-gateway
+    app.kubernetes.io/managed-by: kubevela
+    app.kubernetes.io/part-of: graphql-platform
+spec:
+  components:
+  - name: graphql-gateway
+    type: graphql-gateway
+    properties:
+      gatewayImage: "docker.io/socrates12345/graphql-mesh-gateway:openapi-fix"
+      autoSchema: true
+      enableCors: true
+      environment:
+        NODE_ENV: "production"
+      exposeIntrospection: false
+      exposePlayground: true
+      resources:
+        cpu: "500m"
+        memory: "512Mi"
+      schemaRefreshInterval: "5m"
+      serviceSelector:
+        app.kubernetes.io/managed-by: "kubevela"
+      version: "latest"

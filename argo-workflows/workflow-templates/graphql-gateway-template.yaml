@@ -1,0 +1,190 @@
+---
+# Argo Workflow Template for GraphQL Gateway Repository Creation
+# This template creates a new GraphQL gateway repository from template
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: graphql-gateway-template
+  namespace: argo
+spec:
+  entrypoint: create-graphql-gateway
+  arguments:
+    parameters:
+    - name: repository-name
+      description: "Name of the repository to create"
+    - name: app-container
+      description: "Parent application container name"
+    - name: namespace
+      description: "Target namespace for deployment"
+    - name: gateway-name
+      description: "Name of the GraphQL gateway"
+    - name: docker-registry
+      value: "docker.io"
+    - name: docker-username
+      value: "socrates12345"
+    - name: gitops-repo
+      value: "health-service-idp-gitops"
+  
+  templates:
+  - name: create-graphql-gateway
+    steps:
+    - - name: clone-template
+        template: git-clone-template
+    - - name: customize-gateway
+        template: customize-repository
+    - - name: create-github-repo
+        template: github-create-repo
+    - - name: push-to-github
+        template: git-push-code
+    - - name: notify-completion
+        template: notify-slack
+
+  - name: git-clone-template
+    container:
+      image: alpine/git:latest
+      command: [sh, -c]
+      args:
+      - |
+        echo "🔄 Cloning GraphQL gateway template..."
+        git clone https://github.com/shlapolosa/graphql-federation-gateway-template.git /workspace/repo
+        cd /workspace/repo
+        rm -rf .git
+        git init
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        ls -la
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
+
+  - name: customize-repository
+    container:
+      image: mikefarah/yq:4
+      command: [sh, -c]
+      args:
+      - |
+        echo "🔧 Customizing repository for {{workflow.parameters.gateway-name}}..."
+        cd /workspace/repo
+        
+        # Replace placeholders in workflows
+        sed -i "s/{{ GATEWAY_NAME }}/{{workflow.parameters.gateway-name}}/g" .github/workflows/graphql-gateway-ci.yml
+        sed -i "s/{{ DOCKER_USERNAME }}/{{workflow.parameters.docker-username}}/g" .github/workflows/graphql-gateway-ci.yml
+        sed -i "s/{{ GITOPS_REPO }}/{{workflow.parameters.gitops-repo}}/g" .github/workflows/graphql-gateway-ci.yml
+        
+        # Update Kubernetes manifests
+        yq eval '.metadata.namespace = "{{workflow.parameters.namespace}}"' -i microservices/graphql-gateway/knative-service.yaml
+        yq eval '.metadata.namespace = "{{workflow.parameters.namespace}}"' -i microservices/graphql-gateway/configmap.yaml
+        
+        # Replace APP_CONTAINER placeholder
+        sed -i "s/APP_CONTAINER_PLACEHOLDER/{{workflow.parameters.app-container}}/g" microservices/graphql-gateway/knative-service.yaml
+        sed -i "s/APP_CONTAINER_PLACEHOLDER/{{workflow.parameters.app-container}}/g" microservices/graphql-gateway/configmap.yaml
+        
+        # Update README
+        echo "# {{workflow.parameters.gateway-name}}" > README.md
+        echo "" >> README.md
+        echo "GraphQL Federation Gateway for {{workflow.parameters.app-container}}" >> README.md
+        echo "" >> README.md
+        echo "Auto-generated from graphql-federation-gateway-template" >> README.md
+        
+        git add -A
+        git commit -m "Initial commit: GraphQL gateway for {{workflow.parameters.app-container}}"
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
+
+  - name: github-create-repo
+    container:
+      image: alpine/curl:latest
+      command: [sh, -c]
+      args:
+      - |
+        echo "📦 Creating GitHub repository {{workflow.parameters.repository-name}}..."
+        
+        # Get GitHub token from secret
+        GITHUB_TOKEN=$(cat /etc/github-token/token)
+        
+        # Create repository
+        curl -X POST \
+          -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/orgs/shlapolosa/repos \
+          -d '{
+            "name": "{{workflow.parameters.repository-name}}",
+            "description": "GraphQL Federation Gateway for {{workflow.parameters.app-container}}",
+            "private": false,
+            "auto_init": false
+          }'
+        
+        # Add workflow secret for Docker Hub
+        DOCKER_PASSWORD=$(cat /etc/docker-secret/password)
+        curl -X PUT \
+          -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/shlapolosa/{{workflow.parameters.repository-name}}/actions/secrets/DOCKER_PASSWORD \
+          -d "{\"encrypted_value\": \"$DOCKER_PASSWORD\", \"key_id\": \"568250167242549743\"}"
+      env:
+      - name: GITHUB_ORG
+        value: shlapolosa
+      volumeMounts:
+      - name: github-token
+        mountPath: /etc/github-token
+      - name: docker-secret
+        mountPath: /etc/docker-secret
+
+  - name: git-push-code
+    container:
+      image: alpine/git:latest
+      command: [sh, -c]
+      args:
+      - |
+        echo "🚀 Pushing code to GitHub..."
+        cd /workspace/repo
+        
+        GITHUB_TOKEN=$(cat /etc/github-token/token)
+        git remote add origin https://oauth2:${GITHUB_TOKEN}@github.com/shlapolosa/{{workflow.parameters.repository-name}}.git
+        git push -u origin main
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
+      - name: github-token
+        mountPath: /etc/github-token
+
+  - name: notify-slack
+    container:
+      image: curlimages/curl:latest
+      command: [sh, -c]
+      args:
+      - |
+        echo "📢 Notifying Slack..."
+        SLACK_WEBHOOK=$(cat /etc/slack-webhook/url)
+        
+        curl -X POST $SLACK_WEBHOOK \
+          -H 'Content-type: application/json' \
+          -d '{
+            "text": "GraphQL Gateway Created! 🎉",
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "*GraphQL Gateway Repository Created*\n\n*Repository:* <https://github.com/shlapolosa/{{workflow.parameters.repository-name}}|{{workflow.parameters.repository-name}}>\n*Gateway:* {{workflow.parameters.gateway-name}}\n*Container:* {{workflow.parameters.app-container}}\n*Namespace:* {{workflow.parameters.namespace}}"
+                }
+              }
+            ]
+          }'
+      volumeMounts:
+      - name: slack-webhook
+        mountPath: /etc/slack-webhook
+
+  volumes:
+  - name: workspace
+    emptyDir: {}
+  - name: github-token
+    secret:
+      secretName: github-token
+  - name: docker-secret
+    secret:
+      secretName: docker-registry-creds
+  - name: slack-webhook
+    secret:
+      secretName: slack-webhook-secret

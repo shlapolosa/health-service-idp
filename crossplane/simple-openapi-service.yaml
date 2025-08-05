@@ -1,0 +1,35 @@
+---
+# Simple OpenAPI Service for GraphQL Federation Testing
+# Uses swaggerapi/petstore which has a proper OpenAPI spec
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: petstore-api-service
+  namespace: default
+  labels:
+    app.kubernetes.io/name: petstore-api-service
+    app.kubernetes.io/component: openapi-service
+    app.kubernetes.io/part-of: graphql-federation-test
+    app.kubernetes.io/managed-by: kubevela
+spec:
+  components:
+  - name: petstore-api
+    type: webservice
+    properties:
+      # Swagger Petstore provides OpenAPI spec at /v2/swagger.json
+      image: swaggerapi/petstore:latest
+      ports:
+      - port: 8080
+        expose: true
+      env:
+      - name: SWAGGER_HOST
+        value: "petstore-api"
+      - name: SWAGGER_BASE_PATH
+        value: "/v2"
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "100m"
+        limits:
+          memory: "256Mi"  
+          cpu: "200m"

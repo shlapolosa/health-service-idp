@@ -43,7 +43,7 @@ generate_service_prefix() {
 
 # Main discovery process
 echo "📊 Discovering Knative services"
-echo "Selector: ${SERVICE_SELECTOR}"
+echo "Selector: \"$SERVICE_SELECTOR\""
 echo "Namespace: ${NAMESPACE}"
 
 # Parse service selector JSON to kubectl label selector format

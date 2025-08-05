@@ -1,0 +1,35 @@
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: test-graphql-gateway
+  namespace: default
+  labels:
+    app.kubernetes.io/name: test-graphql-gateway
+    app.kubernetes.io/component: graphql-gateway
+    app.kubernetes.io/managed-by: kubevela
+spec:
+  components:
+  - name: api-gateway
+    type: graphql-gateway
+    properties:
+      gatewayImage: docker.io/socrates12345/graphql-mesh-gateway:production
+      serviceSelector:
+        app.kubernetes.io/managed-by: kubevela
+      autoSchema: true
+      schemaRefreshInterval: "5m"
+      exposeIntrospection: false
+      exposePlayground: true
+      enableCors: true
+      resources:
+        cpu: "500m"
+        memory: "512Mi"
+      version: "latest"
+      environment:
+        NODE_ENV: "production"
+    # traits:
+    # - type: ingress
+    #   properties:
+    #     domain: test-graphql-gateway.local
+    #     http:
+    #       "/":
+    #         port: 8080

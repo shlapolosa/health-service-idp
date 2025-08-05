@@ -1,0 +1,20 @@
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: test-simple-gateway
+  namespace: default
+  labels:
+    app.kubernetes.io/name: test-simple-gateway
+    app.kubernetes.io/managed-by: kubevela
+spec:
+  components:
+  - name: httpbin-service
+    type: webservice
+    properties:
+      image: kennethreitz/httpbin:latest 
+      ports:
+      - port: 80
+        expose: true
+      resources:
+        cpu: "200m"
+        memory: "256Mi"

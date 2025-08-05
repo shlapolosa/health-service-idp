@@ -1,0 +1,26 @@
+---
+# Proper OAM Application using webservice ComponentDefinition
+# Creates a REST API with OpenAPI spec that GraphQL gateway can discover
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: demo-rest-service
+  namespace: default
+  labels:
+    app.kubernetes.io/name: demo-rest-service
+    app.kubernetes.io/component: rest-api
+    app.kubernetes.io/part-of: graphql-federation-test
+spec:
+  components:
+  - name: simple-api
+    type: webservice
+    properties:
+      # Use httpbin which provides OpenAPI spec at /spec.json
+      image: kennethreitz/httpbin:latest
+      port: 80
+      version: "latest"
+      healthPath: "/get"
+      resources:
+        cpu: "100m"
+        memory: "128Mi"
+      environment: {}
