@@ -192,6 +192,115 @@ spec:
           }
         }
         
+        // Optional output: Istio Gateway for external access
+        if parameter.enableIstioGateway != _|_ && parameter.enableIstioGateway == true {
+          outputs: "istio-gateway": {
+            apiVersion: "networking.istio.io/v1beta1"
+            kind:       "Gateway"
+            metadata: {
+              name:      context.name + "-gateway"
+              namespace: context.namespace
+              annotations: {
+                // Multi-cluster deployment support
+                if parameter.targetEnvironment != _|_ {
+                  "app.oam.dev/cluster": parameter.targetEnvironment
+                }
+                "graphql-gateway.oam.dev/component": context.name
+              }
+              labels: {
+                "app.kubernetes.io/name": context.name
+                "app.kubernetes.io/component": "istio-gateway"
+                "app.kubernetes.io/part-of": "graphql-platform"
+              }
+            }
+            spec: {
+              selector: {
+                istio: "ingressgateway"
+              }
+              servers: [{
+                port: {
+                  number:   80
+                  name:     "http"
+                  protocol: "HTTP"
+                }
+                hosts: [(*parameter.gatewayHost | context.name + ".local")]
+                if parameter.enableTLS == true {
+                  tls: {
+                    httpsRedirect: true
+                  }
+                }
+              }]
+              if parameter.enableTLS == true {
+                servers: [{
+                  port: {
+                    number:   80
+                    name:     "http"
+                    protocol: "HTTP"
+                  }
+                  hosts: [(*parameter.gatewayHost | context.name + ".local")]
+                  tls: {
+                    httpsRedirect: true
+                  }
+                }, {
+                  port: {
+                    number:   443
+                    name:     "https"
+                    protocol: "HTTPS"
+                  }
+                  hosts: [(*parameter.gatewayHost | context.name + ".local")]
+                  tls: {
+                    mode: "SIMPLE"
+                    credentialName: context.name + "-tls-secret"
+                  }
+                }]
+              }
+            }
+          }
+
+          outputs: "istio-virtualservice": {
+            apiVersion: "networking.istio.io/v1beta1"
+            kind:       "VirtualService"
+            metadata: {
+              name:      context.name + "-vs"
+              namespace: context.namespace
+              annotations: {
+                // Multi-cluster deployment support
+                if parameter.targetEnvironment != _|_ {
+                  "app.oam.dev/cluster": parameter.targetEnvironment
+                }
+                "graphql-gateway.oam.dev/component": context.name
+              }
+              labels: {
+                "app.kubernetes.io/name": context.name
+                "app.kubernetes.io/component": "istio-virtualservice"
+                "app.kubernetes.io/part-of": "graphql-platform"
+              }
+            }
+            spec: {
+              hosts: [(*parameter.gatewayHost | context.name + ".local")]
+              gateways: [context.name + "-gateway"]
+              http: [{
+                match: [{
+                  uri: {
+                    prefix: "/"
+                  }
+                }]
+                rewrite: {
+                  uri: "/"
+                }
+                route: [{
+                  destination: {
+                    host: context.name + "." + context.namespace + ".svc.cluster.local"
+                    port: {
+                      number: 80
+                    }
+                  }
+                }]
+              }]
+            }
+          }
+        }
+        
         // Optional: Repository Creation Workflow (when language specified - follows webservice pattern)
         if parameter.language != _|_ {
           outputs: {
@@ -394,6 +503,11 @@ spec:
           
           // Multi-cluster support
           targetEnvironment?: string  // vCluster deployment target
+          
+          // External access (optional)
+          enableIstioGateway?: bool
+          gatewayHost?: string
+          enableTLS?: bool
           
           // Configuration
           configMapName?: string  // ConfigMap name for gateway configuration
