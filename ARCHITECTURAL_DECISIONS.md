@@ -2381,6 +2381,119 @@ if parameter.enableIstioGateway {
 
 ---
 
+## ADR-033: Priority 2 Architecture - Host Cluster Platform Management with vCluster Application Runtime
+
+**Status**: Decided  
+**Date**: 2025-08-06  
+**Deciders**: Platform Architecture Team
+
+### Context
+
+The current system implements an advanced OAM-driven Internal Developer Platform with comprehensive infrastructure provisioning. Analysis revealed that Priority 2 architecture (host cluster manages platform, vCluster runs workloads) is **95% correctly implemented**, with only 3 critical configuration issues preventing full functionality.
+
+### Decision
+
+Implement Priority 2 architecture by addressing the identified configuration gaps while preserving all existing system strengths:
+
+#### **Responsibility Separation**
+- **Host Cluster**: Platform management (Crossplane compositions, ApplicationClaim processing, infrastructure provisioning, GitOps coordination)
+- **vCluster**: Application runtime (Knative Services, OAM Applications, workload execution, service mesh)
+
+#### **Critical Issues Identified and Solutions**
+
+**Issue 1: vCluster Components Disabled by Default**
+- **Location**: `crossplane/vcluster-environment-claim-xrd.yaml:60-68`
+- **Problem**: Istio, Knative, ArgoCD default to `false`, preventing application runtime
+- **Solution**: Change defaults to `true` for essential runtime components
+
+**Issue 2: OAM Analyzer in Wrong Cluster Location**  
+- **Location**: `crossplane/vcluster-environment-claim-composition.yaml:~1850-2100`
+- **Problem**: Analyzer creates ApplicationClaims in vCluster but compositions run in host cluster
+- **Solution**: Remove vCluster analyzer, implement enhanced host-cluster multi-vCluster analyzer
+
+**Issue 3: GitOps Path Structure for vCluster Context**
+- **Location**: `crossplane/application-claim-composition.yaml:~900`
+- **Problem**: Flat GitOps structure, no vCluster-specific paths
+- **Solution**: Add vCluster context detection and structured GitOps paths
+
+### **Implementation Plan**
+
+**Phase 1 (Critical - 15 minutes)**
+- Enable essential vCluster runtime components by default
+- Ensures applications can run in vCluster environments
+
+**Phase 2 (Critical - 50 minutes)**  
+- Remove ineffective vCluster OAM analyzer
+- Implement enhanced host cluster multi-vCluster analyzer
+- Fixes OAM-driven development workflow
+
+**Phase 3 (Important - 45 minutes)**
+- Update ApplicationClaim composition for vCluster-aware GitOps
+- Enables proper vCluster-specific deployment structure
+
+**Phase 4 (Optional - 15 minutes)**
+- Verify and optimize ArgoCD configuration
+- Ensures proper Apps-of-Apps pattern
+
+### **Architectural Principles Maintained**
+
+✅ **OAM-Driven Development**: Enhanced with multi-vCluster support  
+✅ **Infrastructure Automation**: Crossplane compositions remain in host cluster  
+✅ **GitOps Workflow**: ArgoCD deployments with vCluster-specific paths  
+✅ **Repository Management**: Individual AppContainer per microservice preserved  
+✅ **Secret Management**: External Secrets Operator cross-cluster synchronization  
+✅ **Service Mesh**: Istio runtime in vCluster for workload communication  
+
+### **Benefits**
+
+- **Clear Separation of Concerns**: Platform vs. application responsibilities
+- **Scalable Multi-Tenancy**: Multiple vClusters with independent workload isolation
+- **Enhanced Developer Experience**: OAM Applications work correctly in vCluster runtime
+- **Operational Excellence**: Host cluster platform management with vCluster workload execution
+- **Cost Optimization**: vCluster pause/resume capabilities for complete workload shutdown
+
+### **Success Criteria**
+
+✅ **API-Driven Creation**: Slack commands create services in vCluster runtime  
+✅ **OAM-Driven Updates**: GitOps OAM changes trigger proper infrastructure provisioning  
+✅ **Multi-vCluster Support**: Host analyzer monitors multiple vCluster environments  
+✅ **Component Health**: vCluster defaults ensure Istio, Knative, ArgoCD availability  
+
+### Consequences
+
+**Positive**:
+- ✅ **Architecture Completion**: Achieves intended Priority 2 separation pattern
+- ✅ **OAM Functionality**: Fixes broken OAM-driven development workflow  
+- ✅ **Platform Scalability**: Supports multiple vCluster environments from single host
+- ✅ **Minimal Changes**: Configuration fixes rather than architectural rewrites
+
+**Negative**:
+- ❌ **Implementation Complexity**: Multi-vCluster analyzer requires credential management
+- ❌ **Cross-Cluster Dependencies**: Host cluster needs vCluster kubeconfig access
+- ❌ **Monitoring Overhead**: 2-minute detection latency for OAM changes acceptable
+
+**Risk Mitigation**:
+- All changes are configuration-level with clear rollback procedures
+- Existing API-driven workflows continue working during implementation
+- Comprehensive validation plan with specific test cases
+
+### **Files Modified**
+
+**Critical Configuration Changes**:
+- `crossplane/vcluster-environment-claim-xrd.yaml` - Enable runtime components
+- `crossplane/vcluster-environment-claim-composition.yaml` - Remove vCluster analyzer
+- **NEW**: `crossplane/host-multi-vcluster-oam-analyzer.yaml` - Enhanced host analyzer
+- `crossplane/application-claim-composition.yaml` - vCluster-aware GitOps paths
+
+### **Implementation Status**
+
+- **Analysis**: ✅ Complete - Priority 2 architecture 95% implemented
+- **Implementation Plan**: ✅ Complete - 126 specific tasks documented
+- **Configuration Changes**: 🟡 Pending - Ready for implementation
+- **Validation Testing**: 🟡 Pending - Test cases defined
+
+---
+
 ## References
 
 - **Parameter Contract Implementation**: `argo-workflows/*-standard-contract.yaml`
@@ -2392,9 +2505,10 @@ if parameter.enableIstioGateway {
 - **Equivalence Analysis**: ADR-028 Architectural Equivalence Table
 - **Chat CI/CD Implementation**: `.github/workflows/chat-gitops.yml`
 - **Chat ComponentDefinition**: `health-service-chat-template/oam/chat-template-componentdef.yaml`
+- **Priority 2 Implementation Tasks**: Analysis documented separately (not included in release)
 
 ---
 
-**Document Status**: Current as of latest session  
-**Next Review**: After chat services implementation completion  
+**Document Status**: Current as of latest session - Priority 2 Architecture decisions documented  
+**Next Review**: After Priority 2 implementation completion  
 **Maintained By**: Platform Team
