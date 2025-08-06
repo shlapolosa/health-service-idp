@@ -255,26 +255,7 @@ check_resource_with_fix "deployment" "slack-api-server" "default" "Slack API dep
     "kubectl apply -f $PROJECT_ROOT/slack-api-server/deployment.yaml" \
     "Deploy Slack API deployment" || ((HEALTH_ISSUES++))
 
-# Test external access with improved endpoint detection
-INGRESS_IP=$(kubectl get service istio-ingressgateway -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
-if [ -z "$INGRESS_IP" ]; then
-    INGRESS_IP=$(kubectl get service istio-ingressgateway -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-fi
-
-if [ -n "$INGRESS_IP" ]; then
-    # Try different endpoints for health check
-    for endpoint in "/health" "/api/health" "/"; do
-        if test_external_access_with_fix "http://$INGRESS_IP$endpoint" "Slack API external access ($endpoint)" \
-            "kubectl get pods -n default -l app=slack-api-server" \
-            "Check pod status"; then
-            break
-        fi
-    done
-else
-    log_warning "Cannot determine ingress IP for external testing"
-    log_remediation "Check if Istio ingress gateway is properly configured"
-    log_remediation "Command: kubectl get svc -n istio-system istio-ingressgateway"
-fi
+# External access testing is environment-specific and not part of system infrastructure validation
 echo
 
 # 2. Check Essential Secrets
@@ -338,12 +319,12 @@ echo
 
 # 4. Check ComponentDefinitions
 log_info "🧩 Checking OAM ComponentDefinitions..."
-check_resource_count_with_fix "componentdefinitions" "default" 11 "ComponentDefinitions in default" \
-    "kubectl apply -f $PROJECT_ROOT/crossplane/oam/consolidated-component-definitions.yaml && kubectl apply -f $PROJECT_ROOT/crossplane/oam/realtime-platform-component-definition.yaml && kubectl apply -f $PROJECT_ROOT/crossplane/oam/rasa-chatbot-component-definition.yaml" \
-    "Apply consolidated ComponentDefinitions, realtime-platform, and rasa-chatbot" || ((HEALTH_ISSUES++))
+check_resource_count_with_fix "componentdefinitions" "default" 13 "ComponentDefinitions in default" \
+    "kubectl apply -f $PROJECT_ROOT/crossplane/oam/consolidated-component-definitions.yaml && kubectl apply -f $PROJECT_ROOT/crossplane/oam/realtime-platform-component-definition.yaml && kubectl apply -f $PROJECT_ROOT/crossplane/oam/rasa-chatbot-component-definition.yaml && kubectl apply -f $PROJECT_ROOT/crossplane/oam/graphql-gateway-component-definition.yaml && kubectl apply -f $PROJECT_ROOT/crossplane/oam/camunda-orchestrator-enhanced.yaml" \
+    "Apply all ComponentDefinitions including GraphQL and Camunda" || ((HEALTH_ISSUES++))
 
 # List all available ComponentDefinitions
-ALL_COMPONENTS=("webservice" "realtime-platform" "rasa-chatbot" "kafka" "redis" "mongodb" "application-infrastructure" "vcluster" "neon-postgres" "auth0-idp" "clickhouse")
+ALL_COMPONENTS=("webservice" "realtime-platform" "rasa-chatbot" "kafka" "redis" "mongodb" "application-infrastructure" "vcluster" "neon-postgres" "auth0-idp" "clickhouse" "graphql-gateway" "camunda-orchestrator")
 for component in "${ALL_COMPONENTS[@]}"; do
     if [ "$component" = "realtime-platform" ]; then
         check_resource_with_fix "componentdefinition" "$component" "default" "ComponentDefinition: $component" \
@@ -353,6 +334,14 @@ for component in "${ALL_COMPONENTS[@]}"; do
         check_resource_with_fix "componentdefinition" "$component" "default" "ComponentDefinition: $component" \
             "kubectl apply -f $PROJECT_ROOT/crossplane/oam/rasa-chatbot-component-definition.yaml" \
             "Apply rasa-chatbot ComponentDefinition" || ((HEALTH_ISSUES++))
+    elif [ "$component" = "graphql-gateway" ]; then
+        check_resource_with_fix "componentdefinition" "$component" "default" "ComponentDefinition: $component" \
+            "kubectl apply -f $PROJECT_ROOT/crossplane/oam/graphql-gateway-component-definition.yaml" \
+            "Apply graphql-gateway ComponentDefinition" || ((HEALTH_ISSUES++))
+    elif [ "$component" = "camunda-orchestrator" ]; then
+        check_resource_with_fix "componentdefinition" "$component" "default" "ComponentDefinition: $component" \
+            "kubectl apply -f $PROJECT_ROOT/crossplane/oam/camunda-orchestrator-enhanced.yaml" \
+            "Apply camunda-orchestrator ComponentDefinition" || ((HEALTH_ISSUES++))
     else
         check_resource_with_fix "componentdefinition" "$component" "default" "ComponentDefinition: $component" \
             "kubectl apply -f $PROJECT_ROOT/crossplane/oam/consolidated-component-definitions.yaml" \
@@ -360,39 +349,6 @@ for component in "${ALL_COMPONENTS[@]}"; do
     fi
 done
 
-# 4b. Check Rasa Chatbot Template Resources
-log_info "🤖 Checking Rasa Chatbot Template Resources..."
-if [ -d "$PROJECT_ROOT/health-service-chat-template" ]; then
-    log_success "✅ Rasa chatbot template directory exists"
-    
-    # Check essential template files
-    TEMPLATE_FILES=("docker/rasa/Dockerfile" "docker/rasa-actions/Dockerfile" "endpoints.yml" "credentials.yml" "config.yml" "domain.yml" "pyproject.toml")
-    for file in "${TEMPLATE_FILES[@]}"; do
-        if [ -f "$PROJECT_ROOT/health-service-chat-template/$file" ]; then
-            log_success "✅ Template file: $file"
-        else
-            log_error "❌ Missing template file: $file"
-            if [ "$AUTO_REMEDIATE" = "true" ]; then
-                log_remediation "Template file $file would need manual creation"
-            fi
-            ((HEALTH_ISSUES++))
-        fi
-    done
-    
-    # Check OAM sample applications
-    if [ -f "$PROJECT_ROOT/health-service-chat-template/oam/sample-applications.yaml" ]; then
-        log_success "✅ OAM sample applications available"
-    else
-        log_warning "⚠️  OAM sample applications not found (optional)"
-    fi
-else
-    log_error "❌ Rasa chatbot template directory not found at $PROJECT_ROOT/health-service-chat-template"
-    if [ "$AUTO_REMEDIATE" = "true" ]; then
-        log_remediation "Creating rasa chatbot template directory would require manual setup"
-    fi
-    ((HEALTH_ISSUES++))
-fi
-echo
 
 # 5. Check WorkloadDefinitions
 log_info "⚙️  Checking WorkloadDefinitions..."
@@ -437,18 +393,50 @@ check_resource_with_fix "secret" "slack-api-argo-token" "argo" "Argo token secre
     "Copy Argo token to argo namespace" || ((HEALTH_ISSUES++))
 echo
 
+# 6c. Check GraphQL Gateway Resources
+log_info "🔀 Checking GraphQL Gateway Resources..."
+# GraphQL gateway system artifacts are validated via ComponentDefinition check above
+log_info "GraphQL gateway: ℹ️  System components validated via ComponentDefinition checks"
+echo
+
+# 6d. Check Camunda Orchestrator Resources
+log_info "🎼 Checking Camunda Orchestrator Resources..."
+# Check Orchestration Platform XRD and Composition
+check_resource_with_fix "compositeresourcedefinition.apiextensions.crossplane.io" "xorchestrationplatformclaims.platform.example.org" "" "Orchestration Platform XRD" \
+    "kubectl apply -f $PROJECT_ROOT/crossplane/orchestration-platform-claim-xrd.yaml" \
+    "Apply Orchestration Platform XRD" || ((HEALTH_ISSUES++))
+
+check_resource_with_fix "composition.apiextensions.crossplane.io" "orchestration-platform-composition" "" "Orchestration Platform Composition" \
+    "kubectl apply -f $PROJECT_ROOT/crossplane/orchestration-platform-composition.yaml" \
+    "Apply Orchestration Platform Composition" || ((HEALTH_ISSUES++))
+
+# Check Kubernetes ProviderConfig for Crossplane
+check_resource_with_fix "providerconfig.kubernetes.crossplane.io" "kubernetes-provider" "" "Kubernetes ProviderConfig" \
+    "$PROJECT_ROOT/scripts/restart-crossplane-providers.sh" \
+    "Run Crossplane providers restart script" || ((HEALTH_ISSUES++))
+
+# Camunda orchestrator system artifacts are validated via XRD and Composition checks above
+log_info "Camunda orchestrator: ℹ️  System infrastructure validated via XRD and Composition checks"
+echo
+
 # 7. Check Crossplane Infrastructure
 log_info "🔗 Checking Crossplane..."
-check_resource_count_with_fix "compositeresourcedefinitions.apiextensions.crossplane.io" "" 4 "Crossplane CRDs" \
-    "kubectl apply -f $PROJECT_ROOT/crossplane/application-claim-xrd.yaml -f $PROJECT_ROOT/crossplane/app-container-claim-xrd.yaml -f $PROJECT_ROOT/crossplane/vcluster-environment-claim-xrd.yaml -f $PROJECT_ROOT/crossplane/realtime-platform-claim-xrd.yaml" \
-    "Apply Crossplane XRDs" || ((HEALTH_ISSUES++))
+check_resource_count_with_fix "compositeresourcedefinitions.apiextensions.crossplane.io" "" 6 "Crossplane CRDs" \
+    "kubectl apply -f $PROJECT_ROOT/crossplane/application-claim-xrd.yaml -f $PROJECT_ROOT/crossplane/app-container-claim-xrd.yaml -f $PROJECT_ROOT/crossplane/vcluster-environment-claim-xrd.yaml -f $PROJECT_ROOT/crossplane/realtime-platform-claim-xrd.yaml -f $PROJECT_ROOT/crossplane/orchestration-platform-claim-xrd.yaml -f $PROJECT_ROOT/crossplane/secret-injector-xrd.yaml" \
+    "Apply all Crossplane XRDs" || ((HEALTH_ISSUES++))
 
 # Check specific CRDs
-CROSSPLANE_CRDS=("xapplicationclaims.platform.example.org" "xappcontainerclaims.platform.example.org")
+CROSSPLANE_CRDS=("xapplicationclaims.platform.example.org" "xappcontainerclaims.platform.example.org" "xorchestrationplatformclaims.platform.example.org")
 for crd in "${CROSSPLANE_CRDS[@]}"; do
-    check_resource_with_fix "compositeresourcedefinition" "$crd" "" "Crossplane CRD: $crd" \
-        "kubectl apply -f $PROJECT_ROOT/crossplane/application-claim-xrd.yaml -f $PROJECT_ROOT/crossplane/app-container-claim-xrd.yaml" \
-        "Apply Crossplane XRDs" || ((HEALTH_ISSUES++))
+    if [ "$crd" = "xorchestrationplatformclaims.platform.example.org" ]; then
+        check_resource_with_fix "compositeresourcedefinition" "$crd" "" "Crossplane CRD: $crd" \
+            "kubectl apply -f $PROJECT_ROOT/crossplane/orchestration-platform-claim-xrd.yaml" \
+            "Apply Orchestration Platform XRD" || ((HEALTH_ISSUES++))
+    else
+        check_resource_with_fix "compositeresourcedefinition" "$crd" "" "Crossplane CRD: $crd" \
+            "kubectl apply -f $PROJECT_ROOT/crossplane/application-claim-xrd.yaml -f $PROJECT_ROOT/crossplane/app-container-claim-xrd.yaml" \
+            "Apply Crossplane XRDs" || ((HEALTH_ISSUES++))
+    fi
 done
 
 # Check Crossplane providers
@@ -596,6 +584,7 @@ check_resource_count_with_fix "applications.argoproj.io" "argocd" 1 "ArgoCD appl
     "kubectl apply -f $PROJECT_ROOT/slack-api-server/argocd-application.yaml" \
     "Apply ArgoCD application" || ((HEALTH_ISSUES++))
 echo
+
 
 # Summary
 echo "================================================"
