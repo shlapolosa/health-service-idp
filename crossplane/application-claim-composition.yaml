@@ -838,6 +838,19 @@ spec:
                       git config user.name "ApplicationClaim OAM Updater"
                       git config user.email "applicationclaim@platform.local"
                       
+                      # Determine target vCluster from ApplicationClaim spec or annotation
+                      VCLUSTER_TARGET=$(kubectl get applicationclaim $SERVICE_NAME -o jsonpath='{.spec.targetVCluster}' 2>/dev/null || echo "")
+                      if [ -z "$VCLUSTER_TARGET" ]; then
+                        VCLUSTER_TARGET=$(kubectl get applicationclaim $SERVICE_NAME -o jsonpath='{.metadata.annotations.webservice\.oam\.dev/vcluster}' 2>/dev/null || echo "")
+                      fi
+                      if [ -z "$VCLUSTER_TARGET" ]; then
+                        VCLUSTER_TARGET="development-vcluster"
+                      fi
+                      echo "🎯 Target vCluster: $VCLUSTER_TARGET"
+                      
+                      # Create vCluster-specific directory structure
+                      mkdir -p vcluster/$VCLUSTER_TARGET/applications/$SERVICE_NAME
+                      
                       # Check if this is an API-driven ApplicationClaim (should update OAM)
                       # vs OAM-driven ApplicationClaim (should NOT update OAM to avoid circular dependency)
                       SOURCE="${BOOTSTRAP_SOURCE:-api-driven}"
@@ -942,9 +955,86 @@ spec:
                       echo "✅ Updated OAM Application:"
                       cat oam/applications/application.yaml
                       
+                      # Create vCluster-specific manifests
+                      echo "📁 Creating vCluster-specific manifests for $VCLUSTER_TARGET..."
+                      
+                      # Create ApplicationClaim for vCluster processing
+                      cat > vcluster/$VCLUSTER_TARGET/applications/$SERVICE_NAME/application-claim.yaml << EOF
+                      apiVersion: platform.example.org/v1alpha1
+                      kind: ApplicationClaim
+                      metadata:
+                        name: $SERVICE_NAME
+                        namespace: default
+                        annotations:
+                          webservice.oam.dev/source: "$BOOTSTRAP_SOURCE"
+                          webservice.oam.dev/processed-by: "host-cluster-composition"
+                      spec:
+                        appContainer: $APP_CONTAINER
+                        name: $SERVICE_NAME
+                        language: $LANGUAGE
+                        framework: $FRAMEWORK
+                        database: $DATABASE
+                        cache: $CACHE
+                      EOF
+                      
+                      # Create OAM Application for vCluster KubeVela processing
+                      cat > vcluster/$VCLUSTER_TARGET/applications/$SERVICE_NAME/oam-application.yaml << EOF
+                      apiVersion: core.oam.dev/v1beta1
+                      kind: Application
+                      metadata:
+                        name: $SERVICE_NAME-app
+                        namespace: default
+                      spec:
+                        components:
+                        - name: $SERVICE_NAME
+                          type: webservice
+                          properties:
+                            image: "docker.io/socrates12345/$SERVICE_NAME:latest"
+                            port: 8080
+                            healthPath: "/health"
+                            language: $LANGUAGE
+                            framework: $FRAMEWORK
+                      $(if [ "$DATABASE" != "none" ]; then
+                      echo "      database: $DATABASE
+                            envFrom:
+                            - secretRef:
+                                name: \"${SERVICE_NAME}-db-secret\""
+                      fi)
+                            environment:
+                              LOG_LEVEL: "INFO"
+                              AGENT_TYPE: "$SERVICE_NAME"
+                      EOF
+                      
+                      # Create ArgoCD Application for this service
+                      cat > vcluster/$VCLUSTER_TARGET/applications/$SERVICE_NAME/argocd-app.yaml << EOF
+                      apiVersion: argoproj.io/v1alpha1
+                      kind: Application
+                      metadata:
+                        name: $SERVICE_NAME
+                        namespace: argocd
+                      spec:
+                        project: default
+                        source:
+                          repoURL: https://github.com/$GITHUB_USER/$APP_CONTAINER-gitops
+                          targetRevision: main
+                          path: vcluster/$VCLUSTER_TARGET/applications/$SERVICE_NAME
+                          directory:
+                            include: '{application-claim.yaml,oam-application.yaml}'
+                        destination:
+                          server: https://kubernetes.default.svc
+                          namespace: default
+                        syncPolicy:
+                          automated:
+                            prune: true
+                            selfHeal: true
+                      EOF
+                      
+                      echo "✅ Created vCluster-specific manifests in vcluster/$VCLUSTER_TARGET/applications/$SERVICE_NAME/"
+                      
                       # Commit and push changes
                       git add oam/applications/application.yaml
-                      git commit -m "Add $SERVICE_NAME webservice component to OAM Application - Language $LANGUAGE Framework $FRAMEWORK Database $DATABASE Cache $CACHE - Generated by ApplicationClaim composition"
+                      git add vcluster/$VCLUSTER_TARGET/applications/$SERVICE_NAME/
+                      git commit -m "Add $SERVICE_NAME webservice component to OAM Application (Target: $VCLUSTER_TARGET, Lang: $LANGUAGE, Framework: $FRAMEWORK, DB: $DATABASE, Cache: $CACHE)"
                       
                       git push
                       
@@ -1317,3 +1407,149 @@ spec:
       fromFieldPath: metadata.namespace  
       toFieldPath: spec.forProvider.manifest.metadata.namespace
 
+
+  # Setup ArgoCD application for GitOps sync
+  - name: argocd-app-setup
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: placeholder
+              namespace: default
+            spec:
+              template:
+                spec:
+                  serviceAccountName: crossplane-github-provider
+                  restartPolicy: OnFailure
+                  containers:
+                  - name: argocd-setup
+                    image: argoproj/argocd:v2.8.4
+                    command:
+                    - /bin/sh
+                    - -c
+                    - |
+                      set -e
+                      echo "🔧 Setting up ArgoCD for $SERVICE_NAME..."
+                      
+                      # Wait for GitOps repo to be ready
+                      sleep 30
+                      
+                      # Direct kubectl approach (simpler for in-cluster)
+                      echo "📝 Creating ArgoCD Application via kubectl..."
+                      
+                      # Add repository secret for authentication
+                      echo "🔑 Creating repository secret..."
+                      cat <<EOFS | kubectl apply -f -
+                      apiVersion: v1
+                      kind: Secret
+                      metadata:
+                        name: repo-$APP_CONTAINER-gitops
+                        namespace: argocd
+                        labels:
+                          argocd.argoproj.io/secret-type: repository
+                      type: Opaque
+                      stringData:
+                        type: git
+                        url: https://github.com/$GITHUB_USER/$APP_CONTAINER-gitops
+                        username: $GITHUB_USER
+                        password: $GITHUB_TOKEN
+                      EOFS
+                      
+                      echo "✅ Repository secret created"
+                      
+                      # Determine target vCluster
+                      if [ -n "$TARGET_VCLUSTER" ] && [ "$TARGET_VCLUSTER" != "" ]; then
+                        echo "🎯 Deploying to vCluster: $TARGET_VCLUSTER"
+                        # For vCluster deployments, we need to register the vCluster first
+                        # The actual application will be applied to the vCluster once registered
+                        DEST_SERVER="https://kubernetes.default.svc"
+                        APP_PATH="vcluster/$TARGET_VCLUSTER/applications/$SERVICE_NAME"
+                      else
+                        echo "🎯 Deploying to default cluster"
+                        DEST_SERVER="https://kubernetes.default.svc"
+                        APP_PATH="apps"
+                      fi
+                      
+                      # Create ArgoCD Application
+                      cat <<EOFA | kubectl apply -f -
+                      apiVersion: argoproj.io/v1alpha1
+                      kind: Application
+                      metadata:
+                        name: $SERVICE_NAME-app
+                        namespace: argocd
+                        finalizers:
+                          - resources-finalizer.argocd.argoproj.io
+                      spec:
+                        project: default
+                        source:
+                          repoURL: https://github.com/$GITHUB_USER/$APP_CONTAINER-gitops
+                          targetRevision: main
+                          path: $APP_PATH
+                        destination:
+                          server: $DEST_SERVER
+                          namespace: $SERVICE_NAME
+                        syncPolicy:
+                          automated:
+                            prune: true
+                            selfHeal: true
+                          syncOptions:
+                            - CreateNamespace=true
+                      EOFA
+                      
+                      echo "✅ ArgoCD Application created"
+                      
+                      # Trigger initial sync
+                      echo "🔄 Triggering initial sync..."
+                      kubectl patch application $SERVICE_NAME-app -n argocd --type merge -p '{"operation":{"sync":{"revision":"HEAD"}}}' || echo "Sync triggered"
+                      
+                      echo "🎉 ArgoCD setup completed for $SERVICE_NAME"
+                      echo "📊 Application will be synced to namespace: $SERVICE_NAME"
+                      echo "🔗 Repository: https://github.com/$GITHUB_USER/$APP_CONTAINER-gitops"
+                    env:
+                    - name: SERVICE_NAME
+                      value: "placeholder"
+                    - name: APP_CONTAINER
+                      value: "placeholder"
+                    - name: TARGET_VCLUSTER
+                      value: "placeholder"
+                    - name: GITHUB_TOKEN
+                      valueFrom:
+                        secretKeyRef:
+                          name: github-credentials
+                          key: token
+                    - name: GITHUB_USER
+                      valueFrom:
+                        secretKeyRef:
+                          name: github-credentials
+                          key: user
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-argocd-setup"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-argocd-setup"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[0].value
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.appContainer
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[1].value
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.targetVCluster
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[2].value

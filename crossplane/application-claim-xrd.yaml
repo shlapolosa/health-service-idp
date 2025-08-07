@@ -78,6 +78,10 @@ spec:
                 description: References a realtime-platform component name for automatic integration
                 pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
                 maxLength: 63
+              targetVCluster:
+                type: string
+                description: Target vCluster name for deployment (if not specified, uses default or creates new)
+                maxLength: 63
               websocket:
                 type: boolean
                 description: Whether to enable WebSocket endpoints for real-time communication

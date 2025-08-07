@@ -233,6 +233,25 @@ spec:
           - name: notification-type
             value: "progress"
         when: "{{steps.ensure-repositories.status}} == Succeeded"
+    - - name: ensure-target-vcluster
+        template: ensure-target-vcluster
+        arguments:
+          parameters:
+          - name: target-vcluster
+            value: "{{inputs.parameters.target-vcluster}}"
+          - name: auto-create-dependencies
+            value: "{{inputs.parameters.auto-create-dependencies}}"
+          - name: namespace
+            value: "{{inputs.parameters.namespace}}"
+          - name: user
+            value: "{{inputs.parameters.user}}"
+          - name: slack-channel
+            value: "{{inputs.parameters.slack-channel}}"
+          - name: slack-user-id
+            value: "{{inputs.parameters.slack-user-id}}"
+        when: "{{steps.ensure-repositories.status}} == Succeeded"
+        continueOn:
+          failed: false
     - - name: create-microservice-claim
         template: create-microservice-claim
         arguments:
@@ -253,6 +272,8 @@ spec:
             value: "{{inputs.parameters.microservice-cache}}"
           - name: microservice-expose-api
             value: "{{inputs.parameters.microservice-expose-api}}"
+          - name: target-vcluster
+            value: "{{inputs.parameters.target-vcluster}}"
           - name: user
             value: "{{inputs.parameters.user}}"
           - name: slack-channel
@@ -538,6 +559,7 @@ spec:
       - name: microservice-database
       - name: microservice-cache
       - name: microservice-expose-api
+      - name: target-vcluster
       - name: user
       - name: slack-channel
       - name: repository-name
@@ -593,6 +615,7 @@ spec:
             parameter-contract: "compliant"
             created-at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
             webservice.oam.dev/source: "api-driven"
+            webservice.oam.dev/vcluster: "{{inputs.parameters.target-vcluster}}"
         spec:
           name: {{inputs.parameters.resource-name}}
           language: "{{inputs.parameters.microservice-language}}"
@@ -601,6 +624,7 @@ spec:
           cache: "{{inputs.parameters.microservice-cache}}"
           exposeApi: $EXPOSE_API
           appContainer: "$REPO_NAME"
+          targetVCluster: "{{inputs.parameters.target-vcluster}}"
         EOF
         
         if [ $? -eq 0 ]; then
@@ -1029,3 +1053,113 @@ spec:
         echo "📦 AppContainer will create both source and GitOps repositories"
         echo "📁 Microservice will be added to microservices/ folder structure"
 
+
+
+  # =============================================================================
+  # VCLUSTER MANAGEMENT
+  # =============================================================================
+  - name: ensure-target-vcluster
+    inputs:
+      parameters:
+      - name: target-vcluster
+      - name: auto-create-dependencies
+      - name: namespace
+      - name: user
+      - name: slack-channel
+      - name: slack-user-id
+    script:
+      image: bitnami/kubectl:1.28
+      command: [sh]
+      source: |
+        echo "🔍 Checking if target vCluster exists: {{inputs.parameters.target-vcluster}}"
+        
+        # Skip if no target vCluster specified
+        if [ -z "{{inputs.parameters.target-vcluster}}" ] || [ "{{inputs.parameters.target-vcluster}}" = "" ]; then
+          echo "ℹ️ No target vCluster specified, will use default deployment"
+          exit 0
+        fi
+        
+        VCLUSTER_NAME="{{inputs.parameters.target-vcluster}}"
+        AUTO_CREATE="{{inputs.parameters.auto-create-dependencies}}"
+        
+        # Check if vCluster namespace exists
+        if kubectl get namespace "$VCLUSTER_NAME" >/dev/null 2>&1; then
+          echo "✅ vCluster namespace exists: $VCLUSTER_NAME"
+          
+          # Check if vCluster is actually running using vcluster CLI
+          if kubectl get statefulset "$VCLUSTER_NAME" -n "$VCLUSTER_NAME" >/dev/null 2>&1; then
+            echo "✅ vCluster is running: $VCLUSTER_NAME"
+            exit 0
+          fi
+        fi
+        
+        # Check if auto-create is enabled
+        if [ "$AUTO_CREATE" \!= "true" ]; then
+          echo "❌ Target vCluster '$VCLUSTER_NAME' does not exist and auto-create is disabled"
+          echo "Please create the vCluster first or enable auto-create-dependencies"
+          exit 1
+        fi
+        
+        echo "📦 vCluster '$VCLUSTER_NAME' not found, creating it..."
+        
+        # Create VClusterEnvironmentClaim to trigger vCluster creation
+        cat <<EOFVC | kubectl apply -f -
+        apiVersion: platform.example.org/v1alpha1
+        kind: VClusterEnvironmentClaim
+        metadata:
+          name: $VCLUSTER_NAME
+          namespace: {{inputs.parameters.namespace}}
+          labels:
+            created-by: "microservice-standard-contract"
+            created-for: "microservice-deployment"
+            requested-by: "{{inputs.parameters.user}}"
+            environment: "development"
+            managed-by: "platform"
+          annotations:
+            description: "vCluster for microservice deployment"
+            created-at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            capabilities.knative: "true"
+            capabilities.istio: "true"
+            capabilities.observability: "true"
+        spec:
+          name: $VCLUSTER_NAME
+        EOFVC
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ VClusterEnvironmentClaim created, waiting for vCluster to be ready..."
+          
+          # Wait for vCluster to be created (up to 5 minutes)
+          TIMEOUT=300
+          ELAPSED=0
+          
+          while [ $ELAPSED -lt $TIMEOUT ]; do
+            echo "Checking vCluster status... (${ELAPSED}s/${TIMEOUT}s)"
+            
+            # Check if namespace exists
+            if kubectl get namespace "$VCLUSTER_NAME" >/dev/null 2>&1; then
+              # Check if StatefulSet is ready
+              if kubectl get statefulset "$VCLUSTER_NAME" -n "$VCLUSTER_NAME" >/dev/null 2>&1; then
+                READY_REPLICAS=$(kubectl get statefulset "$VCLUSTER_NAME" -n "$VCLUSTER_NAME" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+                if [ "$READY_REPLICAS" -ge "1" ]; then
+                  echo "✅ vCluster '$VCLUSTER_NAME' is ready\!"
+                  
+                  # Check for Knative installation
+                  echo "🔍 Verifying Knative installation in vCluster..."
+                  sleep 10  # Give vCluster time to sync
+                  
+                  exit 0
+                fi
+              fi
+            fi
+            
+            sleep 15
+            ELAPSED=$((ELAPSED + 15))
+          done
+          
+          echo "⚠️ vCluster creation is taking longer than expected"
+          echo "The microservice deployment will continue, but the vCluster might not be fully ready"
+          exit 0
+        else
+          echo "❌ Failed to create VClusterEnvironmentClaim"
+          exit 1
+        fi

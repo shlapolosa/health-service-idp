@@ -50,42 +50,9 @@ spec:
                     type: string
                     description: AWS region for VPC resources. If not provided, uses provider region.
                     nullable: true
-              components:
-                type: object
-                description: Optional components to install in the vCluster environment
-                properties:
-                  istio:
-                    type: boolean
-                    description: Install Istio service mesh for advanced networking and security
-                    default: false
-                  knativeServing:
-                    type: boolean
-                    description: Install Knative Serving for serverless applications (requires Istio)
-                    default: false
-                  argoCD:
-                    type: boolean
-                    description: Install ArgoCD for GitOps deployments
-                    default: false
-                  grafana:
-                    type: boolean
-                    description: Install Grafana for metrics visualization
-                    default: false
-                  prometheus:
-                    type: boolean
-                    description: Install Prometheus for metrics collection
-                    default: false
-                  jaeger:
-                    type: boolean
-                    description: Install Jaeger for distributed tracing
-                    default: false
-                  kiali:
-                    type: boolean
-                    description: Install Kiali for service mesh observability
-                    default: false
-                  apiGateway:
-                    type: boolean
-                    description: Create AWS API Gateway integration for external access
-                    default: false
+              # Note: In Priority 2 architecture, components field is not used
+              # All infrastructure (Istio, Knative, ArgoCD) runs in host cluster
+              # vClusters are lightweight and only run workloads that sync to host
             required:
             - name
           status:
@@ -115,68 +82,7 @@ spec:
                   token:
                     type: string
                     description: Service account token for API access
-              components:
-                type: object
-                description: Status of installed optional components
-                properties:
-                  istio:
-                    type: object
-                    properties:
-                      ready:
-                        type: boolean
-                      endpoint:
-                        type: string
-                      version:
-                        type: string
-                  knativeServing:
-                    type: object
-                    properties:
-                      ready:
-                        type: boolean
-                      endpoint:
-                        type: string
-                      version:
-                        type: string
-                  argoCD:
-                    type: object
-                    properties:
-                      ready:
-                        type: boolean
-                      endpoint:
-                        type: string
-                  grafana:
-                    type: object
-                    properties:
-                      ready:
-                        type: boolean
-                      endpoint:
-                        type: string
-                  prometheus:
-                    type: object
-                    properties:
-                      ready:
-                        type: boolean
-                      endpoint:
-                        type: string
-                  jaeger:
-                    type: object
-                    properties:
-                      ready:
-                        type: boolean
-                      endpoint:
-                        type: string
-                  kiali:
-                    type: object
-                    properties:
-                      ready:
-                        type: boolean
-                      endpoint:
-                        type: string
-                  apiGatewaySupport:
-                    type: object
-                    properties:
-                      ready:
-                        type: boolean
+              # Components status removed - not used in Priority 2 architecture
               apiGateway:
                 type: object
                 description: AWS API Gateway integration status
