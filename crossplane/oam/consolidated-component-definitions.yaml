@@ -10,6 +10,7 @@
 # - graphql-gateway: Auto-discovering GraphQL API aggregation with Hasura
 # - realtime-platform: Complete streaming infrastructure with Kafka/MQTT
 # - rasa-chatbot: Dual-container chatbot with Rasa + Actions
+# - identity-service: Domain-specific Spring Boot identity services via Argo Workflows
 # - kafka/redis/mongodb: Direct infrastructure components via Helm
 # - application-infrastructure: Complex application setup via Claims
 # - vcluster: Virtual Kubernetes environments
@@ -1139,3 +1140,147 @@ spec:
           targetEnvironment?: string  // vCluster deployment target
         }
 
+---
+# Identity Service ComponentDefinition
+# Generates domain-specific Spring Boot identity services via Argo Workflows
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: identity-service
+  annotations:
+    definition.oam.dev/description: "Domain-specific identity and access management service generator using Spring Boot templates"
+spec:
+  workload:
+    definition:
+      apiVersion: argoproj.io/v1alpha1
+      kind: Workflow
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "argoproj.io/v1alpha1"
+          kind: "Workflow"
+          metadata: {
+            generateName: context.name + "-identity-gen-"
+            namespace: context.namespace
+            labels: {
+              "app.kubernetes.io/name": context.name
+              "app.kubernetes.io/component": "identity-service"
+              "app.kubernetes.io/managed-by": "oam"
+              "identity.platform/domain": parameter.domain
+            }
+          }
+          spec: {
+            serviceAccountName: "argo-workflow"
+            workflowTemplateRef: {
+              name: "identity-service-generator"
+            }
+            arguments: {
+              parameters: [
+                {name: "domain", value: parameter.domain},
+                {name: "repo-name", value: context.name + "-identity-service"},
+                {name: "app-name", value: context.name},
+                {name: "github-owner", value: parameter.githubOwner}
+              ]
+            }
+          }
+        }
+        
+        outputs: {
+          // Create ConfigMap with service metadata for other components to discover
+          "service-metadata": {
+            apiVersion: "v1"
+            kind: "ConfigMap"
+            metadata: {
+              name: context.name + "-identity-metadata"
+              namespace: context.namespace
+              labels: {
+                "app.kubernetes.io/name": context.name
+                "app.kubernetes.io/component": "identity-service"
+                "identity.platform/domain": parameter.domain
+              }
+            }
+            data: {
+              "domain": parameter.domain
+              "repository": parameter.githubOwner + "/" + context.name + "-identity-service"
+              "language": "java"
+              "framework": "spring-boot"
+              "profiles": parameter.domain == "healthcare" ? "Patient,Physician,Nurse,Administrator" :
+                         parameter.domain == "financial" ? "Customer,Banker,ComplianceOfficer,Auditor" :
+                         parameter.domain == "education" ? "Student,Teacher,Parent,Administrator" :
+                         "BaseUser"
+              "compliance": parameter.domain == "healthcare" ? "HIPAA,HITECH,GDPR" :
+                           parameter.domain == "financial" ? "PCI-DSS,SOX,AML-KYC,FATCA" :
+                           parameter.domain == "education" ? "FERPA,COPPA,IDEA" :
+                           "GDPR"
+              "integrations": parameter.domain == "healthcare" ? "fhir,hl7,kafka" :
+                             parameter.domain == "financial" ? "kyc,credit-bureau,kafka" :
+                             parameter.domain == "education" ? "lms,sis,kafka" :
+                             "kafka"
+            }
+          }
+          
+          // Create placeholder Service for future deployment
+          "service-placeholder": {
+            apiVersion: "v1"
+            kind: "Service"
+            metadata: {
+              name: context.name + "-identity"
+              namespace: context.namespace
+              labels: {
+                "app.kubernetes.io/name": context.name
+                "app.kubernetes.io/component": "identity-service"
+                "identity.platform/domain": parameter.domain
+              }
+              annotations: {
+                "identity.platform/repository": parameter.githubOwner + "/" + context.name + "-identity-service"
+                "identity.platform/status": "pending-generation"
+              }
+            }
+            spec: {
+              type: "ClusterIP"
+              selector: {
+                "app.kubernetes.io/name": context.name + "-identity"
+              }
+              ports: [{
+                name: "http"
+                port: 8080
+                targetPort: 8080
+                protocol: "TCP"
+              }]
+            }
+          }
+        }
+        
+        parameter: {
+          // Domain selection - determines profiles, integrations, and compliance
+          domain: "healthcare" | "financial" | "education"
+          
+          // GitHub configuration
+          githubOwner: *"shlapolosa" | string
+          
+          // Future expansion parameters (not used in MVP)
+          customProfiles?: [...string]
+          additionalIntegrations?: [...string]
+          javaVersion?: *"21" | string
+          springBootVersion?: *"3.2.0" | string
+          
+          // Database configuration (for future auto-provisioning)
+          database?: *{
+            type: "postgresql"
+            provision: true
+          } | {
+            type: string
+            provision: bool
+          }
+          
+          // Redis configuration (for future auto-provisioning)
+          redis?: *{
+            enabled: true
+            provision: true
+          } | {
+            enabled: bool
+            provision: bool
+          }
+        }
+EOF < /dev/null
