@@ -40,6 +40,58 @@ The project evolved from simple workflow templates to a sophisticated, standardi
 
 ---
 
+### ADR-034: Identity Service Template Integration via Argo Workflows
+**Date**: 2025-08-07
+**Status**: Approved
+**Context**: Need to integrate identity-service-template (Spring Boot Java) with OAM platform
+
+**Problem**: The identity-service-template uses a shell script (instantiate.sh) to generate complex Spring Boot applications with domain-specific profiles (healthcare, financial, education). Need to integrate this with OAM ComponentDefinition pattern.
+
+**Options Considered**:
+1. **GitHub Actions**: Trigger generation via GitHub workflow
+2. **Pure CUE Translation**: Convert entire template to CUE 
+3. **Pre-generated Snapshots**: Store generated code in ComponentDefinition
+4. **Argo Workflows**: Use existing Argo infrastructure for generation
+
+**Decision**: Use Argo Workflows (Option 4)
+
+**Rationale**:
+- **Infrastructure Reuse**: Argo Workflows already deployed and operational
+- **Observability**: Full visibility into generation process via Argo UI
+- **Error Handling**: Built-in retry, backoff, and failure cleanup
+- **Resource Control**: Can limit CPU/memory for Java generation
+- **Evolution Path**: Easy to add validation, testing steps later
+- **Debugging**: Clear logs and step-by-step execution visible
+- **Pattern Alignment**: While different from Rasa/GraphQL direct approach, still uses platform infrastructure
+
+**Implementation Design**:
+```yaml
+ComponentDefinition → Triggers Argo Workflow → Runs instantiate.sh → Pushes to GitHub
+```
+
+**Trade-offs**:
+- ✅ No changes to working identity-service-template
+- ✅ Full generation visibility and debugging
+- ✅ Resource limits and retry strategies
+- ✅ Can handle complex multi-step generation
+- ❌ Additional abstraction layer vs direct CUE
+- ❌ Different pattern from Rasa/GraphQL components
+- ❌ Requires container image maintenance
+
+**Mitigation**:
+- Hide Argo complexity in ComponentDefinition
+- User only sees simple domain selection
+- Document pattern difference clearly
+- Review after 10 services generated
+
+**Long-term Evolution**:
+- MVP: Argo wraps instantiate.sh as-is
+- V1: Add validation and testing steps
+- V2: Support custom profiles beyond presets
+- V3: Consider CUE translation if pattern proves problematic
+
+---
+
 ### Phase 2: Parameter Contract Design (Early Development)
 
 #### ADR-002: Four-Tier Parameter Architecture

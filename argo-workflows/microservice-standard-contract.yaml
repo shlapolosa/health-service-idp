@@ -211,6 +211,8 @@ spec:
             value: "{{inputs.parameters.slack-user-id}}"
           - name: repository-name
             value: "{{inputs.parameters.repository-name}}"
+          - name: target-vcluster
+            value: "{{inputs.parameters.target-vcluster}}"
         when: "{{steps.validate-parameters.status}} == Succeeded"
     - - name: notify-appcontainer-ready
         templateRef:
@@ -238,7 +240,7 @@ spec:
         arguments:
           parameters:
           - name: target-vcluster
-            value: "{{inputs.parameters.target-vcluster}}"
+            value: "{{steps.ensure-repositories.outputs.parameters.vcluster-name}}"
           - name: auto-create-dependencies
             value: "{{inputs.parameters.auto-create-dependencies}}"
           - name: namespace
@@ -273,7 +275,7 @@ spec:
           - name: microservice-expose-api
             value: "{{inputs.parameters.microservice-expose-api}}"
           - name: target-vcluster
-            value: "{{inputs.parameters.target-vcluster}}"
+            value: "{{steps.ensure-repositories.outputs.parameters.vcluster-name}}"
           - name: user
             value: "{{inputs.parameters.user}}"
           - name: slack-channel
@@ -503,6 +505,7 @@ spec:
       - name: slack-channel
       - name: slack-user-id
       - name: repository-name
+      - name: target-vcluster
     outputs:
       parameters:
       - name: repository-name
@@ -522,6 +525,8 @@ spec:
             value: "{{inputs.parameters.parent-appcontainer}}"
           - name: repository-name
             value: "{{inputs.parameters.repository-name}}"
+          - name: target-vcluster
+            value: "{{inputs.parameters.target-vcluster}}"
     - - name: create-or-update-appcontainer
         template: create-or-update-appcontainer
         arguments:
@@ -592,19 +597,14 @@ spec:
         # Use the repository name that was determined in ensure-repositories step
         REPO_NAME="{{inputs.parameters.repository-name}}"
         
-        # Determine target vCluster - use provided value or default to repository name
+        # Target vCluster has already been determined by determine-repository-name step
+        # and passed through ensure-repositories outputs
         TARGET_VCLUSTER="{{inputs.parameters.target-vcluster}}"
         
-        if [ -z "$TARGET_VCLUSTER" ] || [ "$TARGET_VCLUSTER" = "" ]; then
-          # Default to repository name (which already has the proper naming logic applied)
-          TARGET_VCLUSTER="$REPO_NAME"
-          echo "📦 No vCluster specified, defaulting to repository name: $TARGET_VCLUSTER"
-        else
-          echo "🎯 Using specified vCluster: $TARGET_VCLUSTER"
-        fi
-        
-        # Always set targetVCluster now that we have a default
+        # Always set targetVCluster (it's either specified or defaulted to repo name)
         VCLUSTER_SPEC="targetVCluster: \"$TARGET_VCLUSTER\""
+        
+        echo "🎯 Deploying to vCluster: $TARGET_VCLUSTER"
         
         # Create ApplicationClaim manifest that references the AppContainer
         cat <<EOF | kubectl apply -f -
@@ -982,6 +982,7 @@ spec:
       - name: resource-name
       - name: parent-appcontainer
       - name: repository-name
+      - name: target-vcluster
     outputs:
       parameters:
       - name: repository-name
@@ -994,7 +995,7 @@ spec:
       image: alpine:3.18
       command: [sh]
       source: |
-        echo "🔍 Determining repository name for microservice..."
+        echo "🔍 Determining repository and vCluster names..."
         
         # Use provided repository name or derive from microservice name
         if [ -n "{{inputs.parameters.repository-name}}" ] && [ "{{inputs.parameters.repository-name}}" != "" ]; then
@@ -1006,12 +1007,21 @@ spec:
           echo "✅ Auto-derived repository name: $REPOSITORY_NAME"
         fi
         
-        # Determine vCluster name for reference (but not used in creation)
-        VCLUSTER_NAME="${REPOSITORY_NAME}-vcluster"
+        # Determine target vCluster - use provided or default to repository name
+        TARGET_VCLUSTER="{{inputs.parameters.target-vcluster}}"
+        if [ -z "$TARGET_VCLUSTER" ] || [ "$TARGET_VCLUSTER" = "" ]; then
+          # Default to repository name (no suffix needed)
+          VCLUSTER_NAME="$REPOSITORY_NAME"
+          echo "✅ No vCluster specified, defaulting to repository name: $VCLUSTER_NAME"
+        else
+          # Use the specified vCluster
+          VCLUSTER_NAME="$TARGET_VCLUSTER"
+          echo "✅ Using specified vCluster: $VCLUSTER_NAME"
+        fi
         
         echo "Microservice: {{inputs.parameters.resource-name}}"
         echo "Repository: $REPOSITORY_NAME"
-        echo "VCluster reference: $VCLUSTER_NAME"
+        echo "Target vCluster: $VCLUSTER_NAME"
         
         echo "$REPOSITORY_NAME" > /tmp/repository-name
         echo "$VCLUSTER_NAME" > /tmp/vcluster-name
@@ -1087,16 +1097,16 @@ spec:
       image: bitnami/kubectl:1.28
       command: [sh]
       source: |
-        echo "🔍 Checking if target vCluster exists: {{inputs.parameters.target-vcluster}}"
-        
-        # Skip if no target vCluster specified
-        if [ -z "{{inputs.parameters.target-vcluster}}" ] || [ "{{inputs.parameters.target-vcluster}}" = "" ]; then
-          echo "ℹ️ No target vCluster specified, will use default deployment"
-          exit 0
-        fi
-        
         VCLUSTER_NAME="{{inputs.parameters.target-vcluster}}"
         AUTO_CREATE="{{inputs.parameters.auto-create-dependencies}}"
+        
+        echo "🔍 Checking if vCluster exists: $VCLUSTER_NAME"
+        
+        # The vCluster name has already been determined (either specified or defaulted to repo name)
+        if [ -z "$VCLUSTER_NAME" ] || [ "$VCLUSTER_NAME" = "" ]; then
+          echo "❌ Error: vCluster name is empty (this shouldn't happen)"
+          exit 1
+        fi
         
         # Check if vCluster namespace exists
         if kubectl get namespace "$VCLUSTER_NAME" >/dev/null 2>&1; then

@@ -1,0 +1,126 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: identity-service-generator
+  namespace: default
+spec:
+  entrypoint: generate-identity-service
+  serviceAccountName: argo-workflows-client
+  arguments:
+    parameters:
+    - name: domain
+      value: "healthcare"
+    - name: repo-name
+      value: "identity-service"
+    - name: app-name  
+      value: "app"
+    - name: github-owner
+      value: "shlapolosa"
+      
+  templates:
+  - name: generate-identity-service
+    metadata:
+      labels:
+        workflow: identity-generator
+    inputs:
+      parameters:
+      - name: domain
+      - name: repo-name
+      - name: app-name
+      - name: github-owner
+    container:
+      image: socrates12345/identity-template-generator:latest
+      command: ["/bin/bash", "-c"]
+      args:
+      - |
+        set -e
+        echo "Starting identity service generation for domain: {{inputs.parameters.domain}}"
+        
+        # Clone the identity service template repository
+        echo "Cloning identity-service-template repository..."
+        git clone https://github.com/shlapolosa/identity-service-template.git /template
+        
+        # Run instantiate.sh with the specified domain preset
+        echo "Running template instantiation for {{inputs.parameters.domain}} domain..."
+        cd /template
+        ./instantiate.sh --preset {{inputs.parameters.domain}} --output /workspace/generated
+        
+        # Initialize git repository in generated code
+        echo "Initializing git repository..."
+        cd /workspace/generated
+        git init
+        git config user.name "OAM Identity Generator"
+        git config user.email "oam-generator@health-platform.io"
+        
+        # Create initial commit
+        echo "Creating initial commit..."
+        git add .
+        git commit -m "feat: generate {{inputs.parameters.domain}} identity service from OAM template
+
+        - Domain: {{inputs.parameters.domain}}
+        - Application: {{inputs.parameters.app-name}}
+        - Generated from identity-service-template
+        
+        This service provides identity and access management capabilities
+        with domain-specific profiles and compliance requirements.
+        
+        Co-Authored-By: OAM Platform <oam@health-platform.io>"
+        
+        # Create GitHub repository using API
+        echo "Creating GitHub repository: {{inputs.parameters.repo-name}}..."
+        curl -X POST \
+          -H "Authorization: token ${GITHUB_TOKEN}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/{{inputs.parameters.github-owner}}/{{inputs.parameters.repo-name}} \
+          -d '{
+            "name": "{{inputs.parameters.repo-name}}",
+            "description": "Identity service for {{inputs.parameters.app-name}} - {{inputs.parameters.domain}} domain",
+            "private": false,
+            "auto_init": false
+          }' || echo "Repository may already exist, continuing..."
+        
+        # Add remote and push
+        echo "Pushing generated code to GitHub..."
+        git remote add origin https://${GITHUB_TOKEN}@github.com/{{inputs.parameters.github-owner}}/{{inputs.parameters.repo-name}}.git
+        git branch -M main
+        git push -u origin main --force
+        
+        echo "Identity service generation completed successfully!"
+        echo "Repository: https://github.com/{{inputs.parameters.github-owner}}/{{inputs.parameters.repo-name}}"
+        
+      env:
+      - name: GITHUB_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: github-credentials
+            key: token
+      resources:
+        requests:
+          memory: "256Mi"
+          cpu: "100m"
+        limits:
+          memory: "512Mi"
+          cpu: "500m"
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
+        
+    volumes:
+    - name: workspace
+      emptyDir: {}
+      
+  - name: cleanup-on-failure
+    container:
+      image: alpine/git:latest
+      command: ["/bin/sh", "-c"]
+      args:
+      - |
+        echo "Cleaning up after failure..."
+        # Could add cleanup logic here if needed
+        
+    retryStrategy:
+      limit: 2
+      retryPolicy: "OnError"
+      backoff:
+        duration: "30s"
+        factor: 2
