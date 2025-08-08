@@ -592,6 +592,20 @@ spec:
         # Use the repository name that was determined in ensure-repositories step
         REPO_NAME="{{inputs.parameters.repository-name}}"
         
+        # Determine target vCluster - use provided value or default to repository name
+        TARGET_VCLUSTER="{{inputs.parameters.target-vcluster}}"
+        
+        if [ -z "$TARGET_VCLUSTER" ] || [ "$TARGET_VCLUSTER" = "" ]; then
+          # Default to repository name (which already has the proper naming logic applied)
+          TARGET_VCLUSTER="$REPO_NAME"
+          echo "📦 No vCluster specified, defaulting to repository name: $TARGET_VCLUSTER"
+        else
+          echo "🎯 Using specified vCluster: $TARGET_VCLUSTER"
+        fi
+        
+        # Always set targetVCluster now that we have a default
+        VCLUSTER_SPEC="targetVCluster: \"$TARGET_VCLUSTER\""
+        
         # Create ApplicationClaim manifest that references the AppContainer
         cat <<EOF | kubectl apply -f -
         apiVersion: platform.example.org/v1alpha1
@@ -624,7 +638,7 @@ spec:
           cache: "{{inputs.parameters.microservice-cache}}"
           exposeApi: $EXPOSE_API
           appContainer: "$REPO_NAME"
-          targetVCluster: "{{inputs.parameters.target-vcluster}}"
+          $VCLUSTER_SPEC
         EOF
         
         if [ $? -eq 0 ]; then
@@ -635,11 +649,13 @@ spec:
           echo "   Database: {{inputs.parameters.microservice-database}}"
           echo "   Cache: {{inputs.parameters.microservice-cache}}"
           echo "   Expose API: $EXPOSE_API"
+          echo "   Target vCluster: $TARGET_VCLUSTER"
           echo ""
           echo "Crossplane will now create:"
           echo "  🚀 Knative service: {{inputs.parameters.resource-name}}"
           echo "  📁 Repository structure with CLAUDE.md compliance"
           echo "  🔧 CI/CD pipeline with GitHub Actions"
+          echo "  🎯 vCluster deployment: $TARGET_VCLUSTER"
           echo "  📊 Database resources (if enabled)"
           echo "  💾 Cache resources (if enabled)"
           exit 0

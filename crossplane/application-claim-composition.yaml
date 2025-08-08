@@ -1428,7 +1428,7 @@ spec:
                   restartPolicy: OnFailure
                   containers:
                   - name: argocd-setup
-                    image: argoproj/argocd:v2.8.4
+                    image: quay.io/argoproj/argocd:v2.8.4
                     command:
                     - /bin/sh
                     - -c
