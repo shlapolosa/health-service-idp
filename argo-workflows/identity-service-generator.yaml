@@ -2,10 +2,10 @@ apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
   name: identity-service-generator
-  namespace: architecture-visualization
+  namespace: default
 spec:
   entrypoint: generate-identity-service
-  serviceAccountName: argo-workflow
+  serviceAccountName: argo-workflows-client
   arguments:
     parameters:
     - name: domain
@@ -96,11 +96,11 @@ spec:
             key: token
       resources:
         requests:
-          memory: "2Gi"
-          cpu: "1"
+          memory: "256Mi"
+          cpu: "100m"
         limits:
-          memory: "4Gi"
-          cpu: "2"
+          memory: "512Mi"
+          cpu: "500m"
       volumeMounts:
       - name: workspace
         mountPath: /workspace
