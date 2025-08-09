@@ -208,6 +208,16 @@ spec:
             value: "{{inputs.parameters.security-enabled}}"
         dependencies: [wait-for-vcluster-ready]
       
+      - name: register-with-argocd
+        template: register-vcluster-argocd
+        arguments:
+          parameters:
+          - name: resource-name
+            value: "{{inputs.parameters.resource-name}}"
+          - name: namespace
+            value: "{{inputs.parameters.namespace}}"
+        dependencies: [configure-vcluster-access]
+      
       - name: deploy-provisioned-applications
         template: deploy-provisioned-applications
         arguments:
@@ -220,7 +230,7 @@ spec:
             value: "{{inputs.parameters.user}}"
           - name: github-org
             value: "{{inputs.parameters.github-org}}"
-        dependencies: [configure-vcluster-access]
+        dependencies: [register-with-argocd]
       
       - name: notify-success
         templateRef:
@@ -417,16 +427,13 @@ spec:
             description: "{{inputs.parameters.description}}"
             parameter-contract: "compliant"
             created-at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            # Store capabilities in annotations for reference
+            vcluster-capabilities: '$ENHANCED_CAPABILITIES'
+            resource-allocation: "CPU: $CPU_REQUEST-$CPU_LIMIT, Memory: $MEMORY_REQUEST-$MEMORY_LIMIT, Storage: $STORAGE"
         spec:
           name: {{inputs.parameters.resource-name}}
-          components:
-            argoCD: true
-            istio: true
-            knativeServing: true
-            prometheus: $(echo "$ENHANCED_CAPABILITIES" | jq -r '.observability')
-            grafana: $(echo "$ENHANCED_CAPABILITIES" | jq -r '.observability')
-            jaeger: $(echo "$ENHANCED_CAPABILITIES" | jq -r '.observability')
-            kiali: $(echo "$ENHANCED_CAPABILITIES" | jq -r '.observability')
+          # The composition will handle all infrastructure provisioning
+          # based on the labels and annotations
         EOF
         
         if [ $? -eq 0 ]; then
@@ -557,6 +564,60 @@ spec:
         echo "   4. Verify access: kubectl get nodes"
         echo ""
         echo "📚 Documentation: https://docs.vcluster.com/"
+
+  # =============================================================================
+  # REGISTER VCLUSTER WITH ARGOCD
+  # =============================================================================
+  - name: register-vcluster-argocd
+    inputs:
+      parameters:
+      - name: resource-name
+      - name: namespace
+    script:
+      image: alpine/k8s:1.28.4
+      command: [sh]
+      source: |
+        echo "🔗 Registering vCluster with ArgoCD..."
+        
+        # Install tools
+        apk add --no-cache curl jq
+        
+        # Install ArgoCD CLI
+        curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+        chmod +x /usr/local/bin/argocd
+        
+        # Install vcluster CLI
+        curl -L -o /usr/local/bin/vcluster https://github.com/loft-sh/vcluster/releases/latest/download/vcluster-linux-amd64
+        chmod +x /usr/local/bin/vcluster
+        
+        # Get vCluster kubeconfig
+        vcluster connect {{inputs.parameters.resource-name}}-vcluster -n {{inputs.parameters.namespace}} --print > /tmp/vcluster.kubeconfig
+        
+        # Login to ArgoCD
+        ARGOCD_URL="af433f091b55640038c23af3a641d716-112208284.us-west-2.elb.amazonaws.com"
+        ARGOCD_PASSWORD=$(kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}" | base64 -d)
+        
+        argocd login ${ARGOCD_URL}:80 \
+          --grpc-web-root-path /argocd \
+          --username admin \
+          --password ${ARGOCD_PASSWORD} \
+          --insecure \
+          --plaintext || {
+            echo "⚠️ Failed to login to ArgoCD"
+            exit 0  # Don't fail the workflow
+          }
+        
+        # Add vCluster
+        CONTEXT_NAME=$(kubectl config get-contexts --kubeconfig=/tmp/vcluster.kubeconfig -o name | head -1)
+        argocd cluster add ${CONTEXT_NAME} \
+          --kubeconfig /tmp/vcluster.kubeconfig \
+          --name {{inputs.parameters.resource-name}} \
+          --yes || {
+            echo "⚠️ Failed to register with ArgoCD"
+            exit 0  # Don't fail the workflow
+          }
+        
+        echo "✅ vCluster registered with ArgoCD"
 
   # =============================================================================
   # DEPLOY PROVISIONED APPLICATIONS

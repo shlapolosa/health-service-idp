@@ -2781,3 +2781,283 @@ This architectural evolution represents a fundamental simplification that mainta
 **Document Status**: Current as of latest session - Priority 2 Architecture decisions documented  
 **Next Review**: After Priority 2 implementation completion  
 **Maintained By**: Platform Team
+
+---
+
+## ADR-035: OAM-Driven vCluster Infrastructure Architecture
+
+**Status**: Decided  
+**Date**: 2025-08-08  
+**Deciders**: Platform Architecture Team
+
+### Context
+
+The platform requires clear separation between platform infrastructure (vClusters, repositories) and application infrastructure (databases, caches). This decision addresses how OAM drives infrastructure within vClusters while Crossplane manages platform-level resources.
+
+### Problem
+
+The current architecture had confusion around infrastructure provisioning:
+- OAM Applications were creating ApplicationClaims that provisioned infrastructure in the host cluster
+- Database and cache resources were being created outside vClusters, breaking isolation
+- No clear way for OAM to drive vCluster-specific infrastructure changes
+- Mixed responsibilities between platform and application concerns
+- Two conflicting use cases: Slack-driven creation vs OAM-driven updates
+
+### Decision
+
+Implement a hybrid architecture with clear separation of concerns, using Flux in the host cluster following the Knative pattern:
+
+#### **Platform Infrastructure (Crossplane in Host)**
+- vCluster provisioning and lifecycle management
+- GitHub repository creation (source and GitOps)
+- Platform-level networking and security
+- **Flux controllers** (helm-controller, source-controller) as platform services
+
+#### **Application Infrastructure (OAM in vCluster)**
+- Databases, caches, and message queues via Flux Helm ComponentDefinitions
+- Application services via Knative
+- Service mesh configuration
+- HelmRelease resources synced to host cluster for processing
+
+### Architecture Implementation
+
+#### **Infrastructure Provisioning Flow**
+
+```yaml
+# Use Case 1: New Service Creation (Slack)
+Slack Command
+    ↓
+Argo Workflow
+    ├─ Step 1: Create ApplicationClaim (creates AppContainer repos if needed)
+    ├─ Step 2: Wait for vCluster ready
+    └─ Step 3: Setup ArgoCD to watch vCluster
+              ↓
+         ArgoCD syncs OAM from GitOps repo to vCluster
+              ↓
+         OAM creates HelmRelease in vCluster
+              ↓
+         vCluster syncer syncs HelmRelease to host namespace
+              ↓
+         Host Flux controller deploys Helm chart to vCluster namespace
+
+# Use Case 2: OAM-Driven Updates (Direct)
+Developer edits OAM in GitOps repo
+    ↓
+Git push
+    ↓
+ArgoCD detects change and syncs to vCluster
+    ↓
+OAM updates HelmRelease in vCluster
+    ↓
+vCluster syncer updates host namespace
+    ↓
+Host Flux controller updates infrastructure
+```
+
+#### **Flux in Host Cluster Pattern (Like Knative)**
+
+Following the established Knative pattern where platform services run in host cluster:
+
+```yaml
+# vCluster configuration to sync Flux resources
+sync:
+  fromHost:
+    - apiVersion: helm.toolkit.fluxcd.io/v2beta1
+      kind: HelmRelease
+    - apiVersion: source.toolkit.fluxcd.io/v1beta2
+      kind: HelmRepository
+  toHost:
+    - apiVersion: helm.toolkit.fluxcd.io/v2beta1
+      kind: HelmRelease
+```
+
+**Resource Flow**:
+1. OAM ComponentDefinition creates HelmRelease in vCluster
+2. vCluster syncer translates to host cluster namespace (e.g., `customer-service-x-default-x-vcluster`)
+3. Host Flux controller processes HelmRelease
+4. Helm chart resources deployed back into vCluster namespace
+5. vCluster sees the deployed resources as native
+
+#### **ComponentDefinition Strategy for vCluster Infrastructure**
+
+Using Flux Helm Controller in host cluster for infrastructure management:
+
+```yaml
+# postgres-helm ComponentDefinition
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: postgres-helm
+spec:
+  workload:
+    definition:
+      apiVersion: helm.toolkit.fluxcd.io/v2beta1
+      kind: HelmRelease
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "helm.toolkit.fluxcd.io/v2beta1"
+          kind: "HelmRelease"
+          metadata: name: parameter.name + "-postgres"
+          spec: {
+            interval: "5m"
+            chart: {
+              spec: {
+                chart: "postgresql"
+                version: "13.2.24"
+                sourceRef: {
+                  kind: "HelmRepository"
+                  name: "bitnami"
+                  namespace: "flux-system"  # Host cluster Flux namespace
+                }
+              }
+            }
+            values: {
+              auth: {
+                database: parameter.database
+                username: parameter.username
+              }
+              primary: {
+                persistence: {
+                  enabled: true
+                  size: parameter.storage
+                }
+              }
+            }
+          }
+        }
+        parameter: {
+          name: string
+          database: string
+          username: string
+          storage: *"10Gi" | string
+        }
+```
+
+### Key Architectural Principles
+
+1. **"OAM drives application, Crossplane drives platform"**
+   - OAM is the source of truth for application infrastructure
+   - Crossplane handles vClusters and repositories only
+
+2. **"Platform services in host, workloads in vCluster"**
+   - Flux, Knative controllers run in host cluster
+   - Application workloads and configs run in vCluster
+
+3. **"Single source of truth per concern"**
+   - Platform: Argo Workflows and Crossplane
+   - Application: OAM definitions in GitOps repo
+
+### Rationale
+
+**Resource Efficiency**: Single Flux instance serves all vClusters (like Knative)
+**Clean Separation**: Platform teams manage vClusters, development teams manage application infrastructure  
+**OAM-Driven**: All application infrastructure defined in OAM, single source of truth
+**vCluster Isolation**: Infrastructure deployed into vCluster namespaces, isolated from each other
+**GitOps Native**: Changes to OAM automatically provision/update infrastructure
+**Pattern Consistency**: Follows established Knative pattern of host-cluster platform services
+
+### Implementation Requirements
+
+1. **Simplified Crossplane Composition**:
+   - Remove PostgreSQL/Redis Helm charts from ApplicationClaim composition
+   - Remove database/cache secret creation
+   - Keep only vCluster and repository creation logic
+   - ApplicationClaim becomes lightweight, focusing on repos only
+
+2. **Host Cluster Flux Installation**:
+   - Install Flux controllers in host cluster `flux-system` namespace
+   - Configure bitnami and other Helm repositories
+   - Set up RBAC for cross-namespace Helm deployments
+
+3. **vCluster Syncer Configuration**:
+   - Add HelmRelease and HelmRepository to sync configuration
+   - Ensure proper namespace translation
+   - Configure resource quota enforcement per vCluster
+
+4. **OAM ComponentDefinitions**:
+   - Create postgres-helm, redis-helm ComponentDefinitions
+   - Use Flux HelmRelease as workload type
+   - Reference host cluster HelmRepository resources
+   - Implement proper CUE templating for configuration
+
+5. **Workflow Sequence Updates**:
+   - Argo Workflow creates ApplicationClaim for repos/vCluster ONLY
+   - Remove infrastructure provisioning from workflow
+   - ArgoCD syncs OAM to vCluster
+   - OAM/Flux provisions application infrastructure
+
+### Consequences
+
+**Positive**:
+- ✅ True OAM-driven infrastructure management
+- ✅ Complete vCluster isolation for application resources
+- ✅ Single source of truth (OAM) for all application concerns
+- ✅ Platform/application teams have clear boundaries
+- ✅ Infrastructure changes driven by OAM modifications
+- ✅ Resource efficiency with shared Flux controllers
+- ✅ Faster vCluster startup (no Flux installation needed)
+- ✅ Consistent with Knative platform service pattern
+- ✅ Centralized Helm chart caching and management
+
+**Negative**:
+- ❌ Additional vCluster syncer configuration complexity
+- ❌ Host Flux needs permissions across all vCluster namespaces
+- ❌ Debugging requires understanding of resource sync flow
+- ❌ Potential for resource conflicts if naming not managed properly
+
+### Migration Path
+
+1. **Phase 1**: Install Flux in host cluster with proper RBAC
+2. **Phase 2**: Create Flux-based ComponentDefinitions for infrastructure
+3. **Phase 3**: Update vCluster syncer configuration for HelmRelease sync
+4. **Phase 4**: Remove infrastructure provisioning from Crossplane composition
+5. **Phase 5**: Test OAM-driven infrastructure updates
+6. **Phase 6**: Document new infrastructure patterns and resource flow
+
+### Example OAM Application
+
+Demonstrating the new pattern with both infrastructure and application components:
+
+```yaml
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: customer-service
+  namespace: default  # In vCluster
+spec:
+  components:
+  # Infrastructure components (via Flux in host)
+  - name: database
+    type: postgres-helm
+    properties:
+      name: customer-db
+      database: customers
+      storage: 20Gi
+      
+  - name: cache
+    type: redis-helm
+    properties:
+      name: customer-cache
+      storage: 5Gi
+      
+  # Application component (via Knative in host)
+  - name: api
+    type: webservice
+    properties:
+      image: customer-service:latest
+      env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: customer-db-postgresql
+              key: database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: customer-cache-redis
+              key: redis-url
+```
+
+This decision establishes OAM as the primary driver for all application-level infrastructure while maintaining Crossplane's role in platform-level resource management, following the proven Knative pattern of host-cluster platform services.

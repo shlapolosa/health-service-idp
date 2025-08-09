@@ -414,244 +414,111 @@ spec:
         string:
           fmt: "%s-gitops-creator"
 
-  # PostgreSQL Database (conditional on spec.database=postgres)
-  - name: postgres-database
-    base:
-      apiVersion: helm.crossplane.io/v1beta1
-      kind: Release
-      spec:
-        forProvider:
-          chart:
-            name: postgresql
-            repository: https://charts.bitnami.com/bitnami
-            version: "13.2.24"
-          namespace: placeholder
-          skipCreateNamespace: false
-          values:
-            auth:
-              enablePostgresUser: true
-              postgresPassword: "placeholder"
-              username: "placeholder"
-              password: "placeholder"
-              database: "placeholder"
-            primary:
-              persistence:
-                enabled: true
-                size: 10Gi
-                storageClass: gp2
-              resources:
-                requests:
-                  memory: 256Mi
-                  cpu: 250m
-                limits:
-                  memory: 512Mi
-                  cpu: 500m
-              readinessProbe:
-                enabled: true
-                initialDelaySeconds: 30
-                periodSeconds: 10
-              livenessProbe:
-                enabled: true
-                initialDelaySeconds: 30
-                periodSeconds: 10
-            metrics:
-              enabled: true
-              serviceMonitor:
-                enabled: false
-            backup:
-              enabled: false
-        providerConfigRef:
-          name: kubernetes-provider
-    patches:
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.namespace
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: metadata.name
-      transforms:
-      - type: string
-        string:
-          fmt: "%s-postgres"
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.values.auth.database
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.values.auth.username
-    # Generate random passwords (in production, use External Secrets)
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.values.auth.postgresPassword
-      transforms:
-      - type: string
-        string:
-          fmt: "%s-postgres-admin-pass"
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.values.auth.password
-      transforms:
-      - type: string
-        string:
-          fmt: "%s-user-pass"
-    # Status patches for database connection info
-    - type: ToCompositeFieldPath
-      fromFieldPath: status.atProvider.state
-      toFieldPath: status.infrastructure.database.ready
-      transforms:
-      - type: map
-        map:
-          "deployed": true
-          "failed": false
-      policy:
-        fromFieldPath: Optional
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: status.infrastructure.database.endpoint
-      transforms:
-      - type: string
-        string:
-          fmt: "%s-postgresql.%s.svc.cluster.local:5432"
-      policy:
-        fromFieldPath: Optional
-    # Only deploy if database is postgres
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.database
-      toFieldPath: metadata.labels["crossplane.io/enable"]
-      transforms:
-      - type: map
-        map:
-          "postgres": "true"
-          "none": "false"
-
-  # Redis Cache (conditional on spec.cache=redis)
-  - name: redis-cache
-    base:
-      apiVersion: helm.crossplane.io/v1beta1
-      kind: Release
-      spec:
-        forProvider:
-          chart:
-            name: redis
-            repository: https://charts.bitnami.com/bitnami
-            version: "18.4.0"
-          namespace: placeholder
-          skipCreateNamespace: false
-          values:
-            auth:
-              enabled: true
-              password: "placeholder"
-            master:
-              persistence:
-                enabled: true
-                size: 5Gi
-                storageClass: gp2
-              resources:
-                requests:
-                  memory: 128Mi
-                  cpu: 100m
-                limits:
-                  memory: 256Mi
-                  cpu: 200m
-            replica:
-              replicaCount: 1
-              persistence:
-                enabled: true
-                size: 5Gi
-                storageClass: gp2
-              resources:
-                requests:
-                  memory: 128Mi
-                  cpu: 100m
-                limits:
-                  memory: 256Mi
-                  cpu: 200m
-            metrics:
-              enabled: true
-              serviceMonitor:
-                enabled: false
-        providerConfigRef:
-          name: kubernetes-provider
-    patches:
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.namespace
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: metadata.name
-      transforms:
-      - type: string
-        string:
-          fmt: "%s-redis"
-    # Generate random password (in production, use External Secrets)
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.values.auth.password
-      transforms:
-      - type: string
-        string:
-          fmt: "%s-redis-pass"
-    # Status patches for cache connection info
-    - type: ToCompositeFieldPath
-      fromFieldPath: status.atProvider.state
-      toFieldPath: status.infrastructure.cache.ready
-      transforms:
-      - type: map
-        map:
-          "deployed": true
-          "failed": false
-      policy:
-        fromFieldPath: Optional
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: status.infrastructure.cache.endpoint
-      transforms:
-      - type: string
-        string:
-          fmt: "%s-redis-master.%s.svc.cluster.local:6379"
-      policy:
-        fromFieldPath: Optional
-    # Only deploy if cache is redis
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.cache
-      toFieldPath: metadata.labels["crossplane.io/enable"]
-      transforms:
-      - type: map
-        map:
-          "redis": "true"
-          "none": "false"
-
-  # Database Secret (PostgreSQL credentials)
-  - name: postgres-secret
+  # NOTE: PostgreSQL and Redis are now managed by OAM ComponentDefinitions in the vCluster
+  # The infrastructure resources below are removed as per ADR-035
+  
+  # Register vCluster with ArgoCD for OAM deployment
+  - name: register-vcluster-argocd
     base:
       apiVersion: kubernetes.crossplane.io/v1alpha1
       kind: Object
       spec:
         forProvider:
           manifest:
-            apiVersion: v1
-            kind: Secret
+            apiVersion: batch/v1
+            kind: Job
             metadata:
               name: placeholder
               namespace: placeholder
-              labels:
-                app.kubernetes.io/managed-by: "crossplane"
-                app.kubernetes.io/component: "secret-integration"
-                app.kubernetes.io/part-of: "application-infrastructure"
-                realtime.platform.example.org/discoverable: "true"
-                webservice.example.org/integration-type: "database"
-              annotations:
-                webservice.example.org/secret-type: "cross-component-integration"
-                webservice.example.org/service-type: "db"
-            type: Opaque
-            stringData:
-              # Plain text values - Kubernetes will base64 encode automatically
-              DATABASE_URL: ""
-              DB_HOST: ""
-              DB_PORT: "5432"
-              DB_NAME: ""
-              DB_USER: ""
-              DB_PASSWORD: ""
+            spec:
+              template:
+                spec:
+                  serviceAccountName: crossplane-admin
+                  restartPolicy: OnFailure
+                  containers:
+                  - name: register-argocd
+                    image: alpine/k8s:1.28.4
+                    command:
+                    - /bin/sh
+                    - -c
+                    - |
+                      set -e
+                      echo "🔗 Registering vCluster with ArgoCD for OAM deployment..."
+                      
+                      # Install required tools
+                      apk add --no-cache curl jq
+                      
+                      # Install ArgoCD CLI
+                      echo "📦 Installing ArgoCD CLI..."
+                      curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+                      chmod +x /usr/local/bin/argocd
+                      
+                      # Install vcluster CLI
+                      echo "📦 Installing vCluster CLI..."
+                      curl -L -o /usr/local/bin/vcluster https://github.com/loft-sh/vcluster/releases/latest/download/vcluster-linux-amd64
+                      chmod +x /usr/local/bin/vcluster
+                      
+                      # Wait for vCluster to be ready
+                      echo "⏳ Waiting for vCluster to be ready..."
+                      for i in $(seq 1 60); do
+                        if kubectl get secret -n ${VCLUSTER_NAMESPACE} | grep -q "vc-${VCLUSTER_NAME}"; then
+                          echo "✅ vCluster secret found"
+                          break
+                        fi
+                        echo "Waiting for vCluster secret... ($i/60)"
+                        sleep 5
+                      done
+                      
+                      # Get vCluster kubeconfig using vcluster CLI
+                      echo "📥 Getting vCluster kubeconfig..."
+                      vcluster connect ${VCLUSTER_NAME} -n ${VCLUSTER_NAMESPACE} --print > /tmp/vcluster.kubeconfig || {
+                        # Fallback to manual extraction
+                        kubectl get secret vc-${VCLUSTER_NAME} -n ${VCLUSTER_NAMESPACE} \
+                          -o jsonpath='{.data.config}' | base64 -d > /tmp/vcluster.kubeconfig
+                      }
+                      
+                      # ArgoCD Configuration
+                      ARGOCD_INGRESS_URL="${ARGOCD_INGRESS_URL:-af433f091b55640038c23af3a641d716-112208284.us-west-2.elb.amazonaws.com}"
+                      ARGOCD_PASSWORD=$(kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}" | base64 -d)
+                      
+                      # Login to ArgoCD
+                      echo "🔐 Logging into ArgoCD..."
+                      argocd login ${ARGOCD_INGRESS_URL}:80 \
+                        --grpc-web-root-path /argocd \
+                        --username admin \
+                        --password ${ARGOCD_PASSWORD} \
+                        --insecure \
+                        --plaintext || {
+                          echo "⚠️ Failed to login to ArgoCD, continuing anyway"
+                        }
+                      
+                      # Register vCluster with ArgoCD using CLI
+                      echo "📝 Registering vCluster with ArgoCD..."
+                      
+                      # Check if already registered
+                      if argocd cluster list | grep -q "${VCLUSTER_NAME}"; then
+                        echo "Cluster already registered, removing old registration"
+                        argocd cluster rm ${VCLUSTER_NAME} -y 2>/dev/null || true
+                      fi
+                      
+                      # Add the cluster
+                      CONTEXT_NAME=$(kubectl config get-contexts --kubeconfig=/tmp/vcluster.kubeconfig -o name | head -1)
+                      argocd cluster add ${CONTEXT_NAME} \
+                        --kubeconfig /tmp/vcluster.kubeconfig \
+                        --name ${VCLUSTER_NAME} \
+                        --yes || {
+                          echo "⚠️ Failed to add vCluster to ArgoCD"
+                          # Continue anyway as this might be a transient issue
+                        }
+                      
+                      echo "✅ vCluster registered with ArgoCD successfully"
+                    env:
+                    - name: VCLUSTER_NAME
+                      value: placeholder
+                    - name: VCLUSTER_NAMESPACE
+                      value: placeholder
+                    - name: APP_NAME
+                      value: placeholder
         providerConfigRef:
           name: kubernetes-provider
     patches:
@@ -661,7 +528,7 @@ spec:
       transforms:
       - type: string
         string:
-          fmt: "%s-db-secret"
+          fmt: "%s-register-argocd"
     - type: FromCompositeFieldPath
       fromFieldPath: spec.name
       toFieldPath: spec.forProvider.manifest.metadata.namespace
@@ -671,132 +538,21 @@ spec:
       transforms:
       - type: string
         string:
-          fmt: "%s-db-secret"
-    # Only create if database is postgres
+          fmt: "%s-register-argocd"
     - type: FromCompositeFieldPath
-      fromFieldPath: spec.database
-      toFieldPath: metadata.labels["crossplane.io/enable"]
-      transforms:
-      - type: map
-        map:
-          "postgres": "true"
-          "none": "false"
-    # Patch secret values with plain text (Kubernetes will base64 encode)
+      fromFieldPath: spec.targetVCluster
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[0].value
+      policy:
+        fromFieldPath: Optional
     - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.manifest.stringData.DB_HOST
-      transforms:
-      - type: string
-        string:
-          fmt: "%s-postgresql.%s.svc.cluster.local"
-          type: Format
+      fromFieldPath: spec.targetVCluster
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[1].value
+      policy:
+        fromFieldPath: Optional
     - type: FromCompositeFieldPath
       fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.manifest.stringData.DB_NAME
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.manifest.stringData.DB_USER
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.manifest.stringData.DB_PASSWORD
-      transforms:
-      - type: string
-        string:
-          fmt: "%s-user-pass"
-          type: Format
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.manifest.stringData.DATABASE_URL
-      transforms:
-      - type: string
-        string:
-          fmt: "postgresql://%s:%s-user-pass@claims-postgresql.claims.svc.cluster.local:5432/%s"
-          type: Format
-
-  # Cache Secret (Redis credentials)
-  - name: redis-secret
-    base:
-      apiVersion: kubernetes.crossplane.io/v1alpha1
-      kind: Object
-      spec:
-        forProvider:
-          manifest:
-            apiVersion: v1
-            kind: Secret
-            metadata:
-              name: placeholder
-              namespace: placeholder
-              labels:
-                app.kubernetes.io/managed-by: "crossplane"
-                app.kubernetes.io/component: "secret-integration"
-                app.kubernetes.io/part-of: "application-infrastructure"
-                realtime.platform.example.org/discoverable: "true"
-                webservice.example.org/integration-type: "cache"
-              annotations:
-                webservice.example.org/secret-type: "cross-component-integration"
-                webservice.example.org/service-type: "redis"
-            type: Opaque
-            stringData:
-              # Plain text values - Kubernetes will base64 encode automatically
-              REDIS_URL: ""
-              REDIS_HOST: ""
-              REDIS_PORT: "6379"
-              REDIS_PASSWORD: ""
-        providerConfigRef:
-          name: kubernetes-provider
-    patches:
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.manifest.metadata.name
-      transforms:
-      - type: string
-        string:
-          fmt: "%s-redis-secret"
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.manifest.metadata.namespace
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: metadata.name
-      transforms:
-      - type: string
-        string:
-          fmt: "%s-redis-secret"
-    # Only create if cache is redis
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.cache
-      toFieldPath: metadata.labels["crossplane.io/enable"]
-      transforms:
-      - type: map
-        map:
-          "redis": "true"
-          "none": "false"
-    # Patch Redis secret values
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.manifest.stringData.REDIS_HOST
-      transforms:
-      - type: string
-        string:
-          fmt: "%s-redis-master.%s.svc.cluster.local"
-          type: Format
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.manifest.stringData.REDIS_PASSWORD
-      transforms:
-      - type: string
-        string:
-          fmt: "%s-redis-pass"
-          type: Format
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.manifest.stringData.REDIS_URL
-      transforms:
-      - type: string
-        string:
-          fmt: "redis://:%s-redis-pass@claims-redis-master.claims.svc.cluster.local:6379/0"
-          type: Format
-
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[2].value
+  
   # Update OAM Application with new webservice component
   - name: update-oam-application
     base:
@@ -823,8 +579,11 @@ spec:
                     - -c
                     - |
                       set -e
-                      # Install git, curl, and jq
+                      # Install git, curl, jq, and kubectl
                       apk add --no-cache git curl jq
+                      curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+                      chmod +x kubectl
+                      mv kubectl /usr/local/bin/
                       echo "Updating OAM Application with webservice component for $SERVICE_NAME..."
                       
                       TEMP_DIR="/tmp/oam-update-$APP_CONTAINER"
@@ -839,11 +598,20 @@ spec:
                       git config user.email "applicationclaim@platform.local"
                       
                       # Determine target vCluster from ApplicationClaim spec or annotation
-                      VCLUSTER_TARGET=$(kubectl get applicationclaim $SERVICE_NAME -o jsonpath='{.spec.targetVCluster}' 2>/dev/null || echo "")
+                      echo "🔍 Looking up ApplicationClaim: $SERVICE_NAME in namespace: default"
+                      kubectl get applicationclaim $SERVICE_NAME -n default -o yaml | head -20
+                      
+                      VCLUSTER_TARGET=$(kubectl get applicationclaim $SERVICE_NAME -n default -o jsonpath='{.spec.targetVCluster}' 2>/dev/null || echo "")
+                      echo "   spec.targetVCluster value: '$VCLUSTER_TARGET'"
+                      
                       if [ -z "$VCLUSTER_TARGET" ]; then
-                        VCLUSTER_TARGET=$(kubectl get applicationclaim $SERVICE_NAME -o jsonpath='{.metadata.annotations.webservice\.oam\.dev/vcluster}' 2>/dev/null || echo "")
+                        echo "   spec.targetVCluster is empty, checking annotation..."
+                        VCLUSTER_TARGET=$(kubectl get applicationclaim $SERVICE_NAME -n default -o jsonpath='{.metadata.annotations.webservice\.oam\.dev/vcluster}' 2>/dev/null || echo "")
+                        echo "   annotation value: '$VCLUSTER_TARGET'"
                       fi
+                      
                       if [ -z "$VCLUSTER_TARGET" ]; then
+                        echo "   No vCluster target found, using default..."
                         VCLUSTER_TARGET="development-vcluster"
                       fi
                       echo "🎯 Target vCluster: $VCLUSTER_TARGET"
@@ -874,14 +642,14 @@ spec:
                       cat oam/applications/application.yaml
                       
                       # Check if component already exists in OAM Application
+                      COMPONENT_EXISTS=false
                       if grep -q "name: $SERVICE_NAME" oam/applications/application.yaml; then
                         echo "⚠️  Component '$SERVICE_NAME' already exists in OAM Application"
-                        echo "🔄 Skipping update to avoid duplication"
-                        echo "ℹ️  If you need to update the component, modify the OAM Application directly"
-                        exit 0
+                        echo "🔄 Component will be replaced with ApplicationClaim specifications..."
+                        COMPONENT_EXISTS=true
+                      else
+                        echo "✅ Component '$SERVICE_NAME' not found - proceeding with addition"
                       fi
-                      
-                      echo "✅ Component '$SERVICE_NAME' not found - proceeding with addition"
                       
                       # Create new component definition - choose correct ComponentDefinition based on framework
                       if [ "$FRAMEWORK" = "chatbot" ]; then
@@ -927,8 +695,25 @@ spec:
                             appContainer: $APP_CONTAINER
                             exposeApi: true"
                       
-                      # Check if components array is empty
-                      if grep -q "components: \[\]" oam/applications/application.yaml; then
+                      # If component exists, we'll replace it entirely
+                      if [ "$COMPONENT_EXISTS" = "true" ]; then
+                        echo "🔄 Replacing existing component..."
+                        
+                        # Create a new OAM application with just our component (simpler approach)
+                        # Keep everything before components section
+                        sed -n '1,/components:/p' oam/applications/application.yaml > temp_app.yaml
+                        
+                        # Add our component
+                        echo "$COMPONENT_YAML" | sed 's/^/        /' >> temp_app.yaml
+                        
+                        # Keep everything after policies (if exists) or add policies section
+                        if grep -q "policies:" oam/applications/application.yaml; then
+                          sed -n '/policies:/,$p' oam/applications/application.yaml >> temp_app.yaml
+                        fi
+                        
+                        mv temp_app.yaml oam/applications/application.yaml
+                        
+                      elif grep -q "components: \[\]" oam/applications/application.yaml; then
                         echo "🔄 Adding first component to empty OAM Application..."
                         
                         # Replace empty components array with the new component
@@ -952,7 +737,33 @@ spec:
                         exit 1
                       fi
                       
-                      echo "✅ Updated OAM Application:"
+                      # Add or update topology policy for multi-cluster deployment
+                      echo "🎯 Adding topology policy for vCluster deployment..."
+                      if ! grep -q "policies:" oam/applications/application.yaml; then
+                        echo "  policies:" >> oam/applications/application.yaml
+                        echo "  - name: deploy-to-vcluster" >> oam/applications/application.yaml
+                        echo "    type: topology" >> oam/applications/application.yaml
+                        echo "    properties:" >> oam/applications/application.yaml
+                        echo "      clusters: [\"$VCLUSTER_TARGET\"]" >> oam/applications/application.yaml
+                        echo "      namespace: \"$SERVICE_NAME\"" >> oam/applications/application.yaml
+                      else
+                        # Update existing policy
+                        if grep -q "deploy-to-vcluster" oam/applications/application.yaml; then
+                          echo "🔄 Updating existing topology policy..."
+                          # Update the clusters line
+                          sed -i "s/clusters: \[.*\]/clusters: [\"$VCLUSTER_TARGET\"]/" oam/applications/application.yaml
+                          sed -i "s/namespace: \".*\"/namespace: \"$SERVICE_NAME\"/" oam/applications/application.yaml
+                        else
+                          # Add new policy to existing policies section
+                          echo "  - name: deploy-to-vcluster" >> oam/applications/application.yaml
+                          echo "    type: topology" >> oam/applications/application.yaml
+                          echo "    properties:" >> oam/applications/application.yaml
+                          echo "      clusters: [\"$VCLUSTER_TARGET\"]" >> oam/applications/application.yaml
+                          echo "      namespace: \"$SERVICE_NAME\"" >> oam/applications/application.yaml
+                        fi
+                      fi
+                      
+                      echo "✅ Updated OAM Application with topology policy:"
                       cat oam/applications/application.yaml
                       
                       # Create vCluster-specific manifests
@@ -1003,6 +814,12 @@ spec:
                             environment:
                               LOG_LEVEL: "INFO"
                               AGENT_TYPE: "$SERVICE_NAME"
+                        policies:
+                        - name: deploy-to-vcluster
+                          type: topology
+                          properties:
+                            clusters: ["$VCLUSTER_TARGET"]
+                            namespace: "$SERVICE_NAME"
                       EOF
                       
                       # Create ArgoCD Application for this service
@@ -1468,7 +1285,8 @@ spec:
                         # For vCluster deployments, we need to register the vCluster first
                         # The actual application will be applied to the vCluster once registered
                         DEST_SERVER="https://kubernetes.default.svc"
-                        APP_PATH="vcluster/$TARGET_VCLUSTER/applications/$SERVICE_NAME"
+                        # Use apps directory which contains the App of Apps pattern
+                        APP_PATH="apps"
                       else
                         echo "🎯 Deploying to default cluster"
                         DEST_SERVER="https://kubernetes.default.svc"

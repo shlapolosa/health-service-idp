@@ -356,7 +356,7 @@ spec:
             value: "❌ Microservice creation failed\n\nCheck workflow logs for detailed error information"
           - name: notification-type
             value: "error"
-        when: "{{steps.validate-parameters.status}} != Succeeded or {{steps.ensure-repositories.status}} != Succeeded or {{steps.create-microservice-claim.status}} != Succeeded or {{steps.wait-for-microservice-ready.status}} != Succeeded"
+        when: "'{{steps.validate-parameters.status}}' != 'Succeeded' || '{{steps.ensure-repositories.status}}' != 'Succeeded' || '{{steps.create-microservice-claim.status}}' != 'Succeeded' || '{{steps.wait-for-microservice-ready.status}}' != 'Succeeded'"
 
   # =============================================================================
   # PARAMETER VALIDATION
@@ -682,19 +682,46 @@ spec:
         while [ $ELAPSED -lt $TIMEOUT ]; do
           echo "Checking ApplicationClaim status... (${ELAPSED}s/${TIMEOUT}s)"
           
-          READY=$(kubectl get applicationclaim {{inputs.parameters.resource-name}} -n {{inputs.parameters.namespace}} -o jsonpath='{.status.ready}' 2>/dev/null || echo "false")
-          REPOSITORY_URL=$(kubectl get applicationclaim {{inputs.parameters.resource-name}} -n {{inputs.parameters.namespace}} -o jsonpath='{.status.repository.url}' 2>/dev/null || echo "")
-          KNATIVE_SERVICE=$(kubectl get applicationclaim {{inputs.parameters.resource-name}} -n {{inputs.parameters.namespace}} -o jsonpath='{.status.application.knativeService}' 2>/dev/null || echo "")
+          # Check if Ready condition is True
+          READY_STATUS=$(kubectl get applicationclaim {{inputs.parameters.resource-name}} -n {{inputs.parameters.namespace}} \
+            -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "False")
           
-          if [ "$READY" = "true" ] && [ ! -z "$REPOSITORY_URL" ]; then
+          # For ApplicationClaim created by composition, check if it's synced and ready
+          SYNCED=$(kubectl get applicationclaim {{inputs.parameters.resource-name}} -n {{inputs.parameters.namespace}} \
+            -o jsonpath='{.status.conditions[?(@.type=="Synced")].status}' 2>/dev/null || echo "False")
+          
+          # Try to get any repository or infrastructure info
+          REPOSITORY_URL=$(kubectl get applicationclaim {{inputs.parameters.resource-name}} -n {{inputs.parameters.namespace}} \
+            -o jsonpath='{.status.repository.url}' 2>/dev/null || echo "")
+          KNATIVE_SERVICE=$(kubectl get applicationclaim {{inputs.parameters.resource-name}} -n {{inputs.parameters.namespace}} \
+            -o jsonpath='{.status.application.knativeService}' 2>/dev/null || echo "")
+          
+          # Check XApplicationClaim if needed
+          if [ -z "$REPOSITORY_URL" ]; then
+            XR_NAME=$(kubectl get applicationclaim {{inputs.parameters.resource-name}} -n {{inputs.parameters.namespace}} \
+              -o jsonpath='{.spec.resourceRef.name}' 2>/dev/null || echo "")
+            if [ ! -z "$XR_NAME" ]; then
+              REPOSITORY_URL=$(kubectl get xapplicationclaim $XR_NAME \
+                -o jsonpath='{.status.repository.url}' 2>/dev/null || echo "")
+            fi
+          fi
+          
+          if [ "$READY_STATUS" = "True" ] && [ "$SYNCED" = "True" ]; then
             echo "✅ ApplicationClaim ready!"
-            echo "Repository: $REPOSITORY_URL"
-            echo "Knative Service: $KNATIVE_SERVICE"
+            echo "Ready Status: $READY_STATUS"
+            echo "Synced: $SYNCED"
+            if [ ! -z "$REPOSITORY_URL" ]; then
+              echo "Repository: $REPOSITORY_URL"
+            fi
+            if [ ! -z "$KNATIVE_SERVICE" ]; then
+              echo "Knative Service: $KNATIVE_SERVICE"
+            fi
             echo "CLAUDE.md-compliant structure: Ready"
             exit 0
           fi
           
-          echo "  Ready: $READY"
+          echo "  Ready: $READY_STATUS"
+          echo "  Synced: $SYNCED"
           echo "  Repository: $REPOSITORY_URL"
           echo "  Knative Service: $KNATIVE_SERVICE"
           
@@ -1120,7 +1147,7 @@ spec:
         fi
         
         # Check if auto-create is enabled
-        if [ "$AUTO_CREATE" \!= "true" ]; then
+        if [ "$AUTO_CREATE" != "true" ]; then
           echo "❌ Target vCluster '$VCLUSTER_NAME' does not exist and auto-create is disabled"
           echo "Please create the vCluster first or enable auto-create-dependencies"
           exit 1

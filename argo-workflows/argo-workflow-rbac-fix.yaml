@@ -1,0 +1,56 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argo-workflow-executor-extended
+rules:
+# Existing permissions
+- apiGroups: [""]
+  resources: ["pods", "pods/log"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["secrets", "configmaps"]
+  verbs: ["get", "list"]
+- apiGroups: ["argoproj.io"]
+  resources: ["workflows", "workflowtemplates", "cronworkflows", "workflowtasksets"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+# Added permissions for vCluster management
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["statefulsets", "deployments"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+# Permissions for Claims
+- apiGroups: ["platform.example.org"]
+  resources: ["applicationclaims", "vclusterenvironmentclaims", "appcontainerclaims"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["platform.example.org"]
+  resources: ["applicationclaims/status", "vclusterenvironmentclaims/status", "appcontainerclaims/status"]
+  verbs: ["get", "update", "patch"]
+# Permissions for OAM resources
+- apiGroups: ["core.oam.dev"]
+  resources: ["applications", "componentdefinitions", "workloaddefinitions", "traitdefinitions"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+# Permissions for Knative
+- apiGroups: ["serving.knative.dev"]
+  resources: ["services", "configurations", "revisions", "routes"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argo-workflow-executor-extended
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argo-workflow-executor-extended
+subjects:
+- kind: ServiceAccount
+  name: argo-workflow-executor
+  namespace: argo
+- kind: ServiceAccount
+  name: default
+  namespace: argo

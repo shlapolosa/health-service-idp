@@ -2,6 +2,20 @@
 
 A GitOps-enabled cloud-native platform for intelligent architecture visualization and microservice development, built with minimal cost and maximum stability principles.
 
+## 📚 Recent Updates
+
+### Multi-Cluster OAM Implementation (January 2025)
+- **OAM vCluster Integration**: Full implementation of OAM-driven vCluster provisioning with topology policies for multi-cluster deployments
+- **ArgoCD Automation Fix**: Fixed ArgoCD application path to use App of Apps pattern (`apps/` directory)
+- **Topology Policy Fix**: Corrected vCluster name propagation in ApplicationClaim composition
+- **ClusterGateway Synchronization**: Added endpoint synchronization fix to prevent stale LoadBalancer references
+- **Functional Testing**: Added comprehensive test script in `scripts/test-functional-multicluster.sh`
+
+See implementation details in:
+- [OAM vCluster Implementation Summary](./OAM-VCLUSTER-IMPLEMENTATION-SUMMARY.md)
+- [Multi-cluster Test Results](./MULTICLUSTER-TEST-RESULTS.md)
+- [Workflow Changes for Multi-cluster](./WORKFLOW-CHANGES-MULTICLUSTER.md)
+
 ## 🔍 Infrastructure Health Check
 
 **CRITICAL**: Before starting any development work, always run the infrastructure health check to ensure all components are operational:

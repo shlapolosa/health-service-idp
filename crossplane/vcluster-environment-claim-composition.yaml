@@ -83,6 +83,9 @@ spec:
                               - apiGroups: ["core.oam.dev"]
                                 resources: ["applications"]
                                 verbs: ["create", "delete", "patch", "update", "get", "list", "watch"]
+                              - apiGroups: ["helm.crossplane.io"]
+                                resources: ["releases"]
+                                verbs: ["create", "delete", "patch", "update", "get", "list", "watch"]
                           clusterRole:
                             extraRules:
                               - apiGroups: ["apiextensions.k8s.io"]
@@ -93,6 +96,9 @@ spec:
                                 verbs: ["create", "delete", "patch", "update", "get", "list", "watch"]
                               - apiGroups: ["core.oam.dev"]
                                 resources: ["applications"]
+                                verbs: ["create", "delete", "patch", "update", "get", "list", "watch"]
+                              - apiGroups: ["helm.crossplane.io"]
+                                resources: ["releases"]
                                 verbs: ["create", "delete", "patch", "update", "get", "list", "watch"]
                           export:
                             - apiVersion: serving.knative.dev/v1
@@ -105,6 +111,8 @@ spec:
                               kind: Route
                             - apiVersion: core.oam.dev/v1beta1
                               kind: Application
+                            - apiVersion: helm.crossplane.io/v1beta1
+                              kind: Release
                       EOF
                       
                       # Check if vCluster already exists
@@ -887,6 +895,15 @@ spec:
                       
                       # Register vCluster with KubeVela using vela cluster join
                       echo "Registering vCluster with KubeVela..."
+                      
+                      # First, try to detach the existing cluster if it exists
+                      if vela cluster list | grep -q ${VCLUSTER_NAME}; then
+                        echo "Existing cluster registration found, detaching first..."
+                        vela cluster detach ${VCLUSTER_NAME} 2>/dev/null || true
+                        sleep 5
+                      fi
+                      
+                      # Now register the vCluster with the new endpoint
                       for attempt in $(seq 1 3); do
                         if vela cluster join /tmp/vcluster.kubeconfig --name ${VCLUSTER_NAME}; then
                           echo "✅ Successfully registered vCluster!"

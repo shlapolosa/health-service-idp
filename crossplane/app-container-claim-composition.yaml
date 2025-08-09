@@ -581,6 +581,12 @@ spec:
                             healthPath: /health
                             database: postgres
                             cache: redis
+                        policies:
+                        - name: deploy-to-vcluster
+                          type: topology
+                          properties:
+                            clusters: ["$APP_NAME"]  # Will be updated with actual vCluster name
+                            namespace: "$APP_NAME"
                         # Add your components here using the following types:
                         # - microservice-with-db: Full-featured microservice with database and cache
                         # - react-frontend: React TypeScript frontend with Material-UI

@@ -1,0 +1,95 @@
+# ArgoCD Application Template for vCluster Deployments
+# This template creates ArgoCD Applications that target the appropriate vCluster
+# Based on ADR-035: OAM-driven vCluster Infrastructure Architecture
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: "{{ .Values.applicationName }}-oam"
+  namespace: argocd
+  labels:
+    app.kubernetes.io/managed-by: "oam-platform"
+    app.kubernetes.io/part-of: "{{ .Values.applicationName }}"
+    vcluster.loft.sh/target: "{{ .Values.vclusterName }}"
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  project: default
+  source:
+    repoURL: "https://github.com/{{ .Values.githubOrg }}/{{ .Values.applicationName }}-gitops"
+    targetRevision: main
+    path: oam/applications
+  
+  # Dynamic destination based on vCluster
+  destination:
+    # For vCluster deployments, use the vCluster's API endpoint
+    # This should be populated by the ClusterGateway or vCluster manager
+    name: "{{ .Values.vclusterName }}"  # Reference to registered vCluster in ArgoCD
+    namespace: "{{ .Values.namespace | default 'default' }}"
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+    - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  
+  # Ignore differences for dynamic fields
+  ignoreDifferences:
+  - group: core.oam.dev
+    kind: Application
+    jsonPointers:
+    - /status
+  - group: ""
+    kind: Secret
+    jsonPointers:
+    - /data
+
+---
+# ConfigMap to store vCluster connection details for ArgoCD
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vcluster-argocd-targets
+  namespace: argocd
+data:
+  # This will be populated by the vCluster provisioning workflow
+  # Format: vcluster-name: server-url
+  vcluster-targets.yaml: |
+    # Example:
+    # customer-service: https://customer-service.customer-service.svc.cluster.local:443
+    # This is dynamically updated when vClusters are created
+
+---
+# ClusterSecret template for registering vCluster with ArgoCD
+apiVersion: v1
+kind: Secret
+metadata:
+  name: "{{ .Values.vclusterName }}-cluster"
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: cluster
+    vcluster.loft.sh/vcluster-name: "{{ .Values.vclusterName }}"
+type: Opaque
+stringData:
+  name: "{{ .Values.vclusterName }}"
+  # The server URL should point to the vCluster's API endpoint
+  # This is typically the vCluster service in the namespace
+  server: "https://{{ .Values.vclusterName }}.{{ .Values.vclusterNamespace }}.svc.cluster.local:443"
+  config: |
+    {
+      "bearerToken": "{{ .Values.vclusterToken }}",
+      "tlsClientConfig": {
+        "insecure": false,
+        "caData": "{{ .Values.vclusterCAData }}"
+      }
+    }
