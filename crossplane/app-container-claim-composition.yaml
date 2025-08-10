@@ -870,29 +870,53 @@ spec:
                                   
                                   echo "📝 Updating $service to image: $NEW_IMAGE"
                                   
-                                  # Find OAM application file - project-specific path
-                                  OAM_FILE="oam/applications/${service}.yaml"
-                                  if [ ! -f "$OAM_FILE" ]; then
-                                    # Try other possible locations specific to this project
-                                    OAM_FILE=$(find oam -name "*${service}*.yaml" | head -1)
+                                  # Update multiple OAM file locations
+                                  # 1. Main OAM application file
+                                  MAIN_OAM="oam/applications/application.yaml"
+                                  
+                                  # 2. Service-specific OAM files in vcluster directories
+                                  VCLUSTER_OAM_FILES=$(find . -path "*/vcluster/*/applications/${service}/oam-application.yaml" 2>/dev/null)
+                                  
+                                  # 3. Look for any OAM file containing the service
+                                  OTHER_OAM_FILES=$(grep -l "name: ${service}" oam/**/*.yaml 2>/dev/null || true)
+                                  
+                                  # Update main OAM file if it exists and contains the service
+                                  if [ -f "$MAIN_OAM" ] && grep -q "name: ${service}" "$MAIN_OAM"; then
+                                    echo "📄 Updating main OAM: $MAIN_OAM"
+                                    sed -i "s|image: docker.io/socrates12345/${service}:.*|image: $NEW_IMAGE|g" "$MAIN_OAM"
+                                    echo "✅ Updated main OAM manifest"
                                   fi
                                   
-                                  if [ -f "$OAM_FILE" ]; then
-                                    echo "📄 Updating manifest: $OAM_FILE"
-                                    
-                                    # Update the image in the OAM file
-                                    sed -i "s|image: .*/$service:.*|image: $NEW_IMAGE|g" "$OAM_FILE"
-                                    
-                                    # Update version labels if they exist
-                                    if [ ! -z "$COMMIT_SHA" ]; then
-                                      sed -i "s|version: .*|version: $COMMIT_SHA|g" "$OAM_FILE"
-                                    fi
-                                    
-                                    echo "✅ Updated $service manifest successfully"
-                                  else
-                                    echo "⚠️ Warning: Could not find OAM file for $service"
+                                  # Update vCluster-specific OAM files
+                                  if [ ! -z "$VCLUSTER_OAM_FILES" ]; then
+                                    for oam_file in $VCLUSTER_OAM_FILES; do
+                                      echo "📄 Updating vCluster OAM: $oam_file"
+                                      sed -i "s|image: .*/${service}:.*|image: $NEW_IMAGE|g" "$oam_file"
+                                      
+                                      # Update version labels if they exist
+                                      if [ ! -z "$COMMIT_SHA" ]; then
+                                        sed -i "s|version: .*|version: $COMMIT_SHA|g" "$oam_file"
+                                      fi
+                                      echo "✅ Updated vCluster OAM: $oam_file"
+                                    done
+                                  fi
+                                  
+                                  # Update any other OAM files containing the service
+                                  if [ ! -z "$OTHER_OAM_FILES" ]; then
+                                    for oam_file in $OTHER_OAM_FILES; do
+                                      if [ "$oam_file" != "$MAIN_OAM" ]; then
+                                        echo "📄 Updating additional OAM: $oam_file"
+                                        sed -i "s|image: .*/${service}:.*|image: $NEW_IMAGE|g" "$oam_file"
+                                        echo "✅ Updated: $oam_file"
+                                      fi
+                                    done
+                                  fi
+                                  
+                                  # Report if no files were found
+                                  if [ ! -f "$MAIN_OAM" ] && [ -z "$VCLUSTER_OAM_FILES" ] && [ -z "$OTHER_OAM_FILES" ]; then
+                                    echo "⚠️ Warning: Could not find any OAM files for $service"
                                     echo "Available OAM files:"
-                                    find oam -name "*.yaml" -type f 2>/dev/null || echo "No OAM files found"
+                                    find . -name "*.yaml" -path "*/oam/*" -o -path "*/vcluster/*" | head -20
                                   fi
                                 done
                       
