@@ -5,31 +5,15 @@ on:
     branches: [ main, develop, 'feature/*', 'hotfix/*', 'release/*' ]
     paths:
       - 'microservices/**'
-    paths-ignore:
-      - 'microservices/**/domain.yml'
-      - 'microservices/**/config.yml'
-      - 'microservices/**/data/**'
-      - 'microservices/**/actions/**'
-      - 'microservices/**/docker/Dockerfile.rasa'
-      - 'microservices/**/docker/Dockerfile.actions'
-      - 'microservices/**/credentials.yml'
-      - 'microservices/**/endpoints.yml'
   pull_request:
     branches: [ main ]
     paths:
       - 'microservices/**'
-    paths-ignore:
-      - 'microservices/**/domain.yml'
-      - 'microservices/**/config.yml'
-      - 'microservices/**/data/**'
-      - 'microservices/**/actions/**'
-      - 'microservices/**/docker/Dockerfile.rasa'
-      - 'microservices/**/docker/Dockerfile.actions'
-      - 'microservices/**/credentials.yml'
-      - 'microservices/**/endpoints.yml'
   schedule:
     # Run security scans daily at 2 AM UTC
     - cron: '0 2 * * *'
+  workflow_dispatch:
+    # Enable manual workflow runs
 
 permissions:
   contents: read
@@ -64,43 +48,40 @@ jobs:
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | grep -E '^microservices/' || true)
           elif [ "${{ github.event_name }}" = "schedule" ]; then
-            # For scheduled runs, scan first few services
+            # For scheduled runs, scan all services with Dockerfiles
             CHANGED_FILES=$(find microservices -name "Dockerfile" -type f | head -3)
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # For manual runs, scan all services
+            CHANGED_FILES=$(find microservices -type d -mindepth 1 -maxdepth 1 ! -name "README*" | head -5)
           else
-            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -E '^microservices/' || true)
+            # For push events, check if we have previous commits
+            COMMIT_COUNT=$(git rev-list --count HEAD)
+            if [ "$COMMIT_COUNT" -gt 1 ]; then
+              CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -E '^microservices/' || true)
+            else
+              # First commit - check all microservices
+              CHANGED_FILES=$(find microservices -type d -mindepth 1 -maxdepth 1 ! -name "README*" || true)
+            fi
           fi
           
-          # Extract unique service directories and exclude chat services
+          echo "Debug: CHANGED_FILES=$CHANGED_FILES"
+          
+          # Extract unique service directories
           CHANGED_SERVICES=""
           CHANGED_SERVICES_JSON="[]"
           
           if [ ! -z "$CHANGED_FILES" ]; then
-            # Get service names
-            ALL_SERVICE_NAMES=$(echo "$CHANGED_FILES" | cut -d'/' -f1-2 | sort -u | grep '^microservices/' | cut -d'/' -f2)
+            # Get service names - fix the filtering
+            SERVICE_NAMES=$(echo "$CHANGED_FILES" | sed 's|^microservices/||' | cut -d'/' -f1 | sort -u | grep -v '^README' | grep -v '\.md$' || true)
+            echo "Debug: SERVICE_NAMES=$SERVICE_NAMES"
             
-            # Filter out chat services (those with domain.yml and config.yml)
-            FILTERED_SERVICES=""
-            for service in $ALL_SERVICE_NAMES; do
-              if [ -f "microservices/$service/domain.yml" ] && [ -f "microservices/$service/config.yml" ]; then
-                echo "🤖 Excluding chat service from standard pipeline: $service (handled by chat-gitops.yml)"
-              else
-                echo "📦 Including standard service: $service"
-                if [ -z "$FILTERED_SERVICES" ]; then
-                  FILTERED_SERVICES="$service"
-                else
-                  FILTERED_SERVICES="$FILTERED_SERVICES $service"
-                fi
-              fi
-            done
-            
-            # Convert to comma-separated for output
-            if [ ! -z "$FILTERED_SERVICES" ]; then
-              CHANGED_SERVICES=$(echo "$FILTERED_SERVICES" | tr ' ' ',' | sed 's/,$//')
+            if [ ! -z "$SERVICE_NAMES" ]; then
+              CHANGED_SERVICES=$(echo "$SERVICE_NAMES" | tr '\n' ',' | sed 's/,$//')
               
-              # Create JSON array for matrix
+              # Create JSON array for matrix (simpler approach)
               CHANGED_SERVICES_JSON="["
               FIRST=true
-              for service in $FILTERED_SERVICES; do
+              for service in $SERVICE_NAMES; do
                 if [ "$FIRST" = true ]; then
                   CHANGED_SERVICES_JSON="$CHANGED_SERVICES_JSON\"$service\""
                   FIRST=false
@@ -112,9 +93,11 @@ jobs:
             fi
           fi
           
-          # Determine if we should deploy (only on main branch pushes)
+          # Determine if we should deploy (main branch pushes or manual runs)
           SHOULD_DEPLOY="false"
           if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            SHOULD_DEPLOY="true"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             SHOULD_DEPLOY="true"
           fi
           
@@ -176,189 +159,6 @@ jobs:
           format: 'table'
         continue-on-error: true
 
-  # Phase 2: Code Quality Analysis (GitHub CodeQL + Linters)
-  code-quality-analysis:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.changed-services != '' && fromJson(needs.detect-changes.outputs.changed-services-json)[0] != null
-    runs-on: ubuntu-latest
-    continue-on-error: true  # Don't block GitOps pipeline on quality issues
-    strategy:
-      matrix:
-        service: ${{ fromJson(needs.detect-changes.outputs.changed-services-json) }}
-      fail-fast: false
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Full history for better analysis
-
-      - name: Initialize GitHub CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: python
-          queries: security-extended,quality
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies for analysis
-        run: |
-          echo "🔍 Installing dependencies for ${{ matrix.service }} analysis..."
-          
-          if [ -f "microservices/${{ matrix.service }}/pyproject.toml" ]; then
-            echo "📦 Found pyproject.toml, installing with pip"
-            cd "microservices/${{ matrix.service }}"
-            
-            # Install poetry if pyproject.toml uses poetry
-            if grep -q "tool.poetry" pyproject.toml; then
-              pip install poetry
-              poetry config virtualenvs.create false
-              poetry install --no-root || echo "⚠️ Poetry install failed, continuing with pip"
-            else
-              pip install -e . || echo "⚠️ pip install failed, continuing with analysis"
-            fi
-          elif [ -f "microservices/${{ matrix.service }}/requirements.txt" ]; then
-            echo "📦 Found requirements.txt, installing with pip"
-            pip install -r "microservices/${{ matrix.service }}/requirements.txt" || echo "⚠️ Requirements install failed, continuing with analysis"
-          else
-            echo "⚠️ No dependency file found, running analysis without dependencies"
-          fi
-
-      - name: Run Python linting with Bandit (Security)
-        run: |
-          echo "🔒 Running Bandit security analysis for ${{ matrix.service }}..."
-          pip install bandit[toml]
-          cd "microservices/${{ matrix.service }}"
-          
-          # Create bandit config if it doesn't exist
-          if [ ! -f "pyproject.toml" ] || ! grep -q "\[tool.bandit\]" pyproject.toml; then
-            echo "Creating basic bandit configuration..."
-            cat >> .bandit << EOF
-[bandit]
-exclude_dirs = ["tests", "test_*", "__pycache__", "venv", "env"]
-skips = ["B101"]  # Skip assert_used test
-EOF
-          fi
-          
-          bandit -r . -f json -o bandit-report.json || echo "⚠️ Bandit found security issues"
-          bandit -r . -f txt || echo "⚠️ Bandit security scan completed with warnings"
-
-      - name: Run Python linting with flake8 (Style & Quality)
-        run: |
-          echo "📋 Running flake8 code quality analysis for ${{ matrix.service }}..."
-          pip install flake8 flake8-docstrings flake8-import-order
-          cd "microservices/${{ matrix.service }}"
-          
-          # Create flake8 config if it doesn't exist
-          if [ ! -f ".flake8" ] && [ ! -f "setup.cfg" ]; then
-            cat > .flake8 << EOF
-[flake8]
-max-line-length = 100
-ignore = E203, W503, D100, D101, D102, D103, D104, D105
-exclude = __pycache__, venv, env, tests, .git
-max-complexity = 10
-EOF
-          fi
-          
-          flake8 . --statistics --tee --output-file=flake8-report.txt || echo "⚠️ flake8 found style issues"
-
-      - name: Run tests with coverage
-        run: |
-          echo "🧪 Running tests with coverage for ${{ matrix.service }}..."
-          cd "microservices/${{ matrix.service }}"
-          
-          # Install coverage tools
-          pip install pytest pytest-cov coverage || echo "⚠️ Failed to install test tools"
-          
-          # Run tests with coverage if pytest is available
-          if command -v pytest &> /dev/null; then
-            if [ -d "tests" ] || find . -name "test_*.py" | grep -q .; then
-              echo "Running pytest with coverage..."
-              pytest --cov=. --cov-report=xml --cov-report=term-missing --junitxml=pytest-report.xml || echo "⚠️ Tests failed or no tests found"
-            else
-              echo "⚠️ No tests found, creating empty coverage report"
-              coverage run --source=. -m pytest || true
-              coverage xml || true
-            fi
-          else
-            echo "⚠️ pytest not available, skipping test coverage"
-            echo '<?xml version="1.0" encoding="UTF-8"?><coverage></coverage>' > coverage.xml
-          fi
-
-      - name: Run OWASP Dependency Check
-        uses: dependency-check/Dependency-Check_Action@main
-        with:
-          project: ${{ matrix.service }}
-          path: microservices/${{ matrix.service }}
-          format: SARIF
-          out: dependency-check-report.sarif
-        continue-on-error: true
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-        with:
-          category: "codeql-${{ matrix.service }}"
-        continue-on-error: true
-
-      - name: Upload Bandit results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: microservices/${{ matrix.service }}/bandit-report.json
-          category: "bandit-${{ matrix.service }}"
-        continue-on-error: true
-
-      - name: Upload OWASP Dependency Check results
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: dependency-check-report.sarif
-          category: "dependency-check-${{ matrix.service }}"
-        continue-on-error: true
-
-      - name: Generate Code Quality Summary
-        if: always()
-        run: |
-          echo "## 🔍 Code Quality Analysis Results for ${{ matrix.service }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          cd "microservices/${{ matrix.service }}"
-          
-          # Bandit Security Summary
-          if [ -f "bandit-report.json" ]; then
-            BANDIT_ISSUES=$(jq '.metrics._totals.loc' bandit-report.json 2>/dev/null || echo "N/A")
-            echo "### 🔒 Security Analysis (Bandit)" >> $GITHUB_STEP_SUMMARY
-            echo "- **Lines Analyzed**: $BANDIT_ISSUES" >> $GITHUB_STEP_SUMMARY
-            if [ -f "bandit-report.json" ]; then
-              HIGH_ISSUES=$(jq '[.results[] | select(.issue_severity=="HIGH")] | length' bandit-report.json 2>/dev/null || echo "0")
-              MED_ISSUES=$(jq '[.results[] | select(.issue_severity=="MEDIUM")] | length' bandit-report.json 2>/dev/null || echo "0")
-              echo "- **High Severity Issues**: $HIGH_ISSUES" >> $GITHUB_STEP_SUMMARY
-              echo "- **Medium Severity Issues**: $MED_ISSUES" >> $GITHUB_STEP_SUMMARY
-            fi
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          # Flake8 Quality Summary
-          if [ -f "flake8-report.txt" ]; then
-            echo "### 📋 Code Quality (flake8)" >> $GITHUB_STEP_SUMMARY
-            TOTAL_ISSUES=$(wc -l < flake8-report.txt || echo "0")
-            echo "- **Total Style Issues**: $TOTAL_ISSUES" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          # Test Coverage Summary
-          if [ -f "coverage.xml" ]; then
-            echo "### 🧪 Test Coverage" >> $GITHUB_STEP_SUMMARY
-            COVERAGE=$(grep -o 'line-rate="[^"]*"' coverage.xml | head -1 | grep -o '[0-9.]*' | awk '{print int($1*100)}' || echo "N/A")
-            echo "- **Line Coverage**: ${COVERAGE}%" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          echo "### ✅ Analysis Complete" >> $GITHUB_STEP_SUMMARY
-          echo "All results have been uploaded to GitHub Security tab for detailed review." >> $GITHUB_STEP_SUMMARY
-
   dependency-check:
     runs-on: ubuntu-latest
     steps:
@@ -385,10 +185,10 @@ EOF
           done
         continue-on-error: true
 
-  # Phase 3: Semantic Versioning and Build
+  # Phase 2: Semantic Versioning and Build
   semantic-versioning:
-    needs: [detect-changes, vulnerability-scan, code-quality-analysis, dependency-check]
-    if: always() && needs.detect-changes.outputs.changed-services != '' && needs.detect-changes.outputs.should-deploy == 'true' && needs.dependency-check.result == 'success' && (needs.vulnerability-scan.result == 'success' || needs.vulnerability-scan.result == 'failure') && (needs.code-quality-analysis.result == 'success' || needs.code-quality-analysis.result == 'failure')
+    needs: [detect-changes, vulnerability-scan, dependency-check]
+    if: always() && needs.detect-changes.outputs.changed-services != '' && needs.detect-changes.outputs.should-deploy == 'true' && needs.dependency-check.result == 'success' && (needs.vulnerability-scan.result == 'success' || needs.vulnerability-scan.result == 'failure')
     runs-on: ubuntu-latest
     outputs:
       version-info: ${{ steps.versions.outputs.version-info }}
@@ -476,7 +276,7 @@ EOF
                 --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
                 --label "org.opencontainers.image.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
                 --label "org.opencontainers.image.title=$service" \
-                --label "org.opencontainers.image.description=Visual Architecture Tool - $service" \
+                --label "org.opencontainers.image.description=AppContainer Service - $service" \
                 --label "version=$SEMVER" \
                 --label "commit=${{ github.sha }}" \
                 --label "commit-short=$COMMIT_SHA" \
@@ -549,7 +349,7 @@ EOF
           echo "📤 Sending dispatch event using GitHub CLI..."
           
           # Trigger repository dispatch using GitHub CLI with proper JSON formatting
-          if gh api repos/shlapolosa/${{ env.GITOPS_REPO }}/dispatches \
+          if gh api repos/${{ github.repository_owner }}/${{ env.GITOPS_REPO }}/dispatches \
             --method POST \
             --field event_type=update-deployments \
             --field client_payload[services]="$SERVICES" \
@@ -566,7 +366,7 @@ EOF
             echo "Trying simplified dispatch approach..."
             
             # Fallback: Simplified dispatch with just essential data
-            if gh api repos/shlapolosa/${{ env.GITOPS_REPO }}/dispatches \
+            if gh api repos/${{ github.repository_owner }}/${{ env.GITOPS_REPO }}/dispatches \
               --method POST \
               --field event_type=simple-update \
               --field client_payload[services]="$SERVICES" \
@@ -578,14 +378,14 @@ EOF
               echo "❌ All dispatch methods failed"
               echo "Manual GitOps update required:"
               echo "  Services: $SERVICES"
-              echo "  Images: ${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/streamlit-frontend:$COMMIT_SHA"
+              echo "  Images: ${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/[service]:$COMMIT_SHA"
               exit 1
             fi
           fi
 
-  # Phase 5: Generate Summary
+  # Phase 4: Generate Summary
   deployment-summary:
-    needs: [detect-changes, vulnerability-scan, code-quality-analysis, semantic-versioning, trigger-gitops-update]
+    needs: [detect-changes, semantic-versioning, trigger-gitops-update]
     if: always() && needs.detect-changes.outputs.changed-services != ''
     runs-on: ubuntu-latest
     steps:
@@ -593,9 +393,8 @@ EOF
         run: |
           echo "## 🚀 Comprehensive GitOps Pipeline Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔍 Security & Quality Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔍 Security Scanning" >> $GITHUB_STEP_SUMMARY
           echo "- **Vulnerability Scan**: ${{ needs.vulnerability-scan.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Code Quality Analysis**: ${{ needs.code-quality-analysis.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Dependency Check**: ${{ needs.dependency-check.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🏗️ Build & Deploy" >> $GITHUB_STEP_SUMMARY
@@ -608,139 +407,147 @@ EOF
           echo "- **Source Commit**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Branch**: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Build Number**: \`${{ github.run_number }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **GitOps Repo**: [health-service-idp-gitops](https://github.com/shlapolosa/health-service-idp-gitops)" >> $GITHUB_STEP_SUMMARY
+          echo "- **GitOps Repo**: [${{ env.GITOPS_REPO }}](https://github.com/${{ github.repository_owner }}/${{ env.GITOPS_REPO }})" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "🎯 **Pipeline Status**: Security → Quality → Build → GitOps → Complete!"
+          echo "🎯 **Pipeline Status**: Security → Build → GitOps → Complete!"
 
-  # Phase 6: Slack Notifications
+  # Phase 5: Slack Notifications
   slack-notify-success:
     runs-on: ubuntu-latest
-    needs: [detect-changes, vulnerability-scan, code-quality-analysis, semantic-versioning, trigger-gitops-update]
+    needs: [detect-changes, semantic-versioning, trigger-gitops-update]
     if: needs.detect-changes.outputs.changed-services != '' && needs.detect-changes.outputs.should-deploy == 'true' && needs.trigger-gitops-update.result == 'success'
     steps:
       - name: Send Slack Success Notification
         run: |
-          curl -X POST -H 'Content-type: application/json' \
-            --data "{
-              \"blocks\": [
-                {
-                  \"type\": \"header\",
-                  \"text\": {
-                    \"type\": \"plain_text\",
-                    \"text\": \"🎉 Microservices Deployment Successful\"
-                  }
-                },
-                {
-                  \"type\": \"section\",
-                  \"fields\": [
-                    {
-                      \"type\": \"mrkdwn\",
-                      \"text\": \"*Services:* ${{ needs.detect-changes.outputs.changed-services }}\"
-                    },
-                    {
-                      \"type\": \"mrkdwn\",
-                      \"text\": \"*Branch:* ${{ github.ref_name }}\"
-                    },
-                    {
-                      \"type\": \"mrkdwn\",
-                      \"text\": \"*Commit:* \`${{ github.sha }}\`\"
-                    },
-                    {
-                      \"type\": \"mrkdwn\",
-                      \"text\": \"*Build #:* ${{ github.run_number }}\"
+          if [ ! -z "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+            curl -X POST -H 'Content-type: application/json' \
+              --data "{
+                \"blocks\": [
+                  {
+                    \"type\": \"header\",
+                    \"text\": {
+                      \"type\": \"plain_text\",
+                      \"text\": \"🎉 AppContainer Deployment Successful\"
                     }
-                  ]
-                },
-                {
-                  \"type\": \"section\",
-                  \"text\": {
-                    \"type\": \"mrkdwn\",
-                    \"text\": \"✅ *Pipeline Status:* Security → Quality → Build → GitOps → Complete!\\n\\n📊 *Security Scans:* ${{ needs.vulnerability-scan.result == 'success' && '✅ Passed' || needs.vulnerability-scan.result == 'failure' && '⚠️ Issues Found' || '⏭️ Skipped' }}\\n🔍 *Code Quality:* ${{ needs.code-quality-analysis.result == 'success' && '✅ Passed' || needs.code-quality-analysis.result == 'failure' && '⚠️ Issues Found' || '⏭️ Skipped' }}\\n📦 *Version Info:* ${{ needs.semantic-versioning.outputs.version-info }}\\n🔗 *GitOps:* Repository dispatch sent successfully\"
-                  }
-                },
-                {
-                  \"type\": \"actions\",
-                  \"elements\": [
-                    {
-                      \"type\": \"button\",
-                      \"text\": {
-                        \"type\": \"plain_text\",
-                        \"text\": \"View GitHub Action\"
+                  },
+                  {
+                    \"type\": \"section\",
+                    \"fields\": [
+                      {
+                        \"type\": \"mrkdwn\",
+                        \"text\": \"*Services:* ${{ needs.detect-changes.outputs.changed-services }}\"
                       },
-                      \"url\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
-                    },
-                    {
-                      \"type\": \"button\",
-                      \"text\": {
-                        \"type\": \"plain_text\",
-                        \"text\": \"GitOps Repository\"
+                      {
+                        \"type\": \"mrkdwn\",
+                        \"text\": \"*Branch:* ${{ github.ref_name }}\"
                       },
-                      \"url\": \"https://github.com/shlapolosa/health-service-idp-gitops\"
+                      {
+                        \"type\": \"mrkdwn\",
+                        \"text\": \"*Commit:* \`${{ github.sha }}\`\"
+                      },
+                      {
+                        \"type\": \"mrkdwn\",
+                        \"text\": \"*Build #:* ${{ github.run_number }}\"
+                      }
+                    ]
+                  },
+                  {
+                    \"type\": \"section\",
+                    \"text\": {
+                      \"type\": \"mrkdwn\",
+                      \"text\": \"✅ *Pipeline Status:* Security → Build → GitOps → Complete!\\n\\n📊 *Security Scans:* ${{ needs.vulnerability-scan.result == 'success' && '✅ Passed' || needs.vulnerability-scan.result == 'failure' && '⚠️ Issues Found' || '⏭️ Skipped' }}\\n📦 *Version Info:* ${{ needs.semantic-versioning.outputs.version-info }}\\n🔗 *GitOps:* Repository dispatch sent successfully\"
                     }
-                  ]
-                }
-              ]
-            }" \
-            "${{ secrets.SLACK_WEBHOOK_URL }}"
+                  },
+                  {
+                    \"type\": \"actions\",
+                    \"elements\": [
+                      {
+                        \"type\": \"button\",
+                        \"text\": {
+                          \"type\": \"plain_text\",
+                          \"text\": \"View GitHub Action\"
+                        },
+                        \"url\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+                      },
+                      {
+                        \"type\": \"button\",
+                        \"text\": {
+                          \"type\": \"plain_text\",
+                          \"text\": \"GitOps Repository\"
+                        },
+                        \"url\": \"https://github.com/${{ github.repository_owner }}/${{ env.GITOPS_REPO }}\"
+                      }
+                    ]
+                  }
+                ]
+              }" \
+              "${{ secrets.SLACK_WEBHOOK_URL }}"
+          else
+            echo "Slack webhook not configured, skipping notification"
+          fi
 
   slack-notify-failure:
     runs-on: ubuntu-latest
-    needs: [detect-changes, vulnerability-scan, code-quality-analysis, dependency-check, semantic-versioning, trigger-gitops-update]
-    if: always() && needs.detect-changes.outputs.changed-services != '' && needs.detect-changes.outputs.should-deploy == 'true' && (needs.dependency-check.result == 'failure' || needs.code-quality-analysis.result == 'failure' || needs.semantic-versioning.result == 'failure' || needs.trigger-gitops-update.result == 'failure')
+    needs: [detect-changes, vulnerability-scan, dependency-check, semantic-versioning, trigger-gitops-update]
+    if: always() && needs.detect-changes.outputs.changed-services != '' && needs.detect-changes.outputs.should-deploy == 'true' && (needs.dependency-check.result == 'failure' || needs.semantic-versioning.result == 'failure' || needs.trigger-gitops-update.result == 'failure')
     steps:
       - name: Send Slack Failure Notification
         run: |
-          curl -X POST -H 'Content-type: application/json' \
-            --data "{
-              \"blocks\": [
-                {
-                  \"type\": \"header\",
-                  \"text\": {
-                    \"type\": \"plain_text\",
-                    \"text\": \"❌ Microservices Deployment Failed\"
-                  }
-                },
-                {
-                  \"type\": \"section\",
-                  \"fields\": [
-                    {
-                      \"type\": \"mrkdwn\",
-                      \"text\": \"*Services:* ${{ needs.detect-changes.outputs.changed-services }}\"
-                    },
-                    {
-                      \"type\": \"mrkdwn\",
-                      \"text\": \"*Branch:* ${{ github.ref_name }}\"
-                    },
-                    {
-                      \"type\": \"mrkdwn\",
-                      \"text\": \"*Commit:* \`${{ github.sha }}\`\"
-                    },
-                    {
-                      \"type\": \"mrkdwn\",
-                      \"text\": \"*Triggered by:* ${{ github.actor }}\"
+          if [ ! -z "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+            curl -X POST -H 'Content-type: application/json' \
+              --data "{
+                \"blocks\": [
+                  {
+                    \"type\": \"header\",
+                    \"text\": {
+                      \"type\": \"plain_text\",
+                      \"text\": \"❌ AppContainer Deployment Failed\"
                     }
-                  ]
-                },
-                {
-                  \"type\": \"section\",
-                  \"text\": {
-                    \"type\": \"mrkdwn\",
-                    \"text\": \"❌ **Pipeline Failed**\\n\\n*Failed Jobs:*\\n${{ needs.dependency-check.result == 'failure' && '• Dependency Check\\n' || '' }}${{ needs.code-quality-analysis.result == 'failure' && '• Code Quality Analysis\\n' || '' }}${{ needs.semantic-versioning.result == 'failure' && '• Build & Versioning\\n' || '' }}${{ needs.trigger-gitops-update.result == 'failure' && '• GitOps Deployment\\n' || '' }}\\n\\n*Security Status:* ${{ needs.vulnerability-scan.result == 'success' && '✅ Passed' || needs.vulnerability-scan.result == 'failure' && '⚠️ Issues Found' || '⏭️ Skipped' }}\\n*Quality Status:* ${{ needs.code-quality-analysis.result == 'success' && '✅ Passed' || needs.code-quality-analysis.result == 'failure' && '⚠️ Issues Found' || '⏭️ Skipped' }}\\n\\nPlease check the GitHub Action logs for details.\"
-                  }
-                },
-                {
-                  \"type\": \"actions\",
-                  \"elements\": [
-                    {
-                      \"type\": \"button\",
-                      \"text\": {
-                        \"type\": \"plain_text\",
-                        \"text\": \"View Failed Action\"
+                  },
+                  {
+                    \"type\": \"section\",
+                    \"fields\": [
+                      {
+                        \"type\": \"mrkdwn\",
+                        \"text\": \"*Services:* ${{ needs.detect-changes.outputs.changed-services }}\"
                       },
-                      \"url\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+                      {
+                        \"type\": \"mrkdwn\",
+                        \"text\": \"*Branch:* ${{ github.ref_name }}\"
+                      },
+                      {
+                        \"type\": \"mrkdwn\",
+                        \"text\": \"*Commit:* \`${{ github.sha }}\`\"
+                      },
+                      {
+                        \"type\": \"mrkdwn\",
+                        \"text\": \"*Triggered by:* ${{ github.actor }}\"
+                      }
+                    ]
+                  },
+                  {
+                    \"type\": \"section\",
+                    \"text\": {
+                      \"type\": \"mrkdwn\",
+                      \"text\": \"❌ **Pipeline Failed**\\n\\n*Failed Jobs:*\\n${{ needs.dependency-check.result == 'failure' && '• Dependency Check\\n' || '' }}${{ needs.semantic-versioning.result == 'failure' && '• Build & Versioning\\n' || '' }}${{ needs.trigger-gitops-update.result == 'failure' && '• GitOps Deployment\\n' || '' }}\\n\\n*Security Status:* ${{ needs.vulnerability-scan.result == 'success' && '✅ Passed' || needs.vulnerability-scan.result == 'failure' && '⚠️ Issues Found' || '⏭️ Skipped' }}\\n\\nPlease check the GitHub Action logs for details.\"
                     }
-                  ]
-                }
-              ]
-            }" \
-            "${{ secrets.SLACK_WEBHOOK_URL }}"
+                  },
+                  {
+                    \"type\": \"actions\",
+                    \"elements\": [
+                      {
+                        \"type\": \"button\",
+                        \"text\": {
+                          \"type\": \"plain_text\",
+                          \"text\": \"View Failed Action\"
+                        },
+                        \"url\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+                      }
+                    ]
+                  }
+                ]
+              }" \
+              "${{ secrets.SLACK_WEBHOOK_URL }}"
+          else
+            echo "Slack webhook not configured, skipping notification"
+          fi

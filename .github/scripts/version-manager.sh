@@ -42,12 +42,6 @@ is_release_branch() {
     [[ "$branch" == "main" || "$branch" == "master" || "$branch" =~ ^release/.* ]]
 }
 
-# Function to check if this is a hotfix
-is_hotfix() {
-    local branch=$(get_branch_name)
-    [[ "$branch" =~ ^hotfix/.* ]]
-}
-
 # Function to generate semantic version
 generate_semantic_version() {
     local service_name="$1"
@@ -99,81 +93,6 @@ generate_container_tags() {
     echo "${tags[*]}"
 }
 
-# Function to update version in single OAM application file
-update_oam_version() {
-    local service_name="$1"
-    local new_image="$2"
-    local commit_sha=$(get_commit_sha)
-    local semver=$(generate_semantic_version "$service_name")
-    
-    echo "Updating OAM application for $service_name"
-    echo "New image: $new_image"
-    echo "Semantic version: $semver"
-    
-    # Single OAM application file approach
-    local oam_file="$PROJECT_ROOT/oam/applications/application.yaml"
-    
-    if [ ! -f "$oam_file" ]; then
-        echo "Error: OAM application file not found at $oam_file"
-        return 1
-    fi
-    
-    echo "Updating $oam_file"
-    
-    # Update image reference for the specific service
-    # Match the service name in the components array and update its image
-    sed -i.bak "/- name: $service_name/,/- name: /{
-        s|image: [^[:space:]]*$service_name:.*|image: $new_image|g
-    }" "$oam_file"
-    
-    # Update application-level version annotation
-    if grep -q "app.version:" "$oam_file"; then
-        sed -i.bak "s|app.version: .*|app.version: \"$semver\"|g" "$oam_file"
-    else
-        # Add version to annotations section
-        sed -i.bak "/annotations:/a\\
-    app.version: \"$semver\"" "$oam_file"
-    fi
-    
-    # Update application-level commit SHA annotation
-    if grep -q "app.commit-sha:" "$oam_file"; then
-        sed -i.bak "s|app.commit-sha: .*|app.commit-sha: \"$commit_sha\"|g" "$oam_file"
-    else
-        sed -i.bak "/annotations:/a\\
-    app.commit-sha: \"$commit_sha\"" "$oam_file"
-    fi
-    
-    # Remove backup file
-    rm -f "$oam_file.bak"
-    
-    echo "Successfully updated $service_name image in OAM application"
-}
-
-# Function to create version summary
-create_version_summary() {
-    local service_name="$1"
-    local commit_sha=$(get_commit_sha)
-    local branch=$(get_branch_name)
-    local semver=$(generate_semantic_version "$service_name")
-    local container_tags=$(generate_container_tags "$service_name")
-    
-    cat << EOF
-## 🏷️ Version Information for $service_name
-
-**Semantic Version:** \`$semver\`
-**Commit SHA:** \`$commit_sha\`
-**Branch:** \`$branch\`
-
-### 📦 Container Tags
-$(echo "$container_tags" | tr ',' '\n' | sed 's/^/- `/' | sed 's/$/`/')
-
-### 📅 Build Information
-- **Timestamp:** $(date -u +"%Y-%m-%dT%H:%M:%SZ")
-- **Build Number:** $(get_patch_version)
-- **Is Release:** $(is_release_branch && echo "Yes" || echo "No")
-EOF
-}
-
 # Main function
 main() {
     local command="$1"
@@ -187,40 +106,19 @@ main() {
         "tags")
             generate_container_tags "$service_name" "$registry"
             ;;
-        "update-oam")
-            local new_image="$registry/$service_name:$(get_commit_sha)"
-            update_oam_version "$service_name" "$new_image"
-            ;;
-        "summary")
-            create_version_summary "$service_name"
-            ;;
-        "increment-major")
-            echo "$((MAJOR_VERSION + 1)).0" > "$BASE_VERSION_FILE"
-            echo "Incremented major version to $((MAJOR_VERSION + 1)).0.0"
-            ;;
-        "increment-minor")
-            echo "$MAJOR_VERSION.$((MINOR_VERSION + 1))" > "$BASE_VERSION_FILE"
-            echo "Incremented minor version to $MAJOR_VERSION.$((MINOR_VERSION + 1)).0"
-            ;;
         "help"|*)
-            cat << EOF
+            cat << HELP_EOF
 Usage: $0 <command> [service_name] [registry]
 
 Commands:
   version <service>           Generate semantic version
   tags <service> [registry]   Generate container tags
-  update-oam <service>        Update OAM applications with new version
-  summary <service>           Create version summary
-  increment-major             Increment major version
-  increment-minor             Increment minor version
   help                        Show this help
 
 Examples:
-  $0 version streamlit-frontend
-  $0 tags orchestration-service
-  $0 update-oam streamlit-frontend
-  $0 summary streamlit-frontend
-EOF
+  $0 version accommodation-service
+  $0 tags accommodation-service
+HELP_EOF
             ;;
     esac
 }
