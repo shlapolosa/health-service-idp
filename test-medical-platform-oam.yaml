@@ -1,0 +1,44 @@
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: medical-platform
+  namespace: default
+  labels:
+    app-container: "medical-records-api"  # Using the same app container as the service we just created
+spec:
+  components:
+    - name: medical-records-api  # Same name - should trigger idempotency
+      type: webservice
+      properties:
+        image: nginx:latest
+        cpu: "100m"
+        memory: "128Mi"
+        language: "python"
+        framework: "fastapi"
+        database: "postgresql"
+        cache: "redis"
+    - name: prescription-service  # New service to add to the same monorepo
+      type: webservice
+      properties:
+        image: nginx:latest
+        cpu: "100m"
+        memory: "128Mi"
+        language: "python"
+        framework: "fastapi"
+        database: "postgresql"
+        cache: "none"
+    - name: appointment-scheduler  # Another new service
+      type: webservice
+      properties:
+        image: nginx:latest
+        cpu: "100m"
+        memory: "128Mi"
+        language: "java"
+        framework: "springboot"
+        database: "postgresql"
+        cache: "redis"
+  policies:
+    - name: topology-policy
+      type: topology
+      properties:
+        clusters: ["local"]

@@ -1,0 +1,45 @@
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: health-platform-services
+  namespace: default
+  labels:
+    app-container: "health-service-idp"  # This will be the monorepo name
+spec:
+  components:
+    - name: patient-api
+      type: webservice
+      properties:
+        image: nginx:latest
+        cpu: "100m"
+        memory: "128Mi"
+        language: "python"
+        framework: "fastapi"
+        database: "postgresql"
+        cache: "redis"
+    - name: appointment-service
+      type: webservice
+      properties:
+        image: nginx:latest
+        cpu: "100m"
+        memory: "128Mi"
+        language: "java"
+        framework: "springboot"
+        database: "postgresql"
+        cache: "none"
+    - name: notification-service
+      type: webservice
+      properties:
+        image: nginx:latest
+        cpu: "100m"
+        memory: "128Mi"
+        language: "python"
+        framework: "fastapi"
+        database: "none"
+        cache: "redis"
+        realtime: "mqtt-platform"
+  policies:
+    - name: topology-policy
+      type: topology
+      properties:
+        clusters: ["local"]

@@ -1,0 +1,153 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: oam-microservice-creator
+  namespace: default
+webhooks:
+  - name: oam-microservice-creator.default.svc.cluster.local
+    clientConfig:
+      service:
+        name: slack-api-server
+        namespace: default
+        path: "/oam/webhook"
+        port: 8000
+    rules:
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: ["core.oam.dev"]
+        apiVersions: ["v1beta1"]
+        resources: ["applications"]
+    admissionReviewVersions: ["v1", "v1beta1"]
+    sideEffects: None
+    failurePolicy: Ignore  # Don't block deployments if webhook is down
+    matchPolicy: Exact
+    namespaceSelector:
+      matchLabels:
+        oam-webhook: "enabled"  # Only trigger for labeled namespaces initially
+    timeoutSeconds: 10
+---
+# Update the Slack API server deployment to handle webhook traffic
+apiVersion: v1
+kind: Service
+metadata:
+  name: slack-api-server
+  namespace: default
+spec:
+  selector:
+    app: slack-api-server
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+      name: http
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: slack-api-server
+  namespace: default
+  labels:
+    app: slack-api-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: slack-api-server
+  template:
+    metadata:
+      labels:
+        app: slack-api-server
+    spec:
+      serviceAccountName: slack-api-sa
+      containers:
+      - name: slack-api-server
+        image: docker.io/socrates12345/slack-api-server:latest
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: ARGO_SERVER_URL
+          value: "https://argo-server.argo:2746"
+        - name: ARGO_NAMESPACE
+          value: "argo"
+        - name: ARGO_TOKEN_FILE
+          value: "/var/run/secrets/argo/token"
+        - name: SLACK_SIGNING_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: slack-credentials
+              key: signing-secret
+              optional: true
+        - name: PERSONAL_ACCESS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: github-credentials
+              key: token
+              optional: true
+        volumeMounts:
+        - name: argo-token
+          mountPath: /var/run/secrets/argo
+          readOnly: true
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: argo-token
+        secret:
+          secretName: argo-server-token
+          optional: true
+---
+# ServiceAccount with necessary permissions
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: slack-api-sa
+  namespace: default
+---
+# ClusterRole for reading OAM Applications
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: oam-application-reader
+rules:
+- apiGroups: ["core.oam.dev"]
+  resources: ["applications"]
+  verbs: ["get", "list", "watch"]
+---
+# ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: slack-api-oam-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: oam-application-reader
+subjects:
+- kind: ServiceAccount
+  name: slack-api-sa
+  namespace: default
+---
+# Label the default namespace to enable webhook
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: default
+  labels:
+    oam-webhook: "enabled"

@@ -1,0 +1,98 @@
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: medical-platform
+  namespace: default
+  labels:
+    app-container: "medical-records-api"
+    managed-by: "gitops"
+    version: "v2"  # Updated version
+spec:
+  components:
+    # Existing service - should trigger idempotency
+    - name: medical-records-api
+      type: webservice
+      properties:
+        image: docker.io/socrates12345/medical-records-api:latest
+        cpu: "200m"  # Increased resources
+        memory: "512Mi"
+        language: "python"
+        framework: "fastapi"
+        database: "postgresql"
+        cache: "redis"
+        port: 8080
+        
+    # Services from v1
+    - name: prescription-service
+      type: webservice
+      properties:
+        image: nginx:latest
+        cpu: "100m"
+        memory: "256Mi"
+        language: "python"
+        framework: "fastapi"
+        database: "postgresql"
+        cache: "none"
+        port: 8081
+        
+    - name: appointment-scheduler
+      type: webservice
+      properties:
+        image: nginx:latest
+        cpu: "200m"
+        memory: "512Mi"
+        language: "java"
+        framework: "springboot"
+        database: "postgresql"
+        cache: "redis"
+        port: 8082
+        
+    - name: patient-portal
+      type: webservice
+      properties:
+        image: nginx:latest
+        cpu: "100m"
+        memory: "256Mi"
+        language: "typescript"
+        framework: "nextjs"
+        database: "none"
+        cache: "redis"
+        port: 3000
+        
+    # NEW services in v2
+    - name: billing-service
+      type: webservice
+      properties:
+        image: nginx:latest
+        cpu: "150m"
+        memory: "384Mi"
+        language: "java"
+        framework: "springboot"
+        database: "postgresql"
+        cache: "redis"
+        port: 8083
+        
+    - name: lab-results-api
+      type: webservice
+      properties:
+        image: nginx:latest
+        cpu: "100m"
+        memory: "256Mi"
+        language: "python"
+        framework: "fastapi"
+        database: "postgresql"
+        cache: "none"
+        port: 8084
+        realtime: "mqtt-platform"  # With realtime integration
+        
+  policies:
+    - name: topology-policy
+      type: topology
+      properties:
+        clusters: ["local"]
+        
+    - name: health-policy
+      type: health
+      properties:
+        probeInterval: 30
+        probeTimeout: 10

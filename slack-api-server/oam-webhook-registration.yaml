@@ -1,0 +1,21 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: aaa-oam-webhook
+webhooks:
+  - name: oam-application-webhook.default.svc
+    clientConfig:
+      service:
+        name: slack-api-server
+        namespace: default
+        path: "/oam/webhook"
+        port: 8000
+    rules:
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: ["core.oam.dev"]
+        apiVersions: ["v1beta1"]
+        resources: ["applications"]
+    admissionReviewVersions: ["v1", "v1beta1"]
+    sideEffects: None
+    failurePolicy: Ignore  # Don't block if webhook is unavailable
+    timeoutSeconds: 10

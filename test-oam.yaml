@@ -1,0 +1,11 @@
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: test-webhook-v3
+  namespace: default
+spec:
+  components:
+  - name: test-component
+    type: webservice
+    properties:
+      image: nginx:latest
