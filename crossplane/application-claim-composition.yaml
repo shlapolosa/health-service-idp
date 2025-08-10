@@ -445,6 +445,12 @@ spec:
                       set -e
                       echo "🔗 Registering vCluster with ArgoCD for OAM deployment..."
                       
+                      # Skip if deploying to host cluster
+                      if [ "${VCLUSTER_NAME}" = "host" ] || [ -z "${VCLUSTER_NAME}" ]; then
+                        echo "🏠 Deploying to host cluster - skipping vCluster registration"
+                        exit 0
+                      fi
+                      
                       # Install required tools
                       apk add --no-cache curl jq
                       
@@ -529,8 +535,13 @@ spec:
       - type: string
         string:
           fmt: "%s-register-argocd"
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
+    - type: CombineFromComposite
+      combine:
+        variables:
+        - fromFieldPath: spec.name
+        strategy: string
+        string:
+          fmt: "default"
       toFieldPath: spec.forProvider.manifest.metadata.namespace
     - type: FromCompositeFieldPath
       fromFieldPath: spec.name
@@ -665,7 +676,7 @@ spec:
                           type: $COMPONENT_TYPE
                           properties:
                             name: $SERVICE_NAME
-                            image: $SERVICE_NAME:latest
+                            image: docker.io/socrates12345/$SERVICE_NAME:latest
                             language: $LANGUAGE
                             framework: $FRAMEWORK
                             port: $COMPONENT_PORT
@@ -738,28 +749,43 @@ spec:
                       fi
                       
                       # Add or update topology policy for multi-cluster deployment
-                      echo "🎯 Adding topology policy for vCluster deployment..."
-                      if ! grep -q "policies:" oam/applications/application.yaml; then
-                        echo "  policies:" >> oam/applications/application.yaml
-                        echo "  - name: deploy-to-vcluster" >> oam/applications/application.yaml
-                        echo "    type: topology" >> oam/applications/application.yaml
-                        echo "    properties:" >> oam/applications/application.yaml
-                        echo "      clusters: [\"$VCLUSTER_TARGET\"]" >> oam/applications/application.yaml
-                        echo "      namespace: \"$SERVICE_NAME\"" >> oam/applications/application.yaml
-                      else
-                        # Update existing policy
+                      # Check if targetVCluster is "host" - if so, skip topology policy
+                      if [ "$VCLUSTER_TARGET" = "host" ]; then
+                        echo "🏠 Deploying to host cluster - skipping topology policy"
+                        # Remove any existing topology policy if present
                         if grep -q "deploy-to-vcluster" oam/applications/application.yaml; then
-                          echo "🔄 Updating existing topology policy..."
-                          # Update the clusters line
-                          sed -i "s/clusters: \[.*\]/clusters: [\"$VCLUSTER_TARGET\"]/" oam/applications/application.yaml
-                          sed -i "s/namespace: \".*\"/namespace: \"$SERVICE_NAME\"/" oam/applications/application.yaml
-                        else
-                          # Add new policy to existing policies section
+                          echo "Removing existing topology policy for host deployment..."
+                          # Remove the policy section
+                          sed -i '/- name: deploy-to-vcluster/,+4d' oam/applications/application.yaml
+                          # If policies section is now empty, remove it too
+                          if grep -q "policies: \[\]" oam/applications/application.yaml; then
+                            sed -i '/policies: \[\]/d' oam/applications/application.yaml
+                          fi
+                        fi
+                      else
+                        echo "🎯 Adding topology policy for vCluster deployment..."
+                        if ! grep -q "policies:" oam/applications/application.yaml; then
+                          echo "  policies:" >> oam/applications/application.yaml
                           echo "  - name: deploy-to-vcluster" >> oam/applications/application.yaml
                           echo "    type: topology" >> oam/applications/application.yaml
                           echo "    properties:" >> oam/applications/application.yaml
                           echo "      clusters: [\"$VCLUSTER_TARGET\"]" >> oam/applications/application.yaml
-                          echo "      namespace: \"$SERVICE_NAME\"" >> oam/applications/application.yaml
+                          echo "      namespace: \"default\"" >> oam/applications/application.yaml
+                        else
+                          # Update existing policy
+                          if grep -q "deploy-to-vcluster" oam/applications/application.yaml; then
+                            echo "🔄 Updating existing topology policy..."
+                            # Update the clusters line
+                            sed -i "s/clusters: \[.*\]/clusters: [\"$VCLUSTER_TARGET\"]/" oam/applications/application.yaml
+                            sed -i "s/namespace: \".*\"/namespace: \"default\"/" oam/applications/application.yaml
+                          else
+                            # Add new policy to existing policies section
+                            echo "  - name: deploy-to-vcluster" >> oam/applications/application.yaml
+                            echo "    type: topology" >> oam/applications/application.yaml
+                            echo "    properties:" >> oam/applications/application.yaml
+                            echo "      clusters: [\"$VCLUSTER_TARGET\"]" >> oam/applications/application.yaml
+                            echo "      namespace: \"default\"" >> oam/applications/application.yaml
+                          fi
                         fi
                       fi
                       
@@ -789,18 +815,22 @@ spec:
                       EOF
                       
                       # Create OAM Application for vCluster KubeVela processing
+                      # ALWAYS use default namespace for OAM Application (where WorkloadDefinitions exist)
+                      # The topology policy will handle deployment to the correct location
+                      OAM_NAMESPACE="default"
+                      
                       cat > vcluster/$VCLUSTER_TARGET/applications/$SERVICE_NAME/oam-application.yaml << EOF
                       apiVersion: core.oam.dev/v1beta1
                       kind: Application
                       metadata:
                         name: $SERVICE_NAME-app
-                        namespace: default
+                        namespace: $OAM_NAMESPACE
                       spec:
                         components:
                         - name: $SERVICE_NAME
                           type: webservice
                           properties:
-                            image: "docker.io/socrates12345/$SERVICE_NAME:latest"
+                            image: "docker.io/socrates12345/$SERVICE_NAME:v1.0.0"
                             port: 8080
                             healthPath: "/health"
                             language: $LANGUAGE

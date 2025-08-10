@@ -918,6 +918,83 @@ spec:
                       echo "Verifying cluster registration..."
                       if vela cluster list | grep -q ${VCLUSTER_NAME}; then
                         echo "✅ vCluster ${VCLUSTER_NAME} successfully registered with KubeVela"
+                        
+                        # Create namespace in vCluster for OAM deployment
+                        echo "Creating namespace ${VCLUSTER_NAME} in vCluster..."
+                        export KUBECONFIG=/tmp/vcluster.kubeconfig
+                        kubectl create namespace ${VCLUSTER_NAME} --dry-run=client -o yaml | kubectl apply -f -
+                        echo "✅ Namespace ${VCLUSTER_NAME} created in vCluster"
+                        
+                        # Also create the default namespace if not exists (for KubeVela)
+                        kubectl create namespace default --dry-run=client -o yaml | kubectl apply -f -
+                        
+                        # Create knative-docker-sa service account in default namespace
+                        echo "Creating knative-docker-sa service account in default namespace..."
+                        kubectl create serviceaccount knative-docker-sa -n default --dry-run=client -o yaml | kubectl apply -f -
+                        
+                        # Copy docker registry secret to vCluster default namespace
+                        echo "Copying docker registry secret to vCluster..."
+                        unset KUBECONFIG
+                        kubectl get secret docker-registry-secret -n default -o yaml 2>/dev/null | \
+                          sed 's/namespace: default/namespace: default/' | \
+                          KUBECONFIG=/tmp/vcluster.kubeconfig kubectl apply -f - || \
+                          echo "Note: docker-registry-secret not found in host cluster, skipping"
+                        export KUBECONFIG=/tmp/vcluster.kubeconfig
+                        
+                        # Apply webservice WorkloadDefinition to vCluster for Knative support
+                        echo "Applying webservice WorkloadDefinition to vCluster..."
+                        cat <<'WD_EOF' | kubectl apply -f -
+                        apiVersion: core.oam.dev/v1beta1
+                        kind: WorkloadDefinition
+                        metadata:
+                          name: webservice
+                          namespace: default
+                          annotations:
+                            definition.oam.dev/description: "Knative Service workload for serverless deployment"
+                        spec:
+                          definitionRef:
+                            name: services.serving.knative.dev
+                          schematic:
+                            cue:
+                              template: |
+                                output: {
+                                  apiVersion: "serving.knative.dev/v1"
+                                  kind: "Service"
+                                  metadata: {
+                                    name: context.name
+                                    namespace: context.namespace
+                                  }
+                                  spec: {
+                                    template: {
+                                      metadata: {
+                                        annotations: {
+                                          "autoscaling.knative.dev/minScale": "0"
+                                          "autoscaling.knative.dev/maxScale": "10"
+                                        }
+                                      }
+                                      spec: {
+                                        containers: [{
+                                          image: parameter.image
+                                          ports: [{
+                                            containerPort: parameter.port
+                                          }]
+                                          resources: {
+                                            limits: {
+                                              cpu: "500m"
+                                              memory: "512Mi"
+                                            }
+                                          }
+                                        }]
+                                      }
+                                    }
+                                  }
+                                }
+                                parameter: {
+                                  image: string
+                                  port: *8080 | int
+                                }
+                        WD_EOF
+                        echo "✅ WorkloadDefinition applied to vCluster"
                       else
                         echo "⚠️ vCluster registration may have failed, please check manually"
                       fi

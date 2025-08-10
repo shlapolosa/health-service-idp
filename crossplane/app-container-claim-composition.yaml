@@ -562,12 +562,13 @@ spec:
                       mkdir -p .github/workflows
                       
                       # Create blank OAM Application template
+                      # Always use default namespace for OAM (where WorkloadDefinitions exist)
                       cat > oam/applications/application.yaml << EOF
                       apiVersion: core.oam.dev/v1beta1
                       kind: Application
                       metadata:
                         name: $APP_NAME
-                        namespace: $APP_NAME
+                        namespace: default
                       spec:
                         components:
                         - name: $APP_NAME

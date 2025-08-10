@@ -1127,7 +1127,13 @@ spec:
         VCLUSTER_NAME="{{inputs.parameters.target-vcluster}}"
         AUTO_CREATE="{{inputs.parameters.auto-create-dependencies}}"
         
-        echo "🔍 Checking if vCluster exists: $VCLUSTER_NAME"
+        echo "🔍 Checking deployment target: $VCLUSTER_NAME"
+        
+        # Check if deploying to host cluster
+        if [ "$VCLUSTER_NAME" = "host" ]; then
+          echo "🏠 Deploying to host cluster - skipping vCluster creation"
+          exit 0
+        fi
         
         # The vCluster name has already been determined (either specified or defaulted to repo name)
         if [ -z "$VCLUSTER_NAME" ] || [ "$VCLUSTER_NAME" = "" ]; then

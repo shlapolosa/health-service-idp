@@ -1,0 +1,26 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: crossplane-argocd-access
+  namespace: argocd
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create", "get", "list", "watch", "update", "patch"]
+- apiGroups: ["argoproj.io"]
+  resources: ["applications"]
+  verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: crossplane-argocd-access
+  namespace: argocd
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: crossplane-argocd-access
+subjects:
+- kind: ServiceAccount
+  name: crossplane-github-provider
+  namespace: default
