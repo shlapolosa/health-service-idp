@@ -14,9 +14,11 @@ from fastapi.responses import JSONResponse
 from ..application.use_cases import (HealthCheckUseCase,
                                      ProcessSlackCommandUseCase,
                                      VerifySlackRequestUseCase)
+from ..application.oam_use_cases import ProcessOAMWebhook
 from ..domain.models import InvalidSlackCommandError, SlackCommand
 from .dependencies import (get_process_slack_command_use_case,
-                           get_verify_slack_request_use_case)
+                           get_verify_slack_request_use_case,
+                           get_process_oam_webhook_use_case)
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +142,66 @@ class SlackController:
             raise HTTPException(status_code=500, detail="Internal server error")
 
 
+class OAMWebhookController:
+    """Controller for OAM webhook endpoints."""
+    
+    async def oam_webhook(
+        self,
+        request: Request,
+        process_use_case: ProcessOAMWebhook = Depends(get_process_oam_webhook_use_case)
+    ) -> Dict[str, Any]:
+        """Handle OAM Application admission webhook.
+        
+        This endpoint receives admission review requests from Kubernetes
+        when OAM Applications are created or updated, and triggers
+        corresponding microservice creation workflows.
+        """
+        try:
+            # Parse admission review request
+            body = await request.body()
+            try:
+                admission_request = json.loads(body.decode("utf-8"))
+            except json.JSONDecodeError:
+                logger.error("Invalid JSON in OAM webhook request")
+                # Return admission response that allows but logs error
+                return {
+                    "apiVersion": "admission.k8s.io/v1",
+                    "kind": "AdmissionReview",
+                    "response": {
+                        "uid": "unknown",
+                        "allowed": True,
+                        "status": {
+                            "message": "Invalid JSON payload"
+                        }
+                    }
+                }
+            
+            # Process the OAM webhook
+            admission_response = process_use_case.execute(admission_request)
+            
+            logger.info(
+                f"Processed OAM webhook for Application: "
+                f"{admission_request.get('request', {}).get('object', {}).get('metadata', {}).get('name', 'unknown')}"
+            )
+            
+            return admission_response
+            
+        except Exception as e:
+            logger.error(f"Unexpected error in oam_webhook: {e}", exc_info=True)
+            # Always allow to avoid blocking deployments
+            return {
+                "apiVersion": "admission.k8s.io/v1",
+                "kind": "AdmissionReview",
+                "response": {
+                    "uid": admission_request.get("request", {}).get("uid", "unknown") if 'admission_request' in locals() else "unknown",
+                    "allowed": True,
+                    "status": {
+                        "message": f"Error processing webhook: {str(e)}"
+                    }
+                }
+            }
+
+
 def create_slack_app() -> FastAPI:
     """Create and configure FastAPI application."""
     app = FastAPI(
@@ -150,20 +212,25 @@ def create_slack_app() -> FastAPI:
         redoc_url="/redoc",
     )
 
-    # Initialize controller
-    controller = SlackController()
+    # Initialize controllers
+    slack_controller = SlackController()
+    oam_controller = OAMWebhookController()
 
     # Register routes
     app.add_api_route(
-        "/health", controller.health_check, methods=["GET"], tags=["health"]
+        "/health", slack_controller.health_check, methods=["GET"], tags=["health"]
     )
 
     app.add_api_route(
-        "/slack/command", controller.slack_command, methods=["POST"], tags=["slack"]
+        "/slack/command", slack_controller.slack_command, methods=["POST"], tags=["slack"]
     )
 
     app.add_api_route(
-        "/slack/events", controller.slack_events, methods=["POST"], tags=["slack"]
+        "/slack/events", slack_controller.slack_events, methods=["POST"], tags=["slack"]
+    )
+    
+    app.add_api_route(
+        "/oam/webhook", oam_controller.oam_webhook, methods=["POST"], tags=["oam"]
     )
 
     # Add middleware for logging

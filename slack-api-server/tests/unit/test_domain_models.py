@@ -12,7 +12,8 @@ from src.domain.models import (AppContainerRequest, Capability, CapabilitySet,
                                InvalidVClusterRequestError, 
                                MicroserviceRequest, MicroserviceLanguage, 
                                MicroserviceDatabase, MicroserviceCache,
-                               ParsedCommand,
+                               OAMComponent, OAMApplication, OAMWebhookRequest,
+                               OAMWebhookResponse, ParsedCommand,
                                ResourceSpec, SlackCommand, VClusterRequest,
                                VClusterSize)
 
@@ -505,6 +506,7 @@ class TestMicroserviceRequest:
             "language": "java",
             "database": "postgres",  # Note: postgresql -> postgres mapping
             "cache": "redis",
+            "realtime": "",
             "description": "Order processing service",
             "github-org": "ecommerce",
             "docker-registry": "registry.ecommerce.com/services",
@@ -608,3 +610,335 @@ class TestMicroserviceEnums:
         """Test MicroserviceCache enum."""
         assert MicroserviceCache.NONE.value == "none"
         assert MicroserviceCache.REDIS.value == "redis"
+
+
+class TestOAMComponent:
+    """Test OAMComponent model."""
+    
+    def test_valid_oam_component(self):
+        """Test creating a valid OAMComponent."""
+        component = OAMComponent(
+            name="user-service",
+            type="webservice",
+            properties={"language": "python", "framework": "fastapi"},
+            traits=[{"type": "ingress", "properties": {"domain": "example.com"}}]
+        )
+        
+        assert component.name == "user-service"
+        assert component.type == "webservice"
+        assert component.properties["language"] == "python"
+        assert component.properties["framework"] == "fastapi"
+        assert len(component.traits) == 1
+        assert component.traits[0]["type"] == "ingress"
+    
+    def test_is_webservice(self):
+        """Test is_webservice method."""
+        web_component = OAMComponent(
+            name="api",
+            type="webservice",
+            properties={}
+        )
+        assert web_component.is_webservice() is True
+        
+        other_component = OAMComponent(
+            name="db",
+            type="database",
+            properties={}
+        )
+        assert other_component.is_webservice() is False
+    
+    def test_get_language(self):
+        """Test get_language method."""
+        component = OAMComponent(
+            name="service",
+            type="webservice",
+            properties={"language": "java"}
+        )
+        assert component.get_language() == "java"
+        
+        # Test default
+        component_no_lang = OAMComponent(
+            name="service",
+            type="webservice",
+            properties={}
+        )
+        assert component_no_lang.get_language() == "python"
+    
+    def test_get_framework(self):
+        """Test get_framework method."""
+        component = OAMComponent(
+            name="service",
+            type="webservice",
+            properties={"framework": "springboot"}
+        )
+        assert component.get_framework() == "springboot"
+        
+        # Test default
+        component_no_framework = OAMComponent(
+            name="service",
+            type="webservice",
+            properties={}
+        )
+        assert component_no_framework.get_framework() == "fastapi"
+
+
+class TestOAMApplication:
+    """Test OAMApplication model."""
+    
+    def test_valid_oam_application(self):
+        """Test creating a valid OAMApplication."""
+        components = [
+            OAMComponent(
+                name="api",
+                type="webservice",
+                properties={"language": "python"}
+            ),
+            OAMComponent(
+                name="worker",
+                type="webservice",
+                properties={"language": "python"}
+            )
+        ]
+        
+        policies = [
+            {"type": "topology", "properties": {"clusters": ["vcluster-1"]}}
+        ]
+        
+        app = OAMApplication(
+            name="my-app",
+            namespace="production",
+            components=components,
+            policies=policies,
+            labels={"app-container": "my-monorepo"},
+            annotations={"version": "1.0.0"}
+        )
+        
+        assert app.name == "my-app"
+        assert app.namespace == "production"
+        assert len(app.components) == 2
+        assert app.components[0].name == "api"
+        assert len(app.policies) == 1
+        assert app.labels["app-container"] == "my-monorepo"
+        assert app.annotations["version"] == "1.0.0"
+    
+    def test_get_app_container(self):
+        """Test get_app_container method."""
+        app = OAMApplication(
+            name="app",
+            namespace="default",
+            components=[],
+            labels={"app-container": "healthcare-platform"}
+        )
+        assert app.get_app_container() == "healthcare-platform"
+        
+        # Test without label
+        app_no_label = OAMApplication(
+            name="app",
+            namespace="default",
+            components=[],
+            labels={}
+        )
+        assert app_no_label.get_app_container() is None
+    
+    def test_get_target_vcluster(self):
+        """Test get_target_vcluster method."""
+        app = OAMApplication(
+            name="app",
+            namespace="default",
+            components=[],
+            policies=[
+                {"type": "topology", "properties": {"clusters": ["cluster-1", "cluster-2"]}}
+            ]
+        )
+        assert app.get_target_vcluster() == "cluster-1"
+        
+        # Test without topology policy
+        app_no_topology = OAMApplication(
+            name="app",
+            namespace="default",
+            components=[],
+            policies=[
+                {"type": "other", "properties": {}}
+            ]
+        )
+        assert app_no_topology.get_target_vcluster() is None
+        
+        # Test with empty clusters
+        app_empty_clusters = OAMApplication(
+            name="app",
+            namespace="default",
+            components=[],
+            policies=[
+                {"type": "topology", "properties": {"clusters": []}}
+            ]
+        )
+        assert app_empty_clusters.get_target_vcluster() is None
+    
+    def test_get_webservice_components(self):
+        """Test get_webservice_components method."""
+        components = [
+            OAMComponent(name="api", type="webservice", properties={}),
+            OAMComponent(name="db", type="database", properties={}),
+            OAMComponent(name="worker", type="webservice", properties={}),
+            OAMComponent(name="cache", type="redis", properties={})
+        ]
+        
+        app = OAMApplication(
+            name="app",
+            namespace="default",
+            components=components
+        )
+        
+        webservices = app.get_webservice_components()
+        assert len(webservices) == 2
+        assert webservices[0].name == "api"
+        assert webservices[1].name == "worker"
+
+
+class TestOAMWebhookRequest:
+    """Test OAMWebhookRequest model."""
+    
+    def test_valid_oam_webhook_request(self):
+        """Test creating a valid OAMWebhookRequest."""
+        app = OAMApplication(
+            name="test-app",
+            namespace="default",
+            components=[
+                OAMComponent(name="api", type="webservice", properties={})
+            ],
+            labels={"app-container": "monorepo"}
+        )
+        
+        request = OAMWebhookRequest(
+            uid="abc-123",
+            operation="CREATE",
+            oam_application=app,
+            dry_run=False
+        )
+        
+        assert request.uid == "abc-123"
+        assert request.operation == "CREATE"
+        assert request.oam_application.name == "test-app"
+        assert request.dry_run is False
+    
+    def test_should_process_create(self):
+        """Test should_process for CREATE operation."""
+        app = OAMApplication(
+            name="app",
+            namespace="default",
+            components=[
+                OAMComponent(name="api", type="webservice", properties={})
+            ],
+            labels={"app-container": "monorepo"}
+        )
+        
+        request = OAMWebhookRequest(
+            uid="123",
+            operation="CREATE",
+            oam_application=app
+        )
+        assert request.should_process() is True
+    
+    def test_should_process_update(self):
+        """Test should_process for UPDATE operation."""
+        app = OAMApplication(
+            name="app",
+            namespace="default",
+            components=[
+                OAMComponent(name="api", type="webservice", properties={})
+            ],
+            labels={"app-container": "monorepo"}
+        )
+        
+        request = OAMWebhookRequest(
+            uid="123",
+            operation="UPDATE",
+            oam_application=app
+        )
+        assert request.should_process() is True
+    
+    def test_should_not_process_delete(self):
+        """Test should_process for DELETE operation."""
+        app = OAMApplication(
+            name="app",
+            namespace="default",
+            components=[
+                OAMComponent(name="api", type="webservice", properties={})
+            ],
+            labels={"app-container": "monorepo"}
+        )
+        
+        request = OAMWebhookRequest(
+            uid="123",
+            operation="DELETE",
+            oam_application=app
+        )
+        assert request.should_process() is False
+    
+    def test_should_not_process_no_app_container(self):
+        """Test should_process without app-container label."""
+        app = OAMApplication(
+            name="app",
+            namespace="default",
+            components=[
+                OAMComponent(name="api", type="webservice", properties={})
+            ],
+            labels={}  # No app-container label
+        )
+        
+        request = OAMWebhookRequest(
+            uid="123",
+            operation="CREATE",
+            oam_application=app
+        )
+        assert request.should_process() is False
+    
+    def test_should_not_process_no_webservices(self):
+        """Test should_process without webservice components."""
+        app = OAMApplication(
+            name="app",
+            namespace="default",
+            components=[
+                OAMComponent(name="db", type="database", properties={})
+            ],
+            labels={"app-container": "monorepo"}
+        )
+        
+        request = OAMWebhookRequest(
+            uid="123",
+            operation="CREATE",
+            oam_application=app
+        )
+        assert request.should_process() is False
+
+
+class TestOAMWebhookResponse:
+    """Test OAMWebhookResponse model."""
+    
+    def test_valid_oam_webhook_response(self):
+        """Test creating a valid OAMWebhookResponse."""
+        response = OAMWebhookResponse(
+            uid="abc-123",
+            allowed=True,
+            message="Processing successful",
+            triggered_workflows=["api-workflow", "worker-workflow"]
+        )
+        
+        assert response.uid == "abc-123"
+        assert response.allowed is True
+        assert response.message == "Processing successful"
+        assert len(response.triggered_workflows) == 2
+        assert response.triggered_workflows[0] == "api-workflow"
+        assert response.triggered_workflows[1] == "worker-workflow"
+    
+    def test_minimal_response(self):
+        """Test creating a minimal OAMWebhookResponse."""
+        response = OAMWebhookResponse(
+            uid="123",
+            allowed=True
+        )
+        
+        assert response.uid == "123"
+        assert response.allowed is True
+        assert response.message is None
+        assert response.triggered_workflows == []

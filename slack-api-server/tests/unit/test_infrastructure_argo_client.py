@@ -76,11 +76,12 @@ class TestArgoWorkflowsClient:
         # Verify workflow spec structure
         workflow_spec = call_args[1]["json"]
         assert workflow_spec["namespace"] == "argo"
-        assert workflow_spec["workflow"]["spec"]["workflowTemplateRef"]["name"] == "vcluster-creation"
+        assert workflow_spec["workflow"]["spec"]["workflowTemplateRef"]["name"] == "vcluster-standard-contract"
         
-        # Verify parameters
+        # Verify parameters - now uses standard contract naming
         params = {p["name"]: p["value"] for p in workflow_spec["workflow"]["spec"]["arguments"]["parameters"]}
-        assert params["vcluster-name"] == "test-cluster"
+        assert params["resource-name"] == "test-cluster"
+        assert params["resource-type"] == "vcluster"
         assert params["namespace"] == "default"
         assert params["user"] == "testuser"
         assert params["slack-channel"] == "C123"

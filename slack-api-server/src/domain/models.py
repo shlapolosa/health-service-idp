@@ -3,10 +3,10 @@ Domain Models - Core business entities and value objects
 Contains the fundamental business logic without external dependencies
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 
 class VClusterSize(Enum):
@@ -412,3 +412,87 @@ class ParsingError(DomainError):
     """Raised when command parsing fails."""
 
     pass
+
+
+# OAM Webhook Models
+@dataclass
+class OAMComponent:
+    """Represents an OAM Application component."""
+    name: str
+    type: str
+    properties: Dict[str, Any] = field(default_factory=dict)
+    traits: List[Dict[str, Any]] = field(default_factory=list)
+    
+    def is_webservice(self) -> bool:
+        """Check if component is a webservice type."""
+        return self.type == "webservice"
+    
+    def get_language(self) -> str:
+        """Extract language from properties."""
+        return self.properties.get("language", "python")
+    
+    def get_framework(self) -> str:
+        """Extract framework from properties."""
+        return self.properties.get("framework", "fastapi")
+
+
+@dataclass
+class OAMApplication:
+    """Represents an OAM Application."""
+    name: str
+    namespace: str
+    components: List[OAMComponent]
+    policies: List[Dict[str, Any]] = field(default_factory=list)
+    labels: Dict[str, str] = field(default_factory=dict)
+    annotations: Dict[str, str] = field(default_factory=dict)
+    
+    def get_app_container(self) -> Optional[str]:
+        """Get the app-container label value."""
+        return self.labels.get("app-container")
+    
+    def get_target_vcluster(self) -> Optional[str]:
+        """Extract target vCluster from topology policy."""
+        for policy in self.policies:
+            if policy.get("type") == "topology":
+                clusters = policy.get("properties", {}).get("clusters", [])
+                if clusters:
+                    return clusters[0]
+        return None
+    
+    def get_webservice_components(self) -> List[OAMComponent]:
+        """Get all webservice components."""
+        return [comp for comp in self.components if comp.is_webservice()]
+
+
+@dataclass
+class OAMWebhookRequest:
+    """Represents an OAM webhook admission request."""
+    uid: str
+    operation: str  # CREATE, UPDATE, DELETE
+    oam_application: OAMApplication
+    dry_run: bool = False
+    
+    def should_process(self) -> bool:
+        """Determine if this request should trigger microservice creation."""
+        # Only process CREATE and UPDATE operations
+        if self.operation not in ["CREATE", "UPDATE"]:
+            return False
+        
+        # Must have app-container label
+        if not self.oam_application.get_app_container():
+            return False
+        
+        # Must have webservice components
+        if not self.oam_application.get_webservice_components():
+            return False
+        
+        return True
+
+
+@dataclass
+class OAMWebhookResponse:
+    """Response from OAM webhook processing."""
+    uid: str
+    allowed: bool = True
+    message: Optional[str] = None
+    triggered_workflows: List[str] = field(default_factory=list)

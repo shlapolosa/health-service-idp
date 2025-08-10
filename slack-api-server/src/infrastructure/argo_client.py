@@ -479,3 +479,42 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
 
         except Exception as e:
             return False, {"error": f"Error getting workflow status: {str(e)}"}
+    
+    def trigger_microservice_from_oam(self, component: Dict, app_container: str, vcluster: str) -> Tuple[bool, str]:
+        """Trigger microservice creation from OAM component (no NLP needed).
+        
+        This method is called by the OAM webhook to create microservices
+        based on OAM Application components. It bypasses NLP parsing and
+        directly maps OAM properties to workflow parameters.
+        """
+        
+        # Extract properties directly from OAM component
+        props = component.get("properties", {})
+        
+        # Build payload matching what trigger_microservice_creation expects
+        payload = {
+            "microservice-name": component.get("name", "unknown"),
+            "language": props.get("language", "python"),
+            "framework": props.get("framework", "fastapi"),
+            "database": props.get("database", "none"),
+            "cache": props.get("cache", "none"),
+            "target-vcluster": vcluster if vcluster else "",
+            "parent-appcontainer": app_container,  # Key: Always set for monorepo
+            "repository-name": app_container,       # Use monorepo pattern
+            "namespace": "default",
+            "user": "oam-webhook",
+            "slack-channel": "#platform-automation",
+            "slack-user-id": "OAM-System",
+            "github-org": "shlapolosa",
+            "docker-registry": "docker.io/socrates12345",
+            "auto-create-vcluster": "false",  # vCluster should already exist
+            "description": f"Service {component.get('name')} auto-created from OAM Application",
+            "security": "true",
+            "observability": "true",
+            "realtime": props.get("realtime", "")
+        }
+        
+        logger.info(f"🎯 OAM-triggered microservice creation for: {component.get('name')} in {app_container}")
+        
+        # Use existing trigger_microservice_creation with our constructed payload
+        return self.trigger_microservice_creation(payload)

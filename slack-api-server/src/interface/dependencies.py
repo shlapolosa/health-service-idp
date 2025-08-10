@@ -12,6 +12,7 @@ from ..application.use_cases import (CreateAppContainerUseCase,
                                      CreateVClusterUseCase,
                                      ProcessSlackCommandUseCase,
                                      VerifySlackRequestUseCase)
+from ..application.oam_use_cases import ProcessOAMWebhook
 from ..domain.services import (SlackResponseBuilderService,
                                VClusterFactoryService,
                                VClusterValidationService)
@@ -146,3 +147,8 @@ def get_verify_slack_request_use_case() -> Optional[VerifySlackRequestUseCase]:
         return None
 
     return VerifySlackRequestUseCase(verifier)
+
+
+def get_process_oam_webhook_use_case() -> ProcessOAMWebhook:
+    """Get process OAM webhook use case with dependencies."""
+    return ProcessOAMWebhook(argo_client=get_argo_client())

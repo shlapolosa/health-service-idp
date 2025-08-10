@@ -4,7 +4,7 @@ Contains the core business rules and domain logic
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from .models import (AppContainerRequest, Capability, CapabilitySet,
                      InvalidVClusterRequestError, MicroserviceRequest, ParsedCommand, 
@@ -366,3 +366,78 @@ class SlackResponseBuilderService:
                 }
             ],
         }
+
+
+class OAMWebhookService:
+    """Domain service for OAM webhook processing.
+    
+    This service handles the business logic for processing OAM Applications
+    and determining which microservices need to be created.
+    """
+    
+    def process_oam_webhook(
+        self, 
+        request: "OAMWebhookRequest",
+        argo_client: Any
+    ) -> "OAMWebhookResponse":
+        """Process an OAM webhook request.
+        
+        This implements the stateless approach - we trigger workflows for
+        ALL webservice components and let ApplicationClaim handle idempotency.
+        
+        Args:
+            request: The OAM webhook request
+            argo_client: Infrastructure client for triggering workflows
+            
+        Returns:
+            OAMWebhookResponse with processing results
+        """
+        from .models import OAMWebhookResponse
+        
+        # Check if we should process this request
+        if not request.should_process():
+            return OAMWebhookResponse(
+                uid=request.uid,
+                allowed=True,
+                message="Request does not require processing"
+            )
+        
+        app_container = request.oam_application.get_app_container()
+        vcluster = request.oam_application.get_target_vcluster()
+        triggered_workflows = []
+        
+        # Process all webservice components (stateless approach)
+        for component in request.oam_application.get_webservice_components():
+            try:
+                # Trigger workflow for this component
+                # ApplicationClaim will handle idempotency
+                success, message = argo_client.trigger_microservice_from_oam(
+                    component={
+                        "name": component.name,
+                        "properties": component.properties
+                    },
+                    app_container=app_container,
+                    vcluster=vcluster or ""
+                )
+                
+                if success:
+                    triggered_workflows.append(f"{component.name}: {message}")
+                else:
+                    # Log but don't fail the webhook
+                    # This maintains resilience
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"Failed to trigger workflow for {component.name}: {message}")
+                    
+            except Exception as e:
+                # Log errors but continue processing other components
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error processing component {component.name}: {str(e)}")
+        
+        return OAMWebhookResponse(
+            uid=request.uid,
+            allowed=True,
+            message=f"Processed {len(triggered_workflows)} components",
+            triggered_workflows=triggered_workflows
+        )
