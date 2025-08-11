@@ -160,7 +160,11 @@ class OAMWebhookController:
             # Parse admission review request
             body = await request.body()
             try:
-                admission_request = json.loads(body.decode("utf-8"))
+                data = json.loads(body.decode("utf-8"))
+                # Log the exact request received from Argo Events
+                logger.info(f"=== OAM Webhook Request Received ===")
+                logger.info(f"Raw request keys: {list(data.keys())}")
+                logger.info(f"Full request body: {json.dumps(data, indent=2)}")
             except json.JSONDecodeError:
                 logger.error("Invalid JSON in OAM webhook request")
                 # Return admission response that allows but logs error
@@ -175,6 +179,41 @@ class OAMWebhookController:
                         }
                     }
                 }
+            
+            # Log the received data for debugging
+            logger.debug(f"Received webhook data structure: {list(data.keys())}")
+            
+            # Handle both Argo Events format and standard admission review format
+            # Check if this is from Argo Events (has 'body' field)
+            if "body" in data and "operation" in data:
+                # Argo Events format - body is a JSON string that needs parsing
+                try:
+                    # Parse the body string into an object
+                    oam_object = json.loads(data["body"]) if isinstance(data["body"], str) else data["body"]
+                    app_name = oam_object.get("metadata", {}).get("name", "unknown")
+                    logger.info(f"Processing Argo Events webhook for OAM Application: {app_name}")
+                    
+                    # Wrap it in admission review format
+                    admission_request = {
+                        "apiVersion": "admission.k8s.io/v1",
+                        "kind": "AdmissionReview",
+                        "request": {
+                            "uid": "argo-events-trigger",
+                            "kind": {
+                                "group": "core.oam.dev",
+                                "version": "v1beta1", 
+                                "kind": "Application"
+                            },
+                            "operation": data.get("operation", "CREATE"),
+                            "object": oam_object
+                        }
+                    }
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse Argo Events body field: {e}")
+                    admission_request = data
+            else:
+                # Standard admission review format
+                admission_request = data
             
             # Process the OAM webhook
             admission_response = process_use_case.execute(admission_request)

@@ -1,0 +1,68 @@
+---
+# EventSource to watch OAM Applications
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: oam-application-watcher
+  namespace: argo-events
+spec:
+  template:
+    serviceAccountName: oam-event-sa
+  resource:
+    oam-applications:
+      namespace: default
+      group: core.oam.dev
+      version: v1beta1
+      resource: applications
+      eventTypes:
+        - ADD
+        - UPDATE
+      # Filter for applications with specific labels
+      filter:
+        labels:
+          - key: app-container
+            operation: "!="
+            value: ""
+---
+# ServiceAccount with permissions to watch OAM resources
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: oam-event-sa
+  namespace: argo-events
+---
+# Role to watch OAM Applications
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: oam-event-role
+rules:
+  - apiGroups:
+      - core.oam.dev
+    resources:
+      - applications
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+---
+# RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: oam-event-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: oam-event-role
+subjects:
+  - kind: ServiceAccount
+    name: oam-event-sa
+    namespace: argo-events

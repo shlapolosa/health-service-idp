@@ -1,0 +1,36 @@
+---
+# Simple Sensor that sends raw event data to updated Slack API
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: oam-to-slack-api
+  namespace: argo-events
+spec:
+  template:
+    serviceAccountName: oam-event-sa
+  dependencies:
+    - name: oam-app-change
+      eventSourceName: oam-application-watcher
+      eventName: oam-applications
+  triggers:
+    - template:
+        name: slack-api-webhook-trigger
+        http:
+          url: http://slack-api-server.default.svc.cluster.local:8080/oam/webhook
+          method: POST
+          headers:
+            Content-Type: application/json
+          # Just send the whole event as-is
+          payload:
+            - src:
+                dependencyName: oam-app-change
+                dataKey: body
+              dest: body
+            - src:
+                dependencyName: oam-app-change
+                dataKey: type
+              dest: operation
+          retryStrategy:
+            steps: 3
+            duration: "3s"
+            factor: 2
