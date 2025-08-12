@@ -133,9 +133,9 @@ spec:
                       set -e
                       echo "Setting up source repository structure for $APP_NAME..."
                       
-                      # Install required tools
+                      # Install required tools (including jq for JSON parsing)
                       # Note: kubectl is not in Alpine repos, use curl to download it
-                      apk add --no-cache git curl
+                      apk add --no-cache git curl jq python3 py3-pip
                       
                       # Download kubectl binary
                       curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
@@ -459,8 +459,8 @@ spec:
                       PUBLIC_KEY_RESPONSE=$(curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
                         "https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/public-key")
                       
-                      PUBLIC_KEY=$(echo "$PUBLIC_KEY_RESPONSE" | grep -o '"key":"[^"]*' | cut -d'"' -f4)
-                      KEY_ID=$(echo "$PUBLIC_KEY_RESPONSE" | grep -o '"key_id":"[^"]*' | cut -d'"' -f4)
+                      PUBLIC_KEY=$(echo "$PUBLIC_KEY_RESPONSE" | jq -r '.key')
+                      KEY_ID=$(echo "$PUBLIC_KEY_RESPONSE" | jq -r '.key_id')
                       
                       if [ -z "$PUBLIC_KEY" ] || [ -z "$KEY_ID" ]; then
                         echo "Warning: Could not retrieve public key for repository secrets"
@@ -1128,8 +1128,8 @@ spec:
                       PUBLIC_KEY_RESPONSE=$(curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
                         "https://api.github.com/repos/${GITHUB_REPO}-gitops/actions/secrets/public-key")
                       
-                      PUBLIC_KEY=$(echo "$PUBLIC_KEY_RESPONSE" | grep -o '"key":"[^"]*' | cut -d'"' -f4)
-                      KEY_ID=$(echo "$PUBLIC_KEY_RESPONSE" | grep -o '"key_id":"[^"]*' | cut -d'"' -f4)
+                      PUBLIC_KEY=$(echo "$PUBLIC_KEY_RESPONSE" | jq -r '.key')
+                      KEY_ID=$(echo "$PUBLIC_KEY_RESPONSE" | jq -r '.key_id')
                       
                       if [ -z "$PUBLIC_KEY" ] || [ -z "$KEY_ID" ]; then
                         echo "Warning: Could not retrieve public key for repository secrets"
