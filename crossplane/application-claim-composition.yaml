@@ -429,7 +429,7 @@ spec:
             kind: Job
             metadata:
               name: placeholder
-              namespace: placeholder
+              namespace: default
             spec:
               template:
                 spec:
@@ -535,14 +535,6 @@ spec:
       - type: string
         string:
           fmt: "%s-register-argocd"
-    - type: CombineFromComposite
-      combine:
-        variables:
-        - fromFieldPath: spec.name
-        strategy: string
-        string:
-          fmt: "default"
-      toFieldPath: spec.forProvider.manifest.metadata.namespace
     - type: FromCompositeFieldPath
       fromFieldPath: spec.name
       toFieldPath: metadata.name
