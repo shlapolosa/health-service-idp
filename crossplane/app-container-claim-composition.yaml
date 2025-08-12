@@ -135,7 +135,7 @@ spec:
                       
                       # Install required tools
                       # Note: kubectl is not in Alpine repos, use curl to download it
-                      apk add --no-cache git curl jq
+                      apk add --no-cache git curl
                       
                       # Download kubectl binary
                       curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
@@ -493,8 +493,8 @@ spec:
                           "https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/PERSONAL_ACCESS_TOKEN" \
                           -d "{\"encrypted_value\":\"$ENCRYPTED_TOKEN\",\"key_id\":\"$KEY_ID\"}"
                         
-                        # Get Docker password from secret
-                        DOCKER_PASSWORD=$(kubectl get secret docker-registry-secret -n default -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d | jq -r '.auths."docker.io".password')
+                        # Get Docker password from secret (using docker-credentials which has plain password field)
+                        DOCKER_PASSWORD=$(kubectl get secret docker-credentials -n default -o jsonpath='{.data.password}' | base64 -d)
                         
                         if [ -n "$DOCKER_PASSWORD" ]; then
                           # Create DOCKER_PASSWORD secret
