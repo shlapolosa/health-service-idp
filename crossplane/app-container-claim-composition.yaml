@@ -125,13 +125,16 @@ spec:
                   restartPolicy: OnFailure
                   containers:
                   - name: source-repo-setup
-                    image: alpine/git:latest
+                    image: alpine:3.18
                     command:
                     - /bin/sh
                     - -c
                     - |
                       set -e
                       echo "Setting up source repository structure for $APP_NAME..."
+                      
+                      # Install required tools
+                      apk add --no-cache git curl kubectl
                       
                       TEMP_DIR="/tmp/repo-$APP_NAME"
                       mkdir -p $TEMP_DIR
@@ -443,7 +446,66 @@ spec:
                       
                       echo "Source repository structure created successfully with 2 commits"
                       
-                      echo "Source repository structure created successfully"
+                      # Setup GitHub repository secrets for CI/CD
+                      echo "Setting up GitHub repository secrets..."
+                      
+                      # Get repository public key for secret encryption
+                      PUBLIC_KEY_RESPONSE=$(curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
+                        "https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/public-key")
+                      
+                      PUBLIC_KEY=$(echo "$PUBLIC_KEY_RESPONSE" | grep -o '"key":"[^"]*' | cut -d'"' -f4)
+                      KEY_ID=$(echo "$PUBLIC_KEY_RESPONSE" | grep -o '"key_id":"[^"]*' | cut -d'"' -f4)
+                      
+                      if [ -z "$PUBLIC_KEY" ] || [ -z "$KEY_ID" ]; then
+                        echo "Warning: Could not retrieve public key for repository secrets"
+                      else
+                        # Install python for encryption
+                        apk add --no-cache python3 py3-pip
+                        pip3 install pynacl
+                        
+                        # Create encryption script
+                        cat > /tmp/encrypt_secret.py << 'ENCRYPT_EOF'
+                      import sys
+                      import base64
+                      from nacl import encoding, public
+                      
+                      def encrypt_secret(public_key: str, secret_value: str) -> str:
+                          public_key = public.PublicKey(public_key.encode("utf-8"), encoding.Base64Encoder())
+                          sealed_box = public.SealedBox(public_key)
+                          encrypted = sealed_box.encrypt(secret_value.encode("utf-8"))
+                          return base64.b64encode(encrypted).decode("utf-8")
+                      
+                      if __name__ == "__main__":
+                          print(encrypt_secret(sys.argv[1], sys.argv[2]))
+                      ENCRYPT_EOF
+                        
+                        # Create PERSONAL_ACCESS_TOKEN secret
+                        ENCRYPTED_TOKEN=$(python3 /tmp/encrypt_secret.py "$PUBLIC_KEY" "$GITHUB_TOKEN")
+                        curl -X PUT \
+                          -H "Authorization: token ${GITHUB_TOKEN}" \
+                          -H "Accept: application/vnd.github.v3+json" \
+                          "https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/PERSONAL_ACCESS_TOKEN" \
+                          -d "{\"encrypted_value\":\"$ENCRYPTED_TOKEN\",\"key_id\":\"$KEY_ID\"}"
+                        
+                        # Get Docker password from secret
+                        DOCKER_PASSWORD=$(kubectl get secret docker-registry-secret -n default -o jsonpath='{.data.password}' | base64 -d)
+                        
+                        if [ -n "$DOCKER_PASSWORD" ]; then
+                          # Create DOCKER_PASSWORD secret
+                          ENCRYPTED_PASSWORD=$(python3 /tmp/encrypt_secret.py "$PUBLIC_KEY" "$DOCKER_PASSWORD")
+                          curl -X PUT \
+                            -H "Authorization: token ${GITHUB_TOKEN}" \
+                            -H "Accept: application/vnd.github.v3+json" \
+                            "https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/DOCKER_PASSWORD" \
+                            -d "{\"encrypted_value\":\"$ENCRYPTED_PASSWORD\",\"key_id\":\"$KEY_ID\"}"
+                          
+                          echo "✅ GitHub secrets created successfully"
+                        else
+                          echo "⚠️  Docker password not found in secret"
+                        fi
+                      fi
+                      
+                      echo "Source repository setup completed successfully"
                     env:
                     - name: APP_NAME
                       value: placeholder
@@ -787,6 +849,38 @@ spec:
                       
                       # Create ApplicationSet for microservices
                       
+                      # Create OAM trigger workflow for GitOps changes
+                      cat > .github/workflows/oam-sync-trigger.yml << 'EOF'
+                      name: OAM Sync Trigger
+                      
+                      on:
+                        push:
+                          branches: [ main ]
+                          paths:
+                            - 'oam/applications/**'
+                            - 'oam/components/**'
+                        workflow_dispatch:
+                      
+                      jobs:
+                        trigger-argocd-sync:
+                          runs-on: ubuntu-latest
+                          steps:
+                            - name: Checkout code
+                              uses: actions/checkout@v4
+                            
+                            - name: Trigger ArgoCD Sync
+                              run: |
+                                echo "🔄 OAM files changed, triggering ArgoCD sync..."
+                                # ArgoCD will automatically sync due to automated sync policy
+                                # This workflow ensures the change is tracked and logged
+                                
+                            - name: Log OAM Changes
+                              run: |
+                                echo "📝 OAM Application changes detected:"
+                                git diff HEAD~1 HEAD -- oam/applications/ oam/components/ || true
+                                echo "✅ Changes will be synced to cluster via ArgoCD"
+                      EOF
+                      
                       # Create GitOps update workflow from template
                       cat > .github/workflows/deployment-update.yml << 'EOF'
                       name: GitOps Deployment Update
@@ -1021,7 +1115,51 @@ spec:
                       - Add OAM and manifests directories"
                       git push
                       
-                      echo "GitOps repository structure created successfully"
+                      # Setup GitHub repository secrets for GitOps workflows
+                      echo "Setting up GitHub repository secrets for GitOps..."
+                      
+                      # Get repository public key for secret encryption
+                      PUBLIC_KEY_RESPONSE=$(curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
+                        "https://api.github.com/repos/${GITHUB_REPO}-gitops/actions/secrets/public-key")
+                      
+                      PUBLIC_KEY=$(echo "$PUBLIC_KEY_RESPONSE" | grep -o '"key":"[^"]*' | cut -d'"' -f4)
+                      KEY_ID=$(echo "$PUBLIC_KEY_RESPONSE" | grep -o '"key_id":"[^"]*' | cut -d'"' -f4)
+                      
+                      if [ -z "$PUBLIC_KEY" ] || [ -z "$KEY_ID" ]; then
+                        echo "Warning: Could not retrieve public key for repository secrets"
+                      else
+                        # Install python for encryption
+                        apk add --no-cache python3 py3-pip
+                        pip3 install pynacl
+                        
+                        # Create encryption script
+                        cat > /tmp/encrypt_secret.py << 'ENCRYPT_EOF'
+                      import sys
+                      import base64
+                      from nacl import encoding, public
+                      
+                      def encrypt_secret(public_key: str, secret_value: str) -> str:
+                          public_key = public.PublicKey(public_key.encode("utf-8"), encoding.Base64Encoder())
+                          sealed_box = public.SealedBox(public_key)
+                          encrypted = sealed_box.encrypt(secret_value.encode("utf-8"))
+                          return base64.b64encode(encrypted).decode("utf-8")
+                      
+                      if __name__ == "__main__":
+                          print(encrypt_secret(sys.argv[1], sys.argv[2]))
+                      ENCRYPT_EOF
+                        
+                        # Create PERSONAL_ACCESS_TOKEN secret for GitOps operations
+                        ENCRYPTED_TOKEN=$(python3 /tmp/encrypt_secret.py "$PUBLIC_KEY" "$GITHUB_TOKEN")
+                        curl -X PUT \
+                          -H "Authorization: token ${GITHUB_TOKEN}" \
+                          -H "Accept: application/vnd.github.v3+json" \
+                          "https://api.github.com/repos/${GITHUB_REPO}-gitops/actions/secrets/PERSONAL_ACCESS_TOKEN" \
+                          -d "{\"encrypted_value\":\"$ENCRYPTED_TOKEN\",\"key_id\":\"$KEY_ID\"}"
+                        
+                        echo "✅ GitOps repository secrets created successfully"
+                      fi
+                      
+                      echo "GitOps repository setup completed successfully"
                     env:
                     - name: APP_NAME
                       value: placeholder

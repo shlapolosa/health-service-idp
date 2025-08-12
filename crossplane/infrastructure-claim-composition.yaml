@@ -1,0 +1,357 @@
+---
+# InfrastructureClaim Composition
+# Provisions internal infrastructure via Helm releases
+# Pattern 3B: Infrastructure Components
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: infrastructure-claim-composition
+  labels:
+    provider: helm
+    pattern: infrastructural
+    type: infrastructure
+spec:
+  compositeTypeRef:
+    apiVersion: platform.io/v1alpha1
+    kind: XInfrastructureClaim
+  
+  patchSets:
+  # Common resource sizing
+  - name: size-small
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.size
+      toFieldPath: spec.forProvider.values.resources.requests.cpu
+      transforms:
+      - type: map
+        map:
+          small: "500m"
+          medium: "1"
+          large: "2"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.size
+      toFieldPath: spec.forProvider.values.resources.requests.memory
+      transforms:
+      - type: map
+        map:
+          small: "1Gi"
+          medium: "2Gi"
+          large: "4Gi"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.size
+      toFieldPath: spec.forProvider.values.persistence.size
+      transforms:
+      - type: map
+        map:
+          small: "10Gi"
+          medium: "50Gi"
+          large: "100Gi"
+  
+  resources:
+  # Helm Release for infrastructure
+  - name: helm-release
+    base:
+      apiVersion: helm.crossplane.io/v1beta1
+      kind: Release
+      spec:
+        providerConfigRef:
+          name: helm-provider
+        forProvider:
+          namespace: default
+          wait: true
+          waitTimeout: 10m
+          values: 
+            global:
+              storageClass: gp2
+            auth:
+              enabled: true
+            metrics:
+              enabled: true
+              serviceMonitor:
+                enabled: true
+            persistence:
+              enabled: true
+            resources:
+              requests:
+                cpu: "500m"
+                memory: "1Gi"
+    patches:
+    # Set release name
+    - type: FromCompositeFieldPath
+      fromFieldPath: metadata.uid
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "infra-%s"
+    
+    # Set namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.namespace
+      toFieldPath: spec.forProvider.namespace
+    
+    # Configure chart based on infrastructure type
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.infrastructureType
+      toFieldPath: spec.forProvider.chart.name
+      transforms:
+      - type: map
+        map:
+          postgresql: postgresql
+          mongodb: mongodb
+          redis: redis
+          kafka: kafka
+          clickhouse: clickhouse
+    
+    # Set chart repository
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.infrastructureType
+      toFieldPath: spec.forProvider.chart.repository
+      transforms:
+      - type: map
+        map:
+          postgresql: https://charts.bitnami.com/bitnami
+          mongodb: https://charts.bitnami.com/bitnami
+          redis: https://charts.bitnami.com/bitnami
+          kafka: https://strimzi.io/charts/
+          clickhouse: https://charts.bitnami.com/bitnami
+    
+    # Set chart version if specified
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.version
+      toFieldPath: spec.forProvider.chart.version
+    
+    # Apply size configuration
+    - type: PatchSet
+      patchSetName: size-small
+    
+    # Override with custom resources if provided
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.resources.cpu
+      toFieldPath: spec.forProvider.values.resources.requests.cpu
+    
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.resources.memory
+      toFieldPath: spec.forProvider.values.resources.requests.memory
+    
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.resources.storage
+      toFieldPath: spec.forProvider.values.persistence.size
+    
+    # Set replicas
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.replicas
+      toFieldPath: spec.forProvider.values.replicaCount
+    
+    # High availability configuration
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.highAvailability
+      toFieldPath: spec.forProvider.values.architecture
+      transforms:
+      - type: map
+        map:
+          "true": replication
+          "false": standalone
+    
+    # Backup configuration
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.backupEnabled
+      toFieldPath: spec.forProvider.values.backup.enabled
+    
+    # Monitoring configuration
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.monitoringEnabled
+      toFieldPath: spec.forProvider.values.metrics.enabled
+    
+    # Connection secret reference
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.connectionSecretRef.name
+      toFieldPath: spec.writeConnectionSecretToRef.name
+    
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.connectionSecretRef.namespace
+      toFieldPath: spec.writeConnectionSecretToRef.namespace
+    
+    # Infrastructure-specific configurations
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.infrastructureType
+      toFieldPath: spec.forProvider.values
+      transforms:
+      - type: map
+        map:
+          postgresql: |
+            auth:
+              database: appdb
+              username: appuser
+              postgresPassword: postgres123
+              password: user123
+            volumePermissions:
+              enabled: true
+            primary:
+              persistence:
+                enabled: true
+          mongodb: |
+            auth:
+              rootPassword: root123
+              username: appuser
+              password: user123
+              database: appdb
+            persistence:
+              enabled: true
+          redis: |
+            auth:
+              enabled: true
+              password: redis123
+            master:
+              persistence:
+                enabled: true
+          kafka: |
+            spec:
+              kafka:
+                replicas: 3
+                listeners:
+                  plain: {}
+                  tls: {}
+                config:
+                  offsets.topic.replication.factor: 3
+                  transaction.state.log.replication.factor: 3
+                storage:
+                  type: persistent-claim
+                  size: 10Gi
+              zookeeper:
+                replicas: 3
+                storage:
+                  type: persistent-claim
+                  size: 10Gi
+          clickhouse: |
+            auth:
+              username: default
+              password: clickhouse123
+            persistence:
+              enabled: true
+              size: 10Gi
+    
+    # Status updates
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.state
+      toFieldPath: status.ready
+      transforms:
+      - type: map
+        map:
+          deployed: true
+          failed: false
+          pending: false
+
+  # Connection formatting secret
+  - name: connection-formatter
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        providerConfigRef:
+          name: kubernetes-provider
+        forProvider:
+          manifest:
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              labels:
+                infrastructure-type: ""
+                pattern: infrastructural
+            type: Opaque
+            data: {}
+    patches:
+    # Set secret name with -formatted suffix
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.connectionSecretRef.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-formatted"
+    
+    # Set namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.connectionSecretRef.namespace
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+    
+    # Set infrastructure type label
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.infrastructureType
+      toFieldPath: spec.forProvider.manifest.metadata.labels[infrastructure-type]
+    
+    # Format connection strings based on type
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.infrastructureType
+      toFieldPath: spec.forProvider.manifest.data
+      transforms:
+      - type: map
+        map:
+          postgresql: |
+            connection_string: "postgresql://appuser:user123@$(SERVICE_NAME):5432/appdb"
+            jdbc_url: "jdbc:postgresql://$(SERVICE_NAME):5432/appdb"
+          mongodb: |
+            connection_string: "mongodb://appuser:user123@$(SERVICE_NAME):27017/appdb"
+          redis: |
+            connection_string: "redis://:redis123@$(SERVICE_NAME):6379/0"
+          kafka: |
+            bootstrap_servers: "$(SERVICE_NAME)-kafka-bootstrap:9092"
+          clickhouse: |
+            connection_string: "clickhouse://default:clickhouse123@$(SERVICE_NAME):8123/default"
+
+  # Service monitor for Prometheus
+  - name: service-monitor
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        providerConfigRef:
+          name: kubernetes-provider
+        forProvider:
+          manifest:
+            apiVersion: monitoring.coreos.com/v1
+            kind: ServiceMonitor
+            metadata:
+              labels:
+                infrastructure: ""
+            spec:
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: ""
+              endpoints:
+              - port: metrics
+                interval: 30s
+                path: /metrics
+    patches:
+    # Only create if monitoring enabled
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.monitoringEnabled
+      toFieldPath: spec.forProvider.manifest.metadata.annotations[create]
+      transforms:
+      - type: convert
+        convert:
+          toType: string
+    
+    # Set ServiceMonitor name
+    - type: FromCompositeFieldPath
+      fromFieldPath: metadata.uid
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "infra-%s-monitor"
+    
+    # Set namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.namespace
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+    
+    # Set infrastructure type
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.infrastructureType
+      toFieldPath: spec.forProvider.manifest.metadata.labels[infrastructure]
+    
+    # Set selector
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.infrastructureType
+      toFieldPath: spec.forProvider.manifest.spec.selector.matchLabels[app.kubernetes.io/name]

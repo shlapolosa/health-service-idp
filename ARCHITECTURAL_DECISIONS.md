@@ -92,6 +92,103 @@ ComponentDefinition → Triggers Argo Workflow → Runs instantiate.sh → Pushe
 
 ---
 
+### ADR-035: Pattern-Based Component Architecture (3-2-1 Hierarchy)
+**Date**: 2024-12-12
+**Status**: Approved
+**Context**: Need to organize 16+ component types into a coherent processing hierarchy
+
+**Problem**: Components have different lifecycle requirements:
+- Some need repositories and CI/CD (webservice)
+- Some need complex orchestration (rasa-chatbot with 3 images)
+- Some just need infrastructure provisioning (postgresql, redis)
+- Some are external services (neon-postgres, auth0-idp)
+- Processing order matters for dependency resolution
+
+**Options Considered**:
+1. **Flat Processing**: Process all components equally
+2. **Type-Based**: Separate handler per component type (10+ handlers)
+3. **Pattern-Based Hierarchy**: Group by lifecycle patterns (3 patterns)
+
+**Decision**: Pattern-Based Hierarchy with 3-2-1 processing order
+
+**Architecture**:
+```
+Pattern 3: Infrastructural (Process First)
+├── Provider Systems: External services (neon-postgres, auth0-idp)
+├── Infrastructure: Internal services (postgresql, redis, kafka)
+└── Platform Services: Infrastructure with logic (realtime-platform, camunda-orchestrator)
+
+Pattern 2: Compositional (Process Second)
+├── Multi-container services (rasa-chatbot: 3 images)
+├── Federation services (graphql-gateway, graphql-platform)
+└── Complex domain services (identity-service)
+
+Pattern 1: Foundational (Process Last)
+├── Standard microservices (webservice)
+├── K8s deployments (webservice-k8s)
+└── Virtual clusters (vcluster)
+```
+
+**Processing Order**: 3 → 2 → 1
+- Infrastructure ready before compositional services
+- Compositional services ready before foundational
+- Enables proper dependency resolution
+
+**Classification Matrix**:
+```
+If component:
+  - Uses existing images/external service → Pattern 3
+  - Produces multiple services/needs orchestration → Pattern 2
+  - Needs repository/single service → Pattern 1
+  - When in doubt, favor higher pattern (3 > 2 > 1)
+```
+
+**Rationale**:
+- **Simplicity**: 3 handlers instead of 16+
+- **Scalability**: Add new types to existing patterns
+- **Clear Dependencies**: Infrastructure before services
+- **Maintainability**: Pattern determines behavior, parameters determine specifics
+- **Existing Code Reuse**: Maps to existing workflows
+
+**Implementation**:
+- 3 Pattern Handlers in Slack API (Pattern3Handler, Pattern2Handler, Pattern1Handler)
+- 4 Argo Workflows (pattern3-provider, pattern3-infrastructure, pattern2-compositional, pattern1-foundational)
+- 2 Crossplane Claims (ProviderSecretClaim, InfrastructureClaim)
+
+**Component Inventory** (Total: 16):
+- Pattern 3: 9 components (neon-postgres, auth0-idp, postgresql, mongodb, redis, kafka, clickhouse, realtime-platform, camunda-orchestrator)
+- Pattern 2: 4 components (rasa-chatbot, graphql-gateway, graphql-platform, identity-service)
+- Pattern 1: 3 components (webservice, webservice-k8s, vcluster)
+
+**Trade-offs**:
+- ✅ Reduced complexity (3 handlers vs 16+)
+- ✅ Clear processing order
+- ✅ Easy to add new component types
+- ✅ Aligns with existing workflows
+- ❌ Less granular control per type
+- ❌ Pattern classification learning curve
+- ❌ Some edge cases may not fit perfectly
+
+**Mitigation**:
+- Document classification criteria clearly
+- Provide examples for each pattern
+- Allow override via annotations if needed
+- Monitor and refine classification over time
+
+**Reference Resolution**:
+Components can reference Pattern 3 infrastructure:
+```yaml
+components:
+  - name: user-db
+    type: postgresql  # Pattern 3
+  - name: user-service
+    type: webservice  # Pattern 1
+    properties:
+      database: user-db  # Reference to Pattern 3
+```
+
+---
+
 ### Phase 2: Parameter Contract Design (Early Development)
 
 #### ADR-002: Four-Tier Parameter Architecture

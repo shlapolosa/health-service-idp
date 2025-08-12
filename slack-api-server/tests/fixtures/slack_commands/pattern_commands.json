@@ -1,0 +1,197 @@
+[
+  {
+    "name": "create_single_microservice",
+    "description": "Create a single microservice via Slack command",
+    "event": {
+      "token": "test-token",
+      "team_id": "T123456",
+      "team_domain": "test-team",
+      "channel_id": "C123456",
+      "channel_name": "architecture",
+      "user_id": "U123456",
+      "user_name": "architect",
+      "command": "/microservice",
+      "text": "create api-service python postgresql redis healthcare-monorepo",
+      "response_url": "https://hooks.slack.com/commands/test",
+      "trigger_id": "trigger123"
+    },
+    "expected": {
+      "success": true,
+      "workflow": "microservice-standard-contract",
+      "parameters": {
+        "name": "api-service",
+        "language": "python",
+        "database": "postgresql",
+        "cache": "redis",
+        "repository": "healthcare-monorepo"
+      }
+    }
+  },
+  {
+    "name": "create_vcluster_infrastructure",
+    "description": "Create VCluster with infrastructure capabilities",
+    "event": {
+      "token": "test-token",
+      "team_id": "T123456",
+      "team_domain": "test-team",
+      "channel_id": "C123456",
+      "channel_name": "infrastructure",
+      "user_id": "U123456",
+      "user_name": "devops",
+      "command": "/vcluster",
+      "text": "create patient-db-vcluster capabilities=postgresql,monitoring resources=cpu:2,memory:4Gi",
+      "response_url": "https://hooks.slack.com/commands/test",
+      "trigger_id": "trigger456"
+    },
+    "expected": {
+      "success": true,
+      "workflow": "vcluster-standard-contract",
+      "parameters": {
+        "name": "patient-db-vcluster",
+        "capabilities": ["postgresql", "monitoring"],
+        "resources": {
+          "cpu": "2",
+          "memory": "4Gi"
+        }
+      }
+    }
+  },
+  {
+    "name": "create_appcontainer",
+    "description": "Create app container via Slack command",
+    "event": {
+      "token": "test-token",
+      "team_id": "T123456",
+      "team_domain": "test-team",
+      "channel_id": "C123456",
+      "channel_name": "platform",
+      "user_id": "U123456",
+      "user_name": "platform-engineer",
+      "command": "/appcontainer",
+      "text": "create auth-service github-org=health-corp vcluster=platform-vcluster",
+      "response_url": "https://hooks.slack.com/commands/test",
+      "trigger_id": "trigger789"
+    },
+    "expected": {
+      "success": true,
+      "workflow": "appcontainer-standard-contract",
+      "parameters": {
+        "appcontainer-name": "auth-service",
+        "github-org": "health-corp",
+        "vcluster-name": "platform-vcluster"
+      }
+    }
+  },
+  {
+    "name": "create_java_microservice",
+    "description": "Create Java Spring Boot microservice",
+    "event": {
+      "token": "test-token",
+      "team_id": "T123456",
+      "team_domain": "test-team",
+      "channel_id": "C123456",
+      "channel_name": "backend",
+      "user_id": "U123456",
+      "user_name": "java-dev",
+      "command": "/microservice",
+      "text": "create order-service java postgresql redis ecommerce-platform",
+      "response_url": "https://hooks.slack.com/commands/test",
+      "trigger_id": "trigger777"
+    },
+    "expected": {
+      "success": true,
+      "workflow": "microservice-standard-contract",
+      "parameters": {
+        "name": "order-service",
+        "language": "java",
+        "database": "postgresql",
+        "cache": "redis",
+        "repository": "ecommerce-platform"
+      }
+    }
+  },
+  {
+    "name": "invalid_command",
+    "description": "Invalid command should fail gracefully",
+    "event": {
+      "token": "test-token",
+      "team_id": "T123456",
+      "team_domain": "test-team",
+      "channel_id": "C123456",
+      "channel_name": "test",
+      "user_id": "U123456",
+      "user_name": "tester",
+      "command": "/unknown-command",
+      "text": "test-service",
+      "response_url": "https://hooks.slack.com/commands/test",
+      "trigger_id": "trigger333"
+    },
+    "expected": {
+      "success": false,
+      "error_contains": "Unknown command"
+    }
+  },
+  {
+    "name": "missing_required_params",
+    "description": "Missing required parameters should show help",
+    "event": {
+      "token": "test-token",
+      "team_id": "T123456",
+      "team_domain": "test-team",
+      "channel_id": "C123456",
+      "channel_name": "test",
+      "user_id": "U123456",
+      "user_name": "tester",
+      "command": "/microservice",
+      "text": "",
+      "response_url": "https://hooks.slack.com/commands/test",
+      "trigger_id": "trigger444"
+    },
+    "expected": {
+      "success": true,
+      "response_contains": "Microservice Management"
+    }
+  },
+  {
+    "name": "vcluster_help",
+    "description": "Help command should return help text",
+    "event": {
+      "token": "test-token",
+      "team_id": "T123456",
+      "team_domain": "test-team",
+      "channel_id": "C123456",
+      "channel_name": "help",
+      "user_id": "U123456",
+      "user_name": "user",
+      "command": "/vcluster",
+      "text": "help",
+      "response_url": "https://hooks.slack.com/commands/test",
+      "trigger_id": "trigger888"
+    },
+    "expected": {
+      "success": true,
+      "response_contains": "VCluster Management"
+    }
+  },
+  {
+    "name": "microservice_help",
+    "description": "Microservice help command",
+    "event": {
+      "token": "test-token",
+      "team_id": "T123456",
+      "team_domain": "test-team",
+      "channel_id": "C123456",
+      "channel_name": "help",
+      "user_id": "U123456",
+      "user_name": "user",
+      "command": "/microservice",
+      "text": "help",
+      "response_url": "https://hooks.slack.com/commands/test",
+      "trigger_id": "trigger999"
+    },
+    "expected": {
+      "success": true,
+      "response_contains": "Microservice Management"
+    }
+  }
+]

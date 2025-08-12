@@ -1,0 +1,373 @@
+---
+# Pattern 2: Compositional Services Workflow
+# Handles multi-service components (rasa-chatbot, graphql-gateway, graphql-platform, identity-service)
+# Orchestrates existing workflows based on component type
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: pattern2-compositional-workflow
+  namespace: argo
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: component_type
+        description: "Type of compositional component (rasa-chatbot, graphql-gateway, graphql-platform, identity-service)"
+      - name: service_name
+        description: "Name of the service"
+      - name: app_container
+        description: "AppContainer name (monorepo)"
+      - name: namespace
+        default: "default"
+      - name: vcluster
+        default: "architecture-visualization"
+      - name: github_owner
+        default: "shlapolosa"
+      - name: template_repo
+        description: "Template repository for the component"
+      - name: build_strategy
+        description: "Build strategy (multi-image, single-image, java-maven)"
+      - name: image_count
+        default: "1"
+      
+      # Component-specific parameters
+      - name: domain
+        default: ""
+        description: "Domain for identity-service (healthcare, financial, education)"
+      - name: nlu_pipeline
+        default: "pretrained_embeddings_spacy"
+        description: "NLU pipeline for rasa-chatbot"
+      - name: federation_services
+        default: "[]"
+        description: "Federation services for graphql-gateway"
+  
+  templates:
+    - name: main
+      dag:
+        tasks:
+          # Task 1: Check/Create AppContainer
+          - name: verify-appcontainer
+            template: check-appcontainer
+            arguments:
+              parameters:
+                - name: app_container
+                  value: "{{workflow.parameters.app_container}}"
+          
+          # Task 2: Route to appropriate handler based on component type
+          - name: handle-component
+            dependencies: [verify-appcontainer]
+            template: route-component-handler
+            arguments:
+              parameters:
+                - name: component_type
+                  value: "{{workflow.parameters.component_type}}"
+                - name: service_name
+                  value: "{{workflow.parameters.service_name}}"
+                - name: app_container
+                  value: "{{workflow.parameters.app_container}}"
+                - name: app_container_exists
+                  value: "{{tasks.verify-appcontainer.outputs.result}}"
+    
+    # Template: Check if AppContainer exists
+    - name: check-appcontainer
+      inputs:
+        parameters:
+          - name: app_container
+      script:
+        image: bitnami/kubectl:latest
+        command: [bash]
+        source: |
+          #!/bin/bash
+          echo "🔍 Checking AppContainer: {{inputs.parameters.app_container}}"
+          
+          # Check if AppContainerClaim exists
+          if kubectl get appcontainerclaim {{inputs.parameters.app_container}} \
+             -n crossplane-system 2>/dev/null; then
+            echo "exists"
+            
+            # Get repository URL
+            REPO_URL=$(kubectl get appcontainerclaim {{inputs.parameters.app_container}} \
+              -n crossplane-system \
+              -o jsonpath='{.status.repository.url}' 2>/dev/null)
+            
+            echo "Repository: $REPO_URL"
+          else
+            echo "not-found"
+          fi
+      outputs:
+        parameters:
+          - name: result
+            valueFrom:
+              path: /tmp/result
+    
+    # Template: Route to appropriate component handler
+    - name: route-component-handler
+      inputs:
+        parameters:
+          - name: component_type
+          - name: service_name
+          - name: app_container
+          - name: app_container_exists
+      dag:
+        tasks:
+          # Create AppContainer if missing
+          - name: create-appcontainer
+            when: "{{inputs.parameters.app_container_exists}} == not-found"
+            templateRef:
+              name: microservice-standard-contract
+              template: create-app-container-claim
+            arguments:
+              parameters:
+                - name: app_container
+                  value: "{{inputs.parameters.app_container}}"
+          
+          # Handle identity-service
+          - name: handle-identity-service
+            when: "{{inputs.parameters.component_type}} == identity-service"
+            dependencies: [create-appcontainer]
+            templateRef:
+              name: identity-service-generator
+              template: main
+            arguments:
+              parameters:
+                - name: service_name
+                  value: "{{inputs.parameters.service_name}}"
+                - name: domain
+                  value: "{{workflow.parameters.domain}}"
+                - name: github_owner
+                  value: "{{workflow.parameters.github_owner}}"
+          
+          # Handle rasa-chatbot (requires multi-image build)
+          - name: handle-rasa-chatbot
+            when: "{{inputs.parameters.component_type}} == rasa-chatbot"
+            dependencies: [create-appcontainer]
+            template: add-rasa-to-monorepo
+            arguments:
+              parameters:
+                - name: service_name
+                  value: "{{inputs.parameters.service_name}}"
+                - name: app_container
+                  value: "{{inputs.parameters.app_container}}"
+                - name: nlu_pipeline
+                  value: "{{workflow.parameters.nlu_pipeline}}"
+          
+          # Handle graphql-gateway
+          - name: handle-graphql-gateway
+            when: "{{inputs.parameters.component_type}} == graphql-gateway"
+            dependencies: [create-appcontainer]
+            template: add-graphql-to-monorepo
+            arguments:
+              parameters:
+                - name: service_name
+                  value: "{{inputs.parameters.service_name}}"
+                - name: app_container
+                  value: "{{inputs.parameters.app_container}}"
+                - name: federation_services
+                  value: "{{workflow.parameters.federation_services}}"
+          
+          # Handle graphql-platform (uses claim)
+          - name: handle-graphql-platform
+            when: "{{inputs.parameters.component_type}} == graphql-platform"
+            dependencies: [create-appcontainer]
+            template: create-graphql-platform-claim
+            arguments:
+              parameters:
+                - name: service_name
+                  value: "{{inputs.parameters.service_name}}"
+                - name: namespace
+                  value: "{{workflow.parameters.namespace}}"
+    
+    # Template: Add RASA chatbot to monorepo
+    - name: add-rasa-to-monorepo
+      inputs:
+        parameters:
+          - name: service_name
+          - name: app_container
+          - name: nlu_pipeline
+      script:
+        image: alpine/git:latest
+        command: [sh]
+        source: |
+          #!/bin/sh
+          echo "🤖 Adding RASA chatbot {{inputs.parameters.service_name}} to monorepo"
+          
+          # Clone AppContainer repository
+          git clone https://github.com/{{workflow.parameters.github_owner}}/{{inputs.parameters.app_container}} /workspace
+          cd /workspace
+          
+          # Create RASA service structure
+          mkdir -p microservices/{{inputs.parameters.service_name}}/docker/rasa
+          mkdir -p microservices/{{inputs.parameters.service_name}}/docker/rasa-actions
+          mkdir -p microservices/{{inputs.parameters.service_name}}/data
+          mkdir -p microservices/{{inputs.parameters.service_name}}/actions
+          
+          # Create domain.yml
+          cat > microservices/{{inputs.parameters.service_name}}/domain.yml <<EOF
+          version: "3.1"
+          intents:
+            - greet
+            - goodbye
+            - affirm
+            - deny
+          responses:
+            utter_greet:
+              - text: "Hello! How can I help you?"
+          session_config:
+            session_expiration_time: 60
+            carry_over_slots_to_new_session: true
+          EOF
+          
+          # Create config.yml with specified NLU pipeline
+          cat > microservices/{{inputs.parameters.service_name}}/config.yml <<EOF
+          language: en
+          pipeline: {{inputs.parameters.nlu_pipeline}}
+          policies:
+            - name: TEDPolicy
+              max_history: 5
+            - name: MemoizationPolicy
+            - name: RulePolicy
+          EOF
+          
+          # Create multi-stage Dockerfiles
+          cat > microservices/{{inputs.parameters.service_name}}/docker/Dockerfile <<EOF
+          # Base image with dependencies
+          FROM rasa/rasa:3.6.0 AS base
+          WORKDIR /app
+          COPY requirements.txt .
+          RUN pip install -r requirements.txt
+          EOF
+          
+          cat > microservices/{{inputs.parameters.service_name}}/docker/rasa/Dockerfile <<EOF
+          ARG BASE_IMAGE
+          FROM \${BASE_IMAGE}
+          COPY . /app
+          CMD ["run", "--enable-api", "--cors", "*"]
+          EOF
+          
+          cat > microservices/{{inputs.parameters.service_name}}/docker/rasa-actions/Dockerfile <<EOF
+          ARG BASE_IMAGE
+          FROM \${BASE_IMAGE}
+          COPY actions /app/actions
+          CMD ["run", "actions"]
+          EOF
+          
+          # Update GitHub Actions for 3-image build
+          if [ ! -f .github/workflows/chat-gitops.yml ]; then
+            mkdir -p .github/workflows
+            cat > .github/workflows/chat-gitops.yml <<'WORKFLOW'
+          name: RASA Chatbot GitOps Pipeline
+          on:
+            push:
+              paths:
+                - 'microservices/*/domain.yml'
+                - 'microservices/*/config.yml'
+          jobs:
+            build-rasa:
+              runs-on: ubuntu-latest
+              steps:
+                - uses: actions/checkout@v4
+                - name: Build base image
+                  run: docker build -f microservices/$SERVICE/docker/Dockerfile -t $SERVICE-base .
+                - name: Build RASA server
+                  run: docker build -f microservices/$SERVICE/docker/rasa/Dockerfile --build-arg BASE_IMAGE=$SERVICE-base -t $SERVICE-rasa .
+                - name: Build actions server
+                  run: docker build -f microservices/$SERVICE/docker/rasa-actions/Dockerfile --build-arg BASE_IMAGE=$SERVICE-base -t $SERVICE-actions .
+          WORKFLOW
+          fi
+          
+          echo "✅ RASA chatbot structure created (requires 3 Docker images)"
+    
+    # Template: Add GraphQL gateway to monorepo
+    - name: add-graphql-to-monorepo
+      inputs:
+        parameters:
+          - name: service_name
+          - name: app_container
+          - name: federation_services
+      script:
+        image: node:18-alpine
+        command: [sh]
+        source: |
+          #!/bin/sh
+          echo "🌐 Adding GraphQL gateway {{inputs.parameters.service_name}} to monorepo"
+          
+          # Create GraphQL gateway structure
+          mkdir -p /tmp/{{inputs.parameters.service_name}}
+          cd /tmp/{{inputs.parameters.service_name}}
+          
+          # Initialize package.json
+          cat > package.json <<EOF
+          {
+            "name": "{{inputs.parameters.service_name}}",
+            "version": "1.0.0",
+            "scripts": {
+              "start": "node src/index.js",
+              "dev": "nodemon src/index.js"
+            },
+            "dependencies": {
+              "@graphql-mesh/cli": "^0.87.0",
+              "@graphql-mesh/graphql": "^0.95.0",
+              "@graphql-mesh/openapi": "^0.95.0",
+              "@graphql-mesh/transform-federation": "^0.95.0",
+              "graphql": "^16.8.0"
+            }
+          }
+          EOF
+          
+          # Create GraphQL Mesh configuration
+          cat > .meshrc.yml <<EOF
+          sources:
+            # Auto-discover Knative services
+            - name: AutoDiscovery
+              handler:
+                openapi:
+                  source: http://localhost:8080/discovery
+          transforms:
+            - federation:
+                types:
+                  - name: Query
+          serve:
+            endpoint: /graphql
+            playground: true
+          EOF
+          
+          # Create Dockerfile
+          cat > Dockerfile <<EOF
+          FROM node:18-alpine
+          WORKDIR /app
+          COPY package*.json ./
+          RUN npm ci --only=production
+          COPY . .
+          EXPOSE 4000
+          CMD ["npm", "start"]
+          EOF
+          
+          echo "✅ GraphQL gateway structure created with federation support"
+    
+    # Template: Create GraphQL platform claim
+    - name: create-graphql-platform-claim
+      inputs:
+        parameters:
+          - name: service_name
+          - name: namespace
+      container:
+        image: bitnami/kubectl:latest
+        command: [sh, -c]
+        args:
+          - |
+            # Create GraphQLPlatformClaim
+            cat <<EOF | kubectl apply -f -
+            apiVersion: platform.example.org/v1alpha1
+            kind: GraphQLPlatformClaim
+            metadata:
+              name: {{inputs.parameters.service_name}}-graphql-platform
+              namespace: crossplane-system
+            spec:
+              serviceName: {{inputs.parameters.service_name}}
+              namespace: {{inputs.parameters.namespace}}
+              enablePlayground: true
+              enableIntrospection: false
+              federationEnabled: true
+            EOF
+            
+            echo "✅ GraphQLPlatformClaim created for {{inputs.parameters.service_name}}"

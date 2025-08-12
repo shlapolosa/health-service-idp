@@ -1,0 +1,76 @@
+[
+  {
+    "name": "postgresql_deployment",
+    "description": "Pattern 3: PostgreSQL infrastructure deployment via Argo Event",
+    "event": {
+      "body": "{\"apiVersion\":\"core.oam.dev/v1beta1\",\"kind\":\"Application\",\"metadata\":{\"name\":\"healthcare-platform\",\"namespace\":\"production\",\"labels\":{\"app-container\":\"healthcare-monorepo\",\"github-owner\":\"test-org\"}},\"spec\":{\"components\":[{\"name\":\"patient-db\",\"type\":\"postgresql\",\"properties\":{\"size\":\"medium\",\"version\":\"14\",\"high_availability\":true,\"backup_enabled\":true}}]}}",
+      "operation": "CREATE"
+    },
+    "expected": {
+      "allowed": true,
+      "pattern_counts": {
+        "pattern_3": 1,
+        "pattern_2": 0,
+        "pattern_1": 0
+      },
+      "workflow_template": "pattern3-infrastructure-workflow",
+      "parameters": {
+        "infrastructure_type": "postgresql",
+        "size": "medium",
+        "version": "14",
+        "high_availability": "true",
+        "backup_enabled": "true"
+      }
+    }
+  },
+  {
+    "name": "redis_kafka_multi_deployment",
+    "description": "Pattern 3: Multiple infrastructure components (Redis + Kafka)",
+    "event": {
+      "body": "{\"apiVersion\":\"core.oam.dev/v1beta1\",\"kind\":\"Application\",\"metadata\":{\"name\":\"streaming-platform\",\"namespace\":\"default\",\"labels\":{\"app-container\":\"streaming-monorepo\"}},\"spec\":{\"components\":[{\"name\":\"session-cache\",\"type\":\"redis\",\"properties\":{\"size\":\"small\"}},{\"name\":\"event-bus\",\"type\":\"kafka\",\"properties\":{\"size\":\"large\",\"replicas\":3}}]}}",
+      "operation": "CREATE"
+    },
+    "expected": {
+      "allowed": true,
+      "pattern_counts": {
+        "pattern_3": 2,
+        "pattern_2": 0,
+        "pattern_1": 0
+      },
+      "workflow_template": "pattern3-infrastructure-workflow",
+      "component_count": 2,
+      "parameters_list": [
+        {
+          "infrastructure_type": "redis",
+          "size": "small"
+        },
+        {
+          "infrastructure_type": "kafka",
+          "size": "large",
+          "replicas": "3"
+        }
+      ]
+    }
+  },
+  {
+    "name": "neon_postgres_external_provider",
+    "description": "Pattern 3: External provider (Neon Postgres)",
+    "event": {
+      "body": "{\"apiVersion\":\"core.oam.dev/v1beta1\",\"kind\":\"Application\",\"metadata\":{\"name\":\"saas-platform\",\"namespace\":\"default\",\"labels\":{\"app-container\":\"saas-monorepo\"}},\"spec\":{\"components\":[{\"name\":\"cloud-db\",\"type\":\"neon-postgres\",\"properties\":{\"credentials\":{\"connection_string\":\"postgres://user:pass@host:5432/db\",\"database_url\":\"postgres://user:pass@host:5432/db\"},\"service_binding\":true}}]}}",
+      "operation": "CREATE"
+    },
+    "expected": {
+      "allowed": true,
+      "pattern_counts": {
+        "pattern_3": 1,
+        "pattern_2": 0,
+        "pattern_1": 0
+      },
+      "workflow_template": "pattern3-provider-workflow",
+      "parameters": {
+        "provider_type": "neon-postgres",
+        "service_binding": "true"
+      }
+    }
+  }
+]

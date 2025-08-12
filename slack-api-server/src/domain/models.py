@@ -427,6 +427,30 @@ class OAMComponent:
         """Check if component is a webservice type."""
         return self.type == "webservice"
     
+    def is_identity_service(self) -> bool:
+        """Check if component is an identity-service type."""
+        return self.type == "identity-service"
+    
+    def is_processable(self) -> bool:
+        """Check if this component type should be processed.
+        
+        Now includes all component types from the pattern-based architecture:
+        - Pattern 3: Infrastructure (postgresql, mongodb, redis, kafka, clickhouse, neon-postgres, auth0-idp, realtime-platform, camunda-orchestrator)
+        - Pattern 2: Compositional (rasa-chatbot, identity-service, orchestration-platform)
+        - Pattern 1: Foundational (webservice)
+        """
+        # All known component types that can be processed
+        processable_types = {
+            # Pattern 3 - Infrastructure
+            "postgresql", "mongodb", "redis", "kafka", "clickhouse",
+            "neon-postgres", "auth0-idp", "realtime-platform", "camunda-orchestrator",
+            # Pattern 2 - Compositional
+            "rasa-chatbot", "identity-service", "orchestration-platform",
+            # Pattern 1 - Foundational
+            "webservice"
+        }
+        return self.type in processable_types
+    
     def get_language(self) -> str:
         """Extract language from properties."""
         return self.properties.get("language", "python")
@@ -462,6 +486,10 @@ class OAMApplication:
     def get_webservice_components(self) -> List[OAMComponent]:
         """Get all webservice components."""
         return [comp for comp in self.components if comp.is_webservice()]
+    
+    def get_processable_components(self) -> List[OAMComponent]:
+        """Get all components that should be processed (webservice, identity-service, etc)."""
+        return [comp for comp in self.components if comp.is_processable()]
 
 
 @dataclass
@@ -482,8 +510,8 @@ class OAMWebhookRequest:
         if not self.oam_application.get_app_container():
             return False
         
-        # Must have webservice components
-        if not self.oam_application.get_webservice_components():
+        # Must have processable components (webservice, identity-service, etc)
+        if not self.oam_application.get_processable_components():
             return False
         
         return True

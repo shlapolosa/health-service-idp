@@ -1,0 +1,195 @@
+---
+# Pattern 3A: Provider Systems Workflow
+# Handles external service providers (neon-postgres, auth0-idp)
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: pattern3-provider-workflow
+  namespace: argo
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: provider_type
+        description: "Type of provider (neon-postgres, auth0-idp)"
+      - name: secret_name
+        description: "Name for the Kubernetes secret"
+      - name: credentials
+        description: "Base64 encoded JSON credentials"
+      - name: namespace
+        default: "default"
+      - name: vcluster
+        default: ""
+      - name: service_binding
+        default: "true"
+      - name: external_secrets_enabled
+        default: "false"
+  
+  templates:
+    - name: main
+      steps:
+        # Step 1: Validate provider type
+        - - name: validate-provider
+            template: validate-provider-type
+            arguments:
+              parameters:
+                - name: provider_type
+                  value: "{{workflow.parameters.provider_type}}"
+        
+        # Step 2: Create ProviderSecretClaim
+        - - name: create-provider-claim
+            template: create-provider-secret-claim
+            arguments:
+              parameters:
+                - name: provider_type
+                  value: "{{workflow.parameters.provider_type}}"
+                - name: secret_name
+                  value: "{{workflow.parameters.secret_name}}"
+                - name: credentials
+                  value: "{{workflow.parameters.credentials}}"
+                - name: namespace
+                  value: "{{workflow.parameters.namespace}}"
+        
+        # Step 3: Wait for secret creation
+        - - name: wait-for-secret
+            template: wait-secret-ready
+            arguments:
+              parameters:
+                - name: secret_name
+                  value: "{{workflow.parameters.secret_name}}"
+                - name: namespace
+                  value: "{{workflow.parameters.namespace}}"
+        
+        # Step 4: Create service binding if enabled
+        - - name: create-service-binding
+            template: create-binding
+            when: "{{workflow.parameters.service_binding}} == 'true'"
+            arguments:
+              parameters:
+                - name: secret_name
+                  value: "{{workflow.parameters.secret_name}}"
+                - name: namespace
+                  value: "{{workflow.parameters.namespace}}"
+                - name: provider_type
+                  value: "{{workflow.parameters.provider_type}}"
+    
+    # Template: Validate provider type
+    - name: validate-provider-type
+      inputs:
+        parameters:
+          - name: provider_type
+      script:
+        image: alpine:latest
+        command: [sh]
+        source: |
+          #!/bin/sh
+          VALID_PROVIDERS="neon-postgres auth0-idp"
+          
+          if echo "$VALID_PROVIDERS" | grep -q "{{inputs.parameters.provider_type}}"; then
+            echo "✅ Valid provider type: {{inputs.parameters.provider_type}}"
+            exit 0
+          else
+            echo "❌ Invalid provider type: {{inputs.parameters.provider_type}}"
+            echo "Valid providers: $VALID_PROVIDERS"
+            exit 1
+          fi
+    
+    # Template: Create ProviderSecretClaim
+    - name: create-provider-secret-claim
+      inputs:
+        parameters:
+          - name: provider_type
+          - name: secret_name
+          - name: credentials
+          - name: namespace
+      container:
+        image: bitnami/kubectl:latest
+        command: [sh, -c]
+        args:
+          - |
+            # Decode credentials
+            CREDS=$(echo '{{inputs.parameters.credentials}}' | base64 -d)
+            
+            # Create ProviderSecretClaim
+            cat <<EOF | kubectl apply -f -
+            apiVersion: platform.io/v1alpha1
+            kind: ProviderSecretClaim
+            metadata:
+              name: {{inputs.parameters.secret_name}}-claim
+              namespace: crossplane-system
+            spec:
+              providerType: {{inputs.parameters.provider_type}}
+              secretName: {{inputs.parameters.secret_name}}
+              namespace: {{inputs.parameters.namespace}}
+              credentials: $CREDS
+              serviceBinding: {{workflow.parameters.service_binding}}
+              externalSecretsEnabled: {{workflow.parameters.external_secrets_enabled}}
+            EOF
+            
+            echo "✅ ProviderSecretClaim created: {{inputs.parameters.secret_name}}-claim"
+    
+    # Template: Wait for secret to be ready
+    - name: wait-secret-ready
+      inputs:
+        parameters:
+          - name: secret_name
+          - name: namespace
+      script:
+        image: bitnami/kubectl:latest
+        command: [bash]
+        source: |
+          #!/bin/bash
+          echo "⏳ Waiting for secret {{inputs.parameters.secret_name}} to be created..."
+          
+          for i in {1..60}; do
+            if kubectl get secret {{inputs.parameters.secret_name}} \
+               -n {{inputs.parameters.namespace}} 2>/dev/null; then
+              echo "✅ Secret {{inputs.parameters.secret_name}} is ready!"
+              
+              # Display secret keys (not values)
+              echo "Secret keys:"
+              kubectl get secret {{inputs.parameters.secret_name}} \
+                -n {{inputs.parameters.namespace}} \
+                -o jsonpath='{.data}' | jq 'keys[]'
+              
+              exit 0
+            fi
+            
+            echo "Waiting... ($i/60)"
+            sleep 5
+          done
+          
+          echo "❌ Timeout waiting for secret"
+          exit 1
+    
+    # Template: Create service binding
+    - name: create-binding
+      inputs:
+        parameters:
+          - name: secret_name
+          - name: namespace
+          - name: provider_type
+      container:
+        image: bitnami/kubectl:latest
+        command: [sh, -c]
+        args:
+          - |
+            # Create ServiceBinding for automatic injection
+            cat <<EOF | kubectl apply -f -
+            apiVersion: servicebinding.io/v1alpha3
+            kind: ServiceBinding
+            metadata:
+              name: {{inputs.parameters.secret_name}}-binding
+              namespace: {{inputs.parameters.namespace}}
+            spec:
+              service:
+                apiVersion: v1
+                kind: Secret
+                name: {{inputs.parameters.secret_name}}
+              workload:
+                selector:
+                  matchLabels:
+                    uses-provider: {{inputs.parameters.provider_type}}
+            EOF
+            
+            echo "✅ ServiceBinding created for {{inputs.parameters.secret_name}}"

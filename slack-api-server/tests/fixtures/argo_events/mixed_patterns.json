@@ -1,0 +1,86 @@
+[
+  {
+    "name": "complex_platform_all_patterns",
+    "description": "Mixed patterns processed in 3→2→1 order",
+    "event": {
+      "body": "{\"apiVersion\":\"core.oam.dev/v1beta1\",\"kind\":\"Application\",\"metadata\":{\"name\":\"complex-platform\",\"namespace\":\"default\",\"labels\":{\"app-container\":\"complex-monorepo\"}},\"spec\":{\"components\":[{\"name\":\"api-1\",\"type\":\"webservice\",\"properties\":{\"language\":\"python\"}},{\"name\":\"api-2\",\"type\":\"webservice\",\"properties\":{\"language\":\"java\"}},{\"name\":\"db\",\"type\":\"postgresql\",\"properties\":{\"size\":\"medium\"}},{\"name\":\"cache\",\"type\":\"redis\",\"properties\":{\"size\":\"small\"}},{\"name\":\"stream\",\"type\":\"kafka\",\"properties\":{\"size\":\"large\"}},{\"name\":\"bot\",\"type\":\"rasa-chatbot\",\"properties\":{}},{\"name\":\"auth\",\"type\":\"identity-service\",\"properties\":{\"domain\":\"healthcare\"}},{\"name\":\"api-3\",\"type\":\"webservice\",\"properties\":{\"language\":\"go\"}}]}}",
+      "operation": "CREATE"
+    },
+    "expected": {
+      "allowed": true,
+      "total_components": 8,
+      "pattern_counts": {
+        "pattern_3": 3,
+        "pattern_2": 2,
+        "pattern_1": 3
+      },
+      "processing_order": [
+        "pattern3-infrastructure-workflow",
+        "pattern3-infrastructure-workflow", 
+        "pattern3-infrastructure-workflow",
+        "pattern2-compositional-workflow",
+        "identity-service-generator",
+        "microservice-standard-contract",
+        "microservice-standard-contract",
+        "microservice-standard-contract"
+      ]
+    }
+  },
+  {
+    "name": "healthcare_platform_integrated",
+    "description": "Healthcare platform with all pattern types",
+    "event": {
+      "body": "{\"apiVersion\":\"core.oam.dev/v1beta1\",\"kind\":\"Application\",\"metadata\":{\"name\":\"healthcare-integrated\",\"namespace\":\"production\",\"labels\":{\"app-container\":\"healthcare-monorepo\",\"github-owner\":\"health-corp\"}},\"spec\":{\"components\":[{\"name\":\"patient-db\",\"type\":\"postgresql\",\"properties\":{\"size\":\"large\",\"high_availability\":true}},{\"name\":\"auth-provider\",\"type\":\"auth0-idp\",\"properties\":{\"credentials\":{\"domain\":\"health-corp.auth0.com\",\"client_id\":\"test-client-id\",\"client_secret\":\"test-client-secret\"}}},{\"name\":\"realtime-engine\",\"type\":\"realtime-platform\",\"properties\":{\"channels\":100}},{\"name\":\"patient-auth\",\"type\":\"identity-service\",\"properties\":{\"domain\":\"healthcare\",\"compliance_level\":\"hipaa\"}},{\"name\":\"patient-api\",\"type\":\"webservice\",\"properties\":{\"language\":\"python\",\"framework\":\"fastapi\",\"database\":\"patient-db\"}},{\"name\":\"notification-service\",\"type\":\"webservice\",\"properties\":{\"language\":\"nodejs\",\"framework\":\"nestjs\"}}],\"policies\":[{\"type\":\"topology\",\"properties\":{\"clusters\":[\"healthcare-vcluster\"]}}]}}",
+      "operation": "CREATE"
+    },
+    "expected": {
+      "allowed": true,
+      "total_components": 6,
+      "pattern_counts": {
+        "pattern_3": 3,
+        "pattern_2": 1,
+        "pattern_1": 2
+      },
+      "vcluster": "healthcare-vcluster",
+      "has_references": true,
+      "processing_order": [
+        "pattern3-infrastructure-workflow",
+        "pattern3-provider-workflow",
+        "realtime-platform-workflow",
+        "identity-service-generator",
+        "microservice-standard-contract",
+        "microservice-standard-contract"
+      ]
+    }
+  },
+  {
+    "name": "ecommerce_platform_scalable",
+    "description": "E-commerce platform with heavy infrastructure",
+    "event": {
+      "body": "{\"apiVersion\":\"core.oam.dev/v1beta1\",\"kind\":\"Application\",\"metadata\":{\"name\":\"ecommerce-platform\",\"namespace\":\"default\",\"labels\":{\"app-container\":\"ecommerce-monorepo\"}},\"spec\":{\"components\":[{\"name\":\"catalog-db\",\"type\":\"mongodb\",\"properties\":{\"size\":\"large\",\"replicas\":3}},{\"name\":\"orders-db\",\"type\":\"postgresql\",\"properties\":{\"size\":\"large\"}},{\"name\":\"session-cache\",\"type\":\"redis\",\"properties\":{\"size\":\"medium\"}},{\"name\":\"event-stream\",\"type\":\"kafka\",\"properties\":{\"size\":\"large\",\"replicas\":5}},{\"name\":\"analytics-db\",\"type\":\"clickhouse\",\"properties\":{\"size\":\"xlarge\"}},{\"name\":\"workflow-engine\",\"type\":\"camunda-orchestrator\",\"properties\":{\"workers\":10}},{\"name\":\"catalog-api\",\"type\":\"webservice\",\"properties\":{\"language\":\"go\",\"framework\":\"gin\",\"database\":\"catalog-db\"}},{\"name\":\"order-api\",\"type\":\"webservice\",\"properties\":{\"language\":\"java\",\"framework\":\"springboot\",\"database\":\"orders-db\",\"cache\":\"session-cache\",\"events\":\"event-stream\"}},{\"name\":\"analytics-api\",\"type\":\"webservice\",\"properties\":{\"language\":\"python\",\"framework\":\"fastapi\",\"database\":\"analytics-db\"}}]}}",
+      "operation": "CREATE"
+    },
+    "expected": {
+      "allowed": true,
+      "total_components": 9,
+      "pattern_counts": {
+        "pattern_3": 6,
+        "pattern_2": 0,
+        "pattern_1": 3
+      },
+      "has_references": true,
+      "infrastructure_heavy": true,
+      "processing_order": [
+        "pattern3-infrastructure-workflow",
+        "pattern3-infrastructure-workflow",
+        "pattern3-infrastructure-workflow",
+        "pattern3-infrastructure-workflow",
+        "pattern3-infrastructure-workflow",
+        "pattern3-platform-workflow",
+        "microservice-standard-contract",
+        "microservice-standard-contract",
+        "microservice-standard-contract"
+      ]
+    }
+  }
+]

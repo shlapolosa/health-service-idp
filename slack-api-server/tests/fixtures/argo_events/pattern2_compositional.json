@@ -1,0 +1,72 @@
+[
+  {
+    "name": "rasa_chatbot_deployment",
+    "description": "Pattern 2: RASA chatbot deployment (multi-container)",
+    "event": {
+      "body": "{\"apiVersion\":\"core.oam.dev/v1beta1\",\"kind\":\"Application\",\"metadata\":{\"name\":\"customer-support\",\"namespace\":\"default\",\"labels\":{\"app-container\":\"support-monorepo\"}},\"spec\":{\"components\":[{\"name\":\"support-bot\",\"type\":\"rasa-chatbot\",\"properties\":{\"nlu_pipeline\":\"pretrained_embeddings_spacy\",\"language_model\":\"en_core_web_lg\",\"policies\":\"TEDPolicy,MemoizationPolicy\"}}]}}",
+      "operation": "CREATE"
+    },
+    "expected": {
+      "allowed": true,
+      "pattern_counts": {
+        "pattern_3": 0,
+        "pattern_2": 1,
+        "pattern_1": 0
+      },
+      "workflow_template": "pattern2-compositional-workflow",
+      "parameters": {
+        "component_type": "rasa-chatbot",
+        "nlu_pipeline": "pretrained_embeddings_spacy",
+        "build_base_image": "true",
+        "build_rasa_image": "true",
+        "build_actions_image": "true"
+      }
+    }
+  },
+  {
+    "name": "identity_service_deployment",
+    "description": "Pattern 2: Identity service with domain requirements",
+    "event": {
+      "body": "{\"apiVersion\":\"core.oam.dev/v1beta1\",\"kind\":\"Application\",\"metadata\":{\"name\":\"healthcare-auth\",\"namespace\":\"default\",\"labels\":{\"app-container\":\"healthcare-monorepo\"}},\"spec\":{\"components\":[{\"name\":\"patient-identity\",\"type\":\"identity-service\",\"properties\":{\"domain\":\"healthcare\",\"compliance_level\":\"hipaa\",\"mfa\":true,\"audit\":true}}]}}",
+      "operation": "CREATE"
+    },
+    "expected": {
+      "allowed": true,
+      "pattern_counts": {
+        "pattern_3": 0,
+        "pattern_2": 1,
+        "pattern_1": 0
+      },
+      "workflow_template": "identity-service-generator",
+      "parameters": {
+        "domain": "healthcare",
+        "compliance_level": "hipaa",
+        "enable_mfa": "true",
+        "enable_audit": "true"
+      }
+    }
+  },
+  {
+    "name": "orchestration_platform_deployment",
+    "description": "Pattern 2: Orchestration platform with workflow engine",
+    "event": {
+      "body": "{\"apiVersion\":\"core.oam.dev/v1beta1\",\"kind\":\"Application\",\"metadata\":{\"name\":\"workflow-platform\",\"namespace\":\"default\",\"labels\":{\"app-container\":\"workflow-monorepo\"}},\"spec\":{\"components\":[{\"name\":\"order-orchestrator\",\"type\":\"orchestration-platform\",\"properties\":{\"engine\":\"temporal\",\"workers\":5,\"namespace\":\"order-processing\"}}]}}",
+      "operation": "CREATE"
+    },
+    "expected": {
+      "allowed": true,
+      "pattern_counts": {
+        "pattern_3": 0,
+        "pattern_2": 1,
+        "pattern_1": 0
+      },
+      "workflow_template": "orchestration-workflow",
+      "parameters": {
+        "orchestration_type": "orchestration-platform",
+        "engine": "temporal",
+        "workers": "5",
+        "namespace": "order-processing"
+      }
+    }
+  }
+]

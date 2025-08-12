@@ -1,0 +1,83 @@
+[
+  {
+    "name": "webservice_python_fastapi",
+    "description": "Pattern 1: Standard Python FastAPI webservice deployment",
+    "event": {
+      "body": "{\"apiVersion\":\"core.oam.dev/v1beta1\",\"kind\":\"Application\",\"metadata\":{\"name\":\"api-platform\",\"namespace\":\"default\",\"labels\":{\"app-container\":\"api-monorepo\"}},\"spec\":{\"components\":[{\"name\":\"user-api\",\"type\":\"webservice\",\"properties\":{\"language\":\"python\",\"framework\":\"fastapi\",\"minScale\":2,\"maxScale\":10,\"cpu\":\"500m\",\"memory\":\"1Gi\"}}]}}",
+      "operation": "CREATE"
+    },
+    "expected": {
+      "allowed": true,
+      "pattern_counts": {
+        "pattern_3": 0,
+        "pattern_2": 0,
+        "pattern_1": 1
+      },
+      "workflow_template": "microservice-standard-contract",
+      "parameters": {
+        "language": "python",
+        "framework": "fastapi",
+        "template_repo": "onion-architecture-template",
+        "min_scale": "2",
+        "max_scale": "10",
+        "cpu_request": "500m",
+        "memory_request": "1Gi"
+      }
+    }
+  },
+  {
+    "name": "webservice_nodejs_express",
+    "description": "Pattern 1: Node.js Express webservice with infrastructure references",
+    "event": {
+      "body": "{\"apiVersion\":\"core.oam.dev/v1beta1\",\"kind\":\"Application\",\"metadata\":{\"name\":\"full-stack-app\",\"namespace\":\"default\",\"labels\":{\"app-container\":\"fullstack-monorepo\"}},\"spec\":{\"components\":[{\"name\":\"app-db\",\"type\":\"postgresql\",\"properties\":{\"size\":\"small\"}},{\"name\":\"app-cache\",\"type\":\"redis\",\"properties\":{\"size\":\"small\"}},{\"name\":\"app-api\",\"type\":\"webservice\",\"properties\":{\"language\":\"nodejs\",\"framework\":\"express\",\"database\":\"app-db\",\"cache\":\"app-cache\"}}]}}",
+      "operation": "CREATE"
+    },
+    "expected": {
+      "allowed": true,
+      "pattern_counts": {
+        "pattern_3": 2,
+        "pattern_2": 0,
+        "pattern_1": 1
+      },
+      "total_components": 3,
+      "processing_order": ["pattern_3", "pattern_3", "pattern_1"],
+      "workflow_templates": [
+        "pattern3-infrastructure-workflow",
+        "pattern3-infrastructure-workflow",
+        "microservice-standard-contract"
+      ],
+      "pattern1_params": {
+        "language": "nodejs",
+        "framework": "express",
+        "has_references": true
+      }
+    }
+  },
+  {
+    "name": "webservice_java_springboot",
+    "description": "Pattern 1: Java Spring Boot microservice",
+    "event": {
+      "body": "{\"apiVersion\":\"core.oam.dev/v1beta1\",\"kind\":\"Application\",\"metadata\":{\"name\":\"enterprise-platform\",\"namespace\":\"production\",\"labels\":{\"app-container\":\"enterprise-monorepo\",\"github-owner\":\"acme-corp\"}},\"spec\":{\"components\":[{\"name\":\"order-service\",\"type\":\"webservice\",\"properties\":{\"language\":\"java\",\"framework\":\"springboot\",\"jdk_version\":\"17\",\"build_tool\":\"gradle\",\"minScale\":1,\"maxScale\":5}}],\"policies\":[{\"type\":\"topology\",\"properties\":{\"clusters\":[\"production-vcluster\"]}}]}}",
+      "operation": "CREATE"
+    },
+    "expected": {
+      "allowed": true,
+      "pattern_counts": {
+        "pattern_3": 0,
+        "pattern_2": 0,
+        "pattern_1": 1
+      },
+      "workflow_template": "microservice-standard-contract",
+      "vcluster": "production-vcluster",
+      "parameters": {
+        "language": "java",
+        "framework": "springboot",
+        "jdk_version": "17",
+        "build_tool": "gradle",
+        "template_repo": "onion-architecture-template",
+        "min_scale": "1",
+        "max_scale": "5"
+      }
+    }
+  }
+]

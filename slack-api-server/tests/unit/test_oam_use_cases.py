@@ -11,16 +11,48 @@ from src.application.oam_use_cases import ProcessOAMWebhook
 from src.domain.models import (
     OAMApplication, OAMComponent, OAMWebhookRequest, OAMWebhookResponse
 )
+from src.domain.strategies.base import HandlerResult, ComponentPattern
 
 
 class TestProcessOAMWebhook:
     """Test ProcessOAMWebhook use case."""
     
-    def test_process_valid_create_request(self):
+    @patch('src.domain.strategies.orchestrator.PatternOrchestrator')
+    def test_process_valid_create_request(self, mock_orchestrator_class):
         """Test processing a valid CREATE OAM webhook request."""
         # Setup mock argo client
         mock_argo_client = Mock()
-        mock_argo_client.trigger_microservice_from_oam.return_value = (True, "workflow-123")
+        
+        # Mock orchestrator
+        mock_orchestrator = Mock()
+        mock_orchestrator_class.return_value = mock_orchestrator
+        
+        # Mock successful processing results
+        mock_results = [
+            Mock(success=True, workflow_name="microservice-standard-contract", 
+                 workflow_run_name="run-123", error=None, pattern=ComponentPattern.FOUNDATIONAL),
+            Mock(success=True, workflow_name="microservice-standard-contract",
+                 workflow_run_name="run-456", error=None, pattern=ComponentPattern.FOUNDATIONAL)
+        ]
+        mock_orchestrator.handle_oam_application.return_value = mock_results
+        
+        # Mock processing summary
+        mock_summary = {
+            "total": 2,
+            "successful": 2,
+            "failed": 0,
+            "by_pattern": {
+                "pattern_3": {"successful": 0, "failed": 0},
+                "pattern_2": {"successful": 0, "failed": 0},
+                "pattern_1": {"successful": 2, "failed": 0}
+            },
+            "workflows_triggered": [
+                {"workflow": "microservice-standard-contract", "run": "run-123"},
+                {"workflow": "microservice-standard-contract", "run": "run-456"}
+            ],
+            "errors": []
+        }
+        mock_orchestrator.get_processing_summary.return_value = mock_summary
         
         # Create use case
         use_case = ProcessOAMWebhook(argo_client=mock_argo_client)
@@ -79,25 +111,50 @@ class TestProcessOAMWebhook:
         assert response["response"]["uid"] == "test-uid-123"
         assert response["response"]["allowed"] is True
         
-        # Verify argo client was called for both webservices
-        assert mock_argo_client.trigger_microservice_from_oam.call_count == 2
+        # Verify orchestrator was initialized and called
+        mock_orchestrator_class.assert_called_once_with(mock_argo_client)
+        mock_orchestrator.handle_oam_application.assert_called_once()
         
-        # Check first call (api-service)
-        first_call = mock_argo_client.trigger_microservice_from_oam.call_args_list[0]
-        assert first_call[1]["component"]["name"] == "api-service"
-        assert first_call[1]["app_container"] == "my-monorepo"
-        assert first_call[1]["vcluster"] == "test-vcluster"
-        
-        # Check second call (worker-service)
-        second_call = mock_argo_client.trigger_microservice_from_oam.call_args_list[1]
-        assert second_call[1]["component"]["name"] == "worker-service"
-        assert second_call[1]["app_container"] == "my-monorepo"
-        assert second_call[1]["vcluster"] == "test-vcluster"
+        # Check orchestrator was called with correct parameters
+        call_args = mock_orchestrator.handle_oam_application.call_args
+        oam_app_dict = call_args[1]["oam_application"]
+        assert oam_app_dict["metadata"]["name"] == "test-app"
+        assert len(oam_app_dict["spec"]["components"]) == 2
+        assert call_args[1]["vcluster"] == "test-vcluster"
+        assert call_args[1]["namespace"] == "default"
     
-    def test_process_update_request(self):
+    @patch('src.domain.strategies.orchestrator.PatternOrchestrator')
+    def test_process_update_request(self, mock_orchestrator_class):
         """Test processing an UPDATE OAM webhook request."""
         mock_argo_client = Mock()
-        mock_argo_client.trigger_microservice_from_oam.return_value = (True, "workflow-456")
+        
+        # Mock orchestrator
+        mock_orchestrator = Mock()
+        mock_orchestrator_class.return_value = mock_orchestrator
+        
+        # Mock successful processing result
+        mock_results = [
+            Mock(success=True, workflow_name="microservice-standard-contract", 
+                 workflow_run_name="run-789", error=None, pattern=ComponentPattern.FOUNDATIONAL)
+        ]
+        mock_orchestrator.handle_oam_application.return_value = mock_results
+        
+        # Mock processing summary
+        mock_summary = {
+            "total": 1,
+            "successful": 1,
+            "failed": 0,
+            "by_pattern": {
+                "pattern_3": {"successful": 0, "failed": 0},
+                "pattern_2": {"successful": 0, "failed": 0},
+                "pattern_1": {"successful": 1, "failed": 0}
+            },
+            "workflows_triggered": [
+                {"workflow": "microservice-standard-contract", "run": "run-789"}
+            ],
+            "errors": []
+        }
+        mock_orchestrator.get_processing_summary.return_value = mock_summary
         
         use_case = ProcessOAMWebhook(argo_client=mock_argo_client)
         
@@ -132,7 +189,8 @@ class TestProcessOAMWebhook:
         response = use_case.execute(admission_request)
         
         assert response["response"]["allowed"] is True
-        assert mock_argo_client.trigger_microservice_from_oam.call_count == 1
+        # Verify orchestrator was called
+        mock_orchestrator.handle_oam_application.assert_called_once()
     
     def test_skip_delete_operation(self):
         """Test that DELETE operations are skipped."""
@@ -170,7 +228,7 @@ class TestProcessOAMWebhook:
         assert response["response"]["allowed"] is True
         assert "does not require processing" in response["response"]["status"]["message"]
         # Argo client should not be called for DELETE
-        mock_argo_client.trigger_microservice_from_oam.assert_not_called()
+        mock_argo_client.assert_not_called()
     
     def test_skip_no_app_container_label(self):
         """Test that requests without app-container label are skipped."""
@@ -205,21 +263,21 @@ class TestProcessOAMWebhook:
         
         assert response["response"]["allowed"] is True
         assert "does not require processing" in response["response"]["status"]["message"]
-        mock_argo_client.trigger_microservice_from_oam.assert_not_called()
+        mock_argo_client.assert_not_called()
     
-    def test_skip_no_webservice_components(self):
-        """Test that requests without webservice components are skipped."""
+    def test_skip_no_processable_components(self):
+        """Test that requests with only unknown component types are skipped."""
         mock_argo_client = Mock()
         
         use_case = ProcessOAMWebhook(argo_client=mock_argo_client)
         
         admission_request = {
             "request": {
-                "uid": "no-webservice-uid",
+                "uid": "no-processable-uid",
                 "operation": "CREATE",
                 "object": {
                     "metadata": {
-                        "name": "app-no-webservice",
+                        "name": "app-no-processable",
                         "namespace": "default",
                         "labels": {
                             "app-container": "monorepo"
@@ -228,13 +286,13 @@ class TestProcessOAMWebhook:
                     "spec": {
                         "components": [
                             {
-                                "name": "database",
-                                "type": "database",
+                                "name": "unknown1",
+                                "type": "database",  # Unknown type
                                 "properties": {}
                             },
                             {
-                                "name": "cache",
-                                "type": "redis",
+                                "name": "unknown2",
+                                "type": "custom-type",  # Unknown type
                                 "properties": {}
                             }
                         ]
@@ -247,7 +305,7 @@ class TestProcessOAMWebhook:
         
         assert response["response"]["allowed"] is True
         assert "does not require processing" in response["response"]["status"]["message"]
-        mock_argo_client.trigger_microservice_from_oam.assert_not_called()
+        mock_argo_client.assert_not_called()
     
     def test_handle_argo_client_failure(self):
         """Test handling of Argo client failures."""
@@ -348,10 +406,38 @@ class TestProcessOAMWebhook:
         # Since operation is missing, should_process will return False
         assert "does not require processing" in response["response"]["status"]["message"]
     
-    def test_dry_run_request(self):
+    @patch('src.domain.strategies.orchestrator.PatternOrchestrator')
+    def test_dry_run_request(self, mock_orchestrator_class):
         """Test that dry-run requests are processed normally (stateless approach)."""
         mock_argo_client = Mock()
-        mock_argo_client.trigger_microservice_from_oam.return_value = (True, "workflow-dry")
+        
+        # Mock orchestrator
+        mock_orchestrator = Mock()
+        mock_orchestrator_class.return_value = mock_orchestrator
+        
+        # Mock successful processing result
+        mock_results = [
+            Mock(success=True, workflow_name="microservice-standard-contract", 
+                 workflow_run_name="workflow-dry", error=None, pattern=ComponentPattern.FOUNDATIONAL)
+        ]
+        mock_orchestrator.handle_oam_application.return_value = mock_results
+        
+        # Mock processing summary
+        mock_summary = {
+            "total": 1,
+            "successful": 1,
+            "failed": 0,
+            "by_pattern": {
+                "pattern_3": {"successful": 0, "failed": 0},
+                "pattern_2": {"successful": 0, "failed": 0},
+                "pattern_1": {"successful": 1, "failed": 0}
+            },
+            "workflows_triggered": [
+                {"workflow": "microservice-standard-contract", "run": "workflow-dry"}
+            ],
+            "errors": []
+        }
+        mock_orchestrator.get_processing_summary.return_value = mock_summary
         
         use_case = ProcessOAMWebhook(argo_client=mock_argo_client)
         
@@ -386,17 +472,45 @@ class TestProcessOAMWebhook:
         assert response["response"]["allowed"] is True
         # In stateless approach, dry-run still triggers workflows
         # (ApplicationClaim will handle idempotency)
-        assert mock_argo_client.trigger_microservice_from_oam.call_count == 1
+        mock_orchestrator.handle_oam_application.assert_called_once()
     
-    def test_multiple_components_partial_failure(self):
+    @patch('src.domain.strategies.orchestrator.PatternOrchestrator')
+    def test_multiple_components_partial_failure(self, mock_orchestrator_class):
         """Test processing multiple components with partial failures."""
         mock_argo_client = Mock()
-        # First call succeeds, second fails, third succeeds
-        mock_argo_client.trigger_microservice_from_oam.side_effect = [
-            (True, "workflow-1"),
-            (False, "Connection error"),
-            (True, "workflow-3")
+        
+        # Mock orchestrator
+        mock_orchestrator = Mock()
+        mock_orchestrator_class.return_value = mock_orchestrator
+        
+        # Mock partial success results - first succeeds, second fails, third succeeds
+        mock_results = [
+            Mock(success=True, workflow_name="microservice-standard-contract", 
+                 workflow_run_name="workflow-1", error=None, pattern=ComponentPattern.FOUNDATIONAL),
+            Mock(success=False, workflow_name=None,
+                 workflow_run_name=None, error="Connection error", pattern=ComponentPattern.FOUNDATIONAL),
+            Mock(success=True, workflow_name="microservice-standard-contract",
+                 workflow_run_name="workflow-3", error=None, pattern=ComponentPattern.FOUNDATIONAL)
         ]
+        mock_orchestrator.handle_oam_application.return_value = mock_results
+        
+        # Mock processing summary with partial failure
+        mock_summary = {
+            "total": 3,
+            "successful": 2,
+            "failed": 1,
+            "by_pattern": {
+                "pattern_3": {"successful": 0, "failed": 0},
+                "pattern_2": {"successful": 0, "failed": 0},
+                "pattern_1": {"successful": 2, "failed": 1}
+            },
+            "workflows_triggered": [
+                {"workflow": "microservice-standard-contract", "run": "workflow-1"},
+                {"workflow": "microservice-standard-contract", "run": "workflow-3"}
+            ],
+            "errors": ["Connection error"]
+        }
+        mock_orchestrator.get_processing_summary.return_value = mock_summary
         
         use_case = ProcessOAMWebhook(argo_client=mock_argo_client)
         
@@ -439,7 +553,10 @@ class TestProcessOAMWebhook:
         
         # Should still allow despite partial failure
         assert response["response"]["allowed"] is True
-        assert mock_argo_client.trigger_microservice_from_oam.call_count == 3
+        # Verify orchestrator was called
+        mock_orchestrator.handle_oam_application.assert_called_once()
         # Response should indicate some processing occurred
         assert "Processed" in response["response"]["status"]["message"]
-        assert "2" in response["response"]["status"]["message"]  # 2 successful
+        assert "3" in response["response"]["status"]["message"]  # 3 total processed
+        assert "Pattern 1: 2" in response["response"]["status"]["message"]  # 2 successful
+        assert "1 failed" in response["response"]["status"]["message"]  # 1 failed

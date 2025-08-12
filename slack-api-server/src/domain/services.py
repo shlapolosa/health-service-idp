@@ -375,15 +375,20 @@ class OAMWebhookService:
     and determining which microservices need to be created.
     """
     
+    def __init__(self):
+        """Initialize with pattern orchestrator."""
+        from .strategies.orchestrator import PatternOrchestrator
+        self.orchestrator = None  # Will be set with argo_client
+    
     def process_oam_webhook(
         self, 
         request: "OAMWebhookRequest",
         argo_client: Any
     ) -> "OAMWebhookResponse":
-        """Process an OAM webhook request.
+        """Process an OAM webhook request using pattern-based orchestration.
         
-        This implements the stateless approach - we trigger workflows for
-        ALL webservice components and let ApplicationClaim handle idempotency.
+        This implements the pattern-based approach (3→2→1) - we process
+        infrastructure first, then compositional services, then foundational services.
         
         Args:
             request: The OAM webhook request
@@ -393,6 +398,10 @@ class OAMWebhookService:
             OAMWebhookResponse with processing results
         """
         from .models import OAMWebhookResponse
+        from .strategies.orchestrator import PatternOrchestrator
+        import logging
+        
+        logger = logging.getLogger(__name__)
         
         # Check if we should process this request
         if not request.should_process():
@@ -402,42 +411,67 @@ class OAMWebhookService:
                 message="Request does not require processing"
             )
         
-        app_container = request.oam_application.get_app_container()
-        vcluster = request.oam_application.get_target_vcluster()
-        triggered_workflows = []
+        # Initialize orchestrator with argo client
+        orchestrator = PatternOrchestrator(argo_client)
         
-        # Process all webservice components (stateless approach)
-        for component in request.oam_application.get_webservice_components():
-            try:
-                # Trigger workflow for this component
-                # ApplicationClaim will handle idempotency
-                success, message = argo_client.trigger_microservice_from_oam(
-                    component={
-                        "name": component.name,
-                        "properties": component.properties
-                    },
-                    app_container=app_container,
-                    vcluster=vcluster or ""
-                )
-                
-                if success:
-                    triggered_workflows.append(f"{component.name}: {message}")
-                else:
-                    # Log but don't fail the webhook
-                    # This maintains resilience
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.warning(f"Failed to trigger workflow for {component.name}: {message}")
-                    
-            except Exception as e:
-                # Log errors but continue processing other components
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.error(f"Error processing component {component.name}: {str(e)}")
+        # Build OAM application dictionary for orchestrator
+        oam_app_dict = {
+            "metadata": {
+                "name": request.oam_application.name,
+                "namespace": request.oam_application.namespace,
+                "labels": request.oam_application.labels,
+                "annotations": request.oam_application.annotations
+            },
+            "spec": {
+                "components": [
+                    {
+                        "name": comp.name,
+                        "type": comp.type,
+                        "properties": comp.properties,
+                        "traits": comp.traits
+                    }
+                    for comp in request.oam_application.components
+                ]
+            }
+        }
+        
+        # Get GitHub owner from labels or use default
+        github_owner = request.oam_application.labels.get("github-owner", "shlapolosa")
+        
+        # Process the application with pattern-based ordering
+        logger.info(f"Processing OAM Application {request.oam_application.name} with pattern orchestrator")
+        results = orchestrator.handle_oam_application(
+            oam_application=oam_app_dict,
+            namespace=request.oam_application.namespace,
+            vcluster=request.oam_application.get_target_vcluster(),
+            github_owner=github_owner
+        )
+        
+        # Get processing summary
+        summary = orchestrator.get_processing_summary(results)
+        
+        # Build response
+        triggered_workflows = []
+        for workflow in summary.get("workflows_triggered", []):
+            triggered_workflows.append(f"{workflow['workflow']}: {workflow['run']}")
+        
+        # Log any errors
+        for error in summary.get("errors", []):
+            logger.warning(f"Component processing error: {error}")
+        
+        message = (
+            f"Processed {summary['total']} components "
+            f"(Pattern 3: {summary['by_pattern']['pattern_3']['successful']}, "
+            f"Pattern 2: {summary['by_pattern']['pattern_2']['successful']}, "
+            f"Pattern 1: {summary['by_pattern']['pattern_1']['successful']})"
+        )
+        
+        if summary['failed'] > 0:
+            message += f" - {summary['failed']} failed"
         
         return OAMWebhookResponse(
             uid=request.uid,
             allowed=True,
-            message=f"Processed {len(triggered_workflows)} components",
+            message=message,
             triggered_workflows=triggered_workflows
         )

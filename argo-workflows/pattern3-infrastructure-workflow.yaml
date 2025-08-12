@@ -1,0 +1,376 @@
+---
+# Pattern 3B: Infrastructure Components Workflow
+# Handles internal infrastructure (postgresql, mongodb, redis, kafka, clickhouse)
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: pattern3-infrastructure-workflow
+  namespace: argo
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: infrastructure_type
+        description: "Type of infrastructure (postgresql, mongodb, redis, kafka, clickhouse)"
+      - name: claim_name
+        description: "Name for the infrastructure claim"
+      - name: size
+        default: "small"
+        description: "Size (small, medium, large)"
+      - name: version
+        default: ""
+        description: "Version of the infrastructure"
+      - name: replicas
+        default: "1"
+      - name: namespace
+        default: "default"
+      - name: vcluster
+        default: ""
+      - name: high_availability
+        default: "false"
+      - name: backup_enabled
+        default: "false"
+      - name: monitoring_enabled
+        default: "true"
+  
+  templates:
+    - name: main
+      steps:
+        # Step 1: Validate infrastructure type
+        - - name: validate-infrastructure
+            template: validate-infrastructure-type
+            arguments:
+              parameters:
+                - name: infrastructure_type
+                  value: "{{workflow.parameters.infrastructure_type}}"
+        
+        # Step 2: Create InfrastructureClaim
+        - - name: create-infrastructure-claim
+            template: create-infra-claim
+            arguments:
+              parameters:
+                - name: infrastructure_type
+                  value: "{{workflow.parameters.infrastructure_type}}"
+                - name: claim_name
+                  value: "{{workflow.parameters.claim_name}}"
+                - name: size
+                  value: "{{workflow.parameters.size}}"
+                - name: version
+                  value: "{{workflow.parameters.version}}"
+                - name: replicas
+                  value: "{{workflow.parameters.replicas}}"
+                - name: namespace
+                  value: "{{workflow.parameters.namespace}}"
+        
+        # Step 3: Wait for provisioning
+        - - name: wait-for-provisioning
+            template: wait-infrastructure-ready
+            arguments:
+              parameters:
+                - name: claim_name
+                  value: "{{workflow.parameters.claim_name}}"
+                - name: namespace
+                  value: "{{workflow.parameters.namespace}}"
+        
+        # Step 4: Extract connection details
+        - - name: extract-connection
+            template: extract-connection-details
+            arguments:
+              parameters:
+                - name: claim_name
+                  value: "{{workflow.parameters.claim_name}}"
+                - name: namespace
+                  value: "{{workflow.parameters.namespace}}"
+                - name: infrastructure_type
+                  value: "{{workflow.parameters.infrastructure_type}}"
+        
+        # Step 5: Create service monitor if monitoring enabled
+        - - name: create-monitor
+            template: create-service-monitor
+            when: "{{workflow.parameters.monitoring_enabled}} == 'true'"
+            arguments:
+              parameters:
+                - name: infrastructure_type
+                  value: "{{workflow.parameters.infrastructure_type}}"
+                - name: claim_name
+                  value: "{{workflow.parameters.claim_name}}"
+                - name: namespace
+                  value: "{{workflow.parameters.namespace}}"
+    
+    # Template: Validate infrastructure type
+    - name: validate-infrastructure-type
+      inputs:
+        parameters:
+          - name: infrastructure_type
+      script:
+        image: alpine:latest
+        command: [sh]
+        source: |
+          #!/bin/sh
+          VALID_TYPES="postgresql mongodb redis kafka clickhouse"
+          
+          if echo "$VALID_TYPES" | grep -q "{{inputs.parameters.infrastructure_type}}"; then
+            echo "✅ Valid infrastructure type: {{inputs.parameters.infrastructure_type}}"
+            exit 0
+          else
+            echo "❌ Invalid infrastructure type: {{inputs.parameters.infrastructure_type}}"
+            echo "Valid types: $VALID_TYPES"
+            exit 1
+          fi
+    
+    # Template: Create InfrastructureClaim
+    - name: create-infra-claim
+      inputs:
+        parameters:
+          - name: infrastructure_type
+          - name: claim_name
+          - name: size
+          - name: version
+          - name: replicas
+          - name: namespace
+      container:
+        image: bitnami/kubectl:latest
+        command: [sh, -c]
+        args:
+          - |
+            # Determine resource configuration based on size
+            case "{{inputs.parameters.size}}" in
+              small)
+                CPU="500m"
+                MEMORY="1Gi"
+                STORAGE="10Gi"
+                ;;
+              medium)
+                CPU="1"
+                MEMORY="2Gi"
+                STORAGE="50Gi"
+                ;;
+              large)
+                CPU="2"
+                MEMORY="4Gi"
+                STORAGE="100Gi"
+                ;;
+              *)
+                echo "Invalid size: {{inputs.parameters.size}}"
+                exit 1
+                ;;
+            esac
+            
+            # Create InfrastructureClaim
+            cat <<EOF | kubectl apply -f -
+            apiVersion: platform.io/v1alpha1
+            kind: InfrastructureClaim
+            metadata:
+              name: {{inputs.parameters.claim_name}}
+              namespace: crossplane-system
+            spec:
+              infrastructureType: {{inputs.parameters.infrastructure_type}}
+              size: {{inputs.parameters.size}}
+              version: "{{inputs.parameters.version}}"
+              replicas: {{inputs.parameters.replicas}}
+              namespace: {{inputs.parameters.namespace}}
+              vcluster: "{{workflow.parameters.vcluster}}"
+              highAvailability: {{workflow.parameters.high_availability}}
+              backupEnabled: {{workflow.parameters.backup_enabled}}
+              monitoringEnabled: {{workflow.parameters.monitoring_enabled}}
+              resources:
+                cpu: "$CPU"
+                memory: "$MEMORY"
+                storage: "$STORAGE"
+              connectionSecretRef:
+                name: {{inputs.parameters.claim_name}}-connection
+                namespace: {{inputs.parameters.namespace}}
+            EOF
+            
+            echo "✅ InfrastructureClaim created: {{inputs.parameters.claim_name}}"
+    
+    # Template: Wait for infrastructure to be ready
+    - name: wait-infrastructure-ready
+      inputs:
+        parameters:
+          - name: claim_name
+          - name: namespace
+      script:
+        image: bitnami/kubectl:latest
+        command: [bash]
+        source: |
+          #!/bin/bash
+          echo "⏳ Waiting for infrastructure {{inputs.parameters.claim_name}} to be ready..."
+          
+          for i in {1..120}; do
+            # Check if claim is ready
+            STATUS=$(kubectl get infrastructureclaim {{inputs.parameters.claim_name}} \
+              -n crossplane-system \
+              -o jsonpath='{.status.ready}' 2>/dev/null)
+            
+            if [ "$STATUS" = "true" ]; then
+              echo "✅ Infrastructure {{inputs.parameters.claim_name}} is ready!"
+              
+              # Check for Helm release
+              RELEASE=$(kubectl get releases.helm -n crossplane-system \
+                -l crossplane.io/claim-name={{inputs.parameters.claim_name}} \
+                -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+              
+              if [ ! -z "$RELEASE" ]; then
+                echo "Helm release: $RELEASE"
+                kubectl get release $RELEASE -n crossplane-system
+              fi
+              
+              exit 0
+            fi
+            
+            echo "Waiting... ($i/120)"
+            sleep 10
+          done
+          
+          echo "❌ Timeout waiting for infrastructure"
+          kubectl describe infrastructureclaim {{inputs.parameters.claim_name}} -n crossplane-system
+          exit 1
+    
+    # Template: Extract connection details
+    - name: extract-connection-details
+      inputs:
+        parameters:
+          - name: claim_name
+          - name: namespace
+          - name: infrastructure_type
+      script:
+        image: bitnami/kubectl:latest
+        command: [bash]
+        source: |
+          #!/bin/bash
+          SECRET_NAME="{{inputs.parameters.claim_name}}-connection"
+          
+          echo "📋 Extracting connection details from secret $SECRET_NAME..."
+          
+          # Wait for connection secret
+          for i in {1..30}; do
+            if kubectl get secret $SECRET_NAME -n {{inputs.parameters.namespace}} 2>/dev/null; then
+              break
+            fi
+            echo "Waiting for connection secret... ($i/30)"
+            sleep 2
+          done
+          
+          # Extract based on infrastructure type
+          case "{{inputs.parameters.infrastructure_type}}" in
+            postgresql)
+              HOST=$(kubectl get secret $SECRET_NAME -n {{inputs.parameters.namespace}} \
+                -o jsonpath='{.data.host}' | base64 -d)
+              PORT=$(kubectl get secret $SECRET_NAME -n {{inputs.parameters.namespace}} \
+                -o jsonpath='{.data.port}' | base64 -d)
+              DATABASE=$(kubectl get secret $SECRET_NAME -n {{inputs.parameters.namespace}} \
+                -o jsonpath='{.data.database}' | base64 -d)
+              USERNAME=$(kubectl get secret $SECRET_NAME -n {{inputs.parameters.namespace}} \
+                -o jsonpath='{.data.username}' | base64 -d)
+              
+              CONNECTION_STRING="postgresql://$USERNAME:***@$HOST:$PORT/$DATABASE"
+              echo "PostgreSQL connection: $CONNECTION_STRING"
+              
+              # Create formatted connection secret
+              kubectl create secret generic ${SECRET_NAME}-formatted \
+                -n {{inputs.parameters.namespace}} \
+                --from-literal=connection_string="$CONNECTION_STRING" \
+                --from-literal=jdbc_url="jdbc:postgresql://$HOST:$PORT/$DATABASE" \
+                --dry-run=client -o yaml | kubectl apply -f -
+              ;;
+              
+            redis)
+              HOST=$(kubectl get secret $SECRET_NAME -n {{inputs.parameters.namespace}} \
+                -o jsonpath='{.data.host}' | base64 -d)
+              PORT=$(kubectl get secret $SECRET_NAME -n {{inputs.parameters.namespace}} \
+                -o jsonpath='{.data.port}' | base64 -d)
+              
+              CONNECTION_STRING="redis://:***@$HOST:$PORT/0"
+              echo "Redis connection: $CONNECTION_STRING"
+              
+              kubectl create secret generic ${SECRET_NAME}-formatted \
+                -n {{inputs.parameters.namespace}} \
+                --from-literal=connection_string="$CONNECTION_STRING" \
+                --dry-run=client -o yaml | kubectl apply -f -
+              ;;
+              
+            mongodb)
+              HOST=$(kubectl get secret $SECRET_NAME -n {{inputs.parameters.namespace}} \
+                -o jsonpath='{.data.host}' | base64 -d)
+              PORT=$(kubectl get secret $SECRET_NAME -n {{inputs.parameters.namespace}} \
+                -o jsonpath='{.data.port}' | base64 -d)
+              DATABASE=$(kubectl get secret $SECRET_NAME -n {{inputs.parameters.namespace}} \
+                -o jsonpath='{.data.database}' | base64 -d)
+              USERNAME=$(kubectl get secret $SECRET_NAME -n {{inputs.parameters.namespace}} \
+                -o jsonpath='{.data.username}' | base64 -d)
+              
+              CONNECTION_STRING="mongodb://$USERNAME:***@$HOST:$PORT/$DATABASE"
+              echo "MongoDB connection: $CONNECTION_STRING"
+              
+              kubectl create secret generic ${SECRET_NAME}-formatted \
+                -n {{inputs.parameters.namespace}} \
+                --from-literal=connection_string="$CONNECTION_STRING" \
+                --dry-run=client -o yaml | kubectl apply -f -
+              ;;
+              
+            kafka)
+              BOOTSTRAP=$(kubectl get secret $SECRET_NAME -n {{inputs.parameters.namespace}} \
+                -o jsonpath='{.data.bootstrap_servers}' | base64 -d)
+              
+              echo "Kafka bootstrap servers: $BOOTSTRAP"
+              
+              kubectl create secret generic ${SECRET_NAME}-formatted \
+                -n {{inputs.parameters.namespace}} \
+                --from-literal=bootstrap_servers="$BOOTSTRAP" \
+                --dry-run=client -o yaml | kubectl apply -f -
+              ;;
+              
+            clickhouse)
+              HOST=$(kubectl get secret $SECRET_NAME -n {{inputs.parameters.namespace}} \
+                -o jsonpath='{.data.host}' | base64 -d)
+              PORT=$(kubectl get secret $SECRET_NAME -n {{inputs.parameters.namespace}} \
+                -o jsonpath='{.data.port}' | base64 -d)
+              USERNAME=$(kubectl get secret $SECRET_NAME -n {{inputs.parameters.namespace}} \
+                -o jsonpath='{.data.username}' | base64 -d)
+              
+              CONNECTION_STRING="clickhouse://$USERNAME:***@$HOST:$PORT/default"
+              echo "ClickHouse connection: $CONNECTION_STRING"
+              
+              kubectl create secret generic ${SECRET_NAME}-formatted \
+                -n {{inputs.parameters.namespace}} \
+                --from-literal=connection_string="$CONNECTION_STRING" \
+                --dry-run=client -o yaml | kubectl apply -f -
+              ;;
+          esac
+          
+          echo "✅ Connection details extracted and formatted"
+    
+    # Template: Create ServiceMonitor for Prometheus
+    - name: create-service-monitor
+      inputs:
+        parameters:
+          - name: infrastructure_type
+          - name: claim_name
+          - name: namespace
+      container:
+        image: bitnami/kubectl:latest
+        command: [sh, -c]
+        args:
+          - |
+            cat <<EOF | kubectl apply -f -
+            apiVersion: monitoring.coreos.com/v1
+            kind: ServiceMonitor
+            metadata:
+              name: {{inputs.parameters.claim_name}}-monitor
+              namespace: {{inputs.parameters.namespace}}
+              labels:
+                infrastructure: {{inputs.parameters.infrastructure_type}}
+                claim: {{inputs.parameters.claim_name}}
+            spec:
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: {{inputs.parameters.infrastructure_type}}
+                  app.kubernetes.io/instance: {{inputs.parameters.claim_name}}
+              endpoints:
+              - port: metrics
+                interval: 30s
+                path: /metrics
+            EOF
+            
+            echo "✅ ServiceMonitor created for {{inputs.parameters.claim_name}}"
