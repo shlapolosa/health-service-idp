@@ -643,7 +643,7 @@ spec:
                           type: webservice
                           properties:
                             name: $APP_NAME
-                            image: $APP_NAME:latest
+                            image: docker.io/socrates12345/$APP_NAME:latest
                             language: python
                             framework: fastapi
                             port: 8080
@@ -983,7 +983,13 @@ spec:
                                   # Update main OAM file if it exists and contains the service
                                   if [ -f "$MAIN_OAM" ] && grep -q "name: ${service}" "$MAIN_OAM"; then
                                     echo "📄 Updating main OAM: $MAIN_OAM"
+                                    echo "Current image line:"
+                                    grep "image:" "$MAIN_OAM" | head -1
+                                    # Update image - handle both with and without registry prefix
                                     sed -i "s|image: docker.io/socrates12345/${service}:.*|image: $NEW_IMAGE|g" "$MAIN_OAM"
+                                    sed -i "s|image: ${service}:.*|image: $NEW_IMAGE|g" "$MAIN_OAM"
+                                    echo "Updated image line:"
+                                    grep "image:" "$MAIN_OAM" | head -1
                                     echo "✅ Updated main OAM manifest"
                                   fi
                                   
