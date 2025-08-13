@@ -294,6 +294,7 @@ class TestPatternFunctional:
                     call_args = mock_argo.create_workflow_from_template.call_args_list[0]
                     params = call_args[1]["parameters"]
                     assert params.get("vcluster") == test_case["expected"]["vcluster"] or \
-                           params.get("target_vcluster") == test_case["expected"]["vcluster"], \
+                           params.get("target_vcluster") == test_case["expected"]["vcluster"] or \
+                           params.get("target-vcluster") == test_case["expected"]["vcluster"], \
                            "vCluster parameter not passed correctly"
                 break

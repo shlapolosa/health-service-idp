@@ -7,6 +7,7 @@ metadata:
   name: realtime-platform
   annotations:
     definition.oam.dev/description: "Complete real-time streaming platform with IoT, analytics, and stream processing"
+    definition.oam.dev/requires-source-code: "false"
 spec:
   workload:
     definition:

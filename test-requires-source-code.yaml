@@ -1,0 +1,41 @@
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: test-source-code-routing
+  namespace: default
+  labels:
+    app-container: "test-routing-repo"
+spec:
+  components:
+    # This should use ApplicationClaim path (requires-source-code: true)
+    - name: api-service
+      type: webservice
+      properties:
+        language: python
+        framework: fastapi
+        database: postgres
+        cache: redis
+        port: 8080
+        healthPath: /health
+        
+    # This should use direct Knative path (requires-source-code: false)
+    - name: realtime-hub
+      type: realtime-platform
+      properties:
+        enableKafka: true
+        enableMQTT: true
+        enableLenses: true
+        
+    # This should use ApplicationClaim path (requires-source-code: true)
+    - name: chatbot
+      type: rasa-chatbot
+      properties:
+        domain: customer-support
+        language: en
+        
+  policies:
+    - name: deploy-to-default
+      type: topology
+      properties:
+        clusters: ["local"]
+        namespace: "default"

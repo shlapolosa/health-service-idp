@@ -7,6 +7,7 @@ metadata:
   name: rasa-chatbot
   annotations:
     definition.oam.dev/description: "Complete Rasa chatbot with dual-container pattern (Rasa server + Actions server) and automatic service discovery"
+    definition.oam.dev/requires-source-code: "true"
 spec:
   workload:
     definition:

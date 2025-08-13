@@ -121,17 +121,18 @@ class PatternHandler(ABC):
             )
             
             # Step 6: Update processed components
+            workflow_run_name = workflow_run.get("metadata", {}).get("name", "unknown") if isinstance(workflow_run, dict) else workflow_run.metadata.name
             context.processed_components[component.get("name")] = {
                 "type": component.get("type"),
                 "pattern": self.get_pattern().value,
                 "workflow": workflow_name,
-                "run": workflow_run.metadata.name
+                "run": workflow_run_name
             }
             
             return HandlerResult(
                 success=True,
                 workflow_name=workflow_name,
-                workflow_run_name=workflow_run.metadata.name,
+                workflow_run_name=workflow_run_name,
                 error=None,
                 metadata={"parameters": params},
                 pattern=self.get_pattern()
@@ -157,3 +158,53 @@ class PatternHandler(ABC):
         """Get endpoint for a referenced component."""
         # This would typically query the actual service
         return f"http://{ref}.{context.namespace}.svc.cluster.local"
+    
+    def get_component_definition_metadata(self, component_type: str) -> Dict[str, Any]:
+        """Fetch ComponentDefinition from K8s to check requires-source-code annotation."""
+        import subprocess
+        import json
+        
+        try:
+            # Query Kubernetes for ComponentDefinition
+            cmd = ["kubectl", "get", "componentdefinition", component_type, "-o", "json"]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+            
+            if result.returncode == 0:
+                component_def = json.loads(result.stdout)
+                annotations = component_def.get("metadata", {}).get("annotations", {})
+                
+                # Check for requires-source-code annotation
+                requires_source = annotations.get("definition.oam.dev/requires-source-code", "false")
+                
+                return {
+                    "requires_source_code": requires_source.lower() == "true",
+                    "component_type": component_type,
+                    "annotations": annotations,
+                    "found": True
+                }
+            else:
+                logger.warning(f"ComponentDefinition not found for {component_type}")
+                # Default behavior based on known types
+                default_requires_source = component_type in [
+                    "webservice", "webservice-k8s", "orchestration-service",
+                    "identity-service", "rasa-chatbot", "camunda-orchestrator"
+                ]
+                return {
+                    "requires_source_code": default_requires_source,
+                    "component_type": component_type,
+                    "annotations": {},
+                    "found": False
+                }
+                
+        except subprocess.TimeoutExpired:
+            logger.error(f"Timeout fetching ComponentDefinition for {component_type}")
+        except Exception as e:
+            logger.error(f"Error fetching ComponentDefinition for {component_type}: {e}")
+        
+        # Fallback to safe default
+        return {
+            "requires_source_code": False,
+            "component_type": component_type,
+            "annotations": {},
+            "found": False
+        }

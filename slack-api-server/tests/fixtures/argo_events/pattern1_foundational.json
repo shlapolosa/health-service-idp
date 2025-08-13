@@ -15,13 +15,11 @@
       },
       "workflow_template": "microservice-standard-contract",
       "parameters": {
-        "language": "python",
-        "framework": "fastapi",
-        "template_repo": "onion-architecture-template",
-        "min_scale": "2",
-        "max_scale": "10",
-        "cpu_request": "500m",
-        "memory_request": "1Gi"
+        "microservice-language": "python",
+        "microservice-framework": "fastapi",
+        "resource-name": "user-api",
+        "resource-type": "microservice",
+        "namespace": "default"
       }
     }
   },
@@ -47,8 +45,8 @@
         "microservice-standard-contract"
       ],
       "pattern1_params": {
-        "language": "nodejs",
-        "framework": "express",
+        "microservice-language": "nodejs",
+        "microservice-framework": "express",
         "has_references": true
       }
     }
@@ -70,13 +68,11 @@
       "workflow_template": "microservice-standard-contract",
       "vcluster": "production-vcluster",
       "parameters": {
-        "language": "java",
-        "framework": "springboot",
-        "jdk_version": "17",
-        "build_tool": "gradle",
-        "template_repo": "onion-architecture-template",
-        "min_scale": "1",
-        "max_scale": "5"
+        "microservice-language": "java",
+        "microservice-framework": "springboot",
+        "resource-name": "order-service",
+        "resource-type": "microservice",
+        "namespace": "production"
       }
     }
   }

@@ -58,6 +58,120 @@ class Pattern2CompositionalHandler(PatternHandler):
         """Check if this handler can process the component type."""
         return component_type in self.COMPOSITIONAL_TYPES
     
+    def handle(self, component: Dict[str, Any], context: HandlerContext, argo_client) -> HandlerResult:
+        """Handle component with source code check."""
+        component_type = component.get("type")
+        
+        # Check if this component requires source code
+        component_metadata = self.get_component_definition_metadata(component_type)
+        
+        if component_metadata["requires_source_code"]:
+            # Route to ApplicationClaim creation path
+            logger.info(f"Component {component.get('name')} requires source code, using ApplicationClaim path")
+            return self.handle_via_application_claim(component, context, argo_client)
+        else:
+            # Use existing direct deployment path
+            logger.info(f"Component {component.get('name')} uses external image, using direct deployment")
+            return super().handle(component, context, argo_client)
+    
+    def handle_via_application_claim(self, component: Dict[str, Any], context: HandlerContext, argo_client) -> HandlerResult:
+        """Handle component through ApplicationClaim for source code creation."""
+        try:
+            component_name = component.get("name")
+            component_type = component.get("type")
+            properties = component.get("properties", {})
+            
+            # Special handling for different compositional types
+            if component_type == "rasa-chatbot":
+                language = "rasa"
+                framework = "chatbot"
+            elif component_type == "identity-service":
+                language = "java"
+                framework = "springboot"
+            elif component_type == "orchestration-platform":
+                language = properties.get("language", "java")
+                framework = "orchestration"
+            else:
+                language = properties.get("language", "python")
+                framework = properties.get("framework", "fastapi")
+            
+            # Map OAM properties to workflow parameters
+            params = {
+                # Tier 1: Universal Parameters
+                "resource-name": component_name,
+                "resource-type": "microservice",
+                "namespace": context.namespace or "default",
+                "user": "oam-webhook",
+                "description": f"OAM-driven {component_type} from {context.oam_application_name}",
+                "github-org": context.github_owner or "shlapolosa",
+                "docker-registry": "docker.io/socrates12345",
+                "slack-channel": "#oam-deployments",
+                "slack-user-id": "OAM",
+                
+                # Tier 2: Platform Parameters
+                "security-enabled": "true",
+                "observability-enabled": "true",
+                "backup-enabled": "false",
+                "environment-tier": "development",
+                "auto-create-dependencies": "false",
+                "resource-size": "medium",
+                
+                # Tier 3: Microservice-specific
+                "microservice-language": language,
+                "microservice-framework": framework,
+                "microservice-database": properties.get("database", "none"),
+                "microservice-cache": properties.get("cache", "none"),
+                "microservice-expose-api": str(properties.get("exposeApi", False)).lower(),
+                "target-vcluster": context.vcluster or "",
+                "parent-appcontainer": context.app_container or "",
+                "repository-name": context.app_container or ""
+            }
+            
+            # Use microservice-standard-contract for ApplicationClaim
+            workflow_name = "microservice-standard-contract"
+            
+            logger.info(f"Triggering ApplicationClaim workflow for {component_type}: {component_name}")
+            workflow_run = argo_client.create_workflow_from_template(
+                workflow_template_name=workflow_name,
+                parameters=params,
+                namespace="argo"
+            )
+            
+            # Update processed components
+            workflow_run_name = workflow_run.get("metadata", {}).get("name", "unknown") if isinstance(workflow_run, dict) else workflow_run.metadata.name
+            context.processed_components[component_name] = {
+                "type": component_type,
+                "pattern": self.get_pattern().value,
+                "workflow": workflow_name,
+                "run": workflow_run_name,
+                "via": "ApplicationClaim"
+            }
+            
+            return HandlerResult(
+                success=True,
+                workflow_name=workflow_name,
+                workflow_run_name=workflow_run_name,
+                error=None,
+                metadata={
+                    "parameters": params,
+                    "route": "ApplicationClaim",
+                    "requires_source_code": True,
+                    "compositional_type": component_type
+                },
+                pattern=self.get_pattern()
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to handle component {component.get('name')} via ApplicationClaim: {str(e)}")
+            return HandlerResult(
+                success=False,
+                workflow_name=None,
+                workflow_run_name=None,
+                error=str(e),
+                metadata={"component": component},
+                pattern=self.get_pattern()
+            )
+    
     def get_workflow_name(self, component: Dict[str, Any]) -> str:
         """Get the appropriate workflow for the component type."""
         component_type = component.get("type")

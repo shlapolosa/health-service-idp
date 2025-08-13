@@ -7,6 +7,7 @@ metadata:
   name: camunda-orchestrator
   annotations:
     definition.oam.dev/description: "Camunda 8 orchestrator with full UI stack for process design, monitoring, and human task management"
+    definition.oam.dev/requires-source-code: "true"
 spec:
   workload:
     definition:

@@ -13,13 +13,12 @@
         "pattern_2": 1,
         "pattern_1": 0
       },
-      "workflow_template": "pattern2-compositional-workflow",
+      "workflow_template": "microservice-standard-contract",
       "parameters": {
-        "component_type": "rasa-chatbot",
-        "nlu_pipeline": "pretrained_embeddings_spacy",
-        "build_base_image": "true",
-        "build_rasa_image": "true",
-        "build_actions_image": "true"
+        "resource-name": "support-bot",
+        "resource-type": "microservice",
+        "microservice-language": "rasa",
+        "microservice-framework": "chatbot"
       }
     }
   },
@@ -37,12 +36,12 @@
         "pattern_2": 1,
         "pattern_1": 0
       },
-      "workflow_template": "identity-service-generator",
+      "workflow_template": "microservice-standard-contract",
       "parameters": {
-        "domain": "healthcare",
-        "compliance_level": "hipaa",
-        "enable_mfa": "true",
-        "enable_audit": "true"
+        "resource-name": "patient-identity",
+        "resource-type": "microservice",
+        "microservice-language": "java",
+        "microservice-framework": "springboot"
       }
     }
   },
