@@ -316,7 +316,7 @@ spec:
                       kind: ConfigMap
                       metadata:
                         name: $SERVICE_NAME-config
-                        namespace: $APP_CONTAINER
+                        namespace: default
                       data:
                         APP_ENV: "production"
                         SERVICE_NAME: "$SERVICE_NAME"
@@ -841,7 +841,7 @@ spec:
                           type: topology
                           properties:
                             clusters: ["$VCLUSTER_TARGET"]
-                            namespace: "$SERVICE_NAME"
+                            namespace: "default"
                       EOF
                       
                       # Create ArgoCD Application for this service
@@ -1332,7 +1332,7 @@ spec:
                           path: $APP_PATH
                         destination:
                           server: $DEST_SERVER
-                          namespace: $SERVICE_NAME
+                          namespace: default
                         syncPolicy:
                           automated:
                             prune: true
@@ -1348,7 +1348,7 @@ spec:
                       kubectl patch application $SERVICE_NAME-app -n argocd --type merge -p '{"operation":{"sync":{"revision":"HEAD"}}}' || echo "Sync triggered"
                       
                       echo "🎉 ArgoCD setup completed for $SERVICE_NAME"
-                      echo "📊 Application will be synced to namespace: $SERVICE_NAME"
+                      echo "📊 Application will be synced to namespace: default"
                       echo "🔗 Repository: https://github.com/$GITHUB_USER/$APP_CONTAINER-gitops"
                     env:
                     - name: SERVICE_NAME

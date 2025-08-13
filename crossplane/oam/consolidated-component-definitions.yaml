@@ -135,22 +135,18 @@ spec:
                     }
                   ] + [
                     if parameter.realtime != _|_ {
-                      {
-                        name: "REALTIME_PLATFORM_NAME"
-                        value: parameter.realtime
-                      }
-                    },
+                      name: "REALTIME_PLATFORM_NAME"
+                      value: parameter.realtime
+                    }
+                  ] + [
                     if parameter.realtime != _|_ {
-                      {
-                        name: "REALTIME_INTEGRATION_ENABLED"
-                        value: "true"
-                      }
-                    },
+                      name: "REALTIME_INTEGRATION_ENABLED"
+                      value: "true"
+                    }
+                  ] + [
                     if parameter.realtime != _|_ {
-                      {
-                        name: "WEBSERVICE_NAME"
-                        value: context.name
-                      }
+                      name: "WEBSERVICE_NAME"
+                      value: context.name
                     }
                   ]
                   if parameter.envFrom != _|_ || parameter.realtime != _|_ {
@@ -162,27 +158,23 @@ spec:
                       }
                     ] + [
                       if parameter.realtime != _|_ {
-                        {
-                          secretRef: {
-                            name: parameter.realtime + "-kafka-secret"
-                            optional: true
-                          }
+                        secretRef: {
+                          name: parameter.realtime + "-kafka-secret"
+                          optional: true
                         }
-                      },
+                      }
+                    ] + [
                       if parameter.realtime != _|_ {
-                        {
-                          secretRef: {
-                            name: parameter.realtime + "-mqtt-secret"
-                            optional: true
-                          }
+                        secretRef: {
+                          name: parameter.realtime + "-mqtt-secret"
+                          optional: true
                         }
-                      },
+                      }
+                    ] + [
                       if parameter.realtime != _|_ {
-                        {
-                          secretRef: {
-                            name: parameter.realtime + "-mongodb-secret"
-                            optional: true
-                          }
+                        secretRef: {
+                          name: parameter.realtime + "-mongodb-secret"
+                          optional: true
                         }
                       }
                     ]
