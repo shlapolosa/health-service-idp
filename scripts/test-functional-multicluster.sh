@@ -34,7 +34,12 @@ echo ""
 
 # Step 1: Get Istio Ingress Gateway URL
 echo -e "${YELLOW}Step 1: Getting Istio Ingress Gateway URL...${NC}"
+# Try to get hostname first (AWS)
 INGRESS_HOST=$(kubectl get svc istio-ingressgateway -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+# If no hostname, try IP (Azure/GCP)
+if [ -z "$INGRESS_HOST" ]; then
+    INGRESS_HOST=$(kubectl get svc istio-ingressgateway -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+fi
 if [ -z "$INGRESS_HOST" ]; then
     echo -e "${RED}❌ Failed to get Istio ingress host${NC}"
     exit 1
@@ -57,6 +62,7 @@ echo ""
 
 RESPONSE=$(curl -s -X POST "$SLACK_URL" \
   -H "Content-Type: application/x-www-form-urlencoded" \
+  -H "Host: slack-api-server.default" \
   -d "token=test-token&team_id=T12345&team_domain=test-team&channel_id=C12345&channel_name=$SLACK_CHANNEL&user_id=U12345&user_name=$SLACK_USER&command=/microservice&text=$SLACK_COMMAND&response_url=https://hooks.slack.com/commands/test&trigger_id=test-trigger-${TIMESTAMP}")
 
 echo -e "${GREEN}✅ Request sent${NC}"
@@ -70,7 +76,7 @@ fi
 echo -e "${YELLOW}Step 3: Waiting for Argo workflow to complete...${NC}"
 sleep 10
 
-WORKFLOW=$(kubectl get workflow -n argo --sort-by=.metadata.creationTimestamp | tail -1 | awk '{print $1}')
+WORKFLOW=$(kubectl get workflow -n argo --sort-by=.metadata.creationTimestamp 2>/dev/null | tail -1 | awk '{print $1}')
 echo "Workflow: $WORKFLOW"
 
 # Monitor workflow
@@ -133,8 +139,11 @@ if [ ! -z "$GITOPS_URL" ]; then
     echo -e "${CYAN}GitHub URL:${NC} $GITOPS_HTTPS"
 fi
 
-# Get vCluster LoadBalancer endpoint
+# Get vCluster LoadBalancer endpoint (try hostname first for AWS, then IP for Azure/GCP)
 VCLUSTER_LB=$(kubectl get svc -n $TARGET_VCLUSTER $TARGET_VCLUSTER -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+if [ -z "$VCLUSTER_LB" ]; then
+    VCLUSTER_LB=$(kubectl get svc -n $TARGET_VCLUSTER $TARGET_VCLUSTER -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+fi
 if [ ! -z "$VCLUSTER_LB" ]; then
     echo -e "${CYAN}vCluster Endpoint:${NC} https://$VCLUSTER_LB"
 fi
