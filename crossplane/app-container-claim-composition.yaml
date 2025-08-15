@@ -308,6 +308,15 @@ spec:
                           branches: [ main ]
                           paths: [ 'microservices/**' ]
                       env:
+                        # Docker Hub settings (default)
+                        DOCKERHUB_REGISTRY: docker.io
+                        DOCKERHUB_USERNAME: socrates12345
+                        # ACR settings
+                        ACR_REGISTRY: healthidpuaeacr.azurecr.io
+                        ACR_NAME: healthidpuaeacr
+                        # Default registry selection
+                        DEFAULT_REGISTRY: acr  # or 'dockerhub' or 'both'
+                        # Legacy variables
                         REGISTRY: docker.io
                         REGISTRY_USERNAME: socrates12345
                         GITOPS_REPO: APP_NAME_PLACEHOLDER-gitops
@@ -505,10 +514,29 @@ spec:
                             "https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/DOCKER_PASSWORD" \
                             -d "{\"encrypted_value\":\"$ENCRYPTED_PASSWORD\",\"key_id\":\"$KEY_ID\"}"
                           
-                          echo "✅ GitHub secrets created successfully"
+                          echo "✅ Docker Hub secret created"
                         else
                           echo "⚠️  Docker password not found in secret"
                         fi
+                        
+                        # Get ACR password from secret if it exists
+                        ACR_PASSWORD=$(kubectl get secret acr-credentials -n default -o jsonpath='{.data..dockerconfigjson}' 2>/dev/null | base64 -d | jq -r '.auths."healthidpuaeacr.azurecr.io".password' 2>/dev/null || echo "")
+                        
+                        if [ -n "$ACR_PASSWORD" ]; then
+                          # Create ACR_PASSWORD secret
+                          ENCRYPTED_ACR=$(python3 /tmp/encrypt_secret.py "$PUBLIC_KEY" "$ACR_PASSWORD")
+                          curl -X PUT \
+                            -H "Authorization: token ${GITHUB_TOKEN}" \
+                            -H "Accept: application/vnd.github.v3+json" \
+                            "https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/ACR_PASSWORD" \
+                            -d "{\"encrypted_value\":\"$ENCRYPTED_ACR\",\"key_id\":\"$KEY_ID\"}"
+                          
+                          echo "✅ ACR secret created"
+                        else
+                          echo "⚠️  ACR credentials not found (optional)"
+                        fi
+                        
+                        echo "✅ GitHub secrets setup completed"
                       fi
                       
                       echo "Source repository setup completed successfully"
@@ -1321,6 +1349,22 @@ spec:
                         -H "Accept: application/vnd.github.v3+json" \
                         "https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/DOCKER_PASSWORD" \
                         -d "{\"encrypted_value\":\"$ENCRYPTED_PASSWORD\",\"key_id\":\"$KEY_ID\"}"
+                      
+                      # Get ACR password from secret if it exists
+                      ACR_PASSWORD=$(kubectl get secret acr-credentials -n default -o jsonpath='{.data..dockerconfigjson}' 2>/dev/null | base64 -d | jq -r '.auths."healthidpuaeacr.azurecr.io".password' 2>/dev/null || echo "")
+                      
+                      if [ -n "$ACR_PASSWORD" ]; then
+                        # Create ACR_PASSWORD secret with proper encryption
+                        ENCRYPTED_ACR=$(python encrypt_secret.py "$PUBLIC_KEY" "$ACR_PASSWORD")
+                        curl -X PUT \
+                          -H "Authorization: token ${GITHUB_TOKEN}" \
+                          -H "Accept: application/vnd.github.v3+json" \
+                          "https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/ACR_PASSWORD" \
+                          -d "{\"encrypted_value\":\"$ENCRYPTED_ACR\",\"key_id\":\"$KEY_ID\"}"
+                        echo "✅ ACR secret created"
+                      else
+                        echo "⚠️  ACR credentials not found (optional)"
+                      fi
                       
                       echo "Repository setup completed successfully!"
                     env:
