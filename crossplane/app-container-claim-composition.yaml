@@ -657,6 +657,17 @@ spec:
                       mkdir -p manifests
                       mkdir -p .github/workflows
                       
+                      # Determine registry based on configuration
+                      DEFAULT_REGISTRY="${DEFAULT_REGISTRY:-acr}"  # Default to ACR
+                      
+                      if [ "$DEFAULT_REGISTRY" = "acr" ]; then
+                        IMAGE_REGISTRY="healthidpuaeacr.azurecr.io"
+                        IMAGE_PREFIX=""
+                      else
+                        IMAGE_REGISTRY="docker.io"
+                        IMAGE_PREFIX="socrates12345/"
+                      fi
+                      
                       # Create blank OAM Application template
                       # Always use default namespace for OAM (where WorkloadDefinitions exist)
                       cat > oam/applications/application.yaml << EOF
@@ -671,7 +682,7 @@ spec:
                           type: webservice
                           properties:
                             name: $APP_NAME
-                            image: docker.io/socrates12345/$APP_NAME:latest
+                            image: ${IMAGE_REGISTRY}/${IMAGE_PREFIX}$APP_NAME:latest
                             language: python
                             framework: fastapi
                             port: 8080
@@ -1205,6 +1216,8 @@ spec:
                       value: placeholder
                     - name: GITOPS_CLONE_URL
                       value: placeholder
+                    - name: DEFAULT_REGISTRY
+                      value: acr  # Default to ACR for UAE deployment
                     - name: GITHUB_TOKEN
                       valueFrom:
                         secretKeyRef:

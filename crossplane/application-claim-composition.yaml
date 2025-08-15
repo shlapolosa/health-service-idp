@@ -675,12 +675,24 @@ spec:
                         COMPONENT_PORT="8080"
                       fi
                       
+                      # Determine registry based on configuration
+                      # Check if we should use ACR or Docker Hub
+                      DEFAULT_REGISTRY="${DEFAULT_REGISTRY:-acr}"  # Default to ACR
+                      
+                      if [ "$DEFAULT_REGISTRY" = "acr" ]; then
+                        IMAGE_REGISTRY="healthidpuaeacr.azurecr.io"
+                        IMAGE_PREFIX=""
+                      else
+                        IMAGE_REGISTRY="docker.io"
+                        IMAGE_PREFIX="socrates12345/"
+                      fi
+                      
                       COMPONENT_YAML="
                         - name: $SERVICE_NAME
                           type: $COMPONENT_TYPE
                           properties:
                             name: $SERVICE_NAME
-                            image: docker.io/socrates12345/$SERVICE_NAME:latest
+                            image: ${IMAGE_REGISTRY}/${IMAGE_PREFIX}$SERVICE_NAME:latest
                             language: $LANGUAGE
                             framework: $FRAMEWORK
                             port: $COMPONENT_PORT
@@ -903,6 +915,8 @@ spec:
                       value: "placeholder"
                     - name: CACHE
                       value: "placeholder"
+                    - name: DEFAULT_REGISTRY
+                      value: "acr"  # Default to ACR for UAE deployment
                     - name: BOOTSTRAP_SOURCE
                       value: "placeholder"
                     - name: GITHUB_TOKEN
