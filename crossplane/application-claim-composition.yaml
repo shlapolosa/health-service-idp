@@ -27,6 +27,9 @@ spec:
               namespace: default
             spec:
               template:
+                metadata:
+                  annotations:
+                    sidecar.istio.io/inject: "false"
                 spec:
                   serviceAccountName: crossplane-github-provider
                   restartPolicy: OnFailure
@@ -284,6 +287,9 @@ spec:
               namespace: default
             spec:
               template:
+                metadata:
+                  annotations:
+                    sidecar.istio.io/inject: "false"
                 spec:
                   serviceAccountName: crossplane-github-provider
                   restartPolicy: OnFailure
@@ -432,6 +438,9 @@ spec:
               namespace: default
             spec:
               template:
+                metadata:
+                  annotations:
+                    sidecar.istio.io/inject: "false"
                 spec:
                   serviceAccountName: crossplane-admin
                   restartPolicy: OnFailure
@@ -571,6 +580,9 @@ spec:
               namespace: default
             spec:
               template:
+                metadata:
+                  annotations:
+                    sidecar.istio.io/inject: "false"
                 spec:
                   serviceAccountName: crossplane-github-provider
                   restartPolicy: OnFailure
@@ -963,6 +975,9 @@ spec:
               namespace: default
             spec:
               template:
+                metadata:
+                  annotations:
+                    sidecar.istio.io/inject: "false"
                 spec:
                   serviceAccountName: crossplane-github-provider
                   restartPolicy: OnFailure
@@ -1141,12 +1156,15 @@ spec:
               namespace: default
             spec:
               template:
+                metadata:
+                  annotations:
+                    sidecar.istio.io/inject: "false"
                 spec:
                   serviceAccountName: crossplane-github-provider
                   restartPolicy: OnFailure
                   containers:
                   - name: repository-sync
-                    image: bitnami/kubectl:1.28
+                    image: alpine/k8s:1.28.4
                     command:
                     - /bin/sh
                     - -c
@@ -1262,12 +1280,15 @@ spec:
               namespace: default
             spec:
               template:
+                metadata:
+                  annotations:
+                    sidecar.istio.io/inject: "false"
                 spec:
                   serviceAccountName: crossplane-github-provider
                   restartPolicy: OnFailure
                   containers:
                   - name: argocd-setup
-                    image: bitnami/kubectl:1.28
+                    image: alpine/k8s:1.28.4
                     command:
                     - /bin/sh
                     - -c
