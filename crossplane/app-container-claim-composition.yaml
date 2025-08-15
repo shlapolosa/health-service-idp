@@ -519,21 +519,21 @@ spec:
                           echo "⚠️  Docker password not found in secret"
                         fi
                         
-                        # Get ACR password from secret if it exists
-                        ACR_PASSWORD=$(kubectl get secret acr-credentials -n default -o jsonpath='{.data..dockerconfigjson}' 2>/dev/null | base64 -d | jq -r '.auths."healthidpuaeacr.azurecr.io".password' 2>/dev/null || echo "")
+                        # Get Azure credentials from secret if it exists
+                        AZURE_CREDS=$(kubectl get secret azure-credentials -n default -o jsonpath='{.data.azure-creds\.json}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
                         
-                        if [ -n "$ACR_PASSWORD" ]; then
-                          # Create ACR_PASSWORD secret
-                          ENCRYPTED_ACR=$(python3 /tmp/encrypt_secret.py "$PUBLIC_KEY" "$ACR_PASSWORD")
+                        if [ -n "$AZURE_CREDS" ]; then
+                          # Create AZURE_CREDENTIALS secret for GitHub Actions
+                          ENCRYPTED_AZURE=$(python3 /tmp/encrypt_secret.py "$PUBLIC_KEY" "$AZURE_CREDS")
                           curl -X PUT \
                             -H "Authorization: token ${GITHUB_TOKEN}" \
                             -H "Accept: application/vnd.github.v3+json" \
-                            "https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/ACR_PASSWORD" \
-                            -d "{\"encrypted_value\":\"$ENCRYPTED_ACR\",\"key_id\":\"$KEY_ID\"}"
+                            "https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/AZURE_CREDENTIALS" \
+                            -d "{\"encrypted_value\":\"$ENCRYPTED_AZURE\",\"key_id\":\"$KEY_ID\"}"
                           
-                          echo "✅ ACR secret created"
+                          echo "✅ Azure credentials secret created"
                         else
-                          echo "⚠️  ACR credentials not found (optional)"
+                          echo "⚠️  Azure credentials not found (optional)"
                         fi
                         
                         echo "✅ GitHub secrets setup completed"
@@ -1350,20 +1350,20 @@ spec:
                         "https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/DOCKER_PASSWORD" \
                         -d "{\"encrypted_value\":\"$ENCRYPTED_PASSWORD\",\"key_id\":\"$KEY_ID\"}"
                       
-                      # Get ACR password from secret if it exists
-                      ACR_PASSWORD=$(kubectl get secret acr-credentials -n default -o jsonpath='{.data..dockerconfigjson}' 2>/dev/null | base64 -d | jq -r '.auths."healthidpuaeacr.azurecr.io".password' 2>/dev/null || echo "")
+                      # Get Azure credentials from secret if it exists
+                      AZURE_CREDS=$(kubectl get secret azure-credentials -n default -o jsonpath='{.data.azure-creds\.json}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
                       
-                      if [ -n "$ACR_PASSWORD" ]; then
-                        # Create ACR_PASSWORD secret with proper encryption
-                        ENCRYPTED_ACR=$(python encrypt_secret.py "$PUBLIC_KEY" "$ACR_PASSWORD")
+                      if [ -n "$AZURE_CREDS" ]; then
+                        # Create AZURE_CREDENTIALS secret for GitHub Actions
+                        ENCRYPTED_AZURE=$(python encrypt_secret.py "$PUBLIC_KEY" "$AZURE_CREDS")
                         curl -X PUT \
                           -H "Authorization: token ${GITHUB_TOKEN}" \
                           -H "Accept: application/vnd.github.v3+json" \
-                          "https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/ACR_PASSWORD" \
-                          -d "{\"encrypted_value\":\"$ENCRYPTED_ACR\",\"key_id\":\"$KEY_ID\"}"
-                        echo "✅ ACR secret created"
+                          "https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/AZURE_CREDENTIALS" \
+                          -d "{\"encrypted_value\":\"$ENCRYPTED_AZURE\",\"key_id\":\"$KEY_ID\"}"
+                        echo "✅ Azure credentials secret created"
                       else
-                        echo "⚠️  ACR credentials not found (optional)"
+                        echo "⚠️  Azure credentials not found (optional)"
                       fi
                       
                       echo "Repository setup completed successfully!"

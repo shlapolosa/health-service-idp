@@ -248,13 +248,16 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
       
       # ACR Login
+      - name: Login to Azure
+        if: env.DEFAULT_REGISTRY == 'acr' || env.DEFAULT_REGISTRY == 'both'
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
       - name: Log in to Azure Container Registry
         if: env.DEFAULT_REGISTRY == 'acr' || env.DEFAULT_REGISTRY == 'both'
-        uses: azure/docker-login@v1
-        with:
-          login-server: ${{ env.ACR_REGISTRY }}
-          username: ${{ env.ACR_NAME }}
-          password: ${{ secrets.ACR_PASSWORD }}
+        run: |
+          az acr login --name ${{ env.ACR_NAME }}
 
       - name: Build and push with semantic versioning
         run: |
