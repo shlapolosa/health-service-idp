@@ -221,9 +221,15 @@ jobs:
             if [ -f "microservices/$service/Dockerfile" ]; then
               echo "🏷️ Generating semantic version for: $service"
               
-              # Generate semantic version and tags
+              # Generate semantic version
               SEMVER=$(.github/scripts/version-manager.sh version "$service")
-              CONTAINER_TAGS=$(.github/scripts/version-manager.sh tags "$service" "${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}")
+              
+              # Determine which registry to use for tags
+              if [[ "${{ env.DEFAULT_REGISTRY }}" == "acr" ]]; then
+                CONTAINER_TAGS=$(.github/scripts/version-manager.sh tags "$service" "${{ env.ACR_REGISTRY }}")
+              else
+                CONTAINER_TAGS=$(.github/scripts/version-manager.sh tags "$service" "${{ env.DOCKERHUB_REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}")
+              fi
               
               echo "Service: $service, Version: $SEMVER"
               echo "Container tags: $CONTAINER_TAGS"
@@ -269,23 +275,28 @@ jobs:
             if [ -f "microservices/$service/Dockerfile" ]; then
               echo "🏗️ Building $service with semantic versioning..."
               
-              # Generate semantic version and all tags
+              # Generate semantic version
               SEMVER=$(.github/scripts/version-manager.sh version "$service")
-              CONTAINER_TAGS=$(.github/scripts/version-manager.sh tags "$service" "${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}")
               COMMIT_SHA="${GITHUB_SHA:0:7}"
+              
+              # Determine registry settings first
+              if [[ "${{ env.DEFAULT_REGISTRY }}" == "acr" || "${{ env.DEFAULT_REGISTRY }}" == "both" ]]; then
+                # ACR is primary for 'acr' and 'both'
+                REGISTRY_URL="${{ env.ACR_REGISTRY }}"
+                REGISTRY_PREFIX=""
+                # Generate tags for ACR
+                CONTAINER_TAGS=$(.github/scripts/version-manager.sh tags "$service" "${{ env.ACR_REGISTRY }}")
+              else
+                # Docker Hub for 'dockerhub'
+                REGISTRY_URL="${{ env.DOCKERHUB_REGISTRY }}"
+                REGISTRY_PREFIX="${{ env.DOCKERHUB_USERNAME }}/"
+                # Generate tags for Docker Hub
+                CONTAINER_TAGS=$(.github/scripts/version-manager.sh tags "$service" "${{ env.DOCKERHUB_REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}")
+              fi
               
               echo "🏷️ Service: $service"
               echo "📦 Semantic Version: $SEMVER"
               echo "🔖 All Tags: $CONTAINER_TAGS"
-              
-              # Determine registry settings
-              if [[ "${{ env.DEFAULT_REGISTRY }}" == "acr" ]]; then
-                REGISTRY_URL="${{ env.ACR_REGISTRY }}"
-                REGISTRY_PREFIX=""
-              else
-                REGISTRY_URL="${{ env.DOCKERHUB_REGISTRY }}"
-                REGISTRY_PREFIX="${{ env.DOCKERHUB_USERNAME }}/"
-              fi
               
               # Build primary image with rich metadata
               PRIMARY_TAG="${REGISTRY_URL}/${REGISTRY_PREFIX}${service}:$COMMIT_SHA"
@@ -338,18 +349,11 @@ jobs:
               
               # If DEFAULT_REGISTRY is 'both', also push to secondary registry
               if [[ "${{ env.DEFAULT_REGISTRY }}" == "both" ]]; then
-                echo "📤 Pushing to secondary registry..."
+                echo "📤 Pushing to secondary registry (Docker Hub)..."
                 
-                # Determine secondary registry
-                if [[ "${REGISTRY_URL}" == "${{ env.DOCKERHUB_REGISTRY }}" ]]; then
-                  # Primary was Docker Hub, secondary is ACR
-                  SEC_REGISTRY="${{ env.ACR_REGISTRY }}"
-                  SEC_PREFIX=""
-                else
-                  # Primary was ACR, secondary is Docker Hub
-                  SEC_REGISTRY="${{ env.DOCKERHUB_REGISTRY }}"
-                  SEC_PREFIX="${{ env.DOCKERHUB_USERNAME }}/"
-                fi
+                # Secondary is always Docker Hub when primary is ACR
+                SEC_REGISTRY="${{ env.DOCKERHUB_REGISTRY }}"
+                SEC_PREFIX="${{ env.DOCKERHUB_USERNAME }}/"
                 
                 # Re-tag and push to secondary registry
                 SEC_TAG="${SEC_REGISTRY}/${SEC_PREFIX}${service}:$COMMIT_SHA"
