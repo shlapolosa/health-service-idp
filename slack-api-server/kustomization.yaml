@@ -1,0 +1,29 @@
+# Kustomization for Slack API Server with multi-registry support
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: default
+
+resources:
+- knative-service.yaml
+
+# Comment/uncomment based on target registry
+# For Docker Hub deployment:
+# images:
+# - name: healthidpuaeacr.azurecr.io/slack-api-server
+#   newName: docker.io/socrates12345/slack-api-server
+#   newTag: latest
+
+# For ACR deployment (current):
+images:
+- name: healthidpuaeacr.azurecr.io/slack-api-server
+  newTag: amd64
+
+# Remove imagePullSecrets for Docker Hub
+# patches:
+# - target:
+#     kind: Service
+#     name: slack-api-server
+#   patch: |-
+#     - op: remove
+#       path: /spec/template/spec/imagePullSecrets

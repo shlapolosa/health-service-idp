@@ -95,8 +95,25 @@ spec:
               }
               spec: {
                 serviceAccountName: "knative-docker-sa"
+                // Add image pull secrets based on registry
+                if parameter.registry == "acr" || parameter.registrySecret != _|_ {
+                  imagePullSecrets: [{
+                    name: *parameter.registrySecret | "acr-credentials"
+                  }]
+                }
                 containers: [{
-                  image: parameter.image
+                  // Support multi-registry image specification
+                  image: {
+                    if parameter.registry == _|_ || parameter.registry == "dockerhub" {
+                      parameter.image
+                    }
+                    if parameter.registry == "acr" {
+                      "healthidpuaeacr.azurecr.io/" + parameter.imageName + ":" + parameter.imageTag
+                    }
+                    if parameter.registry == "custom" && parameter.customRegistry != _|_ {
+                      parameter.customRegistry + "/" + parameter.imageName + ":" + parameter.imageTag
+                    }
+                  }
                   ports: [{
                     containerPort: parameter.port
                     name: "http1"
@@ -322,8 +339,16 @@ spec:
         }
         
         parameter: {
-          // Required Parameters
-          image: string
+          // Required Parameters - Support both old and new style
+          image: string  // Full image path for backward compatibility
+          
+          // New multi-registry parameters
+          imageName?: string  // Image name without registry (e.g., "slack-api-server")
+          imageTag?: *"latest" | string  // Image tag
+          registry?: "dockerhub" | "acr" | "custom"  // Registry selection
+          customRegistry?: string  // Custom registry URL if registry == "custom"
+          registrySecret?: string  // Secret name for registry authentication
+          
           port: *8080 | int
           version: *"latest" | string
           healthPath: *"/health" | string

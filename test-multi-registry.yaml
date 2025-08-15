@@ -1,0 +1,52 @@
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: test-multi-registry
+  namespace: default
+spec:
+  components:
+    # Example 1: Using ACR explicitly
+    - name: slack-api-acr
+      type: webservice
+      properties:
+        # New multi-registry parameters
+        imageName: slack-api-server
+        imageTag: amd64
+        registry: acr
+        registrySecret: acr-credentials
+        port: 8080
+        healthPath: /health
+        resources:
+          cpu: "500m"
+          memory: "512Mi"
+        environment:
+          SERVICE_SOURCE: "acr"
+          LOG_LEVEL: "INFO"
+    
+    # Example 2: Using Docker Hub explicitly  
+    - name: test-service-dockerhub
+      type: webservice
+      properties:
+        # Backward compatible - full image path
+        image: docker.io/socrates12345/test-service:latest
+        port: 8080
+        healthPath: /health
+        resources:
+          cpu: "250m"
+          memory: "256Mi"
+        environment:
+          SERVICE_SOURCE: "dockerhub"
+    
+    # Example 3: Using custom registry
+    - name: custom-registry-service
+      type: webservice
+      properties:
+        imageName: my-service
+        imageTag: v1.0.0
+        registry: custom
+        customRegistry: "myregistry.azurecr.io"
+        registrySecret: custom-registry-secret
+        port: 8080
+        resources:
+          cpu: "100m"
+          memory: "128Mi"

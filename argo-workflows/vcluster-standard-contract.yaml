@@ -358,7 +358,7 @@ spec:
       - name: vcluster-capabilities
       - name: slack-channel
     script:
-      image: bitnami/kubectl:1.28
+      image: alpine/k8s:1.28.4
       command: [sh]
       source: |
         echo "🏗️ Creating VCluster claim with standardized parameters..."
@@ -458,7 +458,7 @@ spec:
       - name: resource-name
       - name: namespace
     script:
-      image: bitnami/kubectl:1.28
+      image: alpine/k8s:1.28.4
       command: [sh]
       source: |
         echo "⏳ Waiting for VCluster '{{inputs.parameters.resource-name}}' to be ready..."
@@ -518,7 +518,7 @@ spec:
       - name: user
       - name: security-enabled
     script:
-      image: bitnami/kubectl:1.28
+      image: alpine/k8s:1.28.4
       command: [sh]
       source: |
         echo "🔐 Configuring VCluster access and security..."
@@ -630,7 +630,7 @@ spec:
       - name: user
       - name: github-org
     script:
-      image: bitnami/kubectl:1.28
+      image: alpine/k8s:1.28.4
       command: [sh]
       source: |
         echo "🚀 Deploying provisioned applications to vCluster {{inputs.parameters.resource-name}}..."

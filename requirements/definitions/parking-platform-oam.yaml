@@ -1,0 +1,827 @@
+# Smart Parking Platform - OAM Application Definition
+# Generated from PRD: requirements/parking-system-prd.md
+# Architecture: Event-driven microservices with real-time IoT processing
+# Target: 99.9% uptime, 50,000 concurrent users, <2s response time
+
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: smart-parking-platform
+  namespace: default
+  labels:
+    app.oam.dev/name: smart-parking-platform
+    app.oam.dev/version: "1.0.0"
+    business.domain/type: smart-parking
+    compliance.level/standard: pci-dss
+    scaling.profile/tier: high-availability
+  annotations:
+    app.oam.dev/description: "Smart parking platform with IoT monitoring, multi-channel chat, and real-time analytics"
+    architecture.pattern/type: "event-driven-microservices"
+    business.metrics/target-users: "50000"
+    business.metrics/target-uptime: "99.9%"
+    business.metrics/response-time-sla: "2s"
+    deployment.strategy/pattern: "unified-repository"
+    repository.name/container: "smart-parking-platform"
+spec:
+  components:
+    # ========================================
+    # Real-time IoT & Streaming Infrastructure
+    # ========================================
+    - name: parking-realtime-platform
+      type: realtime-platform
+      properties:
+        image: socrates12345/parking-realtime-platform:latest
+        port: 8080
+        version: "1.0.0"
+        repository: smart-parking-platform
+        language: python
+        framework: fastapi
+        database: postgres
+        visualization: metabase
+        iot: true
+        dataRetention: "90d"  # 90 days for compliance
+        environment:
+          PLATFORM_NAME: "parking-realtime-platform"
+          IOT_ENABLED: "true"
+          WEBSOCKET_ENABLED: "true"
+          SENSOR_UPDATE_FREQUENCY: "3s"  # 3-second update cycle for parking spaces
+          MQTT_TOPIC_PREFIX: "parking/spaces"
+          KAFKA_TOPICS: "space-occupancy,sensor-health,parking-events"
+          ANALYTICS_ENABLED: "true"
+          PREDICTION_ENABLED: "true"
+        resources:
+          cpu: "1000m"
+          memory: "2Gi"
+        mqttUsers:
+          - username: "sensor-client"
+            password: "secure-sensor-pass"
+          - username: "cv-processor"
+            password: "secure-cv-pass"
+      traits:
+        - type: autoscaler
+          properties:
+            minReplicas: 2
+            maxReplicas: 10
+            targetCPU: 70
+            targetMemory: 80
+            scaleUpStabilization: 30
+            scaleDownStabilization: 180
+        - type: kafka-producer
+          properties:
+            topics: ["space-occupancy", "parking-events", "sensor-health", "predictive-analytics"]
+            kafkaCluster: "parking-realtime-platform-kafka"
+
+    # ========================================
+    # Multi-Channel Chat & Customer Service
+    # ========================================
+    - name: parking-chatbot
+      type: rasa-chatbot
+      properties:
+        rasaImage: socrates12345/parking-chatbot-rasa:latest
+        actionsImage: socrates12345/parking-chatbot-actions:latest
+        version: "1.0.0"
+        repository: smart-parking-platform
+        language: rasa
+        framework: chatbot
+        environment:
+          CHATBOT_NAME: "parking-assistant"
+          WHATSAPP_ENABLED: "true"
+          TELEGRAM_ENABLED: "true"
+          WEB_CHAT_ENABLED: "true"
+          BOOKING_INTEGRATION: "true"
+          PAYMENT_INTEGRATION: "true"
+          ANALYTICS_INTEGRATION: "true"
+          MAX_CONVERSATION_LENGTH: "20"
+          RESPONSE_TIMEOUT: "30s"
+        resources:
+          cpu: "500m"
+          memory: "1Gi"
+        actionsResources:
+          cpu: "300m"
+          memory: "512Mi"
+        minScale: 1
+        maxScale: 8
+        actionsMinScale: 1
+        actionsMaxScale: 5
+        targetConcurrency: 50
+        actionsTargetConcurrency: 25
+        envFrom:
+          - secretRef:
+              name: whatsapp-api-credentials
+          - secretRef:
+              name: telegram-bot-credentials
+
+    # ========================================
+    # GraphQL API Gateway & Federation
+    # ========================================
+    - name: parking-api-gateway
+      type: graphql-gateway
+      properties:
+        gatewayImage: socrates12345/parking-api-gateway:latest
+        version: "1.0.0"
+        repository: smart-parking-platform
+        language: typescript
+        framework: graphql-gateway
+        autoSchema: true
+        schemaRefreshInterval: "3m"
+        exposeIntrospection: false  # Security: disable in production
+        exposePlayground: true
+        enableCors: true
+        serviceSelector:
+          graphql.federation/enabled: "true"
+        environment:
+          GATEWAY_NAME: "parking-api-gateway"
+          FEDERATION_ENABLED: "true"
+          RATE_LIMITING_ENABLED: "true"
+          RATE_LIMIT_MAX: "1000"  # 1000 req/min per user
+          CACHE_TTL: "300s"  # 5-minute cache for frequent queries
+          SECURITY_HEADERS: "true"
+          CORS_ORIGINS: "*"  # Configure properly for production
+        resources:
+          cpu: "500m"
+          memory: "1Gi"
+        enableIstioGateway: true
+        gatewayHost: "api.parking.local"
+        enableTLS: true
+      traits:
+        - type: autoscaler
+          properties:
+            minReplicas: 2
+            maxReplicas: 8
+            targetCPU: 75
+            targetMemory: 85
+        - type: ingress
+          properties:
+            domain: "api.parking.local"
+            path: "/"
+            enableTLS: true
+
+    # ========================================
+    # Core Business Logic Microservices
+    # ========================================
+    
+    # User Management Service
+    - name: user-management-service
+      type: webservice
+      properties:
+        image: socrates12345/user-management-service:latest
+        port: 8080
+        version: "1.0.0"
+        repository: smart-parking-platform
+        language: python
+        framework: fastapi
+        enableGraphQLFederation: true
+        openApiPath: "/api/v1/openapi.json"
+        apiVersion: "v1"
+        environment:
+          SERVICE_NAME: "user-management"
+          DATABASE_TYPE: "postgres"
+          AUTH_PROVIDER: "auth0"
+          GDPR_COMPLIANCE: "true"
+          USER_SESSION_TTL: "3600"  # 1 hour
+          PROFILE_VALIDATION: "strict"
+        resources:
+          cpu: "300m"
+          memory: "512Mi"
+        envFrom:
+          - secretRef:
+              name: user-management-db-credentials
+          - secretRef:
+              name: auth0-credentials
+        probes:
+          liveness:
+            httpGet:
+              path: "/health"
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readiness:
+            httpGet:
+              path: "/ready"
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      traits:
+        - type: autoscaler
+          properties:
+            minReplicas: 2
+            maxReplicas: 6
+            targetCPU: 70
+            targetMemory: 75
+
+    # Space Management Service
+    - name: space-management-service
+      type: webservice
+      properties:
+        image: socrates12345/space-management-service:latest
+        port: 8080
+        version: "1.0.0"
+        repository: smart-parking-platform
+        language: python
+        framework: fastapi
+        realtime: parking-realtime-platform
+        enableGraphQLFederation: true
+        openApiPath: "/api/v1/openapi.json"
+        apiVersion: "v1"
+        environment:
+          SERVICE_NAME: "space-management"
+          IOT_INTEGRATION: "true"
+          SPACE_UPDATE_FREQUENCY: "3s"
+          OCCUPANCY_CONFIDENCE_THRESHOLD: "0.85"
+          PREDICTIVE_AVAILABILITY: "true"
+          MULTI_LEVEL_SUPPORT: "true"
+        resources:
+          cpu: "400m"
+          memory: "768Mi"
+        probes:
+          liveness:
+            httpGet:
+              path: "/health"
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readiness:
+            httpGet:
+              path: "/ready"
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      traits:
+        - type: autoscaler
+          properties:
+            minReplicas: 2
+            maxReplicas: 10
+            targetCPU: 70
+            targetMemory: 75
+        - type: kafka-consumer
+          properties:
+            topics: ["space-occupancy", "sensor-health"]
+            consumerGroup: "space-management-group"
+            kafkaCluster: "parking-realtime-platform-kafka"
+
+    # Booking & Reservation Service
+    - name: booking-service
+      type: webservice
+      properties:
+        image: socrates12345/booking-service:latest
+        port: 8080
+        version: "1.0.0"
+        repository: smart-parking-platform
+        language: python
+        framework: fastapi
+        enableGraphQLFederation: true
+        openApiPath: "/api/v1/openapi.json"
+        apiVersion: "v1"
+        environment:
+          SERVICE_NAME: "booking-service"
+          RESERVATION_TTL: "1800"  # 30 minutes
+          BOOKING_CONFIRMATION_TIMEOUT: "300"  # 5 minutes
+          DYNAMIC_PRICING_ENABLED: "true"
+          MAX_PRICE_MULTIPLIER: "3.0"
+          PAYMENT_INTEGRATION: "stripe"
+          QR_CODE_GENERATION: "true"
+        resources:
+          cpu: "350m"
+          memory: "640Mi"
+        envFrom:
+          - secretRef:
+              name: booking-db-credentials
+          - secretRef:
+              name: stripe-api-credentials
+        probes:
+          liveness:
+            httpGet:
+              path: "/health"
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readiness:
+            httpGet:
+              path: "/ready"
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      traits:
+        - type: autoscaler
+          properties:
+            minReplicas: 3
+            maxReplicas: 12
+            targetCPU: 65
+            targetMemory: 70
+        - type: kafka-producer
+          properties:
+            topics: ["booking-events", "payment-events"]
+            kafkaCluster: "parking-realtime-platform-kafka"
+
+    # Payment Processing Service
+    - name: payment-service
+      type: webservice
+      properties:
+        image: socrates12345/payment-service:latest
+        port: 8080
+        version: "1.0.0"
+        repository: smart-parking-platform
+        language: python
+        framework: fastapi
+        enableGraphQLFederation: true
+        openApiPath: "/api/v1/openapi.json"
+        apiVersion: "v1"
+        environment:
+          SERVICE_NAME: "payment-service"
+          PCI_DSS_COMPLIANT: "true"
+          PRIMARY_PROCESSOR: "stripe"
+          BACKUP_PROCESSOR: "paypal"
+          FRAUD_DETECTION: "true"
+          PAYMENT_TIMEOUT: "30s"
+          RETRY_ATTEMPTS: "3"
+          AUDIT_LOGGING: "true"
+        resources:
+          cpu: "300m"
+          memory: "512Mi"
+        envFrom:
+          - secretRef:
+              name: payment-db-credentials
+          - secretRef:
+              name: stripe-api-credentials
+          - secretRef:
+              name: paypal-api-credentials
+        probes:
+          liveness:
+            httpGet:
+              path: "/health"
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readiness:
+            httpGet:
+              path: "/ready"
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      traits:
+        - type: autoscaler
+          properties:
+            minReplicas: 2
+            maxReplicas: 8
+            targetCPU: 60
+            targetMemory: 70
+        - type: kafka-producer
+          properties:
+            topics: ["payment-events", "audit-events"]
+            kafkaCluster: "parking-realtime-platform-kafka"
+
+    # Analytics & Reporting Service
+    - name: analytics-service
+      type: webservice
+      properties:
+        image: socrates12345/analytics-service:latest
+        port: 8080
+        version: "1.0.0"
+        repository: smart-parking-platform
+        language: python
+        framework: fastapi
+        enableGraphQLFederation: true
+        openApiPath: "/api/v1/openapi.json"
+        apiVersion: "v1"
+        environment:
+          SERVICE_NAME: "analytics-service"
+          CLICKHOUSE_INTEGRATION: "true"
+          REAL_TIME_ANALYTICS: "true"
+          PREDICTIVE_MODELING: "true"
+          DEMAND_FORECASTING: "true"
+          REPORTING_ENABLED: "true"
+          DATA_RETENTION_DAYS: "2555"  # 7 years for compliance
+        resources:
+          cpu: "500m"
+          memory: "1Gi"
+        envFrom:
+          - secretRef:
+              name: analytics-db-credentials
+          - secretRef:
+              name: clickhouse-credentials
+        probes:
+          liveness:
+            httpGet:
+              path: "/health"
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readiness:
+            httpGet:
+              path: "/ready"
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      traits:
+        - type: autoscaler
+          properties:
+            minReplicas: 1
+            maxReplicas: 6
+            targetCPU: 75
+            targetMemory: 80
+        - type: kafka-consumer
+          properties:
+            topics: ["parking-events", "booking-events", "payment-events", "sensor-health"]
+            consumerGroup: "analytics-group"
+            kafkaCluster: "parking-realtime-platform-kafka"
+
+    # Notification Service
+    - name: notification-service
+      type: webservice
+      properties:
+        image: socrates12345/notification-service:latest
+        port: 8080
+        version: "1.0.0"
+        repository: smart-parking-platform
+        language: python
+        framework: fastapi
+        enableGraphQLFederation: true
+        openApiPath: "/api/v1/openapi.json"
+        apiVersion: "v1"
+        environment:
+          SERVICE_NAME: "notification-service"
+          MULTI_CHANNEL_ENABLED: "true"
+          SMS_ENABLED: "true"
+          EMAIL_ENABLED: "true"
+          PUSH_NOTIFICATIONS: "true"
+          WHATSAPP_NOTIFICATIONS: "true"
+          RATE_LIMITING: "true"
+          NOTIFICATION_TEMPLATES: "true"
+        resources:
+          cpu: "250m"
+          memory: "512Mi"
+        envFrom:
+          - secretRef:
+              name: notification-credentials
+          - secretRef:
+              name: email-service-credentials
+        probes:
+          liveness:
+            httpGet:
+              path: "/health"
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readiness:
+            httpGet:
+              path: "/ready"
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      traits:
+        - type: autoscaler
+          properties:
+            minReplicas: 1
+            maxReplicas: 6
+            targetCPU: 70
+            targetMemory: 75
+        - type: kafka-consumer
+          properties:
+            topics: ["booking-events", "payment-events", "alert-events"]
+            consumerGroup: "notification-group"
+            kafkaCluster: "parking-realtime-platform-kafka"
+
+    # ========================================
+    # Data Storage Components
+    # ========================================
+    
+    # PostgreSQL for Transactional Data
+    - name: parking-postgres
+      type: neon-postgres
+      properties:
+        name: parking-postgres
+        database: parking_transactional
+        targetEnvironment: default
+
+    # MongoDB for Operational Data
+    - name: parking-mongodb
+      type: mongodb
+      properties:
+        name: parking-mongodb
+        architecture: replicaset
+        replicas: 3
+        storage: "50Gi"
+        auth:
+          enabled: true
+          rootPassword: "secure-mongo-root"
+          username: "parking_user"
+          password: "secure-mongo-pass"
+          database: "parking_operational"
+        resources:
+          cpu: "500m"
+          memory: "1Gi"
+
+    # ClickHouse for Analytics
+    - name: parking-clickhouse
+      type: clickhouse
+      properties:
+        name: parking-clickhouse
+        architecture: standalone
+        storage: "100Gi"
+        storageClass: "gp2"
+        auth:
+          username: "analytics_user"
+          password: "secure-clickhouse-pass"
+          database: "parking_analytics"
+        resources:
+          cpu: "1000m"
+          memory: "2Gi"
+        security:
+          tlsEnabled: true
+          networkPolicyEnabled: true
+          certificateSecret: "parking-clickhouse-tls"
+        backup:
+          enabled: true
+          schedule: "0 2 * * *"  # Daily at 2 AM
+          retentionDays: 2555     # 7 years
+
+    # Redis for Caching
+    - name: parking-redis
+      type: redis
+      properties:
+        name: parking-redis
+        architecture: replication
+        replicas: 2
+        storage: "10Gi"
+        auth:
+          enabled: true
+          password: "secure-redis-pass"
+        resources:
+          cpu: "200m"
+          memory: "512Mi"
+
+    # ========================================
+    # Authentication & Security
+    # ========================================
+    - name: parking-auth
+      type: auth0-idp
+      properties:
+        name: parking-auth
+
+  # ========================================
+  # Application Policies
+  # ========================================
+  policies:
+    # Health Monitoring Policy
+    - name: health-policy
+      type: health
+      properties:
+        probeInterval: 30
+        probeTimeout: 10
+
+    # Security Policy
+    - name: security-policy
+      type: security-policy
+      properties:
+        allowedOrigins: ["istio-system", "monitoring"]
+
+    # Override Policy for Environment-Specific Configurations
+    - name: environment-overrides
+      type: override
+      properties:
+        components:
+          - name: parking-realtime-platform
+            properties:
+              resources:
+                cpu: "2000m"    # Higher resources for production
+                memory: "4Gi"
+          - name: parking-api-gateway
+            properties:
+              environment:
+                CORS_ORIGINS: "https://parking.example.com,https://admin.parking.example.com"
+                RATE_LIMIT_MAX: "2000"  # Higher rate limit for production
+          - name: parking-chatbot
+            properties:
+              minScale: 2
+              maxScale: 15      # Higher scaling for production load
+          - name: booking-service
+            properties:
+              minReplicas: 4    # Higher minimum replicas for critical service
+              maxReplicas: 20
+          - name: payment-service
+            properties:
+              minReplicas: 3    # Higher minimum for payment processing
+              maxReplicas: 12
+
+  # ========================================
+  # Workflow Definitions
+  # ========================================
+  workflow:
+    steps:
+      # Step 1: Deploy Infrastructure Components
+      - name: deploy-infrastructure
+        type: deploy
+        properties:
+          policies: ["health-policy"]
+        # Deploy data storage first
+        if: "status.phase == 'pending'"
+
+      # Step 2: Deploy Core Services
+      - name: deploy-core-services
+        type: deploy
+        properties:
+          policies: ["health-policy", "security-policy"]
+        # Deploy business logic services after infrastructure is ready
+        if: "status.components['parking-postgres'].healthy && status.components['parking-mongodb'].healthy && status.components['parking-redis'].healthy"
+
+      # Step 3: Deploy API Gateway
+      - name: deploy-api-gateway
+        type: deploy
+        properties:
+          policies: ["health-policy", "security-policy"]
+        # Deploy API gateway after core services
+        if: "status.components['user-management-service'].healthy && status.components['booking-service'].healthy"
+
+      # Step 4: Deploy Real-time Platform
+      - name: deploy-realtime-platform
+        type: deploy
+        properties:
+          policies: ["health-policy", "security-policy"]
+        # Deploy real-time platform after core services for dependencies
+        if: "status.components['space-management-service'].healthy && status.components['analytics-service'].healthy"
+
+      # Step 5: Deploy Chat Platform
+      - name: deploy-chat-platform
+        type: deploy
+        properties:
+          policies: ["health-policy", "security-policy"]
+        # Deploy chatbot after API gateway is ready
+        if: "status.components['parking-api-gateway'].healthy"
+
+      # Step 6: Apply Environment Overrides
+      - name: apply-overrides
+        type: deploy
+        properties:
+          policies: ["environment-overrides"]
+        # Apply environment-specific configurations last
+        if: "status.components['parking-chatbot'].healthy && status.components['parking-realtime-platform'].healthy"
+
+---
+# Multi-Environment Configuration Support
+# Development Environment
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: smart-parking-platform-dev
+  namespace: development
+  labels:
+    app.oam.dev/name: smart-parking-platform
+    app.oam.dev/version: "1.0.0"
+    app.oam.dev/environment: development
+    business.domain/type: smart-parking
+  annotations:
+    app.oam.dev/description: "Development environment for smart parking platform"
+    deployment.strategy/pattern: "unified-repository"
+    repository.name/container: "smart-parking-platform"
+spec:
+  components:
+    # Inherit all components from main definition with dev-specific overrides
+    - name: parking-realtime-platform
+      type: realtime-platform
+      properties:
+        image: socrates12345/parking-realtime-platform:dev
+        repository: smart-parking-platform
+        language: python
+        framework: fastapi
+        database: postgres
+        visualization: metabase
+        iot: true
+        dataRetention: "7d"  # Shorter retention for dev
+        environment:
+          LOG_LEVEL: "DEBUG"
+          IOT_SIMULATOR: "true"  # Use simulated sensors in dev
+          SENSOR_UPDATE_FREQUENCY: "10s"  # Slower updates for dev
+        resources:
+          cpu: "500m"    # Lower resources for dev
+          memory: "1Gi"
+
+    # Simplified dev configuration for other components...
+    - name: parking-mongodb
+      type: mongodb
+      properties:
+        name: parking-mongodb-dev
+        architecture: standalone  # Single instance for dev
+        storage: "10Gi"           # Smaller storage for dev
+        auth:
+          enabled: false          # Simplified auth for dev
+        resources:
+          cpu: "250m"
+          memory: "512Mi"
+
+    - name: parking-redis
+      type: redis
+      properties:
+        name: parking-redis-dev
+        architecture: standalone  # Single instance for dev
+        storage: "2Gi"
+        auth:
+          enabled: false          # Simplified auth for dev
+        resources:
+          cpu: "100m"
+          memory: "256Mi"
+
+  policies:
+    - name: dev-overrides
+      type: override
+      properties:
+        components:
+          - name: user-management-service
+            properties:
+              environment:
+                LOG_LEVEL: "DEBUG"
+                MOCK_AUTH: "true"  # Mock authentication for dev
+              resources:
+                cpu: "200m"
+                memory: "256Mi"
+          - name: booking-service
+            properties:
+              environment:
+                MOCK_PAYMENT: "true"  # Mock payments for dev
+                DYNAMIC_PRICING_ENABLED: "false"
+              resources:
+                cpu: "200m"
+                memory: "256Mi"
+
+---
+# Production Environment Configuration
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: smart-parking-platform-prod
+  namespace: production
+  labels:
+    app.oam.dev/name: smart-parking-platform
+    app.oam.dev/version: "1.0.0"
+    app.oam.dev/environment: production
+    business.domain/type: smart-parking
+    compliance.level/standard: pci-dss
+    scaling.profile/tier: high-availability
+  annotations:
+    app.oam.dev/description: "Production environment for smart parking platform"
+    deployment.strategy/pattern: "unified-repository"
+    repository.name/container: "smart-parking-platform"
+    business.metrics/target-users: "50000"
+    business.metrics/target-uptime: "99.9%"
+spec:
+  # Production inherits all components with production-grade configurations
+  policies:
+    - name: production-overrides
+      type: override
+      properties:
+        components:
+          - name: parking-realtime-platform
+            properties:
+              resources:
+                cpu: "2000m"
+                memory: "4Gi"
+              environment:
+                LOG_LEVEL: "INFO"
+                IOT_SIMULATOR: "false"
+                SENSOR_UPDATE_FREQUENCY: "2s"  # Faster updates for production
+                HIGH_AVAILABILITY: "true"
+          
+          - name: parking-mongodb
+            properties:
+              architecture: replicaset
+              replicas: 5         # Higher replication for production
+              storage: "200Gi"    # Larger storage for production
+              auth:
+                enabled: true
+              resources:
+                cpu: "1000m"
+                memory: "2Gi"
+          
+          - name: parking-clickhouse
+            properties:
+              architecture: replication
+              replicas: 3
+              shards: 2
+              storage: "500Gi"    # Much larger analytics storage
+              resources:
+                cpu: "2000m"
+                memory: "8Gi"
+              security:
+                tlsEnabled: true
+                networkPolicyEnabled: true
+          
+          - name: parking-redis
+            properties:
+              architecture: replication
+              replicas: 5         # Higher replication
+              storage: "50Gi"
+              resources:
+                cpu: "500m"
+                memory: "2Gi"
+
+    # Production Security Policy
+    - name: production-security
+      type: security-policy
+      properties:
+        allowedOrigins: ["istio-system", "monitoring", "logging"]
+
+    # Production Health Monitoring
+    - name: production-health
+      type: health
+      properties:
+        probeInterval: 15  # More frequent health checks
+        probeTimeout: 5

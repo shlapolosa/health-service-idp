@@ -605,8 +605,12 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
         """
         import uuid
         import logging
+        import os
         
         logger = logging.getLogger(__name__)
+        
+        # Check if we're in test mode
+        use_mock = os.getenv("ARGO_USE_MOCK", "false").lower() == "true"
         
         # Generate a unique workflow name
         workflow_name = f"{workflow_template_name}-{str(uuid.uuid4())[:8]}"
@@ -614,24 +618,121 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
         # Log the workflow trigger
         logger.info(f"Creating workflow {workflow_name} from template {workflow_template_name}")
         logger.debug(f"Parameters: {parameters}")
+        logger.debug(f"Using mock client: {use_mock}")
         
-        # In production, this would make an actual API call to Argo Workflows
-        # For now, return a mock response that matches what tests expect
-        return {
-            "metadata": {
-                "name": workflow_name,
-                "namespace": namespace,
-                "uid": str(uuid.uuid4())
-            },
-            "spec": {
-                "workflowTemplateRef": {
-                    "name": workflow_template_name
+        if use_mock:
+            # Return mock response for testing
+            return {
+                "metadata": {
+                    "name": workflow_name,
+                    "namespace": namespace,
+                    "uid": str(uuid.uuid4())
                 },
-                "arguments": {
-                    "parameters": [{"name": k, "value": str(v)} for k, v in parameters.items()]
+                "spec": {
+                    "workflowTemplateRef": {
+                        "name": workflow_template_name
+                    },
+                    "arguments": {
+                        "parameters": [{"name": k, "value": str(v)} for k, v in parameters.items()]
+                    }
+                },
+                "status": {
+                    "phase": "Running"
                 }
-            },
-            "status": {
-                "phase": "Running"
+            }
+        
+        # Real Argo API call
+        workflow_spec = {
+            "namespace": namespace,
+            "serverDryRun": False,
+            "workflow": {
+                "metadata": {
+                    "generateName": f"{workflow_template_name}-",
+                    "namespace": namespace,
+                    "labels": {
+                        "created-by": "oam-webhook",
+                        "template": workflow_template_name,
+                        "pattern-handler": "true"
+                    }
+                },
+                "spec": {
+                    "workflowTemplateRef": {
+                        "name": workflow_template_name
+                    },
+                    "arguments": {
+                        "parameters": [
+                            {"name": k, "value": str(v)} 
+                            for k, v in parameters.items()
+                        ]
+                    }
+                }
             }
         }
+        
+        url = f"{self.base_url}/workflows/{namespace}"
+        headers = self._get_auth_headers()
+        
+        try:
+            response = requests.post(
+                url,
+                headers=headers,
+                json=workflow_spec,
+                timeout=self.timeout,
+                verify=False  # Skip SSL verification for internal cluster communication
+            )
+            
+            if response.status_code in [200, 201]:
+                workflow_data = response.json()
+                logger.info(f"✅ Successfully created workflow: {workflow_data.get('metadata', {}).get('name')}")
+                return workflow_data
+            else:
+                error_msg = f"Argo API error: {response.status_code} - {response.text}"
+                logger.error(f"❌ {error_msg}")
+                # Return mock response on error to prevent workflow failures
+                logger.warning("Falling back to mock response due to API error")
+                return {
+                    "metadata": {
+                        "name": workflow_name,
+                        "namespace": namespace,
+                        "uid": str(uuid.uuid4()),
+                        "error": error_msg
+                    },
+                    "spec": {
+                        "workflowTemplateRef": {
+                            "name": workflow_template_name
+                        },
+                        "arguments": {
+                            "parameters": [{"name": k, "value": str(v)} for k, v in parameters.items()]
+                        }
+                    },
+                    "status": {
+                        "phase": "Failed",
+                        "message": error_msg
+                    }
+                }
+                
+        except requests.exceptions.RequestException as e:
+            error_msg = f"Argo API request failed: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            # Return mock response on error to prevent workflow failures
+            logger.warning("Falling back to mock response due to connection error")
+            return {
+                "metadata": {
+                    "name": workflow_name,
+                    "namespace": namespace,
+                    "uid": str(uuid.uuid4()),
+                    "error": error_msg
+                },
+                "spec": {
+                    "workflowTemplateRef": {
+                        "name": workflow_template_name
+                    },
+                    "arguments": {
+                        "parameters": [{"name": k, "value": str(v)} for k, v in parameters.items()]
+                    }
+                },
+                "status": {
+                    "phase": "Failed",
+                    "message": error_msg
+                }
+            }

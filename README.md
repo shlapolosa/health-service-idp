@@ -72,7 +72,7 @@ graph TB
 ## System Components
 
 ### Core Platform
-- **EKS Cluster**: Managed Kubernetes control plane with Karpenter auto-scaling
+- **EKS/AKS Cluster**: Managed Kubernetes control plane with auto-scaling
 - **Istio Service Mesh**: Traffic management and observability
 - **Argo Workflows**: Workflow orchestration for microservice creation
 - **Argo Events**: Event-driven automation for OAM changes
@@ -81,6 +81,7 @@ graph TB
 - **Crossplane**: Infrastructure as Code compositions
 - **vCluster**: Virtual Kubernetes clusters for workload isolation
 - **Knative**: Serverless workload management
+- **Multi-Registry Support**: Dynamic switching between Docker Hub and Azure Container Registry
 
 ### Key Services
 - **Slack API Server**: Central API for processing Slack commands and OAM webhooks
@@ -137,3 +138,61 @@ graph TB
 - **Crossplane compositions** for infrastructure provisioning
 - **Knative serverless** deployments
 - **Comprehensive observability** with Prometheus, Grafana, Jaeger
+- **Multi-registry support** for Docker Hub and Azure Container Registry
+
+## Multi-Registry Support
+
+The platform supports seamless switching between container registries based on deployment region:
+
+### Supported Registries
+- **Docker Hub** (default): `docker.io/socrates12345/*`
+- **Azure Container Registry**: `healthidpuaeacr.azurecr.io/*`
+- **Custom Registry**: Any custom registry URL
+
+### Configuration Methods
+
+#### 1. OAM Application Level
+```yaml
+spec:
+  components:
+    - name: my-service
+      type: webservice
+      properties:
+        # Option A: Specify registry explicitly
+        imageName: my-service
+        imageTag: v1.0.0
+        registry: acr  # or "dockerhub" or "custom"
+        
+        # Option B: Use full image path (backward compatible)
+        image: docker.io/socrates12345/my-service:v1.0.0
+```
+
+#### 2. Global Registry Switch
+```bash
+# Switch all services to ACR
+./scripts/switch-registry.sh switch acr
+
+# Switch back to Docker Hub
+./scripts/switch-registry.sh switch dockerhub
+
+# Show current configuration
+./scripts/switch-registry.sh show
+```
+
+#### 3. Registry Configuration
+Registry settings are stored in ConfigMaps in `default` and `crossplane-system` namespaces:
+- `DEFAULT_REGISTRY`: Primary registry URL
+- `ACR_REGISTRY`: Azure Container Registry URL
+- `ACTIVE_REGISTRY`: Currently active registry
+
+### Setup ACR Credentials
+For Azure Container Registry, create credentials:
+```bash
+# Automatically created by setup-secrets.sh if ACR_NAME is set in .env
+# Or manually:
+kubectl create secret docker-registry acr-credentials \
+  --docker-server=healthidpuaeacr.azurecr.io \
+  --docker-username=<acr-name> \
+  --docker-password=<password> \
+  -n default
+```

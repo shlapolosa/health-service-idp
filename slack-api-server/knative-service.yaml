@@ -22,9 +22,20 @@ spec:
         component: slack-integration
     spec:
       serviceAccountName: slack-api-server
+      # Add image pull secrets for ACR if needed
+      # This should be conditionally added based on registry config
+      imagePullSecrets:
+      - name: acr-credentials
+      
+      volumes:
+      - name: argo-token
+        secret:
+          secretName: argo-token
+          
       containers:
       - name: slack-api-server
-        image: socrates12345/slack-api-server:latest
+        # Keep current ACR image as it's already working in UAE deployment
+        image: healthidpuaeacr.azurecr.io/slack-api-server:amd64
         ports:
         - containerPort: 8080
           protocol: TCP
@@ -35,6 +46,19 @@ spec:
           value: "production"
         - name: GITHUB_REPOSITORY
           value: "shlapolosa/health-service-idp"
+        # Registry type from ConfigMap
+        - name: REGISTRY_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: registry-config
+              key: ACTIVE_REGISTRY
+              optional: true
+        - name: ARGO_TOKEN_FILE
+          value: "/var/run/secrets/argo/token"
+        volumeMounts:
+        - name: argo-token
+          mountPath: /var/run/secrets/argo
+          readOnly: true
         resources:
           limits:
             cpu: "1"

@@ -26,6 +26,34 @@ echo "✅ All required environment variables found"
 echo "🔧 Applying secrets from manual-secrets.yaml..."
 envsubst < manual-secrets.yaml | kubectl apply -f -
 
+# Create ACR credentials secret if in Azure environment
+if [ -n "$ACR_NAME" ]; then
+    echo "🔧 Creating ACR credentials secret..."
+    
+    # Check if Azure CLI is available and logged in
+    if command -v az &> /dev/null && az account show &> /dev/null; then
+        ACR_PASSWORD=$(az acr credential show --name "$ACR_NAME" --query "passwords[0].value" -o tsv 2>/dev/null || echo "")
+        
+        if [ -n "$ACR_PASSWORD" ]; then
+            kubectl create secret docker-registry acr-credentials \
+                --docker-server="${ACR_NAME}.azurecr.io" \
+                --docker-username="$ACR_NAME" \
+                --docker-password="$ACR_PASSWORD" \
+                -n default --dry-run=client -o yaml | kubectl apply -f -
+            echo "✅ ACR credentials secret created"
+        else
+            echo "⚠️  Could not retrieve ACR password. Skipping ACR credentials creation."
+        fi
+    else
+        echo "⚠️  Azure CLI not available or not logged in. Skipping ACR credentials creation."
+        echo "   To create ACR credentials manually, run:"
+        echo "   kubectl create secret docker-registry acr-credentials \\"
+        echo "     --docker-server=${ACR_NAME}.azurecr.io \\"
+        echo "     --docker-username=${ACR_NAME} \\"
+        echo "     --docker-password=<password> -n default"
+    fi
+fi
+
 # Create ConfigMap with namespace-specific agent keys
 echo "🔧 Creating agent keys ConfigMap..."
 echo "apiVersion: v1

@@ -24,9 +24,13 @@ spec:
       - name: argo-token
         secret:
           secretName: slack-api-server-argo-token
+      imagePullSecrets:
+      - name: docker-registry-secret
+      - name: acr-credentials
       containers:
       - name: slack-api-server
-        image: socrates12345/slack-api-server:20250801-201808-amd64
+        # Image will be replaced by kustomize or CI/CD based on active registry
+        image: healthidpuaeacr.azurecr.io/slack-api-server:amd64
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
@@ -38,6 +42,12 @@ spec:
           value: "production"
         - name: GITHUB_REPOSITORY
           value: "shlapolosa/health-service-idp"
+        - name: REGISTRY_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: registry-config
+              key: ACTIVE_REGISTRY
+              optional: true
         - name: VCLUSTER_DISPATCHER
           value: "argo"
         - name: ARGO_SERVER_URL

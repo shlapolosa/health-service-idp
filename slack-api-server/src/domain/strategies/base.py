@@ -163,6 +163,36 @@ class PatternHandler(ABC):
         """Fetch ComponentDefinition from K8s to check requires-source-code annotation."""
         import subprocess
         import json
+        import os
+        
+        # Check if we're in test mode - use defaults immediately
+        if os.getenv("ARGO_USE_MOCK", "false").lower() == "true":
+            # In test mode, use defaults based on component type
+            source_code_types = [
+                "webservice", "webservice-k8s", "microservice",
+                "rasa-chatbot", "identity-service", "graphql-gateway"
+            ]
+            
+            external_image_types = [
+                "kafka", "redis", "mongodb", "postgresql", "clickhouse",
+                "neon-postgres", "auth0-idp", "vcluster",
+                "realtime-platform", "orchestration-platform", "camunda-orchestrator"
+            ]
+            
+            if component_type in source_code_types:
+                return {
+                    "requires_source_code": True,
+                    "component_type": component_type,
+                    "annotations": {},
+                    "found": True
+                }
+            else:
+                return {
+                    "requires_source_code": False,
+                    "component_type": component_type,
+                    "annotations": {},
+                    "found": True
+                }
         
         try:
             # Query Kubernetes for ComponentDefinition

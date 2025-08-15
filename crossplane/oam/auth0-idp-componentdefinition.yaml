@@ -1,0 +1,78 @@
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: auth0-idp
+  annotations:
+    definition.oam.dev/description: "Auth0 identity provider integration via External Secrets"
+    definition.oam.dev/requires-source-code: "false"
+spec:
+  workload:
+    definition:
+      apiVersion: external-secrets.io/v1
+      kind: ExternalSecret
+    type: externalsecrets.external-secrets.io
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "external-secrets.io/v1"
+          kind: "ExternalSecret"
+          metadata: {
+            name: parameter.name + "-auth0-credentials"
+            namespace: context.namespace
+            if parameter.targetEnvironment != _|_ {
+              annotations: {
+                "app.oam.dev/cluster": parameter.targetEnvironment
+              }
+            }
+          }
+          spec: {
+            refreshInterval: "1h"
+            secretStoreRef: {
+              kind: "ClusterSecretStore"
+              name: "aws-secretsmanager"
+            }
+            target: {
+              name: parameter.name + "-auth0-credentials"
+              creationPolicy: "Owner"
+            }
+            data: [
+              {
+                secretKey: "clientId"
+                remoteRef: {
+                  key: "auth0/credentials"
+                  property: "clientId"
+                }
+              },
+              {
+                secretKey: "clientSecret"
+                remoteRef: {
+                  key: "auth0/credentials"
+                  property: "clientSecret"
+                }
+              },
+              {
+                secretKey: "domain"
+                remoteRef: {
+                  key: "auth0/credentials"
+                  property: "domain"
+                }
+              },
+              {
+                secretKey: "audience"
+                remoteRef: {
+                  key: "auth0/credentials"
+                  property: "audience"
+                }
+              }
+            ]
+          }
+        }
+        
+        parameter: {
+          // Required
+          name: string
+          
+          // Optional
+          targetEnvironment?: string
+        }
