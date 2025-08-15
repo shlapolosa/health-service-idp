@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: image-prepuller
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      name: image-prepuller
+  template:
+    metadata:
+      labels:
+        name: image-prepuller
+    spec:
+      initContainers:
+      # Pre-pull stedolan/jq
+      - name: prepull-jq
+        image: stedolan/jq:latest
+        command: ["sh", "-c", "echo 'Pre-pulled stedolan/jq'"]
+      # Pre-pull alpine/k8s
+      - name: prepull-alpine-k8s
+        image: alpine/k8s:1.28.4
+        command: ["sh", "-c", "echo 'Pre-pulled alpine/k8s:1.28.4'"]
+      containers:
+      - name: pause
+        image: gcr.io/google_containers/pause:3.2
+        resources:
+          limits:
+            cpu: 10m
+            memory: 10Mi

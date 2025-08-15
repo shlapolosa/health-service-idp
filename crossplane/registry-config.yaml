@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: registry-config
+  namespace: crossplane-system
+data:
+  # Primary registry configuration
+  DEFAULT_REGISTRY: "docker.io"
+  DEFAULT_REGISTRY_PATH: "socrates12345"
+  
+  # Azure Container Registry configuration
+  ACR_REGISTRY: "healthidpuaeacr.azurecr.io"
+  ACR_REGISTRY_PATH: ""
+  
+  # Region-specific registry selection
+  # Set to "dockerhub" or "acr" based on deployment region
+  ACTIVE_REGISTRY: "dockerhub"
+  
+  # Image pull policy
+  IMAGE_PULL_POLICY: "IfNotPresent"
+  
+  # Fallback configuration
+  ENABLE_FALLBACK: "true"
+  FALLBACK_REGISTRY: "docker.io/socrates12345"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: registry-config
+  namespace: default
+data:
+  # Primary registry configuration
+  DEFAULT_REGISTRY: "docker.io"
+  DEFAULT_REGISTRY_PATH: "socrates12345"
+  
+  # Azure Container Registry configuration
+  ACR_REGISTRY: "healthidpuaeacr.azurecr.io"
+  ACR_REGISTRY_PATH: ""
+  
+  # Region-specific registry selection
+  # Set to "dockerhub" or "acr" based on deployment region
+  ACTIVE_REGISTRY: "dockerhub"
+  
+  # Image pull policy
+  IMAGE_PULL_POLICY: "IfNotPresent"
+  
+  # Fallback configuration
+  ENABLE_FALLBACK: "true"
+  FALLBACK_REGISTRY: "docker.io/socrates12345"
