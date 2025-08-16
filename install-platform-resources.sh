@@ -148,7 +148,24 @@ install_crossplane_xrds() {
     print_status "Crossplane XRDs and Compositions processed"
 }
 
-# 4. Install Istio Gateways and VirtualServices
+# 4. Install ClusterGateway CRDs for Multi-cluster Support
+install_clustergateway_crds() {
+    echo ""
+    echo "Installing ClusterGateway CRDs for Multi-cluster Support..."
+    
+    CRD_DIR="/Users/socrateshlapolosa/Development/health-service-idp/crossplane/cluster-gateway"
+    
+    if [ -d "$CRD_DIR" ]; then
+        echo "  Applying ClusterGateway CRDs..."
+        kubectl apply -f "$CRD_DIR/clustergateway-cluster-crd.yaml" || print_warning "Failed to apply cluster CRD"
+        kubectl apply -f "$CRD_DIR/clustergateway-core-crd.yaml" || print_warning "Failed to apply core CRD"
+        print_status "ClusterGateway CRDs installed"
+    else
+        print_warning "ClusterGateway CRD directory not found: $CRD_DIR"
+    fi
+}
+
+# 5. Install Istio Gateways and VirtualServices
 install_istio_resources() {
     echo ""
     echo "Installing Istio Resources..."
@@ -506,6 +523,9 @@ verify_resources() {
     echo "Crossplane XRDs:"
     kubectl get xrd --no-headers | wc -l | xargs -I {} echo "  Count: {}"
     
+    echo "ClusterGateway CRDs:"
+    kubectl get crd | grep -c "clustergateways.*oam.dev" | xargs -I {} echo "  Count: {}"
+    
     echo "Istio Gateways:"
     kubectl get gateway -A --no-headers | wc -l | xargs -I {} echo "  Count: {}"
     
@@ -522,6 +542,7 @@ main() {
     echo "  - 15 ComponentDefinitions (excluding application-infrastructure, clickhouse)"
     echo "  - 4 TraitDefinitions"
     echo "  - 7 Crossplane XRDs with Compositions"
+    echo "  - 2 ClusterGateway CRDs for multi-cluster support"
     echo "  - 5 Istio Gateways (3 custom + 2 Knative)"
     echo "  - 3 VirtualServices"
     echo "  - Argo Workflow Templates"
@@ -540,6 +561,7 @@ main() {
     install_component_definitions
     install_trait_definitions
     install_crossplane_xrds
+    install_clustergateway_crds
     install_istio_resources
     install_argo_templates
     configure_provider_rbac
