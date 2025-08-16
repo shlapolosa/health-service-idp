@@ -1,0 +1,81 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apiextensions.k8s.io/v1","kind":"CustomResourceDefinition","metadata":{"annotations":{},"name":"clustergateways.cluster.core.oam.dev"},"spec":{"group":"cluster.core.oam.dev","names":{"kind":"ClusterGateway","plural":"clustergateways","singular":"clustergateway"},"scope":"Namespaced","versions":[{"name":"v1alpha1","schema":{"openAPIV3Schema":{"properties":{"spec":{"properties":{"access":{"properties":{"credential":{"properties":{"serviceAccountToken":{"description":"Reference to token secret","type":"string"},"type":{"enum":["ServiceAccountToken","X509Certificate"],"type":"string"}},"type":"object"},"insecure":{"default":false,"type":"boolean"}},"type":"object"},"clusterType":{"description":"Type of cluster (vcluster, eks, etc)","type":"string"},"endpoint":{"description":"Cluster API endpoint","type":"string"}},"type":"object"},"status":{"properties":{"healthy":{"type":"boolean"},"message":{"type":"string"}},"type":"object"}},"type":"object"}},"served":true,"storage":true}]}}
+  creationTimestamp: "2025-08-07T06:58:11Z"
+  generation: 1
+  name: clustergateways.cluster.core.oam.dev
+  resourceVersion: "25132394"
+  uid: 7a802159-2d30-4fbd-9d4b-ee6ba07c792f
+spec:
+  conversion:
+    strategy: None
+  group: cluster.core.oam.dev
+  names:
+    kind: ClusterGateway
+    listKind: ClusterGatewayList
+    plural: clustergateways
+    singular: clustergateway
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        properties:
+          spec:
+            properties:
+              access:
+                properties:
+                  credential:
+                    properties:
+                      serviceAccountToken:
+                        description: Reference to token secret
+                        type: string
+                      type:
+                        enum:
+                        - ServiceAccountToken
+                        - X509Certificate
+                        type: string
+                    type: object
+                  insecure:
+                    default: false
+                    type: boolean
+                type: object
+              clusterType:
+                description: Type of cluster (vcluster, eks, etc)
+                type: string
+              endpoint:
+                description: Cluster API endpoint
+                type: string
+            type: object
+          status:
+            properties:
+              healthy:
+                type: boolean
+              message:
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ClusterGateway
+    listKind: ClusterGatewayList
+    plural: clustergateways
+    singular: clustergateway
+  conditions:
+  - lastTransitionTime: "2025-08-07T06:58:11Z"
+    message: no conflicts found
+    reason: NoConflicts
+    status: "True"
+    type: NamesAccepted
+  - lastTransitionTime: "2025-08-07T06:58:11Z"
+    message: the initial names have been accepted
+    reason: InitialNamesAccepted
+    status: "True"
+    type: Established
+  storedVersions:
+  - v1alpha1
