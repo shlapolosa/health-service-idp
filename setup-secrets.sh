@@ -12,7 +12,7 @@ echo "📁 Loading environment variables from .env file..."
 export $(grep -v '^#' .env | grep '^[A-Z_][A-Z0-9_]*=' | xargs)
 
 # Validate required variables
-required_vars=("PERSONAL_ACCESS_TOKEN" "GITHUB_USERNAME" "DOCKER_USERNAME" "DOCKER_PASSWORD" "DOCKER_AUTH" "SLACK_SIGNING_SECRET" "SLACK_WEBHOOK_URL" "LENSES_LICENSE_KEY" "LENSES_ACCEPT_EULA" "LENSES_HQ_USER" "LENSES_HQ_PASSWORD" "LENSES_DB_USERNAME" "LENSES_DB_PASSWORD")
+required_vars=("PERSONAL_ACCESS_TOKEN" "GITHUB_USERNAME" "DOCKER_USERNAME" "DOCKER_PASSWORD" "DOCKER_AUTH" "SLACK_SIGNING_SECRET" "SLACK_WEBHOOK_URL" "LENSES_LICENSE_KEY" "LENSES_ACCEPT_EULA" "LENSES_HQ_USER" "LENSES_HQ_PASSWORD" "LENSES_DB_USERNAME" "LENSES_DB_PASSWORD" "AUTH0_DOMAIN" "AUTH0_CLIENT_ID" "AUTH0_CLIENT_SECRET" "AUTH0_AUDIENCE")
 for var in "${required_vars[@]}"; do
     if [ -z "${!var}" ]; then
         echo "❌ Required environment variable $var is not set in .env file"
@@ -108,6 +108,7 @@ fi
 echo "🎉 All secrets created successfully from .env file!"
 echo ""
 echo "📋 Created resources:"
+echo "  - auth0-credentials (clientId, clientSecret, domain, audience)"
 echo "  - github-credentials (token, personal-access-token, user)"
 echo "  - github-provider-secret (crossplane provider credentials) in crossplane-system namespace"
 echo "  - docker-credentials (registry, username, password)"

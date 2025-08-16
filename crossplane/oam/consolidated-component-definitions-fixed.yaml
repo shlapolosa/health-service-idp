@@ -888,13 +888,13 @@ metadata:
 spec:
   workload:
     definition:
-      apiVersion: external-secrets.io/v1beta1
+      apiVersion: external-secrets.io/v1
       kind: ExternalSecret
   schematic:
     cue:
       template: |
         output: {
-          apiVersion: "external-secrets.io/v1beta1"
+          apiVersion: "external-secrets.io/v1"
           kind: "ExternalSecret"
           metadata: {
             name: parameter.name + "-auth0-credentials"
