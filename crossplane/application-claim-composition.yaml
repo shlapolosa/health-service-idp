@@ -634,16 +634,18 @@ spec:
                       # Create vCluster-specific directory structure
                       mkdir -p vcluster/$VCLUSTER_TARGET/applications/$SERVICE_NAME
                       
-                      # Check if this is an API-driven ApplicationClaim (should update OAM)
-                      # vs OAM-driven ApplicationClaim (should NOT update OAM to avoid circular dependency)
+                      # Check if this is an OAM-driven ApplicationClaim (should NOT update OAM to avoid circular dependency)
+                      # Default to api-driven if not explicitly set
                       SOURCE="${BOOTSTRAP_SOURCE:-api-driven}"
                       
-                      if [ "$SOURCE" != "api-driven" ]; then
+                      if [ "$SOURCE" == "OAM-driven" ]; then
                         echo "🔄 OAM-driven ApplicationClaim detected (source: $SOURCE)"
                         echo "⚠️  Skipping OAM update to avoid circular dependency"
                         echo "ℹ️  User should manually update OAM Application if needed"
                         exit 0
                       fi
+                      
+                      echo "✅ Processing ApplicationClaim (source: $SOURCE)"
                       
                       echo "🔄 API-driven ApplicationClaim detected - proceeding with OAM update"
                       
@@ -917,6 +919,8 @@ spec:
                       value: "placeholder"
                     - name: DEFAULT_REGISTRY
                       value: "acr"  # Default to ACR for UAE deployment
+                    - name: REALTIME_PLATFORM
+                      value: ""
                     - name: BOOTSTRAP_SOURCE
                       value: "placeholder"
                     - name: GITHUB_TOKEN
@@ -965,8 +969,13 @@ spec:
       fromFieldPath: spec.cache
       toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[5].value
     - type: FromCompositeFieldPath
+      fromFieldPath: spec.realtime
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[7].value
+      policy:
+        fromFieldPath: Optional
+    - type: FromCompositeFieldPath
       fromFieldPath: metadata.annotations["webservice.oam.dev/source"]
-      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[6].value
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[8].value
       policy:
         fromFieldPath: Optional
       transforms:

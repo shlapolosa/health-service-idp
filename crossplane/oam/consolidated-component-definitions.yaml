@@ -709,6 +709,14 @@ spec:
           metadata: {
             name: parameter.name + "-infra"
             namespace: context.namespace
+            annotations: {
+              if parameter.source != _|_ {
+                "webservice.oam.dev/source": parameter.source
+              }
+              if parameter.source == _|_ {
+                "webservice.oam.dev/source": "OAM-driven"
+              }
+            }
           }
           spec: {
             name: parameter.name
@@ -741,6 +749,7 @@ spec:
           database?: "postgres" | "mysql" | "mongodb"
           cache?: "redis" | "memcached"
           generateRepo: *false | bool
+          source?: string  // Source of the ApplicationClaim (api-driven, OAM-driven, etc.)
           environment: *{} | {...}
           resources: *{
             cpu: "500m"

@@ -249,7 +249,7 @@ spec:
                     "webservice.oam.dev/source": parameter.source
                   }
                   if parameter.source == _|_ {
-                    "webservice.oam.dev/source": "oam-driven"
+                    "webservice.oam.dev/source": "OAM-driven"
                   }
                 }
               }
@@ -295,6 +295,7 @@ spec:
                         "          {\"name\": \"docker-registry\", \"value\": \"docker.io/socrates12345\"},\n" +
                         "          {\"name\": \"slack-channel\", \"value\": \"#oam-notifications\"},\n" +
                         "          {\"name\": \"slack-user-id\", \"value\": \"OAM\"},\n" +
+                        "          {\"name\": \"bootstrap-source\", \"value\": \"OAM-driven\"},\n" +
                         "          {\"name\": \"security-enabled\", \"value\": \"true\"},\n" +
                         "          {\"name\": \"observability-enabled\", \"value\": \"true\"},\n" +
                         "          {\"name\": \"backup-enabled\", \"value\": \"false\"},\n" +
@@ -303,8 +304,9 @@ spec:
                         "          {\"name\": \"resource-size\", \"value\": \"medium\"},\n" +
                         "          {\"name\": \"microservice-language\", \"value\": \"" + parameter.language + "\"},\n" +
                         "          {\"name\": \"microservice-framework\", \"value\": \"" + parameter.framework + "\"},\n" +
-                        "          {\"name\": \"microservice-database\", \"value\": \"none\"},\n" +
-                        "          {\"name\": \"microservice-cache\", \"value\": \"none\"},\n" +
+                        "          {\"name\": \"microservice-database\", \"value\": \"" + (*parameter.database | "none") + "\"},\n" +
+                        "          {\"name\": \"microservice-cache\", \"value\": \"" + (*parameter.cache | "none") + "\"},\n" +
+                        "          {\"name\": \"microservice-realtime\", \"value\": \"" + (*parameter.realtime | "") + "\"},\n" +
                         "          {\"name\": \"microservice-expose-api\", \"value\": \"false\"},\n" +
                         "          {\"name\": \"target-vcluster\", \"value\": \"\"},\n" +
                         "          {\"name\": \"parent-appcontainer\", \"value\": \"" + (*parameter.repository | "") + "\"},\n" +

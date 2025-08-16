@@ -109,6 +109,7 @@ class Pattern2CompositionalHandler(PatternHandler):
                 "slack-user-id": "OAM",
                 
                 # Tier 2: Platform Parameters
+                "bootstrap-source": "OAM-driven",  # Pattern2 is OAM-driven
                 "security-enabled": "true",
                 "observability-enabled": "true",
                 "backup-enabled": "false",
@@ -121,6 +122,7 @@ class Pattern2CompositionalHandler(PatternHandler):
                 "microservice-framework": framework,
                 "microservice-database": properties.get("database", "none"),
                 "microservice-cache": properties.get("cache", "none"),
+                "microservice-realtime": properties.get("realtime", ""),
                 "microservice-expose-api": str(properties.get("exposeApi", False)).lower(),
                 "target-vcluster": context.vcluster or "",
                 "parent-appcontainer": context.app_container or "",

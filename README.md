@@ -196,3 +196,189 @@ kubectl create secret docker-registry acr-credentials \
   --docker-password=<password> \
   -n default
 ```
+
+## Parameter Flow and Data Architecture
+
+### Overview
+The platform implements two distinct flows for creating microservices: **API-driven** (via Slack commands) and **OAM-driven** (via GitOps). Understanding the parameter flow between components is critical for maintaining system integrity and preventing circular dependencies.
+
+### Parameter Flow Diagram
+
+```mermaid
+graph TB
+    subgraph "Entry Points"
+        SLACK[Slack Command]
+        OAM_APP[OAM Application]
+        PATTERN1[Pattern1 Handler]
+        PATTERN2[Pattern2 Handler]
+        OAM_COMP[OAM ComponentDefinition]
+    end
+
+    subgraph "Processing Layer"
+        SLACK_API[Slack API Server<br/>argo_client.py]
+        PATTERN_PROC[Pattern Handlers<br/>pattern1/pattern2.py]
+        OAM_TRIGGER[webservice Component<br/>workflow-trigger trait]
+    end
+
+    subgraph "Workflow Layer"
+        WORKFLOW[microservice-standard-contract.yaml<br/>WorkflowTemplate]
+        PARAMS[["Parameters:<br/>
+        • bootstrap-source<br/>
+        • microservice-realtime<br/>
+        • microservice-language<br/>
+        • microservice-framework<br/>
+        • microservice-database<br/>
+        • microservice-cache<br/>
+        • target-vcluster<br/>
+        • parent-appcontainer"]]
+    end
+
+    subgraph "Resource Layer"
+        APP_CLAIM[ApplicationClaim<br/>CRD Resource]
+        CLAIM_SPEC[["spec:<br/>
+        • name<br/>
+        • language<br/>
+        • framework<br/>
+        • database<br/>
+        • cache<br/>
+        • realtime<br/>
+        • appContainer<br/>
+        • targetVCluster"]]
+        CLAIM_META[["metadata.annotations:<br/>
+        • webservice.oam.dev/source"]]
+    end
+
+    subgraph "Crossplane Composition"
+        COMPOSITION[application-claim-composition.yaml]
+        ENV_PATCHES[["Environment Patches:<br/>
+        env[0]: SERVICE_NAME ← spec.name<br/>
+        env[1]: APP_CONTAINER ← spec.appContainer<br/>
+        env[2]: LANGUAGE ← spec.language<br/>
+        env[3]: FRAMEWORK ← spec.framework<br/>
+        env[4]: DATABASE ← spec.database<br/>
+        env[5]: CACHE ← spec.cache<br/>
+        env[6]: DEFAULT_REGISTRY (hardcoded)<br/>
+        env[7]: REALTIME_PLATFORM ← spec.realtime<br/>
+        env[8]: BOOTSTRAP_SOURCE ← annotations"]]
+        OAM_UPDATER[oam-updater Job]
+    end
+
+    subgraph "Decision Point"
+        DECISION{{"if BOOTSTRAP_SOURCE == 'OAM-driven'?"}}
+        SKIP[Skip OAM Update<br/>Prevent Circular Dependency]
+        UPDATE[Update OAM Application<br/>in GitOps Repository]
+    end
+
+    %% API-driven flow (green)
+    SLACK -->|"bootstrap-source: 'api-driven'"| SLACK_API
+    SLACK_API --> WORKFLOW
+    
+    %% OAM-driven flows (blue)
+    OAM_APP --> PATTERN1
+    OAM_APP --> PATTERN2
+    PATTERN1 -->|"bootstrap-source: 'OAM-driven'"| PATTERN_PROC
+    PATTERN2 -->|"bootstrap-source: 'OAM-driven'"| PATTERN_PROC
+    PATTERN_PROC --> WORKFLOW
+    
+    OAM_COMP --> OAM_TRIGGER
+    OAM_TRIGGER -->|"bootstrap-source: 'OAM-driven'"| WORKFLOW
+    
+    %% Common workflow path
+    WORKFLOW --> PARAMS
+    PARAMS --> APP_CLAIM
+    APP_CLAIM --> CLAIM_SPEC
+    APP_CLAIM --> CLAIM_META
+    
+    %% Crossplane processing
+    CLAIM_SPEC --> COMPOSITION
+    CLAIM_META --> COMPOSITION
+    COMPOSITION --> ENV_PATCHES
+    ENV_PATCHES --> OAM_UPDATER
+    
+    %% Decision logic
+    OAM_UPDATER --> DECISION
+    DECISION -->|Yes| SKIP
+    DECISION -->|No| UPDATE
+    
+    %% Styling
+    classDef apiDriven fill:#c8e6c9,stroke:#4caf50,stroke-width:2px
+    classDef oamDriven fill:#bbdefb,stroke:#2196f3,stroke-width:2px
+    classDef workflow fill:#fff3e0,stroke:#ff9800,stroke-width:2px
+    classDef resource fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px
+    classDef decision fill:#ffebee,stroke:#f44336,stroke-width:2px
+    
+    class SLACK,SLACK_API apiDriven
+    class OAM_APP,PATTERN1,PATTERN2,OAM_COMP,PATTERN_PROC,OAM_TRIGGER oamDriven
+    class WORKFLOW,PARAMS workflow
+    class APP_CLAIM,CLAIM_SPEC,CLAIM_META,COMPOSITION,ENV_PATCHES,OAM_UPDATER resource
+    class DECISION,SKIP,UPDATE decision
+```
+
+### Critical Parameter Mappings
+
+#### 1. Bootstrap Source Flow
+The `bootstrap-source` parameter is critical for preventing circular dependencies:
+
+- **API-driven**: Slack commands → `bootstrap-source: "api-driven"` → OAM updates proceed
+- **OAM-driven**: OAM/Patterns → `bootstrap-source: "OAM-driven"` → OAM updates skipped
+
+#### 2. Environment Variable Positions (After REALTIME_PLATFORM Addition)
+```yaml
+env:
+  - name: SERVICE_NAME       # env[0] ← spec.name
+  - name: APP_CONTAINER       # env[1] ← spec.appContainer
+  - name: LANGUAGE           # env[2] ← spec.language
+  - name: FRAMEWORK          # env[3] ← spec.framework
+  - name: DATABASE           # env[4] ← spec.database
+  - name: CACHE              # env[5] ← spec.cache
+  - name: DEFAULT_REGISTRY   # env[6] (hardcoded "acr")
+  - name: REALTIME_PLATFORM  # env[7] ← spec.realtime
+  - name: BOOTSTRAP_SOURCE   # env[8] ← annotations["webservice.oam.dev/source"]
+```
+
+#### 3. Parameter Alignment Requirements
+
+All entry points must provide:
+- `bootstrap-source`: Identifies the trigger source (api-driven vs OAM-driven)
+- `microservice-realtime`: Optional realtime platform integration
+- Standard microservice parameters (language, framework, database, cache)
+- Deployment parameters (target-vcluster, parent-appcontainer)
+
+### Circular Dependency Prevention
+
+The system prevents infinite loops through the following mechanism:
+
+1. **OAM creates ApplicationClaim** → marked with `webservice.oam.dev/source: "OAM-driven"`
+2. **Crossplane processes ApplicationClaim** → creates infrastructure
+3. **oam-updater job checks source** → if "OAM-driven", skips OAM update
+4. **No new OAM change** → no new trigger → loop prevented
+
+### Data Flow Examples
+
+#### API-Driven Flow (Slack Command)
+```
+Slack: /microservice create my-service
+  ↓ parameters: bootstrap-source="api-driven"
+Workflow: microservice-standard-contract
+  ↓ creates ApplicationClaim
+ApplicationClaim: annotations["source"]="api-driven"
+  ↓ Crossplane composition
+oam-updater: BOOTSTRAP_SOURCE="api-driven"
+  ↓ check passes
+Update OAM Application ✓
+```
+
+#### OAM-Driven Flow (GitOps Change)
+```
+OAM Application: new webservice component
+  ↓ webhook triggers Pattern1/Pattern2
+Pattern Handler: bootstrap-source="OAM-driven"
+  ↓ calls workflow
+Workflow: microservice-standard-contract
+  ↓ creates ApplicationClaim
+ApplicationClaim: annotations["source"]="OAM-driven"
+  ↓ Crossplane composition
+oam-updater: BOOTSTRAP_SOURCE="OAM-driven"
+  ↓ check blocks update
+Skip OAM Update ✓ (prevents loop)
+```

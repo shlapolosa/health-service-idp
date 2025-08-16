@@ -333,6 +333,7 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
                             {"name": "slack-user-id", "value": payload.get("slack-user-id", "unknown")},
                             
                             # TIER 2: Platform Parameters
+                            {"name": "bootstrap-source", "value": "api-driven"},
                             {"name": "security-enabled", "value": payload.get("security", "true")},
                             {"name": "observability-enabled", "value": payload.get("observability", "true")},
                             {"name": "backup-enabled", "value": "false"},
