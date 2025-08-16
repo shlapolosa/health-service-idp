@@ -1257,7 +1257,7 @@ spec:
         strategy: string
         string:
           fmt: "%s/%s"
-      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[3].value
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[4].value
     - type: FromCompositeFieldPath
       fromFieldPath: spec.name
       toFieldPath: metadata.name

@@ -284,6 +284,10 @@ spec:
             value: "{{inputs.parameters.slack-channel}}"
           - name: repository-name
             value: "{{steps.ensure-repositories.outputs.parameters.repository-name}}"
+          - name: bootstrap-source
+            value: "{{inputs.parameters.bootstrap-source}}"
+          - name: microservice-realtime
+            value: "{{inputs.parameters.microservice-realtime}}"
         when: "{{steps.ensure-repositories.status}} == Succeeded"
     - - name: wait-for-microservice-ready
         template: wait-for-microservice-ready
@@ -570,6 +574,8 @@ spec:
       - name: user
       - name: slack-channel
       - name: repository-name
+      - name: bootstrap-source
+      - name: microservice-realtime
     script:
       image: bitnami/kubectl:1.28
       command: [sh]
