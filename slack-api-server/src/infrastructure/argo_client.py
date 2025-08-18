@@ -49,6 +49,15 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
             logger.warning(f"Argo token file not found: {self.token_file}")
         
         return headers
+    
+    def _get_default_registry(self) -> str:
+        """Get default registry based on environment configuration."""
+        registry_type = os.getenv("REGISTRY_TYPE", "dockerhub").lower()
+        if registry_type == "acr":
+            return "healthidpuaeacr.azurecr.io"
+        else:
+            # Default to Docker Hub
+            return "docker.io/socrates12345"
 
     def trigger_vcluster_creation(self, payload: Dict) -> Tuple[bool, str]:
         """Trigger VCluster creation via Argo Workflows using standardized parameter contract."""
@@ -233,7 +242,7 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
                             {"name": "namespace", "value": payload.get("namespace", "default")},
                             {"name": "description", "value": payload.get("description", "CLAUDE.md-compliant application container")},
                             {"name": "github-org", "value": payload.get("github-org", "shlapolosa")},
-                            {"name": "docker-registry", "value": payload.get("docker-registry", "docker.io/socrates12345")},
+                            {"name": "docker-registry", "value": payload.get("docker-registry", self._get_default_registry())},
                             {"name": "observability", "value": payload.get("observability", "true")},
                             {"name": "security", "value": payload.get("security", "true")},
                             {"name": "user", "value": payload.get("user", "unknown")},
@@ -328,7 +337,7 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
                             {"name": "user", "value": payload.get("user", "unknown")},
                             {"name": "description", "value": payload.get("description", "CLAUDE.md-compliant microservice")},
                             {"name": "github-org", "value": payload.get("github-org", "shlapolosa")},
-                            {"name": "docker-registry", "value": payload.get("docker-registry", "docker.io/socrates12345")},
+                            {"name": "docker-registry", "value": payload.get("docker-registry", self._get_default_registry())},
                             {"name": "slack-channel", "value": payload.get("slack-channel", "unknown")},
                             {"name": "slack-user-id", "value": payload.get("slack-user-id", "unknown")},
                             
@@ -514,7 +523,7 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
             "slack-channel": "#platform-automation",
             "slack-user-id": "OAM-System",
             "github-org": "shlapolosa",
-            "docker-registry": "docker.io/socrates12345",
+            "docker-registry": self._get_default_registry(),
             "auto-create-vcluster": "false",  # vCluster should already exist
             "description": f"Service {component_name} auto-created from OAM Application",
             "security": "true",

@@ -2,6 +2,7 @@
 
 from typing import Dict, Any
 import logging
+import os
 
 from .base import PatternHandler, ComponentPattern, HandlerContext, HandlerResult
 
@@ -69,21 +70,33 @@ class Pattern1FoundationalHandler(PatternHandler):
             component_name = component.get("name")
             properties = component.get("properties", {})
             
+            # For OAM-driven, repository name should be the app-container (current repo)
+            # Service name is the component name (unique identifier)
+            repository_name = context.app_container if context.app_container else component_name
+            
+            # Get registry configuration from environment or use defaults
+            registry_type = os.getenv("REGISTRY_TYPE", "dockerhub").lower()
+            if registry_type == "acr":
+                docker_registry = "healthidpuaeacr.azurecr.io"
+            else:
+                # Default to Docker Hub
+                docker_registry = "docker.io/socrates12345"
+            
             # Map OAM properties to workflow parameters (reuse Slack command parameters)
             params = {
                 # Tier 1: Universal Parameters
-                "resource-name": component_name,
+                "resource-name": component_name,  # This is the service name
                 "resource-type": "microservice",
                 "namespace": context.namespace or "default",
                 "user": "oam-webhook",
                 "description": f"OAM-driven service from {context.oam_application_name}",
                 "github-org": context.github_owner or "shlapolosa",
-                "docker-registry": "docker.io/socrates12345",
+                "docker-registry": docker_registry,
                 "slack-channel": "#oam-deployments",
                 "slack-user-id": "OAM",
                 
                 # Tier 2: Platform Parameters
-                "bootstrap-source": "OAM-driven",  # Pattern1 is OAM-driven
+                "bootstrap-source": "oam-driven",  # Mark as OAM-driven (lowercase for consistency)
                 "security-enabled": "true",
                 "observability-enabled": "true",
                 "backup-enabled": "false",
@@ -100,7 +113,7 @@ class Pattern1FoundationalHandler(PatternHandler):
                 "microservice-expose-api": str(properties.get("exposeApi", False)).lower(),
                 "target-vcluster": context.vcluster or "",
                 "parent-appcontainer": context.app_container or "",
-                "repository-name": context.app_container or ""  # Use existing repo
+                "repository-name": repository_name  # Use app-container for OAM-driven
             }
             
             # Always use microservice-standard-contract for ApplicationClaim
@@ -255,25 +268,53 @@ class Pattern1FoundationalHandler(PatternHandler):
         else:
             platform = properties.get("platform", "knative")
         
+        # Determine if this is OAM-driven based on context
+        is_oam_driven = bool(context.app_container)
+        
+        # Get registry configuration
+        registry_type = os.getenv("REGISTRY_TYPE", "dockerhub").lower()
+        if registry_type == "acr":
+            docker_registry = "healthidpuaeacr.azurecr.io"
+        else:
+            docker_registry = "docker.io/socrates12345"
+        
         params = {
-            # Core service parameters
-            "service_name": component_name,
+            # Core service parameters - using workflow template expected names
+            "resource-name": component_name,  # Changed from service_name
+            "resource-type": "microservice",
+            "namespace": context.namespace,
+            "user": "oam-webhook" if is_oam_driven else "api-user",
+            "description": f"{'OAM-driven' if is_oam_driven else 'API-driven'} {component_name} service",
+            
+            # GitHub and repository parameters
+            "github-org": context.github_owner or "shlapolosa",
+            "docker-registry": docker_registry,
+            "repository-name": context.app_container if is_oam_driven else component_name,  # Changed from repository
+            
+            # Environment and deployment
+            "environment-tier": "development",
+            "target-vcluster": context.vcluster or "",
+            
+            # Microservice-specific parameters
+            "microservice-language": language,
+            "microservice-framework": framework,
+            "microservice-database": properties.get("database", "none"),
+            "microservice-cache": properties.get("cache", "none"),
+            
+            # Bootstrap and source
+            "bootstrap-source": "oam-driven" if is_oam_driven else "api-driven",  # Changed from source
+            
+            # Additional parameters for backward compatibility
+            "service_name": component_name,  # Keep for templates that might use it
             "language": language,
             "framework": framework,
             "platform": platform,
-            
-            # Repository and template
             "template_repo": template_repo,
             "app_container": context.app_container or "new",
             "github_owner": context.github_owner,
-            "repository": properties.get("repository", component_name),
-            
-            # Deployment context
-            "namespace": context.namespace,
+            "repository": context.app_container if is_oam_driven else component_name,
             "vcluster": context.vcluster,
             "target_environment": properties.get("targetEnvironment", context.vcluster),
-            
-            # OAM context
             "oam_application": context.oam_application_name,
             "oam_namespace": context.oam_application_namespace,
             
@@ -294,7 +335,7 @@ class Pattern1FoundationalHandler(PatternHandler):
             "memory_limit": properties.get("memoryLimit", "512Mi"),
             
             # Additional metadata
-            "source": properties.get("source", "api-driven"),
+            "source": "oam-driven" if is_oam_driven else "api-driven",  # Keep for compatibility
             "api_version": properties.get("apiVersion", "v1"),
             "open_api_path": properties.get("openApiPath", "/openapi.json")
         }

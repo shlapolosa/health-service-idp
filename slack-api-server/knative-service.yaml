@@ -22,8 +22,7 @@ spec:
         component: slack-integration
     spec:
       serviceAccountName: slack-api-server
-      # Add image pull secrets for ACR if needed
-      # This should be conditionally added based on registry config
+      # Image pull secrets for ACR
       imagePullSecrets:
       - name: acr-credentials
       
@@ -34,8 +33,9 @@ spec:
           
       containers:
       - name: slack-api-server
-        # Keep current ACR image as it's already working in UAE deployment
-        image: healthidpuaeacr.azurecr.io/slack-api-server:amd64
+        # Using v1.2.0 AMD64 build with all Pattern fixes
+        image: healthidpuaeacr.azurecr.io/slack-api-server:v1.2.0
+        imagePullPolicy: Always
         ports:
         - containerPort: 8080
           protocol: TCP

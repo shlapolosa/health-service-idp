@@ -16,7 +16,7 @@ spec:
     - template:
         name: slack-api-webhook-trigger
         http:
-          url: http://slack-api-server.default.svc.cluster.local:8080/oam/webhook
+          url: http://slack-api-server.default.svc.cluster.local/oam/webhook
           method: POST
           headers:
             Content-Type: application/json

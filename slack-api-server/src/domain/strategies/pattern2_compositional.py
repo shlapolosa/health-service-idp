@@ -3,6 +3,7 @@
 from typing import Dict, Any
 import json
 import logging
+import os
 
 from .base import PatternHandler, ComponentPattern, HandlerContext, HandlerResult
 
@@ -95,6 +96,14 @@ class Pattern2CompositionalHandler(PatternHandler):
                 language = properties.get("language", "python")
                 framework = properties.get("framework", "fastapi")
             
+            # Get registry configuration from environment or use defaults
+            registry_type = os.getenv("REGISTRY_TYPE", "dockerhub").lower()
+            if registry_type == "acr":
+                docker_registry = "healthidpuaeacr.azurecr.io"
+            else:
+                # Default to Docker Hub
+                docker_registry = "docker.io/socrates12345"
+            
             # Map OAM properties to workflow parameters
             params = {
                 # Tier 1: Universal Parameters
@@ -104,7 +113,7 @@ class Pattern2CompositionalHandler(PatternHandler):
                 "user": "oam-webhook",
                 "description": f"OAM-driven {component_type} from {context.oam_application_name}",
                 "github-org": context.github_owner or "shlapolosa",
-                "docker-registry": "docker.io/socrates12345",
+                "docker-registry": docker_registry,
                 "slack-channel": "#oam-deployments",
                 "slack-user-id": "OAM",
                 
@@ -261,11 +270,40 @@ class Pattern2CompositionalHandler(PatternHandler):
         properties = component.get("properties", {})
         config = self.COMPOSITIONAL_TYPES[component_type]
         
-        # Base parameters for all compositional services
+        # Determine if this is OAM-driven
+        is_oam_driven = bool(context.app_container)
+        
+        # Get registry configuration
+        registry_type = os.getenv("REGISTRY_TYPE", "dockerhub").lower()
+        if registry_type == "acr":
+            docker_registry = "healthidpuaeacr.azurecr.io"
+        else:
+            docker_registry = "docker.io/socrates12345"
+        
+        # Base parameters for all compositional services - using workflow template expected names
         base_params = {
-            "component_type": component_type,
-            "service_name": component_name,
+            # Core parameters matching workflow template
+            "resource-name": component_name,  # Changed from service_name
+            "resource-type": "microservice",
             "namespace": context.namespace,
+            "user": "oam-webhook" if is_oam_driven else "api-user",
+            "description": f"{'OAM-driven' if is_oam_driven else 'API-driven'} {component_type} service",
+            
+            # GitHub and repository parameters
+            "github-org": context.github_owner or "shlapolosa",
+            "docker-registry": docker_registry,
+            "repository-name": context.app_container if is_oam_driven else component_name,
+            
+            # Bootstrap source
+            "bootstrap-source": "oam-driven" if is_oam_driven else "api-driven",
+            
+            # Environment
+            "environment-tier": "development",
+            "target-vcluster": context.vcluster or "",
+            
+            # Backward compatibility parameters
+            "component_type": component_type,
+            "service_name": component_name,  # Keep for compatibility
             "vcluster": context.vcluster,
             "github_owner": context.github_owner,
             "app_container": context.app_container or "new"

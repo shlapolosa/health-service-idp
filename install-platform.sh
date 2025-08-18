@@ -40,7 +40,7 @@ verify_context() {
     CURRENT_CONTEXT=$(kubectl config current-context)
     echo "Current kubectl context: $CURRENT_CONTEXT"
     
-    if [[ ! "$CURRENT_CONTEXT" == *"aks"* ]] && [[ ! "$CURRENT_CONTEXT" == *"health-idp"* ]]; then
+    if [[ ! "$CURRENT_CONTEXT" == *"aks"* ]] && [[ ! "$CURRENT_CONTEXT" == *"health-idp"* ]] && [[ ! "$CURRENT_CONTEXT" == *"internal-developer-platform"* ]]; then
         print_warning "Not on AKS context. Please switch with:"
         echo "kubectl config use-context <your-aks-context>"
         exit 1
@@ -192,11 +192,12 @@ install_crossplane() {
     helm repo add crossplane-stable https://charts.crossplane.io/stable
     helm repo update
     
-    # Install Crossplane
+    # Install Crossplane v1.17.2 (required for compatibility with current compositions)
     helm install crossplane \
       --namespace crossplane-system \
       --create-namespace \
       crossplane-stable/crossplane \
+      --version 1.17.2 \
       --wait
     
     print_status "Crossplane installed"
@@ -402,7 +403,41 @@ install_argo_templates() {
     fi
 }
 
-# 14. Configure Provider RBAC
+# 14. Install Kubernetes Provider
+install_kubernetes_provider() {
+    echo ""
+    echo "=========================================="
+    echo "Installing Crossplane Kubernetes Provider..."
+    echo "=========================================="
+    
+    # Install provider
+    kubectl apply -f - <<EOF
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-kubernetes
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v0.14.1
+EOF
+    
+    # Wait for provider to be installed
+    sleep 10
+    
+    # Configure provider
+    kubectl apply -f - <<EOF
+apiVersion: kubernetes.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: kubernetes-provider
+spec:
+  credentials:
+    source: InjectedIdentity
+EOF
+    
+    print_status "Provider Kubernetes installed"
+}
+
+# 15. Configure Provider RBAC
 configure_provider_rbac() {
     echo ""
     echo "=========================================="
@@ -436,11 +471,11 @@ EOF
     print_status "Provider Kubernetes RBAC configured"
 }
 
-# 15. Install GitHub Provider
-install_github_provider() {
+# 16. Install AWS Provider
+install_aws_provider() {
     echo ""
     echo "=========================================="
-    echo "Installing Crossplane GitHub Provider..."
+    echo "Installing Crossplane AWS Provider..."
     echo "=========================================="
     
     # Install provider
@@ -448,41 +483,132 @@ install_github_provider() {
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
-  name: provider-github
+  name: provider-aws
 spec:
-  package: xpkg.upbound.io/crossplane-contrib/provider-github:v0.13.0
+  package: xpkg.upbound.io/crossplane-contrib/provider-aws:v0.43.0
+EOF
+    
+    print_status "Provider AWS installed"
+}
+
+# 17. Install Helm Provider
+install_helm_provider() {
+    echo ""
+    echo "=========================================="
+    echo "Installing Crossplane Helm Provider..."
+    echo "=========================================="
+    
+    # Install provider
+    kubectl apply -f - <<EOF
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-helm
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/provider-helm:v0.16.0
+EOF
+    
+    # Configure provider
+    kubectl apply -f - <<EOF
+apiVersion: helm.crossplane.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: default
+spec:
+  credentials:
+    source: InjectedIdentity
+EOF
+    
+    print_status "Provider Helm installed"
+}
+
+# 18. Install GitHub Provider
+install_github_provider() {
+    echo ""
+    echo "=========================================="
+    echo "Installing Crossplane GitHub Provider (Upjet)..."
+    echo "=========================================="
+    
+    # Install provider
+    kubectl apply -f - <<EOF
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-upjet-github
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/provider-upjet-github:v0.18.0
 EOF
     
     # Wait for provider to be healthy
-    kubectl wait --for=condition=Healthy provider/provider-github --timeout=300s || print_warning "Provider might not be healthy"
+    kubectl wait --for=condition=Healthy provider/provider-upjet-github --timeout=300s || print_warning "Provider might not be healthy"
     
     # Create ProviderConfig
-    if [ -n "$GITHUB_TOKEN" ]; then
-        kubectl create secret generic github-credentials \
-          --from-literal=token="$GITHUB_TOKEN" \
+    if [ -n "$PERSONAL_ACCESS_TOKEN" ] && [ -n "$GITHUB_USERNAME" ]; then
+        # Create secret in the format expected by upjet provider
+        cat <<EOF | kubectl create secret generic github-provider-secret \
           -n crossplane-system \
+          --from-file=credentials=/dev/stdin \
           --dry-run=client -o yaml | kubectl apply -f -
+{
+  "token": "$PERSONAL_ACCESS_TOKEN",
+  "owner": "$GITHUB_USERNAME"
+}
+EOF
         
         kubectl apply -f - <<EOF
-apiVersion: github.crossplane.io/v1alpha1
+apiVersion: github.upbound.io/v1beta1
 kind: ProviderConfig
 metadata:
-  name: github-provider-config
+  name: default
 spec:
   credentials:
     source: Secret
     secretRef:
-      name: github-credentials
+      name: github-provider-secret
       namespace: crossplane-system
-      key: token
+      key: credentials
 EOF
-        print_status "GitHub Provider configured"
+        
+        # Create additional ProviderConfig with name "github-provider" for compatibility
+        kubectl apply -f - <<EOF
+apiVersion: github.upbound.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: github-provider
+spec:
+  credentials:
+    source: Secret
+    secretRef:
+      name: github-provider-secret
+      namespace: crossplane-system
+      key: credentials
+EOF
+        print_status "GitHub Provider configured (both default and github-provider)"
     else
-        print_warning "GITHUB_TOKEN not found in .env, skipping GitHub provider config"
+        print_warning "PERSONAL_ACCESS_TOKEN or GITHUB_USERNAME not found in .env, skipping GitHub provider config"
     fi
 }
 
-# 16. Setup Secrets
+# 19. Setup Service Accounts
+setup_service_accounts() {
+    echo ""
+    echo "=========================================="
+    echo "Setting up Service Accounts..."
+    echo "=========================================="
+    
+    # Create service account for GitHub provider jobs
+    kubectl create serviceaccount crossplane-github-provider -n default --dry-run=client -o yaml | kubectl apply -f -
+    print_status "Created crossplane-github-provider service account in default namespace"
+    
+    # Grant necessary permissions
+    kubectl create clusterrolebinding crossplane-github-provider-admin \
+      --clusterrole=cluster-admin \
+      --serviceaccount=default:crossplane-github-provider \
+      --dry-run=client -o yaml | kubectl apply -f -
+    print_status "Granted cluster-admin permissions to crossplane-github-provider"
+}
+
+# 20. Setup Secrets
 setup_secrets() {
     echo ""
     echo "=========================================="
@@ -618,8 +744,12 @@ main() {
     install_clustergateway_crds
     install_istio_resources
     install_argo_templates
+    install_kubernetes_provider
     configure_provider_rbac
+    install_aws_provider
+    install_helm_provider
     install_github_provider
+    setup_service_accounts
     setup_secrets
     deploy_slack_api
     

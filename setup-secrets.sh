@@ -105,6 +105,37 @@ else
     echo "⚠️  Argo token not found in argo namespace - workflow triggers may fail"
 fi
 
+# Create Azure service principal credentials for GitHub Actions
+echo "🔧 Creating Azure service principal credentials..."
+if [ -n "$AZURE_CLIENT_ID" ] && [ -n "$AZURE_CLIENT_SECRET" ] && [ -n "$AZURE_SUBSCRIPTION_ID" ] && [ -n "$AZURE_TENANT_ID" ]; then
+    cat <<AZURE_EOF | kubectl apply -f -
+apiVersion: v1
+kind: Secret
+metadata:
+  name: azure-credentials
+  namespace: default
+  labels:
+    managed-by: manual
+  annotations:
+    argocd.argoproj.io/compare: "false"
+    argocd.argoproj.io/sync: "false"
+type: Opaque
+stringData:
+  azure-creds.json: |
+    {
+      "clientId": "${AZURE_CLIENT_ID}",
+      "clientSecret": "${AZURE_CLIENT_SECRET}",
+      "subscriptionId": "${AZURE_SUBSCRIPTION_ID}",
+      "tenantId": "${AZURE_TENANT_ID}"
+    }
+AZURE_EOF
+    echo "✅ Azure service principal credentials created"
+else
+    echo "⚠️  Azure service principal variables not set. Skipping Azure credentials creation."
+    echo "   To enable Azure integration, add to .env:"
+    echo "   AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID, AZURE_TENANT_ID"
+fi
+
 echo "🎉 All secrets created successfully from .env file!"
 echo ""
 echo "📋 Created resources:"
@@ -117,5 +148,6 @@ echo "  - slack-credentials (signing-secret)"
 echo "  - slack-webhook (webhook-url) in argo namespace"
 echo "  - lenses-credentials (license-key, accept-eula, hq-user, hq-password, db-username, db-password)"
 echo "  - env-agent-keys ConfigMap (namespace-specific agent keys)"
+echo "  - azure-credentials (if configured - for GitHub Actions Azure login)"
 echo ""
 echo "⚠️  Remember: .env file is git-ignored for security"

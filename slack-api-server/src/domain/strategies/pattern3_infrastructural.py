@@ -48,9 +48,14 @@ class Pattern3InfrastructuralHandler(PatternHandler):
         elif component_type in self.INFRASTRUCTURE_TYPES:
             return "pattern3-infrastructure-workflow"
         elif component_type == "realtime-platform":
-            return "realtime-platform-workflow"  # Existing workflow
+            # realtime-platform creates infrastructure via OAM ComponentDefinition
+            # The ComponentDefinition creates RealtimePlatformClaim which Crossplane processes
+            # No separate workflow needed - OAM handles the infrastructure provisioning
+            return None
         elif component_type == "camunda-orchestrator":
-            return "orchestration-workflow"  # Existing workflow
+            # camunda-orchestrator also uses OAM ComponentDefinition for infrastructure
+            # No separate workflow needed
+            return None
         else:
             raise ValueError(f"Unknown infrastructural component type: {component_type}")
     
@@ -125,6 +130,9 @@ class Pattern3InfrastructuralHandler(PatternHandler):
         component_name = component.get("name")
         properties = component.get("properties", {})
         
+        # Determine if this is OAM-driven
+        is_oam_driven = bool(context.app_container)
+        
         # Provider systems parameters
         if component_type in self.PROVIDER_TYPES:
             credentials = properties.get("credentials", {})
@@ -138,6 +146,13 @@ class Pattern3InfrastructuralHandler(PatternHandler):
                     encoded_credentials[key] = base64.b64encode(json.dumps(value).encode()).decode()
             
             return {
+                # Use standard parameter names
+                "resource-name": component_name,
+                "resource-type": "provider",
+                "bootstrap-source": "oam-driven" if is_oam_driven else "api-driven",
+                "repository-name": context.app_container if is_oam_driven else component_name,
+                
+                # Provider-specific parameters
                 "provider_type": component_type,
                 "secret_name": f"{component_name}-secret",
                 "credentials": json.dumps(encoded_credentials),
@@ -162,6 +177,13 @@ class Pattern3InfrastructuralHandler(PatternHandler):
             }
             
             return {
+                # Use standard parameter names
+                "resource-name": component_name,
+                "resource-type": "infrastructure",
+                "bootstrap-source": "oam-driven" if is_oam_driven else "api-driven",
+                "repository-name": context.app_container if is_oam_driven else component_name,
+                
+                # Infrastructure-specific parameters
                 "infrastructure_type": component_type,
                 "claim_name": f"{component_name}-{component_type}",
                 "size": size,
@@ -177,6 +199,13 @@ class Pattern3InfrastructuralHandler(PatternHandler):
         # Platform services parameters
         elif component_type == "realtime-platform":
             return {
+                # Use standard parameter names
+                "resource-name": component_name,
+                "resource-type": "platform",
+                "bootstrap-source": "oam-driven" if is_oam_driven else "api-driven",
+                "repository-name": context.app_container if is_oam_driven else component_name,
+                
+                # Platform-specific parameters
                 "name": component_name,
                 "namespace": context.namespace,
                 "vcluster": context.vcluster,
@@ -187,6 +216,13 @@ class Pattern3InfrastructuralHandler(PatternHandler):
         
         elif component_type == "camunda-orchestrator":
             return {
+                # Use standard parameter names
+                "resource-name": component_name,
+                "resource-type": "orchestrator",
+                "bootstrap-source": "oam-driven" if is_oam_driven else "api-driven",
+                "repository-name": context.app_container if is_oam_driven else component_name,
+                
+                # Orchestrator-specific parameters
                 "orchestrator_name": component_name,
                 "namespace": context.namespace,
                 "vcluster": context.vcluster,

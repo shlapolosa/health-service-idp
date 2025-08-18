@@ -1,24 +1,9 @@
-# Consolidated OAM ComponentDefinitions
-# Following Architecture Principles:
-# 1. Single component declaration creates everything needed
-# 2. ComponentDefinition-only (no Claims for basic components)
-# 3. Embedded workflows for complex orchestration
-# 4. KubeVela orchestrates, Crossplane executes
-#
-# Component Types:
-# - webservice: Standard microservices with optional infrastructure
-# - graphql-gateway: Auto-discovering GraphQL API aggregation with Hasura
-# - realtime-platform: Complete streaming infrastructure with Kafka/MQTT
-# - rasa-chatbot: Dual-container chatbot with Rasa + Actions
-# - kafka/redis/mongodb: Direct infrastructure components via Helm
-# - application-infrastructure: Complex application setup via Claims
-# - vcluster: Virtual Kubernetes environments
-# - neon-postgres/auth0-idp: External service integrations
-# - clickhouse: Analytics database for time-series data
+# Core OAM Component Definitions
+# This file contains only the components that don't have standalone files
+# Components included: webservice, kafka, redis, mongodb, application-infrastructure, vcluster, neon-postgres, clickhouse
 
 ---
-# Enhanced WebService ComponentDefinition with Parameter Transformation
-# Works with webservice WorkloadDefinition for Knative Service rendering
+# Enhanced webservice ComponentDefinition with automatic infrastructure bootstrap
 apiVersion: core.oam.dev/v1beta1
 kind: ComponentDefinition
 metadata:
@@ -379,6 +364,10 @@ spec:
           enableGraphQLFederation?: bool  // Mark service for GraphQL federation
           openApiPath?: string           // Custom OpenAPI spec path (e.g., "/api/v1/openapi.json")
           apiVersion?: string            // API version for GraphQL federation (e.g., "v1", "v2")
+          
+          // Optional database and cache settings
+          database?: string
+          cache?: string
         }
 
 ---
@@ -388,12 +377,13 @@ kind: ComponentDefinition
 metadata:
   name: kafka
   annotations:
-    definition.oam.dev/description: "Apache Kafka event streaming platform via Crossplane Helm provider"
+    definition.oam.dev/description: "Native Kafka deployment via Helm (Strimzi) with Crossplane-managed lifecycle"
 spec:
   workload:
     definition:
       apiVersion: helm.crossplane.io/v1beta1
       kind: Release
+    type: releases.helm.crossplane.io
   schematic:
     cue:
       template: |
@@ -401,80 +391,43 @@ spec:
           apiVersion: "helm.crossplane.io/v1beta1"
           kind: "Release"
           metadata: {
-            name: parameter.name + "-kafka"
-            namespace: context.namespace
-            // Multi-cluster deployment support
-            if parameter.targetEnvironment != _|_ {
-              annotations: {
-                "app.oam.dev/cluster": parameter.targetEnvironment
-              }
-            }
+            name: context.name
+            namespace: "crossplane-system"
           }
           spec: {
             forProvider: {
               chart: {
-                name: "kafka"
-                repository: "https://charts.bitnami.com/bitnami"
-                version: "26.8.5"
+                name: "strimzi-kafka-operator"
+                repository: "https://strimzi.io/charts/"
+                version: "0.35.0"
               }
               namespace: context.namespace
-              skipCreateNamespace: false
               values: {
-                replicaCount: parameter.replicas
-                persistence: {
-                  enabled: true
-                  size: parameter.storage
-                }
-                service: {
-                  type: "ClusterIP"
-                }
-                auth: {
-                  clientProtocol: "plaintext"
-                  interBrokerProtocol: "plaintext"
-                }
-                metrics: {
-                  kafka: {
-                    enabled: true
+                kafka: {
+                  replicas: parameter.replicas
+                  storage: {
+                    size: parameter.storageSize
                   }
-                  jmx: {
-                    enabled: true
+                  config: {
+                    "offsets.topic.replication.factor": parameter.replicas
+                    "transaction.state.log.replication.factor": parameter.replicas
+                    "transaction.state.log.min.isr": 2
                   }
                 }
-                if parameter.zookeeper.enabled {
-                  zookeeper: {
-                    enabled: true
-                    replicaCount: parameter.zookeeper.replicas
-                    persistence: {
-                      enabled: true
-                      size: parameter.zookeeper.storage
-                    }
+                zookeeper: {
+                  replicas: 3
+                  storage: {
+                    size: "10Gi"
                   }
                 }
               }
-            }
-            providerConfigRef: {
-              name: "default"
             }
           }
         }
         
         parameter: {
-          // Required
-          name: string
-          
-          // Optional
           replicas: *3 | int
-          storage: *"10Gi" | string
-          zookeeper: *{
-            enabled: true
-            replicas: 3
-            storage: "8Gi"
-          } | {
-            enabled: bool
-            replicas?: int
-            storage?: string
-          }
-          targetEnvironment?: string  // vCluster deployment target
+          storageSize: *"100Gi" | string
         }
 
 ---
@@ -484,12 +437,13 @@ kind: ComponentDefinition
 metadata:
   name: redis
   annotations:
-    definition.oam.dev/description: "Redis in-memory data store via Crossplane Helm provider"
+    definition.oam.dev/description: "Native Redis deployment via Helm with Crossplane-managed lifecycle"
 spec:
   workload:
     definition:
       apiVersion: helm.crossplane.io/v1beta1
       kind: Release
+    type: releases.helm.crossplane.io
   schematic:
     cue:
       template: |
@@ -497,100 +451,52 @@ spec:
           apiVersion: "helm.crossplane.io/v1beta1"
           kind: "Release"
           metadata: {
-            name: parameter.name + "-redis"
-            namespace: context.namespace
-            // Multi-cluster deployment support
-            if parameter.targetEnvironment != _|_ {
-              annotations: {
-                "app.oam.dev/cluster": parameter.targetEnvironment
-              }
-            }
+            name: context.name
+            namespace: "crossplane-system"
           }
           spec: {
             forProvider: {
               chart: {
                 name: "redis"
                 repository: "https://charts.bitnami.com/bitnami"
-                version: "18.19.4"
+                version: "17.11.3"
               }
               namespace: context.namespace
-              skipCreateNamespace: false
               values: {
-                architecture: parameter.architecture
                 auth: {
-                  enabled: parameter.auth.enabled
-                  if parameter.auth.enabled {
-                    password: parameter.auth.password
-                  }
+                  enabled: parameter.authEnabled
+                  password: parameter.password
                 }
+                architecture: parameter.architecture
                 master: {
                   persistence: {
-                    enabled: true
-                    size: parameter.storage
-                  }
-                  resources: {
-                    requests: {
-                      cpu: parameter.resources.cpu
-                      memory: parameter.resources.memory
-                    }
-                    limits: {
-                      cpu: parameter.resources.cpu
-                      memory: parameter.resources.memory
-                    }
+                    enabled: parameter.persistenceEnabled
+                    size: parameter.storageSize
                   }
                 }
-                if parameter.architecture == "replication" {
-                  replica: {
-                    replicaCount: parameter.replicas
-                    persistence: {
-                      enabled: true
-                      size: parameter.storage
-                    }
-                    resources: {
-                      requests: {
-                        cpu: parameter.resources.cpu
-                        memory: parameter.resources.memory
-                      }
-                      limits: {
-                        cpu: parameter.resources.cpu
-                        memory: parameter.resources.memory
-                      }
-                    }
+                replica: {
+                  replicaCount: parameter.replicaCount
+                  persistence: {
+                    enabled: parameter.persistenceEnabled
+                    size: parameter.storageSize
                   }
                 }
                 metrics: {
-                  enabled: false
+                  enabled: parameter.metricsEnabled
                 }
               }
-            }
-            providerConfigRef: {
-              name: "default"
             }
           }
         }
         
         parameter: {
-          // Required
-          name: string
-          
-          // Optional
-          architecture: *"standalone" | "replication"
-          replicas: *2 | int
-          storage: *"8Gi" | string
-          auth: *{
-            enabled: false
-          } | {
-            enabled: bool
-            password?: string
-          }
-          resources: *{
-            cpu: "100m"
-            memory: "128Mi"
-          } | {
-            cpu: string
-            memory: string
-          }
-          targetEnvironment?: string  // vCluster deployment target
+          authEnabled: *true | bool
+          password: *"redis-password" | string
+          architecture: *"replication" | "standalone" | "replication" | "sentinel"
+          persistenceEnabled: *true | bool
+          storageSize: *"8Gi" | string
+          replicaCount: *2 | int
+          metricsEnabled: *true | bool
         }
 
 ---
@@ -600,12 +506,13 @@ kind: ComponentDefinition
 metadata:
   name: mongodb
   annotations:
-    definition.oam.dev/description: "MongoDB document database via Crossplane Helm provider"
+    definition.oam.dev/description: "Native MongoDB deployment via Helm with Crossplane-managed lifecycle"
 spec:
   workload:
     definition:
       apiVersion: helm.crossplane.io/v1beta1
       kind: Release
+    type: releases.helm.crossplane.io
   schematic:
     cue:
       template: |
@@ -613,110 +520,66 @@ spec:
           apiVersion: "helm.crossplane.io/v1beta1"
           kind: "Release"
           metadata: {
-            name: parameter.name + "-mongodb"
-            namespace: context.namespace
-            // Multi-cluster deployment support
-            if parameter.targetEnvironment != _|_ {
-              annotations: {
-                "app.oam.dev/cluster": parameter.targetEnvironment
-              }
-            }
+            name: context.name
+            namespace: "crossplane-system"
           }
           spec: {
             forProvider: {
               chart: {
                 name: "mongodb"
                 repository: "https://charts.bitnami.com/bitnami"
-                version: "15.6.13"
+                version: "13.15.1"
               }
               namespace: context.namespace
-              skipCreateNamespace: false
               values: {
-                architecture: parameter.architecture
                 auth: {
-                  enabled: parameter.auth.enabled
-                  if parameter.auth.enabled {
-                    rootPassword: parameter.auth.rootPassword
-                    username: parameter.auth.username
-                    password: parameter.auth.password
-                    database: parameter.auth.database
-                  }
+                  enabled: parameter.authEnabled
+                  rootPassword: parameter.rootPassword
+                  database: parameter.database
+                  username: parameter.username
+                  password: parameter.password
                 }
+                architecture: parameter.architecture
+                replicaCount: parameter.replicaCount
                 persistence: {
-                  enabled: true
-                  size: parameter.storage
-                }
-                resources: {
-                  requests: {
-                    cpu: parameter.resources.cpu
-                    memory: parameter.resources.memory
-                  }
-                  limits: {
-                    cpu: parameter.resources.cpu
-                    memory: parameter.resources.memory
-                  }
-                }
-                if parameter.architecture == "replicaset" {
-                  replicaCount: parameter.replicas
-                  replicaSetName: parameter.name + "-rs"
+                  enabled: parameter.persistenceEnabled
+                  size: parameter.storageSize
                 }
                 metrics: {
-                  enabled: false
+                  enabled: parameter.metricsEnabled
                 }
               }
-            }
-            providerConfigRef: {
-              name: "default"
             }
           }
         }
         
         parameter: {
-          // Required
-          name: string
-          
-          // Optional
-          architecture: *"standalone" | "replicaset"
-          replicas: *3 | int
-          storage: *"8Gi" | string
-          auth: *{
-            enabled: true
-            rootPassword: "mongopass"
-            username: "mongodb"
-            password: "mongodb"
-            database: "mydb"
-          } | {
-            enabled: bool
-            rootPassword?: string
-            username?: string
-            password?: string
-            database?: string
-          }
-          resources: *{
-            cpu: "500m"
-            memory: "512Mi"
-          } | {
-            cpu: string
-            memory: string
-          }
-          targetEnvironment?: string  // vCluster deployment target
+          authEnabled: *true | bool
+          rootPassword: *"mongodb-root" | string
+          database: *"mydb" | string
+          username: *"user" | string
+          password: *"password" | string
+          architecture: *"replicaset" | "standalone" | "replicaset"
+          replicaCount: *3 | int
+          persistenceEnabled: *true | bool
+          storageSize: *"20Gi" | string
+          metricsEnabled: *true | bool
         }
 
 ---
-# Infrastructure Components (Create Crossplane Claims for complex infrastructure)
-
-# Application Infrastructure Component (for complex setups)
+# Application Infrastructure ComponentDefinition (Crossplane-based)
 apiVersion: core.oam.dev/v1beta1
 kind: ComponentDefinition
 metadata:
   name: application-infrastructure
   annotations:
-    definition.oam.dev/description: "Complete application infrastructure including repos, databases, caches, and secrets. Use when you need the full ApplicationClaim workflow."
+    definition.oam.dev/description: "Comprehensive application infrastructure with networking, storage, and compute resources"
 spec:
   workload:
     definition:
       apiVersion: platform.example.org/v1alpha1
       kind: ApplicationClaim
+    type: applicationclaims.platform.example.org
   schematic:
     cue:
       template: |
@@ -724,254 +587,63 @@ spec:
           apiVersion: "platform.example.org/v1alpha1"
           kind: "ApplicationClaim"
           metadata: {
-            name: parameter.name + "-infra"
+            name: context.name
             namespace: context.namespace
           }
           spec: {
-            name: parameter.name
-            language: parameter.language
-            framework: parameter.framework
-            if parameter.database != _|_ {
-              database: parameter.database
-            }
-            if parameter.cache != _|_ {
-              cache: parameter.cache
-            }
-            if parameter.generateRepo != _|_ {
-              generateRepo: parameter.generateRepo
-            }
-            resources: {
-              cpu: parameter.resources.cpu
-              memory: parameter.resources.memory
-            }
+            appName: context.name
+            appType: parameter.appType
             environment: parameter.environment
+            resources: {
+              compute: {
+                cpu: parameter.compute.cpu
+                memory: parameter.compute.memory
+                replicas: parameter.compute.replicas
+              }
+              storage: {
+                size: parameter.storage.size
+                class: parameter.storage.class
+              }
+              networking: {
+                ingress: parameter.networking.ingress
+                tls: parameter.networking.tls
+              }
+            }
           }
         }
         
         parameter: {
-          // Required
-          name: string
-          language: "python" | "java" | "javascript" | "go"
-          framework: string
-          
-          // Optional
-          database?: "postgres" | "mysql" | "mongodb"
-          cache?: "redis" | "memcached"
-          generateRepo: *false | bool
-          environment: *{} | {...}
-          resources: *{
-            cpu: "500m"
-            memory: "512Mi"
-          } | {
-            cpu?: string
-            memory?: string
+          appType: *"microservice" | "microservice" | "monolith" | "batch"
+          environment: *"development" | "development" | "staging" | "production"
+          compute: {
+            cpu: *"500m" | string
+            memory: *"1Gi" | string
+            replicas: *2 | int
+          }
+          storage: {
+            size: *"10Gi" | string
+            class: *"standard" | string
+          }
+          networking: {
+            ingress: *true | bool
+            tls: *false | bool
           }
         }
 
-
 ---
-# VCluster Component (creates virtual Kubernetes environments)
+# vCluster ComponentDefinition (Crossplane-managed)
 apiVersion: core.oam.dev/v1beta1
 kind: ComponentDefinition
 metadata:
   name: vcluster
   annotations:
-    definition.oam.dev/description: "Virtual Kubernetes cluster with optional components via Crossplane"
-spec:
-  workload:
-    definition:
-      apiVersion: platform.example.org/v1alpha1
-      kind: VClusterEnvironmentClaim
-  schematic:
-    cue:
-      template: |
-        output: {
-          apiVersion: "platform.example.org/v1alpha1"
-          kind: "VClusterEnvironmentClaim"
-          metadata: {
-            name: parameter.name
-            namespace: context.namespace
-          }
-          spec: {
-            name: parameter.name
-            if parameter.domain != _|_ {
-              domain: parameter.domain
-            }
-            components: {
-              istio: parameter.istio
-              knativeServing: parameter.knativeServing
-              argoCD: parameter.argoCD
-              if parameter.observability {
-                grafana: true
-                prometheus: true
-                jaeger: true
-                kiali: true
-              }
-              if parameter.apiGateway {
-                apiGateway: true
-              }
-            }
-          }
-        }
-        
-        parameter: {
-          // Required
-          name: string
-          
-          // Optional
-          domain?: string
-          istio: *true | bool
-          knativeServing: *true | bool
-          argoCD: *true | bool
-          observability: *true | bool
-          apiGateway: *false | bool
-        }
-
----
-# External Integration Components
-
-# Neon Postgres Component (managed database via Secret reference)
-apiVersion: core.oam.dev/v1beta1
-kind: ComponentDefinition
-metadata:
-  name: neon-postgres
-  annotations:
-    definition.oam.dev/description: "Neon PostgreSQL managed database credentials via Secret reference"
-spec:
-  workload:
-    definition:
-      apiVersion: v1
-      kind: Secret
-  schematic:
-    cue:
-      template: |
-        output: {
-          apiVersion: "v1"
-          kind: "Secret"
-          metadata: {
-            name: parameter.name + "-db-credentials" 
-            namespace: context.namespace
-            annotations: {
-              // Multi-cluster deployment support
-              if parameter.targetEnvironment != _|_ {
-                "app.oam.dev/cluster": parameter.targetEnvironment
-              }
-              "neon-postgres.oam.dev/source-secret": "neon-postgres-credentials"
-              "neon-postgres.oam.dev/component-scoped": "true"
-            }
-          }
-          type: "Opaque"
-          stringData: {
-            PGDATABASE: parameter.database
-            // Component references host secret via external mechanism
-            DB_REF: "host-cluster"
-          }
-        }
-        
-        parameter: {
-          // Required
-          name: string
-          
-          // Optional
-          database: *"postgres" | string
-          targetEnvironment?: string  // vCluster deployment target
-        }
-
----
-# Auth0 Identity Provider Component
-apiVersion: core.oam.dev/v1beta1
-kind: ComponentDefinition
-metadata:
-  name: auth0-idp
-  annotations:
-    definition.oam.dev/description: "Auth0 identity provider integration via External Secrets"
-spec:
-  workload:
-    definition:
-      apiVersion: external-secrets.io/v1
-      kind: ExternalSecret
-  schematic:
-    cue:
-      template: |
-        output: {
-          apiVersion: "external-secrets.io/v1"
-          kind: "ExternalSecret"
-          metadata: {
-            name: parameter.name + "-auth0-credentials"
-            namespace: context.namespace
-            // Multi-cluster deployment support
-            if parameter.targetEnvironment != _|_ {
-              annotations: {
-                "app.oam.dev/cluster": parameter.targetEnvironment
-              }
-            }
-          }
-          spec: {
-            refreshInterval: "1h"
-            secretStoreRef: {
-              kind: "ClusterSecretStore"
-              name: "aws-secretsmanager"
-            }
-            target: {
-              name: parameter.name + "-auth0-credentials"
-              creationPolicy: "Owner"
-            }
-            data: [
-              {
-                secretKey: "clientId"
-                remoteRef: {
-                  key: "auth0/credentials"
-                  property: "clientId"
-                }
-              },
-              {
-                secretKey: "clientSecret"
-                remoteRef: {
-                  key: "auth0/credentials"
-                  property: "clientSecret"
-                }
-              },
-              {
-                secretKey: "domain"
-                remoteRef: {
-                  key: "auth0/credentials"
-                  property: "domain"
-                }
-              },
-              {
-                secretKey: "audience"
-                remoteRef: {
-                  key: "auth0/credentials"  
-                  property: "audience"
-                }
-              }
-            ]
-          }
-        }
-        
-        parameter: {
-          // Required
-          name: string
-          
-          // Optional
-          targetEnvironment?: string  // vCluster deployment target
-        }
-
----
-# ClickHouse Analytics Database ComponentDefinition
-# Optimized for healthcare analytics and time-series data
-# Supports OLAP queries for demand forecasting and reporting
-apiVersion: core.oam.dev/v1beta1
-kind: ComponentDefinition
-metadata:
-  name: clickhouse
-  annotations:
-    definition.oam.dev/description: "ClickHouse analytical database for time-series data and OLAP queries with healthcare compliance"
+    definition.oam.dev/description: "Virtual Kubernetes cluster for multi-tenancy and isolation"
 spec:
   workload:
     definition:
       apiVersion: helm.crossplane.io/v1beta1
       kind: Release
+    type: releases.helm.crossplane.io
   schematic:
     cue:
       template: |
@@ -979,178 +651,271 @@ spec:
           apiVersion: "helm.crossplane.io/v1beta1"
           kind: "Release"
           metadata: {
-            name: parameter.name + "-clickhouse"
-            namespace: context.namespace
-            labels: {
-              "app.kubernetes.io/name": parameter.name + "-clickhouse"
-              "app.kubernetes.io/component": "analytics-database"
-              "app.kubernetes.io/managed-by": "kubevela"
-            }
-            // Multi-cluster deployment support
-            if parameter.targetEnvironment != _|_ {
-              annotations: {
-                "app.oam.dev/cluster": parameter.targetEnvironment
-              }
-            }
+            name: context.name
+            namespace: "crossplane-system"
           }
           spec: {
             forProvider: {
               chart: {
-                name: "clickhouse"
-                repository: "https://charts.bitnami.com/bitnami"
-                version: "4.1.15"
+                name: "vcluster"
+                repository: "https://charts.loft.sh"
+                version: "0.15.0"
               }
               namespace: context.namespace
-              skipCreateNamespace: false
               values: {
-                architecture: parameter.architecture
-                auth: {
-                  username: parameter.auth.username
-                  password: parameter.auth.password
-                  database: parameter.auth.database
+                vcluster: {
+                  image: parameter.image
                 }
-                persistence: {
-                  enabled: true
-                  size: parameter.storage
-                  storageClass: parameter.storageClass
+                syncer: {
+                  extraArgs: parameter.syncerArgs
                 }
-                resources: {
-                  requests: {
-                    cpu: parameter.resources.cpu
-                    memory: parameter.resources.memory
+                isolation: {
+                  enabled: parameter.isolationEnabled
+                }
+                rbac: {
+                  clusterRole: {
+                    create: true
                   }
-                  limits: {
-                    cpu: parameter.resources.cpu
-                    memory: parameter.resources.memory
-                  }
-                }
-                if parameter.architecture == "replication" {
-                  replicaCount: parameter.replicas
-                  shards: parameter.shards
                 }
                 service: {
-                  type: "ClusterIP"
-                  ports: {
-                    http: 8123
-                    tcp: 9000
-                    mysql: 9004
-                    postgresql: 9005
-                  }
-                }
-                configuration: {
-                  // Healthcare-specific optimizations
-                  maxMemoryUsage: "8000000000"  // 8GB for analytics queries
-                  maxBytesBeforeExternalGroupBy: "2000000000"  // 2GB
-                  maxBytesBeforeExternalSort: "2000000000"     // 2GB
-                  httpPort: 8123
-                  tcpPort: 9000
-                  // Timezone for South African operations
-                  timezone: "Africa/Johannesburg"
-                  // Custom settings for healthcare compliance
-                  queryLogRetentionTime: "7776000"  // 90 days for audit compliance
-                  partLogRetentionTime: "7776000"   // 90 days
-                  // Performance optimizations for stock analytics
-                  backgroundPoolSize: 16
-                  backgroundSchedulePoolSize: 16
-                  maxConcurrentQueries: 100
-                  maxConnections: 1000
-                }
-                metrics: {
-                  enabled: true
-                  serviceMonitor: {
-                    enabled: true
-                  }
-                }
-                // Healthcare data encryption
-                tls: {
-                  enabled: parameter.security.tlsEnabled
-                  if parameter.security.tlsEnabled {
-                    certificatesSecret: parameter.security.certificateSecret
-                  }
-                }
-                // Backup configuration for compliance
-                backup: {
-                  enabled: parameter.backup.enabled
-                  if parameter.backup.enabled {
-                    schedule: parameter.backup.schedule
-                    retention: parameter.backup.retentionDays
-                  }
-                }
-                // Network policies for healthcare security
-                networkPolicy: {
-                  enabled: parameter.security.networkPolicyEnabled
-                  if parameter.security.networkPolicyEnabled {
-                    allowExternal: false
-                    ingressRules: {
-                      accessOnlyFrom: {
-                        enabled: true
-                        namespaceSelector: {
-                          "healthcare.org/access": "analytics"
-                        }
-                      }
-                    }
-                  }
+                  type: parameter.serviceType
                 }
               }
-            }
-            providerConfigRef: {
-              name: "default"
             }
           }
         }
         
         parameter: {
-          // Required
-          name: string
-          
-          // Database configuration
-          auth: *{
-            username: "clickhouse"
-            password: "secure-clickhouse-password"
-            database: "healthcare_analytics"
-          } | {
-            username: string
-            password: string
-            database: string
-          }
-          
-          // Infrastructure configuration
-          architecture: *"standalone" | "replication"
-          replicas: *1 | int
-          shards: *1 | int
-          storage: *"20Gi" | string
-          storageClass: *"gp2" | string
-          
-          // Resource allocation
-          resources: *{
-            cpu: "2000m"
-            memory: "4Gi"
-          } | {
-            cpu: string
-            memory: string
-          }
-          
-          // Security configuration
-          security: *{
-            tlsEnabled: true
-            networkPolicyEnabled: true
-            certificateSecret: "clickhouse-tls-cert"
-          } | {
-            tlsEnabled: bool
-            networkPolicyEnabled?: bool
-            certificateSecret?: string
-          }
-          
-          // Backup configuration for healthcare compliance
-          backup: *{
-            enabled: true
-            schedule: "0 2 * * *"  // Daily at 2 AM
-            retentionDays: 2555    // 7 years for healthcare compliance
-          } | {
-            enabled: bool
-            schedule?: string
-            retentionDays?: int
-          }
-          targetEnvironment?: string  // vCluster deployment target
+          image: *"rancher/k3s:v1.27.1-k3s1" | string
+          syncerArgs: *[] | [...string]
+          isolationEnabled: *true | bool
+          serviceType: *"ClusterIP" | "ClusterIP" | "LoadBalancer" | "NodePort"
         }
 
+---
+# Neon Postgres ComponentDefinition (Cloud-native serverless PostgreSQL)
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: neon-postgres
+  annotations:
+    definition.oam.dev/description: "Neon serverless PostgreSQL database with automatic scaling and branching"
+spec:
+  workload:
+    definition:
+      apiVersion: v1
+      kind: Secret
+    type: secrets
+  schematic:
+    cue:
+      template: |
+        import "encoding/base64"
+        
+        output: {
+          apiVersion: "v1"
+          kind: "Secret"
+          metadata: {
+            name: context.name + "-neon-credentials"
+            namespace: context.namespace
+            labels: {
+              "app.kubernetes.io/name": context.name
+              "app.kubernetes.io/component": "database"
+              "app.kubernetes.io/managed-by": "kubevela"
+              "database.type": "neon-postgres"
+            }
+          }
+          type: "Opaque"
+          data: {
+            // These would be populated by an operator or controller
+            "database-url": base64.Encode(null, "postgresql://user:pass@ep-xyz.neon.tech/dbname")
+            "host": base64.Encode(null, "ep-xyz.neon.tech")
+            "port": base64.Encode(null, "5432")
+            "database": base64.Encode(null, parameter.database)
+            "username": base64.Encode(null, parameter.username)
+            "password": base64.Encode(null, "generated-password")
+          }
+        }
+        
+        outputs: {
+          // Create External Secret to sync Neon credentials
+          "external-secret": {
+            apiVersion: "external-secrets.io/v1beta1"
+            kind: "ExternalSecret"
+            metadata: {
+              name: context.name + "-neon-sync"
+              namespace: context.namespace
+            }
+            spec: {
+              secretStoreRef: {
+                name: "neon-secret-store"
+                kind: "SecretStore"
+              }
+              target: {
+                name: context.name + "-neon-credentials"
+                creationPolicy: "Merge"
+              }
+              data: [
+                {
+                  secretKey: "database-url"
+                  remoteRef: {
+                    key: context.name
+                    property: "database-url"
+                  }
+                }
+              ]
+            }
+          }
+          
+          // ConfigMap for non-sensitive configuration
+          "config": {
+            apiVersion: "v1"
+            kind: "ConfigMap"
+            metadata: {
+              name: context.name + "-neon-config"
+              namespace: context.namespace
+            }
+            data: {
+              "database": parameter.database
+              "region": parameter.region
+              "compute-size": parameter.computeSize
+              "autoscaling": "\\(parameter.autoscaling)"
+              "branch": parameter.branch
+            }
+          }
+        }
+        
+        parameter: {
+          database: *"myapp" | string
+          username: *"app_user" | string
+          region: *"us-west-2" | string
+          computeSize: *"0.25" | "0.25" | "0.5" | "1" | "2" | "4" | "8"
+          autoscaling: *true | bool
+          branch: *"main" | string
+          poolerEnabled: *true | bool
+          suspendTimeout: *300 | int  // Seconds of inactivity before suspend
+        }
+
+---
+# ClickHouse ComponentDefinition (Analytics database)
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: clickhouse
+  annotations:
+    definition.oam.dev/description: "ClickHouse columnar database for real-time analytics"
+spec:
+  workload:
+    definition:
+      apiVersion: apps/v1
+      kind: StatefulSet
+    type: statefulsets.apps
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "apps/v1"
+          kind: "StatefulSet"
+          metadata: {
+            name: context.name
+            namespace: context.namespace
+          }
+          spec: {
+            serviceName: context.name
+            replicas: parameter.replicas
+            selector: {
+              matchLabels: {
+                app: context.name
+              }
+            }
+            template: {
+              metadata: {
+                labels: {
+                  app: context.name
+                }
+              }
+              spec: {
+                containers: [{
+                  name: "clickhouse"
+                  image: "clickhouse/clickhouse-server:" + parameter.version
+                  ports: [{
+                    containerPort: 8123
+                    name: "http"
+                  }, {
+                    containerPort: 9000
+                    name: "native"
+                  }]
+                  volumeMounts: [{
+                    name: "data"
+                    mountPath: "/var/lib/clickhouse"
+                  }]
+                  resources: {
+                    limits: {
+                      cpu: parameter.resources.cpu
+                      memory: parameter.resources.memory
+                    }
+                    requests: {
+                      cpu: "500m"
+                      memory: "1Gi"
+                    }
+                  }
+                  env: [
+                    {
+                      name: "CLICKHOUSE_DB"
+                      value: parameter.database
+                    }
+                  ]
+                }]
+              }
+            }
+            volumeClaimTemplates: [{
+              metadata: {
+                name: "data"
+              }
+              spec: {
+                accessModes: ["ReadWriteOnce"]
+                resources: {
+                  requests: {
+                    storage: parameter.storageSize
+                  }
+                }
+              }
+            }]
+          }
+        }
+        
+        outputs: {
+          "service": {
+            apiVersion: "v1"
+            kind: "Service"
+            metadata: {
+              name: context.name
+              namespace: context.namespace
+            }
+            spec: {
+              type: "ClusterIP"
+              ports: [{
+                port: 8123
+                targetPort: 8123
+                name: "http"
+              }, {
+                port: 9000
+                targetPort: 9000
+                name: "native"
+              }]
+              selector: {
+                app: context.name
+              }
+            }
+          }
+        }
+        
+        parameter: {
+          version: *"23.5" | string
+          replicas: *1 | int
+          database: *"default" | string
+          storageSize: *"100Gi" | string
+          resources: {
+            cpu: *"2" | string
+            memory: *"4Gi" | string
+          }
+        }
