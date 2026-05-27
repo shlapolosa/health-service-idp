@@ -26,6 +26,8 @@ spec:
               name: placeholder
               namespace: default
             spec:
+              ttlSecondsAfterFinished: 600
+              backoffLimit: 2
               template:
                 metadata:
                   annotations:
@@ -286,6 +288,8 @@ spec:
               name: placeholder
               namespace: default
             spec:
+              ttlSecondsAfterFinished: 600
+              backoffLimit: 2
               template:
                 metadata:
                   annotations:
@@ -437,6 +441,8 @@ spec:
               name: placeholder
               namespace: default
             spec:
+              ttlSecondsAfterFinished: 600
+              backoffLimit: 2
               template:
                 metadata:
                   annotations:
@@ -465,12 +471,12 @@ spec:
                       
                       # Install ArgoCD CLI
                       echo "📦 Installing ArgoCD CLI..."
-                      curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+                      curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/download/v2.13.0/argocd-linux-amd64
                       chmod +x /usr/local/bin/argocd
                       
                       # Install vcluster CLI
                       echo "📦 Installing vCluster CLI..."
-                      curl -L -o /usr/local/bin/vcluster https://github.com/loft-sh/vcluster/releases/latest/download/vcluster-linux-amd64
+                      curl -L -o /usr/local/bin/vcluster https://github.com/loft-sh/vcluster/releases/download/v0.19.5/vcluster-linux-amd64
                       chmod +x /usr/local/bin/vcluster
                       
                       # Wait for vCluster to be ready
@@ -579,6 +585,8 @@ spec:
               name: placeholder
               namespace: default
             spec:
+              ttlSecondsAfterFinished: 600
+              backoffLimit: 2
               template:
                 metadata:
                   annotations:
@@ -997,6 +1005,8 @@ spec:
               name: placeholder
               namespace: default
             spec:
+              ttlSecondsAfterFinished: 600
+              backoffLimit: 2
               template:
                 metadata:
                   annotations:
@@ -1178,6 +1188,8 @@ spec:
               name: placeholder
               namespace: default
             spec:
+              ttlSecondsAfterFinished: 600
+              backoffLimit: 2
               template:
                 metadata:
                   annotations:
@@ -1302,6 +1314,8 @@ spec:
               name: placeholder
               namespace: default
             spec:
+              ttlSecondsAfterFinished: 600
+              backoffLimit: 2
               template:
                 metadata:
                   annotations:

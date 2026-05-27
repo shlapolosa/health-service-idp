@@ -170,7 +170,7 @@ class AppContainerRequest:
     enable_observability: bool = True
     enable_security: bool = True
     vcluster_name: Optional[str] = None
-    auto_create_vcluster: bool = True
+    auto_create_vcluster: bool = False  # 3-tier: default=host; dedicated vcluster is opt-in
     original_text: Optional[str] = None
     created_at: datetime = None
 
@@ -258,7 +258,7 @@ class MicroserviceRequest:
     enable_observability: bool = True
     enable_security: bool = True
     target_vcluster: Optional[str] = None
-    auto_create_vcluster: bool = True
+    auto_create_vcluster: bool = False  # 3-tier: default=host; dedicated vcluster is opt-in
     repository: Optional[str] = None
     original_text: Optional[str] = None
     created_at: datetime = None
@@ -316,7 +316,7 @@ class MicroserviceRequest:
             "docker-registry": self.docker_registry,
             "observability": str(self.enable_observability).lower(),
             "security": str(self.enable_security).lower(),
-            "target-vcluster": self.target_vcluster or "",
+            "target-vcluster": self.get_vcluster_name(),  # 3-tier: "host" | "<team>" | "<repo>-vcluster"
             "auto-create-vcluster": str(self.auto_create_vcluster).lower(),
             "repository-name": self.repository or "",
             "user": self.user,
@@ -332,12 +332,17 @@ class MicroserviceRequest:
         return self.name
 
     def get_vcluster_name(self) -> str:
-        """Get the vCluster name for the microservice."""
+        """Resolve the vCluster target — 3-tier isolation:
+        - explicit target_vcluster   -> shared/team vCluster (created if missing)
+        - auto_create_vcluster=True   -> dedicated "<repo>-vcluster"
+        - otherwise (DEFAULT)         -> "host" (deploy to host cluster, no vCluster)
+        The composition treats VCLUSTER_TARGET=="host" as host deployment (no topology policy).
+        """
         if self.target_vcluster:
             return self.target_vcluster
-        # Create vCluster name from repository name
-        repo_name = self.get_repository_name()
-        return f"{repo_name}-vcluster"
+        if self.auto_create_vcluster:
+            return f"{self.get_repository_name()}-vcluster"
+        return "host"
 
 
 @dataclass
@@ -361,7 +366,7 @@ class ParsedCommand:
     enable_observability: bool = True
     enable_security: bool = True
     target_vcluster: Optional[str] = None
-    auto_create_vcluster: bool = True
+    auto_create_vcluster: bool = False  # 3-tier: default=host; dedicated vcluster is opt-in
     # Microservice specific fields
     microservice_language: MicroserviceLanguage = MicroserviceLanguage.PYTHON
     microservice_database: MicroserviceDatabase = MicroserviceDatabase.NONE

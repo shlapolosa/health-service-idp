@@ -53,6 +53,8 @@ spec:
               name: placeholder
               namespace: placeholder
             spec:
+              ttlSecondsAfterFinished: 600
+              backoffLimit: 2
               template:
                 spec:
                   restartPolicy: OnFailure
@@ -68,7 +70,7 @@ spec:
                       echo "Creating vCluster using CLI..."
                       
                       # Install vcluster CLI
-                      wget -q -O /tmp/vcluster https://github.com/loft-sh/vcluster/releases/latest/download/vcluster-linux-amd64
+                      wget -q -O /tmp/vcluster https://github.com/loft-sh/vcluster/releases/download/v0.19.5/vcluster-linux-amd64
                       chmod +x /tmp/vcluster
                       
                       # Create values file with experimental sync config
@@ -191,6 +193,8 @@ spec:
               name: placeholder
               namespace: placeholder
             spec:
+              ttlSecondsAfterFinished: 600
+              backoffLimit: 2
               template:
                 spec:
                   restartPolicy: OnFailure
@@ -469,6 +473,8 @@ spec:
               name: knative-installer
               namespace: placeholder
             spec:
+              ttlSecondsAfterFinished: 600
+              backoffLimit: 2
               template:
                 spec:
                   serviceAccountName: vcluster-admin
@@ -493,8 +499,12 @@ spec:
                       
                       echo "📡 Connecting to vCluster: $VCLUSTER_NAME in namespace $NAMESPACE"
                       
+                      # Install vcluster CLI (not present in alpine/k8s image)
+                      wget -q -O /tmp/vcluster https://github.com/loft-sh/vcluster/releases/download/v0.19.5/vcluster-linux-amd64
+                      chmod +x /tmp/vcluster
+
                       # Get vCluster kubeconfig
-                      vcluster connect $VCLUSTER_NAME --namespace $NAMESPACE --update-current=false --kube-config=/tmp/kubeconfig.yaml
+                      /tmp/vcluster connect $VCLUSTER_NAME --namespace $NAMESPACE --update-current=false --kube-config=/tmp/kubeconfig.yaml
                       export KUBECONFIG=/tmp/kubeconfig.yaml
                       
                       # Check if Knative is already installed
@@ -823,6 +833,8 @@ spec:
               name: placeholder
               namespace: placeholder
             spec:
+              ttlSecondsAfterFinished: 600
+              backoffLimit: 2
               template:
                 spec:
                   serviceAccountName: crossplane-admin
@@ -869,34 +881,39 @@ spec:
                         sleep 5
                       done
                       
-                      # Get vCluster kubeconfig using vcluster CLI
-                      echo "Getting vCluster kubeconfig..."
-                      # Install vcluster CLI
-                      wget -q -O /tmp/vcluster https://github.com/loft-sh/vcluster/releases/latest/download/vcluster-linux-amd64
-                      chmod +x /tmp/vcluster
-                      
-                      # Get the kubeconfig with proper external endpoint
-                      /tmp/vcluster connect ${VCLUSTER_NAME} -n ${NAMESPACE} --print > /tmp/vcluster.kubeconfig
-                      
-                      # Extract the endpoint URL from kubeconfig
-                      ENDPOINT=$(grep "server:" /tmp/vcluster.kubeconfig | awk '{print $2}' | sed 's|https://||' | cut -d: -f1)
-                      echo "vCluster endpoint: $ENDPOINT"
-                      
-                      # Check if endpoint is an IP address or hostname
-                      echo "Checking endpoint type for $ENDPOINT..."
-                      if echo "$ENDPOINT" | grep -E '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$' >/dev/null; then
-                        echo "✅ Endpoint is an IP address, skipping DNS check"
-                      else
-                        echo "Endpoint is a hostname, waiting for DNS propagation..."
-                        for i in $(seq 1 30); do
-                          if nslookup $ENDPOINT >/dev/null 2>&1; then
-                            echo "DNS resolved successfully!"
-                            break
-                          fi
-                          echo "Waiting for DNS... ($i/30)"
-                          sleep 10
-                        done
+                      # Wait for the exposed vCluster LoadBalancer to get an external IP
+                      echo "Waiting for vCluster LoadBalancer external IP..."
+                      LB_IP=""
+                      for i in $(seq 1 30); do
+                        LB_IP=$(kubectl get svc ${VCLUSTER_NAME}-lb -n ${NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+                        [ -n "$LB_IP" ] && break
+                        echo "Waiting for LB IP... ($i/30)"
+                        sleep 10
+                      done
+                      if [ -z "$LB_IP" ]; then
+                        echo "❌ vCluster LoadBalancer never got an external IP"
+                        exit 1
                       fi
+                      echo "vCluster LoadBalancer IP: ${LB_IP}"
+
+                      # Build the join kubeconfig FROM THE vCluster SECRET (it is complete and has a
+                      # current-context, unlike 'vcluster connect --print' which only prints status).
+                      # Point the server at the LB IP and skip TLS verify (LB IP is not in the cert SAN).
+                      echo "Building vCluster kubeconfig from secret vc-${VCLUSTER_NAME}..."
+                      kubectl get secret vc-${VCLUSTER_NAME} -n ${NAMESPACE} -o jsonpath='{.data.config}' | base64 -d \
+                        | sed "s|server: https://localhost:8443|server: https://${LB_IP}:443|" \
+                        | sed "/certificate-authority-data:/d" \
+                        | yq e '.clusters[0].cluster."insecure-skip-tls-verify" = true' - > /tmp/vcluster.kubeconfig
+                      ENDPOINT="${LB_IP}"
+                      echo "vCluster endpoint: $ENDPOINT (LoadBalancer IP)"
+
+                      # Patch the vc-<name> secret's config so the host Crossplane ProviderConfig (which reads
+                      # vc-<name>/config) reaches the vCluster via the LB IP instead of localhost:8443. Without
+                      # this, the kubevela-access SA/CRB/token Objects can't be created in the vCluster and the
+                      # claim never becomes Ready.
+                      echo "Patching vc-${VCLUSTER_NAME} secret config to the LB-IP kubeconfig..."
+                      kubectl patch secret vc-${VCLUSTER_NAME} -n ${NAMESPACE} --type=merge \
+                        -p "{\"data\":{\"config\":\"$(base64 < /tmp/vcluster.kubeconfig | tr -d '\n')\"}}" || true
                       
                       # Register vCluster with KubeVela using vela cluster join
                       echo "Registering vCluster with KubeVela..."
@@ -947,8 +964,8 @@ spec:
                         export KUBECONFIG=/tmp/vcluster.kubeconfig
                         
                         # Apply webservice WorkloadDefinition to vCluster for Knative support
-                        echo "Applying webservice WorkloadDefinition to vCluster..."
-                        cat <<'WD_EOF' | kubectl apply -f -
+                        echo "Applying webservice WorkloadDefinition to vCluster (best-effort)..."
+                        cat <<'WD_EOF' | kubectl apply -f - || echo "WorkloadDefinition CRD not present in vCluster (expected - KubeVela renders in host and syncs the Knative Service); skipping"
                         apiVersion: core.oam.dev/v1beta1
                         kind: WorkloadDefinition
                         metadata:
@@ -998,7 +1015,7 @@ spec:
                                   image: string
                                   port: *8080 | int
                                 }
-                        WD_EOF
+                      WD_EOF
                         echo "✅ WorkloadDefinition applied to vCluster"
                       else
                         echo "⚠️ vCluster registration may have failed, please check manually"

@@ -93,4 +93,4 @@ setup-*.sh
 
 # Task files
 tasks.json
-tasks/ 
+tasks/ graphify-out/

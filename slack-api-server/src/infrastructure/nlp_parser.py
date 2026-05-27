@@ -346,7 +346,7 @@ class EnhancedNLPParser(CommandParserInterface):
             enable_observability=parsed.get("enable_observability", True),
             enable_security=parsed.get("enable_security", True),
             target_vcluster=parsed.get("target_vcluster"),
-            auto_create_vcluster=parsed.get("auto_create_vcluster", True),
+            auto_create_vcluster=parsed.get("auto_create_vcluster", False),
             parsing_method=parsed["parsing_method"],
         )
 
@@ -367,7 +367,7 @@ class EnhancedNLPParser(CommandParserInterface):
             "enable_observability": True,
             "enable_security": True,
             "target_vcluster": None,
-            "auto_create_vcluster": True,
+            "auto_create_vcluster": False,
         }
 
         # Process spaCy matches
@@ -436,7 +436,7 @@ class EnhancedNLPParser(CommandParserInterface):
             "enable_observability": True,
             "enable_security": True,
             "target_vcluster": None,
-            "auto_create_vcluster": True,
+            "auto_create_vcluster": False,
         }
         
         # Extract AppContainer name - look for various patterns
@@ -492,7 +492,7 @@ class EnhancedNLPParser(CommandParserInterface):
         # Check for auto-create disable flags
         if any(phrase in text for phrase in ["no-vcluster", "no-cluster", "disable-auto-create"]):
             extracted["auto_create_vcluster"] = False
-        elif "auto-create" in text:
+        elif any(p in text for p in ["dedicated", "isolated", "separate-cluster", "own-cluster", "auto-create"]):
             extracted["auto_create_vcluster"] = True
         
         # Extract observability setting
@@ -530,7 +530,7 @@ class EnhancedNLPParser(CommandParserInterface):
             enable_observability=parsed.get("enable_observability", True),
             enable_security=parsed.get("enable_security", True),
             target_vcluster=parsed.get("target_vcluster"),
-            auto_create_vcluster=parsed.get("auto_create_vcluster", True),
+            auto_create_vcluster=parsed.get("auto_create_vcluster", False),
             repository=parsed.get("repository"),
             microservice_language=parsed.get("microservice_language", MicroserviceLanguage.PYTHON),
             microservice_database=parsed.get("microservice_database", MicroserviceDatabase.NONE),
@@ -556,7 +556,7 @@ class EnhancedNLPParser(CommandParserInterface):
             "enable_observability": True,
             "enable_security": True,
             "target_vcluster": None,
-            "auto_create_vcluster": True,
+            "auto_create_vcluster": False,
             "repository": None,
             "microservice_language": MicroserviceLanguage.PYTHON,
             "microservice_database": MicroserviceDatabase.NONE,
@@ -658,7 +658,7 @@ class EnhancedNLPParser(CommandParserInterface):
             "enable_observability": True,
             "enable_security": True,
             "target_vcluster": None,
-            "auto_create_vcluster": True,
+            "auto_create_vcluster": False,
             "repository": None,
             "microservice_language": MicroserviceLanguage.PYTHON,
             "microservice_database": MicroserviceDatabase.NONE,
@@ -720,7 +720,7 @@ class EnhancedNLPParser(CommandParserInterface):
         # Check for auto-create disable flags
         if any(phrase in text for phrase in ["no-vcluster", "no-cluster", "disable-auto-create"]):
             extracted["auto_create_vcluster"] = False
-        elif "auto-create" in text:
+        elif any(p in text for p in ["dedicated", "isolated", "separate-cluster", "own-cluster", "auto-create"]):
             extracted["auto_create_vcluster"] = True
         
         # Extract language

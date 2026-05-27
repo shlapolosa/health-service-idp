@@ -119,6 +119,8 @@ spec:
               name: placeholder
               namespace: default
             spec:
+              ttlSecondsAfterFinished: 600
+              backoffLimit: 2
               template:
                 spec:
                   serviceAccountName: crossplane-github-provider
@@ -623,13 +625,15 @@ spec:
               name: placeholder
               namespace: default
             spec:
+              ttlSecondsAfterFinished: 600
+              backoffLimit: 2
               template:
                 spec:
                   serviceAccountName: crossplane-github-provider
                   restartPolicy: OnFailure
                   containers:
                   - name: gitops-repo-setup
-                    image: alpine/git:latest
+                    image: alpine/git:2.43.0
                     command:
                     - /bin/sh
                     - -c
@@ -1280,6 +1284,8 @@ spec:
               name: placeholder-secrets-setup
               namespace: default
             spec:
+              ttlSecondsAfterFinished: 600
+              backoffLimit: 2
               template:
                 spec:
                   restartPolicy: Never

@@ -56,7 +56,7 @@ check_prerequisites() {
     fi
     
     # Load environment variables
-    export $(grep -E "^(PERSONAL_ACCESS_TOKEN|GITHUB_USERNAME|DOCKER_USERNAME|SLACK_SIGNING_SECRET|GITHUB_TOKEN)=" .env | xargs)
+    export $(grep -E "^(PERSONAL_ACCESS_TOKEN|GITHUB_USERNAME|DOCKER_USERNAME|DOCKER_PASSWORD|SLACK_SIGNING_SECRET|GITHUB_TOKEN)=" .env | xargs)
     
     # Check required tools
     command -v kubectl >/dev/null 2>&1 || { print_error "kubectl is required but not installed."; exit 1; }
@@ -620,7 +620,7 @@ setup_secrets() {
         kubectl create secret docker-registry regcred \
           --docker-server=docker.io \
           --docker-username="$DOCKER_USERNAME" \
-          --docker-password="$PERSONAL_ACCESS_TOKEN" \
+          --docker-password="$DOCKER_PASSWORD" \
           --docker-email="${DOCKER_USERNAME}@users.noreply.github.com" \
           --dry-run=client -o yaml | kubectl apply -f -
         print_status "Docker registry secret created"

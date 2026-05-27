@@ -3157,4 +3157,41 @@ spec:
               key: redis-url
 ```
 
+---
+
+## ADR-036: vCluster Provisioning — Bug-Chain Fixes & Resource Trade-offs (2026-05-27)
+
+**Status**: Fixes applied; resource-model improvements recommended.
+**Full detail**: see [`docs/VCLUSTER-PROVISIONING-AUDIT.md`](docs/VCLUSTER-PROVISIONING-AUDIT.md).
+
+**Context**: The Slack `/microservice` → running-Knative-in-vCluster flow was non-functional —
+every project ended `workflowFailed`. An end-to-end trace found a **7-bug chain**, all in
+`crossplane/vcluster-environment-claim-composition.yaml`, the most important being the vCluster CLI
+pulled from `releases/latest` (now v0.20, which rejects the v0.19 `experimental.genericSync` values
+schema). A second, identical unfixed copy existed in `application-claim-composition.yaml:473`.
+
+**Decisions made**:
+- **Pin the vCluster CLI to v0.19.5** at all download sites (the values schema is version-coupled;
+  `latest` is non-reproducible and broke on an upstream major release). Same lesson applies to the
+  13 remaining `:latest`/`releases/latest` references — pin them.
+- **Build the vCluster join-kubeconfig from the `vc-<name>` secret** (repoint server→LB-IP, add
+  `insecure-skip-tls-verify`), NOT from `vcluster connect --print` (which emits status text, not a
+  kubeconfig, and produces unterminated/context-less output).
+- **Host KubeVela manages the vCluster via the ClusterGateway** (`vela cluster join` stores a stable
+  LB-IP credential in `vela-system`); the vCluster runs Knative only, not KubeVela. The OAM app must
+  be (re)run *after* registration (`deploy-to-vcluster` topology fails if it runs first).
+
+**Trade-offs / known costs (recommended follow-ups)**:
+- `auto_create_vcluster=True` (default) provisions a **full vCluster + full Knative stack per
+  microservice** (~+20 permanent pods each). This is the dominant resource cost; consider shared
+  vClusters or opt-in auto-create.
+- **No Job `ttlSecondsAfterFinished`** (0/17 jobs) and default `backoffLimit=6` → completed/failed
+  job pods leak. Add TTL (~600s) and `backoffLimit: 2`.
+- The vCluster syncer reverts the patched `vc-<name>` secret, so the Crossplane ProviderConfig path
+  (and the claim `Ready` flag) stays flaky; deployment works via the ClusterGateway regardless.
+  Clean fix: point the ProviderConfig at a separate, non-synced secret.
+- No teardown flow exists; orphans accumulate. Use `cleanup-noncore-resources.sh` (delete OAM apps
+  FIRST — they regenerate Crossplane claims — then claims, ArgoCD apps, vcluster registration secrets,
+  namespaces).
+
 This decision establishes OAM as the primary driver for all application-level infrastructure while maintaining Crossplane's role in platform-level resource management, following the proven Knative pattern of host-cluster platform services.

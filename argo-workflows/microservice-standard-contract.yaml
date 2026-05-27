@@ -253,7 +253,9 @@ spec:
             value: "{{inputs.parameters.slack-channel}}"
           - name: slack-user-id
             value: "{{inputs.parameters.slack-user-id}}"
-        when: "{{steps.ensure-repositories.status}} == Succeeded"
+        # 3-tier: skip vCluster creation for the host tier (target-vcluster == "host").
+        # Shared ("<team>") and dedicated ("<svc>-vcluster") tiers still create/ensure the vCluster.
+        when: "{{steps.ensure-repositories.status}} == Succeeded && '{{inputs.parameters.target-vcluster}}' != 'host'"
         continueOn:
           failed: false
     - - name: create-microservice-claim
