@@ -103,3 +103,7 @@ spec:
           capabilities:
             drop:
             - ALL
+  # Always route 100% to the latest revision (avoids stale pinned-revision RevisionMissing)
+  traffic:
+  - latestRevision: true
+    percent: 100
