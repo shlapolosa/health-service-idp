@@ -3194,4 +3194,40 @@ schema). A second, identical unfixed copy existed in `application-claim-composit
   FIRST — they regenerate Crossplane claims — then claims, ArgoCD apps, vcluster registration secrets,
   namespaces).
 
+## ADR-037: Image-Build & ACR-Pull Credential Lifecycle for Generated Repos (2026-05-27)
+
+**Context.** A `/microservice` submission generates a source repo whose CI ("Comprehensive
+GitOps Pipeline") must build the container image and push it to ACR, after which the Knative
+service (host or vCluster) pulls and runs it. Both halves silently failed, so provisioned
+services never started (`RevisionMissing` / `ContainerMissing`).
+
+**Two distinct credential gaps (both fixed):**
+
+1. **Build/push (Azure AD service principal).** The generated repo's CI authenticates to Azure
+   via `azure/login` + the `AZURE_CREDENTIALS` GitHub secret, which the app-container composition
+   (`app-container-claim-composition.yaml`) seeds by reading the cluster secret
+   `default/azure-credentials`. That secret held a **deleted** SP (`AADSTS700016`), so `azure/login`
+   failed and — because GitHub implicitly wraps a custom `if:` with `success()` — `az acr login`
+   and `Build and push` were **skipped**, never failed. No image was produced.
+   *Root fragility:* `install-platform-complete.sh` minted a NEW SP on every run while the cluster
+   secret kept the old appId → drift.
+   *Decision:* keep the SP scheme (vs migrating to ACR-admin auth, deferred) but make it **durable**:
+   install resolves creds idempotently (`.env` → reuse/rotate existing SP → create-once + record to
+   `.env`); the health check now **probes the token** (not mere existence). The single cluster secret
+   is the source of truth, so fixing it fixes all future repos.
+
+2. **Pull (ACR image pull secret in the vCluster).** The vCluster provisioning copied only
+   `docker-registry-secret` (Docker Hub) into the vCluster; generated images live in ACR. Knative
+   pods run as `knative-docker-sa`, and the OAM webservice component only attaches `acr-credentials`
+   when `registry==acr` (which generated apps don't set) → in-vCluster pulls failed `UNAUTHORIZED`.
+   *Decision:* `register-clustergateway` now copies BOTH `acr-credentials` + `docker-registry-secret`
+   into the vCluster (default + `<name>` ns) and attaches `acr-credentials` to `knative-docker-sa`
+   (and default). This mirrors the HOST cluster, where `knative-docker-sa` already carries
+   `acr-credentials` (so 3-tier host-default deploys were never affected — only vClusters).
+
+**Trade-offs.** The SP secret still expires (2-year rotation) — acceptable given idempotent reseed +
+health-check detection; the permanent ACR-admin-auth migration (no AAD dependency) is deferred.
+Cross-cluster secret copy strips server-side metadata via `sed` rather than re-minting, for
+simplicity. Existing vClusters created before this fix need a one-time manual seed.
+
 This decision establishes OAM as the primary driver for all application-level infrastructure while maintaining Crossplane's role in platform-level resource management, following the proven Knative pattern of host-cluster platform services.
