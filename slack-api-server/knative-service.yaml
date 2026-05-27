@@ -55,6 +55,23 @@ spec:
               optional: true
         - name: ARGO_TOKEN_FILE
           value: "/var/run/secrets/argo/token"
+        # Slack signature verification (must match the installed Slack app's signing secret)
+        - name: SLACK_SIGNING_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: slack-credentials
+              key: signing-secret
+        # GitHub PAT for repository_dispatch / Crossplane provider
+        - name: PERSONAL_ACCESS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: github-credentials
+              key: personal-access-token
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: github-credentials
+              key: personal-access-token
         volumeMounts:
         - name: argo-token
           mountPath: /var/run/secrets/argo
