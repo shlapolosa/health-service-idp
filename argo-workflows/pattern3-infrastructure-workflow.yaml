@@ -129,7 +129,7 @@ spec:
           - name: replicas
           - name: namespace
       container:
-        image: bitnami/kubectl:latest
+        image: alpine/k8s:1.28.4
         command: [sh, -c]
         args:
           - |
@@ -191,7 +191,7 @@ spec:
           - name: claim_name
           - name: namespace
       script:
-        image: bitnami/kubectl:latest
+        image: alpine/k8s:1.28.4
         command: [bash]
         source: |
           #!/bin/bash
@@ -235,7 +235,7 @@ spec:
           - name: namespace
           - name: infrastructure_type
       script:
-        image: bitnami/kubectl:latest
+        image: alpine/k8s:1.28.4
         command: [bash]
         source: |
           #!/bin/bash
@@ -349,7 +349,7 @@ spec:
           - name: claim_name
           - name: namespace
       container:
-        image: bitnami/kubectl:latest
+        image: alpine/k8s:1.28.4
         command: [sh, -c]
         args:
           - |

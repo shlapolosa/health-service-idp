@@ -254,7 +254,7 @@ spec:
         spec:
           containers:
           - name: claim-monitor
-            image: bitnami/kubectl:latest
+            image: alpine/k8s:1.28.4
             command:
             - /bin/bash
             - -c

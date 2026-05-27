@@ -579,7 +579,7 @@ spec:
       - name: bootstrap-source
       - name: microservice-realtime
     script:
-      image: bitnami/kubectl:1.28
+      image: alpine/k8s:1.28.4
       command: [sh]
       source: |
         echo "🏗️ Creating ApplicationClaim with standardized parameters..."
@@ -682,7 +682,7 @@ spec:
       - name: resource-name
       - name: namespace
     script:
-      image: bitnami/kubectl:1.28
+      image: alpine/k8s:1.28.4
       command: [sh]
       source: |
         echo "⏳ Waiting for ApplicationClaim to be ready by Crossplane..."
@@ -767,7 +767,7 @@ spec:
         valueFrom:
           path: /tmp/external-endpoints.txt
     script:
-      image: bitnami/kubectl:1.28
+      image: alpine/k8s:1.28.4
       command: [sh]
       source: |
         echo "🔍 Extracting comprehensive microservice artifacts and endpoints..."
@@ -1077,7 +1077,7 @@ spec:
       - name: slack-channel
       - name: slack-user-id
     script:
-      image: bitnami/kubectl:1.28
+      image: alpine/k8s:1.28.4
       command: [sh]
       source: |
         echo "🏗️ Creating or updating AppContainer for microservice repositories..."
@@ -1132,7 +1132,7 @@ spec:
       - name: slack-channel
       - name: slack-user-id
     script:
-      image: bitnami/kubectl:1.28
+      image: alpine/k8s:1.28.4
       command: [sh]
       source: |
         VCLUSTER_NAME="{{inputs.parameters.target-vcluster}}"

@@ -432,7 +432,7 @@ spec:
       - name: vcluster-name
       - name: namespace
     script:
-      image: bitnami/kubectl:1.28
+      image: alpine/k8s:1.28.4
       command: [sh]
       source: |
         echo "🔍 Validating existing VCluster for AppContainer deployment..."
@@ -451,7 +451,7 @@ spec:
       - name: resource-name
       - name: namespace
     script:
-      image: bitnami/kubectl:1.28
+      image: alpine/k8s:1.28.4
       command: [sh]
       source: |
         echo "⏳ Waiting for AppContainer repositories to be created by Crossplane..."
@@ -506,7 +506,7 @@ spec:
         valueFrom:
           path: /tmp/endpoints.txt
     script:
-      image: bitnami/kubectl:1.28
+      image: alpine/k8s:1.28.4
       command: [sh]
       source: |
         echo "🔍 Extracting AppContainer connection information..."
@@ -558,7 +558,7 @@ spec:
       - name: user
       - name: slack-channel
     script:
-      image: bitnami/kubectl:1.28
+      image: alpine/k8s:1.28.4
       command: [sh]
       source: |
         echo "🏗️ Creating AppContainer claim with standardized parameters..."

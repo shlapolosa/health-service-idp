@@ -103,7 +103,7 @@ spec:
           - name: credentials
           - name: namespace
       container:
-        image: bitnami/kubectl:latest
+        image: alpine/k8s:1.28.4
         command: [sh, -c]
         args:
           - |
@@ -135,7 +135,7 @@ spec:
           - name: secret_name
           - name: namespace
       script:
-        image: bitnami/kubectl:latest
+        image: alpine/k8s:1.28.4
         command: [bash]
         source: |
           #!/bin/bash
@@ -170,7 +170,7 @@ spec:
           - name: namespace
           - name: provider_type
       container:
-        image: bitnami/kubectl:latest
+        image: alpine/k8s:1.28.4
         command: [sh, -c]
         args:
           - |

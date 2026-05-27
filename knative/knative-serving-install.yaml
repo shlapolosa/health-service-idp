@@ -32,7 +32,7 @@ spec:
       restartPolicy: OnFailure
       containers:
       - name: knative-installer
-        image: bitnami/kubectl:latest
+        image: alpine/k8s:1.28.4
         command:
         - /bin/sh
         - -c
@@ -69,7 +69,7 @@ spec:
       restartPolicy: OnFailure
       containers:
       - name: knative-core-installer
-        image: bitnami/kubectl:latest
+        image: alpine/k8s:1.28.4
         command:
         - /bin/sh
         - -c

@@ -1430,7 +1430,7 @@ spec:
                   restartPolicy: OnFailure
                   containers:
                   - name: copy-secret
-                    image: bitnami/kubectl:latest
+                    image: alpine/k8s:1.28.4
                     command:
                     - sh
                     - -c
@@ -1774,7 +1774,7 @@ spec:
                   serviceAccountName: secret-copier
                   containers:
                   - name: kafka-config
-                    image: bitnami/kubectl:latest
+                    image: alpine/k8s:1.28.4
                     command:
                     - sh
                     - -c
@@ -1903,7 +1903,7 @@ spec:
                       serviceAccountName: secret-copier
                       containers:
                       - name: sync-secrets
-                        image: bitnami/kubectl:latest
+                        image: alpine/k8s:1.28.4
                         command:
                         - sh
                         - -c
