@@ -954,13 +954,32 @@ spec:
                         echo "Creating knative-docker-sa service account in default namespace..."
                         kubectl create serviceaccount knative-docker-sa -n default --dry-run=client -o yaml | kubectl apply -f -
                         
-                        # Copy docker registry secret to vCluster default namespace
-                        echo "Copying docker registry secret to vCluster..."
+                        # Copy IMAGE PULL secrets into the vCluster so Knative can pull PRIVATE
+                        # images. Generated microservices push to ACR (healthidpuaeacr.azurecr.io),
+                        # so acr-credentials is REQUIRED. BUG FIXED (ADR-037): previously ONLY the
+                        # Docker Hub docker-registry-secret was copied and acr-credentials was never
+                        # seeded, so ACR pulls failed "UNAUTHORIZED" -> RevisionMissing/ContainerMissing
+                        # and the service never started. Knative pods run as knative-docker-sa, so we
+                        # also attach the pull secret to that SA (and default) -> every revision pulls
+                        # from ACR without needing per-app registry config.
+                        echo "Copying image pull secrets (acr-credentials + docker-registry-secret) into vCluster..."
                         unset KUBECONFIG
-                        kubectl get secret docker-registry-secret -n default -o yaml 2>/dev/null | \
-                          sed 's/namespace: default/namespace: default/' | \
-                          KUBECONFIG=/tmp/vcluster.kubeconfig kubectl apply -f - || \
-                          echo "Note: docker-registry-secret not found in host cluster, skipping"
+                        for PULL_NS in default ${VCLUSTER_NAME}; do
+                          KUBECONFIG=/tmp/vcluster.kubeconfig kubectl create namespace ${PULL_NS} --dry-run=client -o yaml | KUBECONFIG=/tmp/vcluster.kubeconfig kubectl apply -f - 2>/dev/null || true
+                          KUBECONFIG=/tmp/vcluster.kubeconfig kubectl create serviceaccount knative-docker-sa -n ${PULL_NS} --dry-run=client -o yaml | KUBECONFIG=/tmp/vcluster.kubeconfig kubectl apply -f - 2>/dev/null || true
+                          for PULL_SECRET in acr-credentials docker-registry-secret; do
+                            kubectl get secret ${PULL_SECRET} -n default -o yaml 2>/dev/null \
+                              | sed -e '/resourceVersion:/d' -e '/uid:/d' -e '/creationTimestamp:/d' -e '/selfLink:/d' -e '/namespace:/d' \
+                              | KUBECONFIG=/tmp/vcluster.kubeconfig kubectl apply -n ${PULL_NS} -f - >/dev/null 2>&1 \
+                              && echo "  ok ${PULL_SECRET} -> ${PULL_NS}" \
+                              || echo "  note: ${PULL_SECRET} not in host/default; skipped for ${PULL_NS}"
+                          done
+                          for SA in knative-docker-sa default; do
+                            KUBECONFIG=/tmp/vcluster.kubeconfig kubectl patch serviceaccount ${SA} -n ${PULL_NS} \
+                              -p '{"imagePullSecrets":[{"name":"acr-credentials"}]}' 2>/dev/null \
+                              && echo "  ok ${SA}@${PULL_NS} imagePullSecrets=acr-credentials" || true
+                          done
+                        done
                         export KUBECONFIG=/tmp/vcluster.kubeconfig
                         
                         # Apply webservice WorkloadDefinition to vCluster for Knative support
