@@ -277,47 +277,66 @@ setup_secrets() {
         if az account show &>/dev/null; then
             SUBSCRIPTION_ID=$(az account show --query id -o tsv)
             
-            # Create service principal if it doesn't exist
-            print_info "Creating/updating Azure service principal for GitHub Actions..."
-            SP_OUTPUT=$(az ad sp create-for-rbac \
-                --name "health-idp-github-actions" \
-                --role "Contributor" \
-                --scopes "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/health-service-idp-uae-rg" \
-                --sdk-auth 2>/dev/null || echo "")
-            
-            if [ ! -z "$SP_OUTPUT" ]; then
-                # Save Azure credentials to a file
-                echo "$SP_OUTPUT" > /tmp/azure-creds.json
-                
-                # Extract client ID for ACR permissions
-                CLIENT_ID=$(echo "$SP_OUTPUT" | jq -r '.clientId')
-                
-                # Add ACR permissions
-                print_info "Adding ACR permissions to service principal..."
-                az role assignment create \
-                    --assignee "$CLIENT_ID" \
-                    --role "AcrPush" \
-                    --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/health-service-idp-uae-rg/providers/Microsoft.ContainerRegistry/registries/healthidpuaeacr" \
-                    2>/dev/null || true
-                
-                az role assignment create \
-                    --assignee "$CLIENT_ID" \
-                    --role "AcrPull" \
-                    --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/health-service-idp-uae-rg/providers/Microsoft.ContainerRegistry/registries/healthidpuaeacr" \
-                    2>/dev/null || true
-                
-                # Create Kubernetes secret
+            TENANT_ID=$(az account show --query tenantId -o tsv)
+            SP_NAME="health-idp-github-actions"
+            RG="health-service-idp-uae-rg"
+            ACR_NAME="healthidpuaeacr"
+            ACR_SCOPE="/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RG/providers/Microsoft.ContainerRegistry/registries/$ACR_NAME"
+
+            # Durable, idempotent credential resolution. The previous version ran
+            # 'az ad sp create-for-rbac' on EVERY install, minting a NEW service principal
+            # while the cluster secret kept the OLD appId -> the live SP and the seeded
+            # AZURE_CREDENTIALS drifted apart, then the old SP was deleted, silently breaking
+            # ACR push in every generated repo's CI (see ADR-037). Resolution order:
+            #   1) reuse the SP recorded in .env (reproducible, no new SP),
+            #   2) reuse an existing SP of the same name and rotate its secret,
+            #   3) create one only on first install -- then record it to .env.
+            CLIENT_ID=""; CLIENT_SECRET=""
+            if [ -n "$AZURE_CLIENT_ID" ] && [ -n "$AZURE_CLIENT_SECRET" ]; then
+                print_info "Using Azure SP from .env ($AZURE_CLIENT_ID) - no new SP created"
+                CLIENT_ID="$AZURE_CLIENT_ID"; CLIENT_SECRET="$AZURE_CLIENT_SECRET"
+                TENANT_ID="${AZURE_TENANT_ID:-$TENANT_ID}"
+                SUBSCRIPTION_ID="${AZURE_SUBSCRIPTION_ID:-$SUBSCRIPTION_ID}"
+            else
+                EXISTING_APPID=$(az ad sp list --display-name "$SP_NAME" --query "[0].appId" -o tsv 2>/dev/null)
+                if [ -n "$EXISTING_APPID" ]; then
+                    print_info "Reusing existing SP $SP_NAME ($EXISTING_APPID); rotating its secret"
+                    CLIENT_ID="$EXISTING_APPID"
+                    CLIENT_SECRET=$(az ad sp credential reset --id "$EXISTING_APPID" --years 2 --query password -o tsv 2>/dev/null)
+                else
+                    print_info "Creating Azure service principal $SP_NAME"
+                    CREATE=$(az ad sp create-for-rbac --name "$SP_NAME" --role "Contributor" \
+                        --scopes "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RG" -o json 2>/dev/null || echo "")
+                    CLIENT_ID=$(echo "$CREATE" | jq -r '.appId // empty')
+                    CLIENT_SECRET=$(echo "$CREATE" | jq -r '.password // empty')
+                fi
+                # Record to .env so the NEXT install reuses these (path 1) instead of drifting.
+                if [ -n "$CLIENT_ID" ] && [ -n "$CLIENT_SECRET" ] && [ -f .env ] && ! grep -q '^AZURE_CLIENT_ID=' .env; then
+                    { echo ""; echo "# Azure SP for GitHub Actions ACR push (auto-recorded by install)"; \
+                      echo "AZURE_CLIENT_ID=$CLIENT_ID"; echo "AZURE_CLIENT_SECRET=$CLIENT_SECRET"; \
+                      echo "AZURE_SUBSCRIPTION_ID=$SUBSCRIPTION_ID"; echo "AZURE_TENANT_ID=$TENANT_ID"; } >> .env
+                    print_info "Recorded Azure SP creds to .env for reproducible reinstalls"
+                fi
+            fi
+
+            if [ -n "$CLIENT_ID" ] && [ -n "$CLIENT_SECRET" ]; then
+                print_info "Ensuring AcrPush/AcrPull on $SP_NAME..."
+                az role assignment create --assignee "$CLIENT_ID" --role "AcrPush" --scope "$ACR_SCOPE" 2>/dev/null || true
+                az role assignment create --assignee "$CLIENT_ID" --role "AcrPull" --scope "$ACR_SCOPE" 2>/dev/null || true
+
+                # Seed the cluster secret -- the SINGLE source of truth the app-container
+                # composition reads to inject AZURE_CREDENTIALS into EVERY generated repo.
+                printf '{\n  "clientId": "%s",\n  "clientSecret": "%s",\n  "subscriptionId": "%s",\n  "tenantId": "%s"\n}\n' \
+                    "$CLIENT_ID" "$CLIENT_SECRET" "$SUBSCRIPTION_ID" "$TENANT_ID" > /tmp/azure-creds.json
                 kubectl create secret generic azure-credentials \
                     --from-file=azure-creds.json=/tmp/azure-creds.json \
                     -n default \
                     --dry-run=client -o yaml | kubectl apply -f -
-                
-                print_status "Azure credentials created with ACR permissions"
-                
-                # Clean up temp file
                 rm -f /tmp/azure-creds.json
+                print_status "azure-credentials secret seeded (source of truth for all generated repos)"
+                print_info "Validate any time with: ./scripts/infrastructure-health-check-enhanced.sh"
             else
-                print_warning "Could not create Azure service principal - manual setup may be required"
+                print_warning "Could not resolve Azure service principal - manual setup may be required"
             fi
         else
             print_warning "Azure CLI not logged in - skipping Azure credentials setup"

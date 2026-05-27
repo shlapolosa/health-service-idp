@@ -279,6 +279,37 @@ check_resource_with_fix "secret" "github-credentials" "default" "GitHub credenti
 check_resource_with_fix "secret" "github-provider-secret" "crossplane-system" "GitHub provider secret" \
     "$PROJECT_ROOT/setup-secrets.sh" \
     "Run setup-secrets.sh script" || ((HEALTH_ISSUES++))
+
+# Validate the Azure SP credential in default/azure-credentials. This secret is the SINGLE
+# source of truth that the app-container Crossplane composition reads to inject AZURE_CREDENTIALS
+# into EVERY generated repo's GitHub Actions. If the SP is expired/deleted, the repo's
+# 'azure/login' step fails and -- via the implicit success() gate -- 'az acr login' + 'Build and
+# push' are SKIPPED, so NO container image is ever built (see ADR-037). Existence alone is not
+# enough; we test that the credential actually acquires a token.
+log_info "Validating azure-credentials SP (gates ACR image push for every generated repo)..."
+if kubectl get secret azure-credentials -n default &>/dev/null; then
+    if kubectl get secret azure-credentials -n default -o jsonpath='{.data.azure-creds\.json}' 2>/dev/null | base64 -d 2>/dev/null | python3 -c '
+import sys, json, urllib.request, urllib.parse
+try:
+    d = json.load(sys.stdin)
+    data = urllib.parse.urlencode({"client_id": d["clientId"], "client_secret": d["clientSecret"],
+        "scope": "https://management.azure.com/.default", "grant_type": "client_credentials"}).encode()
+    urllib.request.urlopen(urllib.request.Request(
+        "https://login.microsoftonline.com/" + d["tenantId"] + "/oauth2/v2.0/token", data=data), timeout=20)
+    sys.exit(0)
+except Exception:
+    sys.exit(1)
+' 2>/dev/null; then
+        log_success "Azure SP credential (azure-credentials): ✅ valid - ACR push works in generated repos"
+    else
+        log_error "Azure SP credential (azure-credentials): ❌ INVALID/expired/deleted - generated repos CANNOT push images to ACR"
+        log_remediation "Fix: re-seed a valid SP via ./install-platform-complete.sh (uses .env), then re-trigger the repo's CI"
+        HEALTH_ISSUES=$((HEALTH_ISSUES+1))
+    fi
+else
+    log_warning "Azure SP credential (azure-credentials): ⚠️  secret missing - generated repos will skip ACR push"
+    log_remediation "Fix: ./install-platform-complete.sh seeds default/azure-credentials from .env"
+fi
 echo
 
 # 3. Check Service Accounts and RBAC
