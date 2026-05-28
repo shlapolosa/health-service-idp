@@ -1,0 +1,17 @@
+# KB entry — Apache Kafka. Profiled with the quality-attribute vocabulary so scoring is deterministic.
+technology: kafka
+category: messaging
+profile:
+  durability: strong
+  ordering: per-partition
+  readPattern: fan-out
+  footprint: heavy
+  latencyP99Ms: 20
+  throughputClass: very-high
+  scalingModel: horizontal
+  availabilityClass: ha-multizone
+  costClass: high
+version: { current: "3.7", tracked: ">=3.6" }
+upstreamSource: github:apache/kafka   # powers the architect's version/CVE watch (upgrade loop)
+provisioning: operator:strimzi
+maturity: kb                            # kb = productizable; published = in the live catalog

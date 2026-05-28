@@ -1,0 +1,9 @@
+# Capability MCP server — pinned deps. Verify latest with context7 before bumping.
+mcp>=1.9.0                 # MCP Python SDK (FastMCP + Streamable-HTTP transport)
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+requests>=2.32.0
+kubernetes>=29.0.0         # in-cluster ComponentDefinition/ConfigMap reads
+pyyaml>=6.0.2
+pyjwt[crypto]>=2.9.0       # Entra JWT validation middleware
+cryptography>=43.0.0
