@@ -1,0 +1,65 @@
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: kafka
+  annotations:
+    definition.oam.dev/description: "Native Kafka deployment via Helm (Strimzi) with Crossplane-managed lifecycle"
+spec:
+  workload:
+    definition:
+      apiVersion: helm.crossplane.io/v1beta1
+      kind: Release
+    type: releases.helm.crossplane.io
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "helm.crossplane.io/v1beta1"
+          kind: "Release"
+          metadata: {
+            name: context.name
+            namespace: "crossplane-system"
+          }
+          spec: {
+            forProvider: {
+              chart: {
+                name: "strimzi-kafka-operator"
+                repository: "https://strimzi.io/charts/"
+                version: "0.35.0"
+              }
+              namespace: context.namespace
+              values: {
+                kafka: {
+                  replicas: parameter.replicas
+                  storage: {
+                    size: parameter.storageSize
+                  }
+                  config: {
+                    "offsets.topic.replication.factor": parameter.replicationFactor
+                    "transaction.state.log.replication.factor": parameter.replicationFactor
+                    "transaction.state.log.min.isr": parameter.minInSyncReplicas
+                    "default.replication.factor": parameter.replicationFactor
+                    "min.insync.replicas": parameter.minInSyncReplicas
+                    "num.partitions": parameter.numPartitions
+                  }
+                }
+                zookeeper: {
+                  replicas: parameter.zookeeperReplicas
+                  storage: {
+                    size: parameter.zookeeperStorageSize
+                  }
+                }
+              }
+            }
+          }
+        }
+        
+        parameter: {
+          replicas: *3 | int
+          storageSize: *"20Gi" | string
+          replicationFactor: *3 | int
+          minInSyncReplicas: *2 | int
+          numPartitions: *6 | int
+          zookeeperReplicas: *3 | int
+          zookeeperStorageSize: *"10Gi" | string
+        }
