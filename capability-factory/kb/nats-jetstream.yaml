@@ -1,8 +1,7 @@
-# KB entry — NATS JetStream. Lightweight, low-latency alternative to Kafka for messaging.
 technology: nats-jetstream
 category: messaging
 profile:
-  durability: tunable
+  durability: strong
   ordering: per-subject
   readPattern: fan-out
   footprint: light
@@ -11,7 +10,9 @@ profile:
   scalingModel: horizontal
   availabilityClass: replicated
   costClass: low
-version: { current: "2.10", tracked: ">=2.10" }
+version:
+  current: '2.10'
+  tracked: '>=2.10'
 upstreamSource: github:nats-io/nats-server
 provisioning: helm:nats
-maturity: kb
+maturity: published
