@@ -1,0 +1,207 @@
+# oam-apply WorkflowTemplate — the OAM-first provisioning entry point.
+#
+# Triggered by the MCP server's `app.submit(oam_yaml)` AFTER the OAM has been committed to the
+# gitops repo (the gate). This workflow's job is to ensure the prerequisites in dependency order
+# (vCluster, ClusterGateway registration) and then create an ArgoCD Application that syncs the
+# committed OAM. ArgoCD + the HOST KubeVela controller do the actual apply/reconcile from there;
+# KubeVela's topology policy routes per-component to the vCluster via the registered ClusterGateway.
+#
+# This is a SEPARATE entry point from the existing OAMWebhookService/PatternOrchestrator path
+# (slack-api-server/src/domain/services.py:371, strategies/orchestrator.py:15), which fires on
+# direct kubectl-apply of an OAM Application. Double-trigger avoidance: `app.submit`-originated
+# OAM is delivered ONLY via gitops → ArgoCD here; the webhook path remains for direct cluster-apply
+# usage. The two never both act on the same Application instance in one cycle.
+#
+# Bootstrap-ordering fix: the `wait-for-clustergateway` step gates the ArgoCD Application's
+# creation on the vCluster/ClusterGateway being registered. This is what makes OAM-first work
+# WITHOUT a manual `vela workflow restart` (the documented race condition).
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: oam-apply
+  namespace: argo
+  labels:
+    parameter-contract-version: "v1.0"
+    resource-type: "oam-application"
+    template-category: "consumer"
+  annotations:
+    description: "OAM-first provisioning: validate → ensure prereqs → wait for ClusterGateway → create ArgoCD Application"
+    maintainer: "platform-team"
+spec:
+  serviceAccountName: argo-workflow-executor
+  entrypoint: apply-oam
+  arguments:
+    parameters:
+    - { name: oam-application }                                      # base64-encoded OAM Application YAML
+    - { name: app-name }                                              # OAM metadata.name
+    - { name: namespace,       value: "default" }                     # target namespace for the OAM Application
+    - { name: target-vcluster, value: "host" }                        # "host" | "<team>" | "<svc>-vcluster"
+    - { name: gitops-path,     value: "oam/applications" }            # where MCP committed the OAM
+    - { name: github-org,      value: "shlapolosa" }
+    - { name: gitops-repo,     value: "health-service-idp-gitops" }
+    - { name: user,            value: "capability-mcp" }
+    - { name: slack-channel,   value: "" }
+    - { name: slack-user-id,   value: "" }
+
+  templates:
+
+  # ─────────────── entrypoint ───────────────
+  - name: apply-oam
+    inputs:
+      parameters:
+      - { name: oam-application }
+      - { name: app-name }
+      - { name: namespace }
+      - { name: target-vcluster }
+      - { name: gitops-path }
+      - { name: github-org }
+      - { name: gitops-repo }
+      - { name: user }
+      - { name: slack-channel }
+      - { name: slack-user-id }
+    steps:
+    - - name: validate-oam
+        template: validate-oam
+        arguments:
+          parameters:
+          - { name: oam-application, value: "{{inputs.parameters.oam-application}}" }
+    - - name: ensure-vcluster
+        templateRef:
+          name: vcluster-standard-contract
+          template: create-vcluster
+        arguments:
+          parameters:
+          - { name: resource-name,     value: "{{inputs.parameters.target-vcluster}}" }
+          - { name: resource-type,     value: "vcluster" }
+          - { name: namespace,         value: "{{inputs.parameters.target-vcluster}}" }
+          - { name: user,              value: "{{inputs.parameters.user}}" }
+          - { name: description,       value: "vCluster auto-ensured by oam-apply for {{inputs.parameters.app-name}}" }
+          - { name: github-org,        value: "{{inputs.parameters.github-org}}" }
+          - { name: slack-channel,     value: "{{inputs.parameters.slack-channel}}" }
+          - { name: slack-user-id,     value: "{{inputs.parameters.slack-user-id}}" }
+        # 3-tier: only ensure a vCluster for shared/dedicated tiers. Host tier deploys to the host cluster.
+        when: "{{steps.validate-oam.status}} == Succeeded && '{{inputs.parameters.target-vcluster}}' != 'host'"
+    - - name: wait-for-clustergateway
+        template: wait-for-clustergateway
+        arguments:
+          parameters:
+          - { name: target-vcluster, value: "{{inputs.parameters.target-vcluster}}" }
+        when: "'{{inputs.parameters.target-vcluster}}' != 'host'"
+    - - name: create-argocd-application
+        template: create-argocd-application
+        arguments:
+          parameters:
+          - { name: app-name,        value: "{{inputs.parameters.app-name}}" }
+          - { name: namespace,       value: "{{inputs.parameters.namespace}}" }
+          - { name: target-vcluster, value: "{{inputs.parameters.target-vcluster}}" }
+          - { name: gitops-path,     value: "{{inputs.parameters.gitops-path}}" }
+          - { name: github-org,      value: "{{inputs.parameters.github-org}}" }
+          - { name: gitops-repo,     value: "{{inputs.parameters.gitops-repo}}" }
+        when: "{{steps.validate-oam.status}} == Succeeded"
+
+  # ─────────────── validate OAM via vela dry-run ───────────────
+  - name: validate-oam
+    inputs:
+      parameters: [{ name: oam-application }]
+    container:
+      image: oamdev/vela-cli:v1.10.8
+      command: [sh, -c]
+      args:
+      - |
+        set -eu
+        echo "{{inputs.parameters.oam-application}}" | base64 -d > /tmp/oam.yaml
+        echo "--- OAM Application ---"
+        cat /tmp/oam.yaml
+        echo "--- vela dry-run ---"
+        vela dry-run -f /tmp/oam.yaml
+
+  # ─────────────── gate: vCluster + ClusterGateway must be ready ───────────────
+  # Mirrors the readiness signals from crossplane/vcluster-environment-claim-composition.yaml's
+  # vcluster-register-clustergateway step (the vela-system credential secret + the ClusterGateway CR).
+  - name: wait-for-clustergateway
+    inputs:
+      parameters: [{ name: target-vcluster }]
+    container:
+      image: alpine/k8s:1.28.4
+      command: [sh, -c]
+      args:
+      - |
+        set -eu
+        VC="{{inputs.parameters.target-vcluster}}"
+        echo "Waiting for ClusterGateway/${VC} + vela-system credential secret to be Ready..."
+        for i in $(seq 1 60); do
+          if kubectl get secret "${VC}" -n vela-system >/dev/null 2>&1 \
+             && kubectl get clustergateway.cluster.core.oam.dev "${VC}" >/dev/null 2>&1; then
+            echo "✅ ClusterGateway ${VC} is registered (attempt ${i}/60)"
+            exit 0
+          fi
+          echo "  not yet (attempt ${i}/60); sleeping 10s..."
+          sleep 10
+        done
+        echo "❌ timeout waiting for ClusterGateway ${VC} after 10 minutes"
+        exit 1
+
+  # ─────────────── create the ArgoCD Application that syncs the committed OAM ───────────────
+  # Destination = "in-cluster" for host tier; the registered vCluster name otherwise. Source =
+  # the gitops repo path where MCP committed the OAM. ArgoCD + the HOST KubeVela controller then
+  # apply/reconcile; the OAM's topology policy routes per-component to the vCluster via ClusterGateway.
+  - name: create-argocd-application
+    inputs:
+      parameters:
+        - { name: app-name }
+        - { name: namespace }
+        - { name: target-vcluster }
+        - { name: gitops-path }
+        - { name: github-org }
+        - { name: gitops-repo }
+    container:
+      image: alpine/k8s:1.28.4
+      command: [sh, -c]
+      args:
+      - |
+        set -eu
+        APP="{{inputs.parameters.app-name}}"
+        NS="{{inputs.parameters.namespace}}"
+        TGT="{{inputs.parameters.target-vcluster}}"
+        DEST="$TGT"
+        if [ "$TGT" = "host" ]; then DEST="in-cluster"; fi
+        cat > /tmp/argocd-app.yaml <<EOF
+        apiVersion: argoproj.io/v1alpha1
+        kind: Application
+        metadata:
+          name: ${APP}-oam
+          namespace: argocd
+          labels:
+            app.kubernetes.io/managed-by: capability-mcp
+            app.kubernetes.io/part-of: ${APP}
+            oam.dev/target: ${TGT}
+          annotations:
+            argocd.argoproj.io/sync-wave: "10"
+        spec:
+          project: default
+          source:
+            repoURL: https://github.com/{{inputs.parameters.github-org}}/{{inputs.parameters.gitops-repo}}
+            targetRevision: main
+            path: {{inputs.parameters.gitops-path}}
+          destination:
+            name: ${DEST}
+            namespace: ${NS}
+          syncPolicy:
+            automated:
+              prune: true
+              selfHeal: true
+              allowEmpty: false
+            syncOptions:
+            - CreateNamespace=true
+            - ServerSideApply=true
+            retry:
+              limit: 5
+              backoff:
+                duration: 5s
+                factor: 2
+                maxDuration: 3m
+        EOF
+        echo "--- ArgoCD Application manifest ---"
+        cat /tmp/argocd-app.yaml
+        kubectl apply -f /tmp/argocd-app.yaml
+        echo "✅ ArgoCD Application ${APP}-oam created (destination=${DEST}, ns=${NS})"

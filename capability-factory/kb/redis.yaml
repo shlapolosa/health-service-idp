@@ -1,0 +1,16 @@
+# KB entry — Redis cache.
+technology: redis
+category: cache
+profile:
+  durability: weak
+  consistency: eventual
+  queryModel: key-value
+  readPattern: multi-reader
+  latencyP99Ms: 1
+  throughputClass: very-high
+  footprint: light
+  costClass: low
+version: { current: "7.2", tracked: ">=7" }
+upstreamSource: github:redis/redis
+provisioning: helm:bitnami-redis
+maturity: kb

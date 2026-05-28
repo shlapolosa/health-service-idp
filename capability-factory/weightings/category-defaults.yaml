@@ -1,0 +1,30 @@
+# Per-category default attribute weights for the deterministic soft-rank.
+# weights: high=3, med=2, low=1. The platform supplies these; a CapabilityRequest only overrides
+# (via its optional `weights:` map) when it cares. See docs/capability-quality-attributes-v0.md.
+weights: { high: 3, med: 2, low: 1 }
+
+categories:
+  messaging:
+    high: [durability, ordering, readPattern, throughputClass]
+    med:  [latencyP99Ms, scalingModel]
+    low:  [footprint, costClass]
+  datastore:
+    high: [durability, consistency, availabilityClass, queryModel]
+    med:  [latencyP99Ms]
+    low:  [footprint]
+  cache:
+    high: [latencyP99Ms, footprint, throughputClass]
+    med:  [scalingModel]
+    low:  [durability]
+  compute-service:
+    high: [latencyP99Ms, scalingModel, scaleToZero]
+    med:  [footprint]
+    low:  [durability]
+  analytics:
+    high: [throughputClass, queryModel, maxScaleClass]
+    med:  [availabilityClass]
+    low:  [latencyP99Ms]
+  identity:
+    high: [encryptionAtRest, encryptionInTransit, authModel, availabilityClass]
+    med:  []
+    low:  [footprint]
