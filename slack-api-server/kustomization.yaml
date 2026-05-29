@@ -17,7 +17,7 @@ resources:
 # For ACR deployment (current):
 images:
 - name: healthidpuaeacr.azurecr.io/slack-api-server
-  newTag: 3tier
+  newTag: lifecycle-v1
 
 # Remove imagePullSecrets for Docker Hub
 # patches:
