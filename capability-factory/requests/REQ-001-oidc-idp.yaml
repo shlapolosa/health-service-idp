@@ -1,0 +1,42 @@
+apiVersion: platform.example.org/v1alpha1
+kind: CapabilityRequest
+metadata:
+  name: req-001-oidc-idp
+spec:
+  project: ap-clean-final
+  capability:
+    name: oidc-idp
+    category: identity-provider
+    description: Generic OIDC external identity provider integration for Azure AD or equivalent enterprise IdP.
+  rationale:
+    architectureArtifacts:
+      - infrastructure_arch
+      - solution_arch_md
+    requiredFor:
+      - external authentication
+      - APIM/front-door authentication
+      - BFF/API authorization integration
+  requirements:
+    workloadKindExclusions:
+      - ApplicationClaim
+    inputs:
+      - name: issuerUrl
+        type: string
+        required: true
+      - name: clientIdSecretRef
+        type: string
+        required: true
+      - name: clientSecretSecretRef
+        type: string
+        required: true
+      - name: audience
+        type: string
+        required: false
+      - name: scopes
+        type: array
+        required: false
+  consideredAlternatives:
+    - name: auth0-idp
+      reasonRejected: Vendor-specific and failed dry-run due to unresolved required naming properties; not a generic Azure AD/external OIDC fit.
+    - name: identity-service
+      reasonRejected: Creates an IAM service workflow, not external IdP integration.
