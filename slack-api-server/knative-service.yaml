@@ -33,8 +33,10 @@ spec:
           
       containers:
       - name: slack-api-server
-        # Using v1.2.0 AMD64 build with all Pattern fixes
-        image: healthidpuaeacr.azurecr.io/slack-api-server:v1.2.0
+        # lifecycle-v1: adds non-breaking CAFE lifecycle wiring — emits observe events
+        # per slack command and optionally drives lifecycle-orchestrator /run on deploy-intent.
+        # LIFECYCLE_MODE controls behavior: events_only (default) | full | off.
+        image: healthidpuaeacr.azurecr.io/slack-api-server:lifecycle-v1
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
@@ -46,6 +48,13 @@ spec:
           value: "production"
         - name: GITHUB_REPOSITORY
           value: "shlapolosa/health-service-idp"
+        # CAFE lifecycle wiring — additive, non-breaking
+        - name: LIFECYCLE_MODE
+          value: "events_only"
+        - name: LIFECYCLE_ORCHESTRATOR_URL
+          value: "http://lifecycle-orchestrator.default.svc.cluster.local"
+        - name: OBSERVE_AUDIT_SINK_URL
+          value: "http://observe-audit-sink.default.svc.cluster.local"
         # Registry type from ConfigMap
         - name: REGISTRY_TYPE
           valueFrom:

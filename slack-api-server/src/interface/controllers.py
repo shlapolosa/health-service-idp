@@ -3,11 +3,14 @@ Interface Layer - FastAPI Controllers
 Handles HTTP requests and responses, coordinates with application layer
 """
 
+import asyncio
 import json
 import logging
+import os
 from datetime import datetime
 from typing import Any, Dict
 
+import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
@@ -21,6 +24,61 @@ from .dependencies import (get_process_slack_command_use_case,
                            get_process_oam_webhook_use_case)
 
 logger = logging.getLogger(__name__)
+
+
+# CAFE lifecycle wiring (additive, non-breaking) — fires alongside existing flow.
+# LIFECYCLE_MODE:
+#   "events_only" (default) — every slack command emits a lifecycle event to observe-audit-sink only.
+#   "full"                  — additionally POST to lifecycle-orchestrator /run for commands
+#                             matching <intent_pattern> (deploy / create / build / submit / propose).
+#   "off"                   — no wiring (legacy behavior).
+LIFECYCLE_MODE = os.environ.get("LIFECYCLE_MODE", "events_only").lower()
+ORCHESTRATOR_URL = os.environ.get(
+    "LIFECYCLE_ORCHESTRATOR_URL",
+    "http://lifecycle-orchestrator.default.svc.cluster.local",
+)
+OBSERVE_URL = os.environ.get(
+    "OBSERVE_AUDIT_SINK_URL",
+    "http://observe-audit-sink.default.svc.cluster.local",
+)
+_INTENT_PATTERN = ("deploy", "create", "build", "submit", "propose", "spin up", "stand up", "make a")
+
+
+async def _fire_lifecycle_event(use_case_id: str, frm: str, to: str, who: str, extra: dict = None) -> None:
+    if LIFECYCLE_MODE == "off":
+        return
+    payload = {
+        "use_case_id": use_case_id,
+        "from_state": frm,
+        "to_state": to,
+        "caller_identity": who,
+        **(extra or {}),
+    }
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as cli:
+            await cli.post(f"{OBSERVE_URL}/events", json=payload)
+    except Exception as e:
+        logger.debug(f"observe event suppressed (best-effort): {e}")
+
+
+async def _maybe_drive_orchestrator(slack_command_text: str, who: str) -> None:
+    """If LIFECYCLE_MODE=full and command text shows deploy intent, kick orchestrator /run."""
+    if LIFECYCLE_MODE != "full":
+        return
+    text = (slack_command_text or "").lower()
+    if not any(token in text for token in _INTENT_PATTERN):
+        return
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as cli:
+            # Fire-and-forget: kick the orchestrator; user gets Slack response from existing path
+            await cli.post(f"{ORCHESTRATOR_URL}/run", json={
+                "plain_text_description": slack_command_text,
+                "caller_identity": who,
+                "channel": "slack",
+                "auto_approve": False,
+            })
+    except Exception as e:
+        logger.debug(f"orchestrator kick suppressed (best-effort): {e}")
 
 
 class SlackController:
@@ -75,11 +133,27 @@ class SlackController:
                 team_domain=form_data.get("team_domain", ""),
             )
 
-            # Process command
+            # Emit CAFE lifecycle event — Slack command received (additive, non-blocking)
+            use_case_id = f"slack-{slack_command.user_id}-{int(datetime.utcnow().timestamp())}"
+            asyncio.create_task(_fire_lifecycle_event(
+                use_case_id, "_initial", "received", slack_command.user_name,
+                {"channel": "slack", "command": slack_command.command, "text_preview": (slack_command.text or "")[:120]},
+            ))
+
+            # Optional: drive the orchestrator in parallel for commands that look like deploys
+            asyncio.create_task(_maybe_drive_orchestrator(slack_command.text, slack_command.user_name))
+
+            # Process command (legacy path — unchanged)
             response = process_use_case.execute(slack_command)
 
+            # Emit CAFE lifecycle event — Slack command processed (additive, non-blocking)
+            asyncio.create_task(_fire_lifecycle_event(
+                use_case_id, "received", "command_processed", slack_command.user_name,
+                {"command": slack_command.command, "legacy_path": True},
+            ))
+
             logger.info(
-                f"Processed Slack command: {slack_command.command} from {slack_command.user_name}"
+                f"Processed Slack command: {slack_command.command} from {slack_command.user_name} (lifecycle_mode={LIFECYCLE_MODE})"
             )
             return response
 
