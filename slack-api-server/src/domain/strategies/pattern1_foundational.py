@@ -116,8 +116,8 @@ class Pattern1FoundationalHandler(PatternHandler):
                 "repository-name": repository_name  # Use app-container for OAM-driven
             }
             
-            # Always use microservice-standard-contract for ApplicationClaim
-            workflow_name = "microservice-standard-contract"
+            # Stage 6 cutover (2026-05-30): switched to oam-driven-contract.
+            workflow_name = "oam-driven-contract"
             
             logger.info(f"Triggering ApplicationClaim workflow for {component_name}")
             workflow_run = argo_client.create_workflow_from_template(
@@ -164,7 +164,8 @@ class Pattern1FoundationalHandler(PatternHandler):
         """Get the appropriate workflow for the component type."""
         component_type = component.get("type")
         config = self.SUPPORTED_TYPES.get(component_type, {})
-        return config.get("workflow", "microservice-standard-contract")
+        # Default fallback: oam-driven-contract (Stage 6 cutover).
+        return config.get("workflow", "oam-driven-contract")
     
     def validate_prerequisites(self, component: Dict[str, Any], context: HandlerContext) -> HandlerResult:
         """Validate prerequisites for foundational components."""
