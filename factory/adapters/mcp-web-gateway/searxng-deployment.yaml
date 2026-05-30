@@ -1,0 +1,76 @@
+# In-cluster SearXNG — minimal single-pod deployment for the web MCP backend.
+# Mirrors the local Docker setup; no upstream account / API key needed.
+# Bumping to multi-replica needs Redis (rate-limit state) — not required for our use.
+apiVersion: v1
+kind: Namespace
+metadata: { name: search }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: searxng-settings
+  namespace: search
+data:
+  settings.yml: |
+    use_default_settings: true
+    server:
+      port: 8080
+      bind_address: "0.0.0.0"
+      secret_key: "change-me-at-deploy-time"
+      base_url: false
+      image_proxy: false
+      method: "POST"
+    search:
+      formats:
+        - html
+        - json
+    general:
+      debug: false
+      instance_name: "capability-factory-searxng"
+    ui:
+      static_use_hash: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: searxng
+  namespace: search
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: searxng } }
+  template:
+    metadata: { labels: { app: searxng } }
+    spec:
+      enableServiceLinks: false        # block k8s `*_PORT=tcp://…` env injection (breaks granian)
+      containers:
+      - name: searxng
+        image: searxng/searxng:latest
+        ports: [{ containerPort: 8080, name: http }]
+        env:
+        - { name: PORT, value: "8080" }   # explicit — overrides anything pre-existing
+        - { name: BIND_ADDRESS, value: "0.0.0.0:8080" }
+        - { name: BASE_URL, value: "http://searxng.search.svc.cluster.local:8080/" }
+        - { name: INSTANCE_NAME, value: "capability-factory-searxng" }
+        volumeMounts:
+        - { name: settings, mountPath: /etc/searxng }
+        resources:
+          requests: { cpu: "100m", memory: "192Mi" }
+          limits:   { cpu: "500m", memory: "512Mi" }
+        readinessProbe:
+          httpGet: { path: /, port: 8080 }
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: settings
+        configMap:
+          name: searxng-settings
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: searxng
+  namespace: search
+spec:
+  selector: { app: searxng }
+  ports:
+  - { port: 8080, targetPort: 8080, name: http }

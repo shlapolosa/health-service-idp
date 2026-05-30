@@ -1,0 +1,25 @@
+# KB entry — Apache Kafka. Profiled with the quality-attribute vocabulary so scoring is deterministic.
+technology: kafka
+category: messaging
+profile:
+  durability: strong
+  ordering: per-partition
+  readPattern: fan-out
+  footprint: heavy
+  latencyP99Ms: 20
+  throughputClass: very-high
+  scalingModel: horizontal
+  availabilityClass: ha-multizone
+  costClass: high
+version: { current: "3.7", tracked: ">=3.6" }
+upstreamSource: github:apache/kafka   # powers the architect's version/CVE watch (upgrade loop)
+provisioning:
+  # P8.1 schema: structured provisioning metadata so Phase 4 of the architect (pattern match)
+  # is a deterministic lookup. See docs/capability-quality-attributes-v0.md.
+  kind: operator-backed              # one of: helm-chart | operator-backed | managed-service | composite | trait
+  source: operator:strimzi           # preserved from pre-P8.1 string form for back-compat
+  requires_cluster_permissions: false
+  notes: |
+    Strimzi operator is installed at platform layer. The architect emits a Kafka CR via the
+    Kubernetes provider; the operator reconciles it into a Kafka StatefulSet cluster.
+maturity: kb                            # kb = productizable; published = in the live catalog

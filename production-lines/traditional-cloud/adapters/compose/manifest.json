@@ -1,0 +1,30 @@
+{
+  "name": "architect-v1",
+  "definition": {
+    "kind": "prompt",
+    "model": "gpt-5.4",
+    "instructions": "## architect-v1 system prompt\n\nLoaded from agents/architect-v1/system-prompt.md. The CLI helper (scripts/foundry_responses.py --create agents/architect-v1/manifest.json) substitutes this `instructions` field with the file's full text before upserting the agent.",
+    "tools": [
+      {
+        "type": "mcp",
+        "server_label": "catalog",
+        "server_url": "https://aigw-apim-dev-w4x7ibwk4e2is.azure-api.net/mcp/catalog/mcp",
+        "project_connection_id": "capability-catalog-mcp"
+      },
+      {
+        "type": "mcp",
+        "server_label": "factory",
+        "server_url": "https://aigw-apim-dev-w4x7ibwk4e2is.azure-api.net/mcp/factory/mcp",
+        "project_connection_id": "capability-factory-mcp"
+      }
+    ]
+  },
+  "metadata": {
+    "version": "v1",
+    "phase": "P8.3",
+    "owner": "capability-factory",
+    "api_contract": "/agents create + /openai/v1/responses run (NOT /assistants + /threads/runs)",
+    "reasoning_doc": "system-prompt.md",
+    "pattern_table_source": "capability-factory/schema/quality-attributes-v0.yaml#provisioning.patterns"
+  }
+}

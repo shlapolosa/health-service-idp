@@ -1,0 +1,79 @@
+# Capability quality-attribute vocabulary (v0 — DRAFT)
+# Single source of truth, used three times: CapabilityRequest.qualityAttributes (intake),
+# KB profile (selection), and (later) acceptance thresholds. See docs/capability-quality-attributes-v0.md.
+#
+# The catalog MCP's `search` reads this + weightings/category-defaults.yaml + kb/*.yaml to run the
+# deterministic match: hard-constraint filter, then weighted-distance soft rank, tie-break on costClass
+# then maturity (published > kb).
+version: v0
+
+categories: [messaging, datastore, cache, compute-service, analytics, identity, secret-config]
+
+# Value-domain types drive scoring:
+#   ordered-enum   — ordinal; under-provision penalised hard, over-provision lightly (cost)
+#   unordered-enum — compatibility table (full / partial / none)
+#   numeric        — has unit + betterDirection; can be a hard threshold
+#   boolean        — match / mismatch; can be hard
+valueTypes: [ordered-enum, unordered-enum, numeric, boolean]
+
+scoring:
+  hardFilter: "request attributes with required:true (or a numeric hard threshold) eliminate failing candidates"
+  softRank: "score = sum(weight_i * penalty_i); lowest penalty wins"
+  tieBreak: [costClass, maturity]   # lower costClass, then published > kb
+
+# tier: core (needed to start) | v0.1 (later). better: higher | lower | na.
+attributes:
+  # --- A. Data & state semantics ---
+  durability:        { group: data-state, type: ordered-enum,   domain: [ephemeral, weak, tunable, strong], better: higher, hard: true,  tier: core,  appliesTo: [datastore, messaging, cache] }
+  consistency:       { group: data-state, type: ordered-enum,   domain: [eventual, read-your-writes, bounded-staleness, strong], better: higher, hard: true, tier: core, appliesTo: [datastore, cache] }
+  ordering:          { group: data-state, type: unordered-enum, domain: [none, per-key, per-partition, per-subject, global], better: na, hard: true, tier: core, appliesTo: [messaging] }
+  retention:         { group: data-state, type: unordered-enum, domain: [none, time-bounded, indefinite], better: na, hard: false, tier: v0.1, appliesTo: [messaging] }
+  statefulness:      { group: data-state, type: unordered-enum, domain: [stateless, ephemeral, persistent], better: na, hard: false, tier: core, appliesTo: [datastore, messaging, cache, compute-service] }
+  # --- B. Access pattern ---
+  readPattern:       { group: access, type: unordered-enum, domain: [single-reader, multi-reader, fan-out], better: na, hard: true, tier: core, appliesTo: [datastore, messaging, cache] }
+  writePattern:      { group: access, type: unordered-enum, domain: [single-writer, multi-writer], better: na, hard: false, tier: v0.1, appliesTo: [datastore, messaging] }
+  queryModel:        { group: access, type: unordered-enum, domain: [key-value, document, relational, columnar, stream, blob, none], better: na, hard: true, tier: core, appliesTo: [datastore, cache, analytics] }
+  # --- C. Performance ---
+  latencyP99Ms:      { group: performance, type: numeric, unit: ms, better: lower, hard: true, tier: core, appliesTo: [messaging, datastore, cache, compute-service, analytics] }
+  throughputClass:   { group: performance, type: ordered-enum, domain: [low, medium, high, very-high], better: higher, hard: true, tier: core, appliesTo: [messaging, datastore, cache, analytics] }
+  payloadSize:       { group: performance, type: ordered-enum, domain: [small, medium, large], better: na, hard: false, tier: v0.1, appliesTo: [messaging, datastore] }
+  # --- D. Scalability & elasticity ---
+  scalingModel:      { group: scalability, type: unordered-enum, domain: [vertical, horizontal, both], better: na, hard: true, tier: core, appliesTo: [messaging, datastore, cache, compute-service, analytics] }
+  maxScaleClass:     { group: scalability, type: ordered-enum, domain: [small, medium, large, massive], better: higher, hard: false, tier: core, appliesTo: [messaging, datastore, analytics] }
+  scaleToZero:       { group: scalability, type: boolean, better: na, hard: false, tier: v0.1, appliesTo: [compute-service] }
+  # --- E. Availability & resilience ---
+  availabilityClass: { group: availability, type: ordered-enum, domain: [single, replicated, ha-multizone], better: higher, hard: true, tier: core, appliesTo: [datastore, messaging, compute-service] }
+  rpoSeconds:        { group: availability, type: numeric, unit: s, better: lower, hard: false, tier: v0.1, appliesTo: [datastore] }
+  rtoSeconds:        { group: availability, type: numeric, unit: s, better: lower, hard: false, tier: v0.1, appliesTo: [datastore] }
+  # --- F. Footprint & cost ---
+  footprint:         { group: footprint, type: ordered-enum, domain: [light, medium, heavy], better: lower, hard: false, tier: core, appliesTo: [messaging, datastore, cache, compute-service, analytics, identity] }
+  costClass:         { group: footprint, type: ordered-enum, domain: [low, medium, high], better: lower, hard: false, tier: core, appliesTo: [messaging, datastore, cache, compute-service, analytics, identity] }
+  # --- G. Operability ---
+  managed:           { group: operability, type: unordered-enum, domain: [self-hosted-helm, operator-backed, external-managed], better: na, hard: false, tier: v0.1, appliesTo: [messaging, datastore, cache, compute-service, analytics, identity] }
+  observability:     { group: operability, type: boolean, better: na, hard: false, tier: v0.1, appliesTo: [messaging, datastore, cache, compute-service, analytics, identity] }
+  # --- H. Security & tenancy ---
+  encryptionAtRest:    { group: security, type: boolean, better: na, hard: true, tier: core, appliesTo: [datastore, messaging, cache, identity] }
+  encryptionInTransit: { group: security, type: boolean, better: na, hard: true, tier: core, appliesTo: [datastore, messaging, cache, identity, compute-service] }
+  authModel:         { group: security, type: unordered-enum, domain: [none, basic, mTLS, oidc], better: na, hard: false, tier: v0.1, appliesTo: [datastore, messaging, identity] }
+  isolation:         { group: security, type: ordered-enum, domain: [shared, namespace, dedicated-vcluster], better: higher, hard: false, tier: core, appliesTo: [messaging, datastore, cache, compute-service, analytics, identity] }
+  # --- I. Platform topology (deployment knob carried on the request) ---
+  targetEnvironment: { group: topology, type: unordered-enum, domain: [host, shared-vcluster, dedicated-vcluster], better: na, hard: false, tier: core, appliesTo: [messaging, datastore, cache, compute-service, analytics, identity] }
+
+# Provisioning metadata (added P8.1) — declares HOW the architect should materialise the OAM
+# artifacts for a KB entry. Phase 4 of architect reasoning (pattern match) is a deterministic
+# lookup keyed on `provisioning.kind`. NOT scored — purely architect machinery.
+provisioning:
+  schema:
+    kind:        { type: ordered-enum, domain: [helm-chart, operator-backed, managed-service, composite, trait] }
+    source:      { type: string, hint: "<verb>:<identifier>, e.g. helm:nats | operator:strimzi" }
+    requires_cluster_permissions: { type: boolean, default: false }
+    cluster_permissions: { type: list, item: { resources: list, verbs: list }, required_if: "requires_cluster_permissions=true" }
+    notes:       { type: string, optional: true }
+  # Pattern table — drives architect's exemplar lookup. (consumed by examples_loader)
+  patterns:
+    pattern-a-helm-chart:        { matches: "kind=helm-chart AND requires_cluster_permissions=false" }
+    pattern-b-helm-cluster-perms: { matches: "kind=helm-chart AND requires_cluster_permissions=true" }
+    pattern-c-operator-backed:   { matches: "kind=operator-backed" }
+    pattern-d-xrd-composition:   { matches: "kind=managed-service" }
+    pattern-e-composite-oam:     { matches: "kind=composite" }
+    pattern-f-trait:             { matches: "kind=trait" }

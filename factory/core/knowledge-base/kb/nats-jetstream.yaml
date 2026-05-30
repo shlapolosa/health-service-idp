@@ -1,0 +1,29 @@
+technology: nats-jetstream
+category: messaging
+profile:
+  durability: strong
+  ordering: per-subject
+  readPattern: fan-out
+  footprint: light
+  latencyP99Ms: 5
+  throughputClass: high
+  scalingModel: horizontal
+  availabilityClass: replicated
+  costClass: low
+version:
+  current: '2.10'
+  tracked: '>=2.10'
+upstreamSource: github:nats-io/nats-server
+provisioning:
+  kind: helm-chart
+  source: helm:nats
+  requires_cluster_permissions: true
+  cluster_permissions:
+    # The NATS Helm chart creates its target namespace; Crossplane provider-helm SA needs
+    # cluster-scope namespaces:create. The architect emits a ClusterRoleBinding alongside the CD.
+    - resources: [namespaces]
+      verbs: [create]
+  notes: |
+    Discovered during P7 walkthrough: provider-helm SA lacks namespaces:create without
+    an explicit ClusterRoleBinding. Pattern B captures this exact case.
+maturity: published

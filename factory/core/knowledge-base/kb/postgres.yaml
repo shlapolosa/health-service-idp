@@ -1,0 +1,19 @@
+# KB entry — PostgreSQL relational datastore.
+technology: postgres
+category: datastore
+profile:
+  durability: strong
+  consistency: strong
+  queryModel: relational
+  readPattern: multi-reader
+  availabilityClass: replicated
+  latencyP99Ms: 10
+  footprint: medium
+  costClass: medium
+version: { current: "16", tracked: ">=15" }
+upstreamSource: github:postgres/postgres
+provisioning:
+  kind: helm-chart
+  source: helm:bitnami-postgresql
+  requires_cluster_permissions: false
+maturity: kb

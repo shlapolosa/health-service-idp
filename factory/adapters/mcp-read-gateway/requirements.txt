@@ -1,0 +1,10 @@
+# capability-mcp-factory — same surface as capability-mcp-server (we import its
+# use cases). Keep pins in lockstep; bump both together.
+mcp>=1.9.0
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+requests>=2.32.0
+kubernetes>=29.0.0
+pyyaml>=6.0.2
+pyjwt[crypto]>=2.9.0
+cryptography>=43.0.0

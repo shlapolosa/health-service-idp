@@ -1,0 +1,46 @@
+apiVersion: core.oam.dev/v1beta1
+kind: PolicyDefinition
+metadata:
+  name: image-source
+  namespace: default
+  annotations:
+    definition.oam.dev/description: >
+      Validates that webservice container images come from the allowed
+      registry. Default allowlist: healthidpuaeacr.azurecr.io plus the
+      explicitly-named extras. This is the OAM-level guard against the
+      "nginx:1.27 hallucination" pattern where an LLM agent fills the
+      image-source void with a public-registry default.
+    policy.oam.dev/enforcement: "advisory"
+    policy.oam.dev/scope: "webservice-shape, webservice"
+spec:
+  schematic:
+    cue:
+      template: |
+        // Validation: every component of type webservice-shape MUST declare
+        // an image whose prefix is in parameter.allowedRegistries. CUE
+        // policies are evaluated at vela dry-run time; failures surface in
+        // catalog.validate diagnostics.
+        validate: {
+          ok: bool
+          reason?: string
+        }
+
+        validate: ok: true
+        for c in context.components {
+          if c.type == "webservice-shape" || c.type == "webservice" {
+            let img = c.properties.image
+            let prefixes = parameter.allowedRegistries
+            let matched = [for p in prefixes if strings.HasPrefix(img, p) {p}]
+            if len(matched) == 0 {
+              validate: {
+                ok:     false
+                reason: "image \(img) on component \(c.name) is not in allowedRegistries"
+              }
+            }
+          }
+        }
+
+        parameter: {
+          // +usage=List of registry prefixes that webservice images MUST start with.
+          allowedRegistries: *["healthidpuaeacr.azurecr.io/", "docker.io/socrates12345/"] | [...string]
+        }

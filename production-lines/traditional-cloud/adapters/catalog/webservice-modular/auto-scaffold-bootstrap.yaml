@@ -1,0 +1,89 @@
+apiVersion: core.oam.dev/v1beta1
+kind: TraitDefinition
+metadata:
+  name: auto-scaffold-bootstrap
+  namespace: default
+  annotations:
+    definition.oam.dev/description: >
+      Trait that, when attached to a webservice-shape component, fires the
+      oam-driven-contract Argo workflow to scaffold a source repo + build
+      pipeline for a given language/framework. This is the bootstrap
+      concern extracted from the monolithic webservice CD as part of the
+      S3 modularization. Apply to webservice-shape components only.
+    trait.oam.dev/replaces: "language-as-bootstrap field on webservice"
+spec:
+  appliesToWorkloads:
+    - webservice-shape
+  podDisruptive: false
+  schematic:
+    cue:
+      template: |
+        outputs: {
+          "scaffold-trigger": {
+            apiVersion: "batch/v1"
+            kind:       "Job"
+            metadata: {
+              name:      context.name + "-scaffold-trigger"
+              namespace: context.namespace
+              labels: {
+                "app.kubernetes.io/name":      context.name
+                "app.kubernetes.io/component": "scaffold-trigger"
+                "app.kubernetes.io/managed-by": "kubevela"
+                "trait.oam.dev/name":          "auto-scaffold-bootstrap"
+              }
+              annotations: {
+                "trait.oam.dev/workflow-template": "oam-driven-contract"
+                "trait.oam.dev/language":          parameter.language
+                "trait.oam.dev/framework":         parameter.framework
+              }
+            }
+            spec: {
+              backoffLimit: 1
+              template: {
+                spec: {
+                  serviceAccountName: "argo-workflows-client"
+                  restartPolicy:      "Never"
+                  containers: [{
+                    name:    "scaffold-trigger"
+                    image:   "curlimages/curl:8.5.0"
+                    command: ["/bin/sh", "-c"]
+                    args: [
+                      "echo 'firing oam-driven-contract for " + context.name + "'; " +
+                      "curl -sS -X POST -H 'Content-Type: application/json' " +
+                      "-d '{\"namespace\":\"argo\",\"workflow\":{" +
+                      "\"metadata\":{\"generateName\":\"scaffold-\"," +
+                      "\"namespace\":\"argo\"}," +
+                      "\"spec\":{\"workflowTemplateRef\":{\"name\":\"oam-driven-contract\"}," +
+                      "\"arguments\":{\"parameters\":[" +
+                      "{\"name\":\"resource-name\",\"value\":\"" + context.name + "\"}," +
+                      "{\"name\":\"resource-type\",\"value\":\"microservice\"}," +
+                      "{\"name\":\"namespace\",\"value\":\"" + context.namespace + "\"}," +
+                      "{\"name\":\"microservice-language\",\"value\":\"" + parameter.language + "\"}," +
+                      "{\"name\":\"microservice-framework\",\"value\":\"" + parameter.framework + "\"}," +
+                      "{\"name\":\"github-org\",\"value\":\"" + parameter.githubOrg + "\"}," +
+                      "{\"name\":\"docker-registry\",\"value\":\"" + parameter.dockerRegistry + "\"}," +
+                      "{\"name\":\"bootstrap-source\",\"value\":\"trait-driven\"}" +
+                      "]}}}' " +
+                      "http://argo-server.argo:2746/api/v1/workflows/argo " +
+                      "|| echo 'scaffold trigger failed (non-fatal)'",
+                    ]
+                  }]
+                }
+              }
+            }
+          }
+        }
+
+        parameter: {
+          // +usage=Language of the service to scaffold. Must be in the language-enum policy allowlist.
+          language: string
+
+          // +usage=Framework matching the language (e.g. fastapi for python, springboot for java).
+          framework: string
+
+          // +usage=GitHub org for the new source repo. Defaults to shlapolosa.
+          githubOrg: *"shlapolosa" | string
+
+          // +usage=Docker registry the build pipeline pushes to.
+          dockerRegistry: *"healthidpuaeacr.azurecr.io" | string
+        }

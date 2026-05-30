@@ -1,0 +1,57 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: capability-web-mcp
+  namespace: default
+  labels: { app: capability-web-mcp, service-type: mcp-server }
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "3"
+    spec:
+      serviceAccountName: capability-web-mcp
+      containerConcurrency: 50
+      timeoutSeconds: 60
+      imagePullSecrets:
+      - name: acr-credentials
+      containers:
+      - name: capability-web-mcp
+        image: healthidpuaeacr.azurecr.io/capability-web-mcp:v0.1
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+        env:
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: SEARXNG_URL
+          value: "http://searxng.search.svc.cluster.local:8080"
+        - name: FETCH_MAX_BYTES
+          value: "200000"
+        - name: MAX_QUERY_LEN
+          value: "300"
+        # APIM is the trust boundary; mirror catalog/factory MCP setup
+        - name: AUTH_DISABLED
+          value: "true"
+        - name: ALLOWED_HOSTS
+          value: "capability-web-mcp.default.20.233.105.82.nip.io,capability-web-mcp.default,capability-web-mcp.default.svc,capability-web-mcp.default.svc.cluster.local,localhost"
+        resources:
+          requests: { cpu: "100m", memory: "192Mi" }
+          limits:   { cpu: "500m", memory: "384Mi" }
+        readinessProbe:
+          httpGet: { path: /healthz, port: 8080 }
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        livenessProbe:
+          httpGet: { path: /healthz, port: 8080 }
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities: { drop: ["ALL"] }
+  traffic:
+  - latestRevision: true
+    percent: 100

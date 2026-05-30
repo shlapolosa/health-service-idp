@@ -1,0 +1,24 @@
+
+recipes:
+  - id: web-service-exposed
+    triggers:
+      and:
+        - { category: compute-service }
+        - { qa: { exposure: public } }
+    emit: [oam/traits/expose-https.yaml]
+    docs: |
+      Public compute services get HTTPS termination.
+  - id: web-service-needs-db
+    triggers:
+      composite:
+        contains: [compute-service, datastore]
+    emit: [oam/traits/datastore-secret-binding.yaml]
+    docs: |
+      DB connection string binding.
+  - id: producer-needs-broker
+    triggers:
+      composite:
+        contains: [compute-service, messaging]
+    emit: [oam/traits/broker-producer-binding.yaml]
+    docs: |
+      BROKER_URL env vars.

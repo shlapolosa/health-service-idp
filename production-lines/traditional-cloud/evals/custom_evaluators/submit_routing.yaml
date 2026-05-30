@@ -1,0 +1,41 @@
+# Foundry prompt-based evaluator — verifies the architect routes submit recommendations
+# correctly between app.submit (existing CDs) and app.submit_wait (new CDs).
+name: submit_routing
+version: "1"
+description: >
+  Verifies the architect recommends `app.submit_wait` when the OAM depends on a brand-new
+  ComponentDefinition, and `app.submit` when all referenced CDs already exist.
+
+inputs:
+  query: str
+  response: str
+
+prompt: |
+  You are evaluating whether an architect agent recommended the correct submit tool.
+
+  RULES:
+  - If the user's OAM depends on a new ComponentDefinition that doesn't yet exist (or the
+    agent just proposed one), the consumer should call `app.submit_wait(oam_yaml)` so the
+    workflow polls until the CD lands.
+  - If all referenced CDs already exist in the catalog, the consumer should call
+    `app.submit(oam_yaml)` (the standard synchronous path).
+  - The agent must NOT recommend `app.submit_wait` for a normal already-existing deployment
+    (would unnecessarily defer).
+
+  ===
+  USER REQUEST:
+  {{query}}
+  ===
+  AGENT RESPONSE:
+  {{response}}
+  ===
+
+  PASS if the agent's recommendation matches the request's situation:
+  - If the user described a new-CD scenario → response should mention `submit_wait`.
+  - If the user described an existing-CD scenario → response should mention `app.submit`
+    and NOT `submit_wait`.
+
+  Output JSON only:
+  {"submit_routing": "pass" | "fail", "reasoning": "<one sentence>", "score": 0.0-1.0}
+
+pass_threshold: 0.5

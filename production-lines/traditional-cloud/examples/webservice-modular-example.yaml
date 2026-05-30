@@ -1,0 +1,67 @@
+# Example OAM Application using the modular webservice composition (S3 refactor).
+#
+# Compares to the monolithic webservice CD:
+#   Monolith: one CD with 23 parameters spanning shape + bootstrap + image + language.
+#   Modular: webservice-shape (shape only) + auto-scaffold-bootstrap trait + 2 policies.
+#
+# Apply this example to verify the modular path end-to-end:
+#   kubectl apply -f crossplane/oam/webservice-modular/
+#   kubectl apply -f examples/webservice-modular-example.yaml
+#
+# Expected: Knative Service my-modular-svc deployed; if image points at a
+# real image, the service serves traffic. If language is set on the trait,
+# a scaffold-trigger Job fires the oam-driven-contract Argo workflow.
+
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: modular-webservice-example
+  namespace: default
+  annotations:
+    architect.oam.dev/example: "true"
+    architect.oam.dev/uses-modular-cds: "true"
+spec:
+  components:
+
+    # Example 1: shape-only webservice, BYO image (no bootstrap).
+    - name: my-modular-api
+      type: webservice-shape
+      properties:
+        image: healthidpuaeacr.azurecr.io/example-api:v0.1
+        port: 8080
+        healthPath: /healthz
+        resources:
+          cpu: "200m"
+          memory: "256Mi"
+        environment:
+          LOG_LEVEL: "INFO"
+          REGION: "uae-north"
+
+    # Example 2: shape + auto-scaffold-bootstrap trait (fires Argo scaffold workflow).
+    - name: my-scaffolded-svc
+      type: webservice-shape
+      properties:
+        # Placeholder image — the bootstrap workflow will build + push the
+        # real image and update the Knative Service revision.
+        image: healthidpuaeacr.azurecr.io/example-bootstrap-placeholder:latest
+        port: 8080
+      traits:
+        - type: auto-scaffold-bootstrap
+          properties:
+            language: python
+            framework: fastapi
+            githubOrg: shlapolosa
+            dockerRegistry: healthidpuaeacr.azurecr.io
+
+  policies:
+    - name: enforce-image-source
+      type: image-source
+      properties:
+        allowedRegistries:
+          - "healthidpuaeacr.azurecr.io/"
+          - "docker.io/socrates12345/"
+
+    - name: enforce-language-enum
+      type: language-enum
+      properties:
+        allowedLanguages: ["python", "java", "nodejs", "rasa"]

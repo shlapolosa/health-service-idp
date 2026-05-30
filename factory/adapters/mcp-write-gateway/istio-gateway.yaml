@@ -1,0 +1,32 @@
+# APIM sits north of this Gateway and does validate-jwt + rate-limit + role-claim enforcement
+# (factory-proposer). This Gateway/VS exposes the MCP for that backend + for in-cluster test traffic.
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: capability-factory-mcp-gateway
+  namespace: default
+spec:
+  selector: { istio: ingressgateway }
+  servers:
+  - port: { number: 80, name: http, protocol: HTTP }
+    hosts: ["*"]
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: capability-factory-mcp-virtualservice
+  namespace: default
+spec:
+  hosts: ["*"]
+  gateways: [capability-factory-mcp-gateway]
+  http:
+  - match:
+    - uri: { prefix: /factory-mcp }
+    - uri: { prefix: /factory-healthz }
+    rewrite:
+      # APIM forwards /mcp/factory/* → here as /factory-mcp/*; rewrite to /mcp/* for FastMCP.
+      uri: /mcp
+    route:
+    - destination:
+        host: capability-factory-mcp.default.svc.cluster.local
+        port: { number: 80 }
