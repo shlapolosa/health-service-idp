@@ -274,7 +274,7 @@ spec:
                 }
                 annotations: {
                   "rasa-chatbot.oam.dev/trigger-type": "argo-workflow"
-                  "rasa-chatbot.oam.dev/workflow-template": "microservice-standard-contract"
+                  "rasa-chatbot.oam.dev/workflow-template": "oam-driven-contract"
                   "rasa-chatbot.oam.dev/source": "oam-driven"
                   "rasa-chatbot.oam.dev/platform-type": "chatbot"
                 }
@@ -315,7 +315,7 @@ spec:
                             },
                             "spec": {
                               "workflowTemplateRef": {
-                                "name": "microservice-standard-contract"
+                                "name": "oam-driven-contract"
                               },
                               "arguments": {
                                 "parameters": [

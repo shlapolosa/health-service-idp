@@ -323,7 +323,7 @@ spec:
                 }
                 annotations: {
                   "graphql-gateway.oam.dev/trigger-type": "argo-workflow"
-                  "graphql-gateway.oam.dev/workflow-template": "microservice-standard-contract"
+                  "graphql-gateway.oam.dev/workflow-template": "oam-driven-contract"
                   "graphql-gateway.oam.dev/source": "oam-driven"
                   "graphql-gateway.oam.dev/platform-type": "graphql"
                 }
@@ -364,7 +364,7 @@ spec:
                             },
                             "spec": {
                               "workflowTemplateRef": {
-                                "name": "microservice-standard-contract"
+                                "name": "oam-driven-contract"
                               },
                               "arguments": {
                                 "parameters": [

@@ -14,12 +14,12 @@ class Pattern1FoundationalHandler(PatternHandler):
     
     SUPPORTED_TYPES = {
         "webservice": {
-            "workflow": "microservice-standard-contract",  # Existing comprehensive workflow
+            "workflow": "oam-driven-contract",  # Existing comprehensive workflow
             "supports_languages": ["python", "nodejs", "java", "go"],
             "supports_frameworks": ["fastapi", "flask", "express", "nestjs", "spring", "gin", "fiber"]
         },
         "webservice-k8s": {
-            "workflow": "microservice-standard-contract",  # Same workflow, different deployment
+            "workflow": "oam-driven-contract",  # Same workflow, different deployment
             "deployment_type": "kubernetes",
             "supports_languages": ["python", "nodejs", "java", "go"]
         },

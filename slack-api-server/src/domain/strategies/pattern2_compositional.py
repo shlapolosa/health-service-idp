@@ -139,7 +139,7 @@ class Pattern2CompositionalHandler(PatternHandler):
             }
             
             # Use microservice-standard-contract for ApplicationClaim
-            workflow_name = "microservice-standard-contract"
+            workflow_name = "oam-driven-contract"
             
             logger.info(f"Triggering ApplicationClaim workflow for {component_type}: {component_name}")
             workflow_run = argo_client.create_workflow_from_template(

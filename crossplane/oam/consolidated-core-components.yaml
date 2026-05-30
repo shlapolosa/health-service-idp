@@ -229,7 +229,7 @@ spec:
                 }
                 annotations: {
                   "webservice.oam.dev/trigger-type": "argo-workflow"
-                  "webservice.oam.dev/workflow-template": "microservice-standard-contract"
+                  "webservice.oam.dev/workflow-template": "oam-driven-contract"
                   if parameter.source != _|_ {
                     "webservice.oam.dev/source": parameter.source
                   }
@@ -267,7 +267,7 @@ spec:
                         "    },\n" +
                         "    \"spec\": {\n" +
                         "      \"workflowTemplateRef\": {\n" +
-                        "        \"name\": \"microservice-standard-contract\"\n" +
+                        "        \"name\": \"oam-driven-contract\"\n" +
                         "      },\n" +
                         "      \"arguments\": {\n" +
                         "        \"parameters\": [\n" +

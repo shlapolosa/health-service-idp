@@ -114,7 +114,7 @@ spec:
           - name: create-appcontainer
             when: "{{inputs.parameters.app_container_exists}} == not-found"
             templateRef:
-              name: microservice-standard-contract
+              name: oam-driven-contract
               template: create-app-container-claim
             arguments:
               parameters:

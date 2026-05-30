@@ -178,7 +178,7 @@ spec:
                 }
                 annotations: {
                   "realtime-platform.oam.dev/trigger-type": "argo-workflow"
-                  "realtime-platform.oam.dev/workflow-template": "microservice-standard-contract"
+                  "realtime-platform.oam.dev/workflow-template": "oam-driven-contract"
                   "realtime-platform.oam.dev/source": "oam-driven"
                   "realtime-platform.oam.dev/platform-type": "realtime"
                 }
@@ -213,7 +213,7 @@ spec:
                         "    },\n" +
                         "    \"spec\": {\n" +
                         "      \"workflowTemplateRef\": {\n" +
-                        "        \"name\": \"microservice-standard-contract\"\n" +
+                        "        \"name\": \"oam-driven-contract\"\n" +
                         "      },\n" +
                         "      \"arguments\": {\n" +
                         "        \"parameters\": [\n" +

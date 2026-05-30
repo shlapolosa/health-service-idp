@@ -78,7 +78,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          python -m spacy download en_core_web_sm
+          # pytest.ini's addopts include --cov=src etc., requiring pytest-cov.
+          # Not in requirements.txt (only runtime deps); install for CI test execution.
+          pip install pytest-cov
+          # spaCy 3.7.x model URL pinned directly. `python -m spacy download` was resolving
+          # the version to empty, producing 404 (`/-en_core_web_sm/-en_core_web_sm.tar.gz`).
+          # Direct install bypasses spaCy's compatibility-table lookup.
+          pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
 
       - name: Run unit tests
         working-directory: slack-api-server

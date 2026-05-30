@@ -355,7 +355,8 @@ class TestAppContainerRequest:
             "observability": "false",
             "security": "true",
             "vcluster-name": "",
-            "auto-create-vcluster": "true",
+            # 3-tier change (models.py): default auto_create_vcluster=False; vcluster opt-in.
+            "auto-create-vcluster": "false",
             "user": "alice",
             "slack-channel": "C456",
             "slack-user-id": "alice",
@@ -423,7 +424,8 @@ class TestMicroserviceRequest:
         assert request.enable_observability is True
         assert request.enable_security is True
         assert request.target_vcluster is None
-        assert request.auto_create_vcluster is True
+        # 3-tier change (models.py L261): default=False; dedicated vcluster is opt-in.
+        assert request.auto_create_vcluster is False
 
     def test_language_alias_normalization(self):
         """Test that language aliases are normalized properly."""
@@ -580,14 +582,25 @@ class TestMicroserviceRequest:
         )
         assert request.get_vcluster_name() == "my-cluster"
 
-        # Test without target_vcluster (auto-generate)
+        # Test without target_vcluster — 3-tier default is "host" (no vCluster).
+        # Dedicated <repo>-vcluster only when auto_create_vcluster=True (opt-in).
         request = MicroserviceRequest(
             name="user-service",
             namespace="default",
             user="testuser",
             slack_channel="C123"
         )
-        assert request.get_vcluster_name() == "user-vcluster"
+        assert request.get_vcluster_name() == "host"
+
+        # Test opt-in dedicated vCluster
+        request_opt_in = MicroserviceRequest(
+            name="user-service",
+            namespace="default",
+            user="testuser",
+            slack_channel="C123",
+            auto_create_vcluster=True
+        )
+        assert request_opt_in.get_vcluster_name() == "user-vcluster"
 
 
 class TestMicroserviceEnums:
