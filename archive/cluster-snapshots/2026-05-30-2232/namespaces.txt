@@ -1,0 +1,16 @@
+namespace/argo
+namespace/argo-events
+namespace/argocd
+namespace/calico-system
+namespace/crossplane-system
+namespace/default
+namespace/external-secrets
+namespace/istio-system
+namespace/knative-serving
+namespace/kube-node-lease
+namespace/kube-public
+namespace/kube-system
+namespace/search
+namespace/tigera-operator
+namespace/vela-system
+namespace/wear-125959-stream-processor-realtime

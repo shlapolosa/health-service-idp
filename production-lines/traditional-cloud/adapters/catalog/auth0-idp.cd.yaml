@@ -5,6 +5,7 @@ metadata:
   annotations:
     definition.oam.dev/description: "Auth0 identity provider integration via External Secrets"
     definition.oam.dev/requires-source-code: "false"
+    definition.oam.dev/shape: external-secret
 spec:
   workload:
     definition:

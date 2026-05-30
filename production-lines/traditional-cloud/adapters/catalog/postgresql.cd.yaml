@@ -5,6 +5,7 @@ metadata:
   namespace: default
   annotations:
     definition.oam.dev/description: PostgreSQL database via Crossplane Helm provider
+    definition.oam.dev/shape: helm-release
 spec:
   workload:
     definition:

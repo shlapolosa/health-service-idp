@@ -8,6 +8,7 @@ metadata:
   annotations:
     definition.oam.dev/description: "Complete real-time streaming platform with IoT, analytics, and stream processing"
     definition.oam.dev/requires-source-code: "false"
+    definition.oam.dev/shape: knative-service
 spec:
   workload:
     definition:

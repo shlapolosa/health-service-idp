@@ -30,10 +30,13 @@ spec:
       value: "system"
     - name: description
       value: "CLAUDE.md-compliant microservice"
+    # Bug-F: github-org has no safe global default — every caller MUST set it
+    # (validate-microservice-parameters now errors on empty). docker-registry
+    # defaults to the platform's actual registry (was docker.io/socrates12345).
     - name: github-org
-      value: "shlapolosa"
+      value: ""
     - name: docker-registry
-      value: "docker.io/socrates12345"
+      value: "healthidpuaeacr.azurecr.io"
     - name: slack-channel
       value: "#microservice-notifications"
     - name: slack-user-id
@@ -98,10 +101,11 @@ spec:
         default: "system"
       - name: description
         default: "CLAUDE.md-compliant microservice"
+      # Bug-F: see top-of-file note. No hardcoded defaults — caller must pass github-org.
       - name: github-org
-        default: "shlapolosa"
+        default: ""
       - name: docker-registry
-        default: "docker.io/socrates12345"
+        default: "healthidpuaeacr.azurecr.io"
       - name: slack-channel
         default: "#microservice-notifications"
       - name: slack-user-id
@@ -417,9 +421,14 @@ spec:
       - name: microservice-cache
       - name: github-org
     script:
-      image: stedolan/jq:latest
+      # Bug-G: stedolan/jq:latest was unpinned and stedolan/jq publishes no version
+      # tags. Switch to a pinned alpine and install jq via apk so the image is
+      # reproducible. (jq isn't actually used in this script — only shell builtins
+      # — but kept available for future validations.)
+      image: alpine:3.19
       command: [sh]
       source: |
+        apk add --no-cache jq >/dev/null 2>&1 || true
         echo "🔍 Validating Microservice parameter contract compliance..."
         
         # Validate Tier 1 - Universal Parameters
@@ -1321,6 +1330,12 @@ spec:
           echo "📄 no change — boilerplate already matches consumer OAM (no-op)"
         else
           git commit -m "oam: apply consumer-supplied OAM Application (app.submit / oam-driven-contract)"
-          git push origin HEAD || true
+          # Bug-E: one retry on push conflict (rebase + push). Auth / branch-protection
+          # failures now propagate instead of being swallowed by `|| true`.
+          if ! git push origin HEAD; then
+            echo "⚠️  push failed — attempting rebase + retry"
+            git pull --rebase origin HEAD
+            git push origin HEAD
+          fi
           echo "✅ consumer OAM committed + pushed to ${ORG}/${REPO}"
         fi

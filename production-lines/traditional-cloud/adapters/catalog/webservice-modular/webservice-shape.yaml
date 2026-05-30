@@ -13,6 +13,7 @@ metadata:
       PolicyDefinitions.
     oam.dev/modular-replacement-for: webservice
     oam.dev/single-responsibility: "true"
+    definition.oam.dev/shape: knative-service
 spec:
   workload:
     definition:

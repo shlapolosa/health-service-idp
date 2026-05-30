@@ -1,0 +1,61 @@
+# vCluster ComponentDefinition (Crossplane-managed)
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: vcluster
+  annotations:
+    definition.oam.dev/description: "Virtual Kubernetes cluster for multi-tenancy and isolation"
+    definition.oam.dev/shape: helm-release
+spec:
+  workload:
+    definition:
+      apiVersion: helm.crossplane.io/v1beta1
+      kind: Release
+    type: releases.helm.crossplane.io
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "helm.crossplane.io/v1beta1"
+          kind: "Release"
+          metadata: {
+            name: context.name
+            namespace: "crossplane-system"
+          }
+          spec: {
+            forProvider: {
+              chart: {
+                name: "vcluster"
+                repository: "https://charts.loft.sh"
+                version: "0.15.0"
+              }
+              namespace: context.namespace
+              values: {
+                vcluster: {
+                  image: parameter.image
+                }
+                syncer: {
+                  extraArgs: parameter.syncerArgs
+                }
+                isolation: {
+                  enabled: parameter.isolationEnabled
+                }
+                rbac: {
+                  clusterRole: {
+                    create: true
+                  }
+                }
+                service: {
+                  type: parameter.serviceType
+                }
+              }
+            }
+          }
+        }
+        
+        parameter: {
+          image: *"rancher/k3s:v1.27.1-k3s1" | string
+          syncerArgs: *[] | [...string]
+          isolationEnabled: *true | bool
+          serviceType: *"ClusterIP" | "ClusterIP" | "LoadBalancer" | "NodePort"
+        }

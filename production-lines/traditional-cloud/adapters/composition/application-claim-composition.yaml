@@ -42,7 +42,7 @@ spec:
                     - /bin/sh
                     - -c
                     - |
-                      set -e
+                      set -euo pipefail
                       # Install git, curl, and jq
                       apk add --no-cache git curl jq
                       echo "Adding microservice $SERVICE_NAME to AppContainer $APP_CONTAINER..."
@@ -304,7 +304,7 @@ spec:
                     - /bin/sh
                     - -c
                     - |
-                      set -e
+                      set -euo pipefail
                       # Install git, curl, and jq
                       apk add --no-cache git curl jq
                       echo "Adding GitOps manifests for $SERVICE_NAME in $APP_CONTAINER-gitops..."
@@ -463,7 +463,7 @@ spec:
                     - /bin/sh
                     - -c
                     - |
-                      set -e
+                      set -euo pipefail
                       echo "🔗 Registering vCluster with ArgoCD for OAM deployment..."
                       
                       # Skip if deploying to host cluster
@@ -602,17 +602,14 @@ spec:
                   restartPolicy: OnFailure
                   containers:
                   - name: oam-updater
-                    image: alpine:3.18
+                    # Bug-C: pinned alpine/k8s bundles kubectl+git+jq — no runtime curl-install.
+                    image: alpine/k8s:1.28.4
                     command:
                     - /bin/sh
                     - -c
                     - |
-                      set -e
-                      # Install git, curl, jq, and kubectl
-                      apk add --no-cache git curl jq
-                      curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-                      chmod +x kubectl
-                      mv kubectl /usr/local/bin/
+                      set -euo pipefail
+                      # kubectl, git, jq already on PATH in alpine/k8s:1.28.4
                       echo "Updating OAM Application with webservice component for $SERVICE_NAME..."
                       
                       TEMP_DIR="/tmp/oam-update-$APP_CONTAINER"
@@ -627,15 +624,25 @@ spec:
                       git config user.email "applicationclaim@platform.local"
                       
                       # Determine target vCluster from ApplicationClaim spec or annotation
-                      echo "🔍 Looking up ApplicationClaim: $SERVICE_NAME in namespace: default"
-                      kubectl get applicationclaim $SERVICE_NAME -n default -o yaml | head -20
-                      
-                      VCLUSTER_TARGET=$(kubectl get applicationclaim $SERVICE_NAME -n default -o jsonpath='{.spec.targetVCluster}' 2>/dev/null || echo "")
+                      # CLAIM_NAMESPACE is patched from spec.claimRef.namespace (see patches below).
+                      # Fall back to "default" only when the claimRef namespace is empty (legacy callers).
+                      CLAIM_NS="${CLAIM_NAMESPACE:-default}"
+                      echo "🔍 Looking up ApplicationClaim: $SERVICE_NAME in namespace: $CLAIM_NS"
+                      kubectl get applicationclaim $SERVICE_NAME -n "$CLAIM_NS" -o yaml | head -20 || {
+                        echo "⚠️  Not found by name in $CLAIM_NS — falling back to cross-namespace lookup by spec.appName"
+                        FOUND_NS=$(kubectl get applicationclaim -A -o jsonpath="{range .items[?(@.spec.appName=='$SERVICE_NAME')]}{.metadata.namespace}{'\n'}{end}" | head -1)
+                        if [ -n "$FOUND_NS" ]; then
+                          echo "   resolved namespace via -A lookup: $FOUND_NS"
+                          CLAIM_NS="$FOUND_NS"
+                        fi
+                      }
+
+                      VCLUSTER_TARGET=$(kubectl get applicationclaim $SERVICE_NAME -n "$CLAIM_NS" -o jsonpath='{.spec.targetVCluster}' 2>/dev/null || echo "")
                       echo "   spec.targetVCluster value: '$VCLUSTER_TARGET'"
-                      
+
                       if [ -z "$VCLUSTER_TARGET" ]; then
                         echo "   spec.targetVCluster is empty, checking annotation..."
-                        VCLUSTER_TARGET=$(kubectl get applicationclaim $SERVICE_NAME -n default -o jsonpath='{.metadata.annotations.webservice\.oam\.dev/vcluster}' 2>/dev/null || echo "")
+                        VCLUSTER_TARGET=$(kubectl get applicationclaim $SERVICE_NAME -n "$CLAIM_NS" -o jsonpath='{.metadata.annotations.webservice\.oam\.dev/vcluster}' 2>/dev/null || echo "")
                         echo "   annotation value: '$VCLUSTER_TARGET'"
                       fi
                       
@@ -703,12 +710,17 @@ spec:
                         IMAGE_PREFIX="socrates12345/"
                       fi
                       
+                      # Bug-B: image tag defaults to ${DEFAULT_IMAGE_TAG:-latest}.
+                      # WARN: bypasses image-source-policy when defaulted — callers
+                      # SHOULD set DEFAULT_IMAGE_TAG (or override the image entirely
+                      # via the consumer OAM) so an immutable digest/tag is used.
+                      IMAGE_TAG_DEFAULT="${DEFAULT_IMAGE_TAG:-latest}"
                       COMPONENT_YAML="
                         - name: $SERVICE_NAME
                           type: $COMPONENT_TYPE
                           properties:
                             name: $SERVICE_NAME
-                            image: ${IMAGE_REGISTRY}/${IMAGE_PREFIX}$SERVICE_NAME:latest
+                            image: ${IMAGE_REGISTRY}/${IMAGE_PREFIX}$SERVICE_NAME:${IMAGE_TAG_DEFAULT}
                             language: $LANGUAGE
                             framework: $FRAMEWORK
                             port: $COMPONENT_PORT
@@ -851,6 +863,10 @@ spec:
                       # The topology policy will handle deployment to the correct location
                       OAM_NAMESPACE="default"
                       
+                      # Bug-B: image tag defaults to ${DEFAULT_IMAGE_TAG:-v1.0.0}.
+                      # WARN: bypasses image-source-policy when defaulted — callers
+                      # SHOULD set DEFAULT_IMAGE_TAG (or override via consumer OAM).
+                      IMAGE_TAG_DEFAULT="${DEFAULT_IMAGE_TAG:-v1.0.0}"
                       cat > vcluster/$VCLUSTER_TARGET/applications/$SERVICE_NAME/oam-application.yaml << EOF
                       apiVersion: core.oam.dev/v1beta1
                       kind: Application
@@ -862,7 +878,7 @@ spec:
                         - name: $SERVICE_NAME
                           type: webservice
                           properties:
-                            image: "docker.io/socrates12345/$SERVICE_NAME:v1.0.0"
+                            image: "${IMAGE_REGISTRY}/${IMAGE_PREFIX}$SERVICE_NAME:${IMAGE_TAG_DEFAULT}"
                             port: 8080
                             healthPath: "/health"
                             language: $LANGUAGE
@@ -937,6 +953,8 @@ spec:
                       value: ""
                     - name: BOOTSTRAP_SOURCE
                       value: "placeholder"
+                    - name: CLAIM_NAMESPACE
+                      value: "default"
                     - name: GITHUB_TOKEN
                       valueFrom:
                         secretKeyRef:
@@ -996,6 +1014,13 @@ spec:
       - type: string
         string:
           fmt: "%s"
+    # Bug-A fix: inject the claim's namespace into the OAM-updater job so the
+    # kubectl lookup is scoped correctly instead of being hardcoded to `default`.
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.claimRef.namespace
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[9].value
+      policy:
+        fromFieldPath: Optional
 
   # Create Chat Service Repository (conditional on language=rasa and framework=chatbot)
   - name: create-chat-service-repository
@@ -1027,8 +1052,8 @@ spec:
                     - /bin/sh
                     - -c
                     - |
-                      set -e
-                      
+                      set -euo pipefail
+
                       # Check if this is a RASA chatbot service
                       if [ "$LANGUAGE" != "rasa" ] || [ "$FRAMEWORK" != "chatbot" ]; then
                         echo "❌ Skipping chat repository creation - not a RASA chatbot service"
@@ -1210,7 +1235,7 @@ spec:
                     - /bin/sh
                     - -c
                     - |
-                      set -e
+                      set -euo pipefail
                       echo "🔄 Synchronizing repository status from AppContainerClaim..."
                       
                       # Wait for AppContainerClaim to be ready and get repository URL
@@ -1336,7 +1361,7 @@ spec:
                     - /bin/sh
                     - -c
                     - |
-                      set -e
+                      set -euo pipefail
                       echo "🔧 Setting up ArgoCD for $SERVICE_NAME..."
                       
                       # Wait for GitOps repo to be ready

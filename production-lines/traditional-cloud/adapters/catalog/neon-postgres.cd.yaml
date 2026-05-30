@@ -1,0 +1,100 @@
+# Neon Postgres ComponentDefinition (Cloud-native serverless PostgreSQL)
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: neon-postgres
+  annotations:
+    definition.oam.dev/description: "Neon serverless PostgreSQL database with automatic scaling and branching"
+    definition.oam.dev/shape: external-secret
+spec:
+  workload:
+    definition:
+      apiVersion: v1
+      kind: Secret
+    type: secrets
+  schematic:
+    cue:
+      template: |
+        import "encoding/base64"
+        
+        output: {
+          apiVersion: "v1"
+          kind: "Secret"
+          metadata: {
+            name: context.name + "-neon-credentials"
+            namespace: context.namespace
+            labels: {
+              "app.kubernetes.io/name": context.name
+              "app.kubernetes.io/component": "database"
+              "app.kubernetes.io/managed-by": "kubevela"
+              "database.type": "neon-postgres"
+            }
+          }
+          type: "Opaque"
+          data: {
+            // These would be populated by an operator or controller
+            "database-url": base64.Encode(null, "postgresql://user:pass@ep-xyz.neon.tech/dbname")
+            "host": base64.Encode(null, "ep-xyz.neon.tech")
+            "port": base64.Encode(null, "5432")
+            "database": base64.Encode(null, parameter.database)
+            "username": base64.Encode(null, parameter.username)
+            "password": base64.Encode(null, "generated-password")
+          }
+        }
+        
+        outputs: {
+          // Create External Secret to sync Neon credentials
+          "external-secret": {
+            apiVersion: "external-secrets.io/v1beta1"
+            kind: "ExternalSecret"
+            metadata: {
+              name: context.name + "-neon-sync"
+              namespace: context.namespace
+            }
+            spec: {
+              secretStoreRef: {
+                name: "neon-secret-store"
+                kind: "SecretStore"
+              }
+              target: {
+                name: context.name + "-neon-credentials"
+                creationPolicy: "Merge"
+              }
+              data: [
+                {
+                  secretKey: "database-url"
+                  remoteRef: {
+                    key: context.name
+                    property: "database-url"
+                  }
+                }
+              ]
+            }
+          }
+          
+          // ConfigMap for non-sensitive configuration
+          "config": {
+            apiVersion: "v1"
+            kind: "ConfigMap"
+            metadata: {
+              name: context.name + "-neon-config"
+              namespace: context.namespace
+            }
+            data: {
+              "database": parameter.database
+              "region": parameter.region
+              "compute-size": parameter.computeSize
+              "autoscaling": "\\(parameter.autoscaling)"
+              "branch": parameter.branch
+            }
+          }
+        }
+        
+        parameter: {
+          database: *"myapp" | string
+          username: *"app_user" | string
+          region: *"us-west-2" | string
+          computeSize: *"0.25" | "0.25" | "0.5" | "1" | "2" | "4" | "8"
+          autoscaling: *true | bool
+          branch: *"main" | string
+        }

@@ -4,6 +4,7 @@ metadata:
   name: nats-jetstream
   annotations:
     definition.oam.dev/description: "Native NATS JetStream deployment via Helm with Crossplane-managed lifecycle"
+    definition.oam.dev/shape: helm-release
 spec:
   workload:
     definition:

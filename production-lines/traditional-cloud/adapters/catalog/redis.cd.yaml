@@ -1,0 +1,68 @@
+# Native Redis ComponentDefinition (Crossplane-managed via Helm)
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: redis
+  annotations:
+    definition.oam.dev/description: "Native Redis deployment via Helm with Crossplane-managed lifecycle"
+    definition.oam.dev/shape: helm-release
+spec:
+  workload:
+    definition:
+      apiVersion: helm.crossplane.io/v1beta1
+      kind: Release
+    type: releases.helm.crossplane.io
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "helm.crossplane.io/v1beta1"
+          kind: "Release"
+          metadata: {
+            name: context.name
+            namespace: "crossplane-system"
+          }
+          spec: {
+            forProvider: {
+              chart: {
+                name: "redis"
+                repository: "https://charts.bitnami.com/bitnami"
+                version: "17.11.3"
+              }
+              namespace: context.namespace
+              values: {
+                auth: {
+                  enabled: parameter.authEnabled
+                  password: parameter.password
+                }
+                architecture: parameter.architecture
+                master: {
+                  persistence: {
+                    enabled: parameter.persistenceEnabled
+                    size: parameter.storageSize
+                  }
+                }
+                replica: {
+                  replicaCount: parameter.replicaCount
+                  persistence: {
+                    enabled: parameter.persistenceEnabled
+                    size: parameter.storageSize
+                  }
+                }
+                metrics: {
+                  enabled: parameter.metricsEnabled
+                }
+              }
+            }
+          }
+        }
+        
+        parameter: {
+          authEnabled: *true | bool
+          password: *"redis-password" | string
+          architecture: *"replication" | "standalone" | "replication" | "sentinel"
+          persistenceEnabled: *true | bool
+          storageSize: *"8Gi" | string
+          replicaCount: *2 | int
+          metricsEnabled: *true | bool
+        }

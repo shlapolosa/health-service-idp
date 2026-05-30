@@ -1,0 +1,69 @@
+# OAM TraitDefinitions and PolicyDefinitions for infrastructure and application management
+
+---
+# 1. Ingress Trait Definition
+apiVersion: core.oam.dev/v1beta1
+kind: TraitDefinition
+metadata:
+  name: ingress
+  annotations:
+    definition.oam.dev/description: "Configure ingress routing for web services"
+spec:
+  appliesToWorkloads:
+  - webservice
+  schematic:
+    cue:
+      template: |
+        outputs: ingress: {
+          apiVersion: "networking.k8s.io/v1"
+          kind: "Ingress"
+          metadata: {
+            name: context.name + "-ingress"
+            namespace: context.namespace
+            annotations: {
+              // Inherit cluster routing from parent component
+              if context.appAnnotations["app.oam.dev/cluster"] != _|_ {
+                "app.oam.dev/cluster": context.appAnnotations["app.oam.dev/cluster"]
+              }
+              "kubernetes.io/ingress.class": "istio"
+              if parameter.enableTLS {
+                "cert-manager.io/cluster-issuer": parameter.clusterIssuer
+              }
+            }
+          }
+          spec: {
+            if parameter.enableTLS {
+              tls: [{
+                hosts: [parameter.domain]
+                secretName: context.name + "-tls"
+              }]
+            }
+            rules: [{
+              host: parameter.domain
+              http: {
+                paths: [{
+                  path: parameter.path
+                  pathType: "Prefix"
+                  backend: {
+                    service: {
+                      name: context.name
+                      port: {
+                        number: context.port
+                      }
+                    }
+                  }
+                }]
+              }
+            }]
+          }
+        }
+
+        parameter: {
+          // Required
+          domain: string
+
+          // Optional
+          path: *"/" | string
+          enableTLS: *true | bool
+          clusterIssuer: *"letsencrypt-prod" | string
+        }

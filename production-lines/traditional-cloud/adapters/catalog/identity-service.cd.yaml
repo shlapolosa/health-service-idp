@@ -6,6 +6,7 @@ metadata:
   name: identity-service
   annotations:
     definition.oam.dev/description: "Domain-specific identity and access management service generator using Spring Boot templates"
+    definition.oam.dev/shape: argo-workflow
 spec:
   workload:
     definition:
@@ -101,22 +102,4 @@ spec:
         parameter: {
           domain: *"healthcare" | "healthcare" | "financial" | "education"
           githubOwner: *"shlapolosa" | string
-          customProfiles?: [...string]
-          additionalIntegrations?: [...string]
-          javaVersion?: *"21" | string
-          springBootVersion?: *"3.2.0" | string
-          database?: *{
-            type: "postgresql"
-            provision: true
-          } | {
-            type: string
-            provision: bool
-          }
-          redis?: *{
-            enabled: true
-            provision: true
-          } | {
-            enabled: bool
-            provision: bool
-          }
         }

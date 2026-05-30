@@ -1,0 +1,2567 @@
+apiVersion: v1
+items:
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Horizontal Pod Autoscaler for applications
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"core.oam.dev/v1beta1","kind":"TraitDefinition","metadata":{"annotations":{"definition.oam.dev/description":"Horizontal Pod Autoscaler for applications"},"name":"autoscaler","namespace":"default"},"spec":{"appliesToWorkloads":["webservice","tfjob"],"schematic":{"cue":{"template":"outputs: hpa: {\n  apiVersion: \"autoscaling/v2\"\n  kind: \"HorizontalPodAutoscaler\"\n  metadata: {\n    name: context.name + \"-hpa\"\n    namespace: context.namespace\n  }\n  spec: {\n    scaleTargetRef: {\n      apiVersion: \"apps/v1\"\n      kind: \"Deployment\"\n      name: context.name\n    }\n    minReplicas: parameter.minReplicas\n    maxReplicas: parameter.maxReplicas\n    metrics: [\n      if parameter.targetCPU != _|_ {\n        {\n          type: \"Resource\"\n          resource: {\n            name: \"cpu\"\n            target: {\n              type: \"Utilization\"\n              averageUtilization: parameter.targetCPU\n            }\n          }\n        }\n      },\n      if parameter.targetMemory != _|_ {\n        {\n          type: \"Resource\"\n          resource: {\n            name: \"memory\"\n            target: {\n              type: \"Utilization\"\n              averageUtilization: parameter.targetMemory\n            }\n          }\n        }\n      }\n    ]\n    behavior: {\n      scaleUp: {\n        stabilizationWindowSeconds: parameter.scaleUpStabilization\n        policies: [{\n          type: \"Percent\"\n          value: 100\n          periodSeconds: 15\n        }]\n      }\n      scaleDown: {\n        stabilizationWindowSeconds: parameter.scaleDownStabilization\n        policies: [{\n          type: \"Percent\"\n          value: 50\n          periodSeconds: 60\n        }]\n      }\n    }\n  }\n}\n\nparameter: {\n  // Required\n  minReplicas: int\n  maxReplicas: int\n  \n  // Optional\n  targetCPU?: int\n  targetMemory?: int\n  scaleUpStabilization: *60 | int\n  scaleDownStabilization: *300 | int\n}\n"}}}}
+    creationTimestamp: "2025-08-17T00:43:14Z"
+    generation: 1
+    name: autoscaler
+    namespace: default
+    resourceVersion: "57191014"
+    uid: 48e866e5-5354-44ab-a97b-3648bc57ddd4
+  spec:
+    appliesToWorkloads:
+    - webservice
+    - tfjob
+    schematic:
+      cue:
+        template: "outputs: hpa: {\n  apiVersion: \"autoscaling/v2\"\n  kind: \"HorizontalPodAutoscaler\"\n
+          \ metadata: {\n    name: context.name + \"-hpa\"\n    namespace: context.namespace\n
+          \ }\n  spec: {\n    scaleTargetRef: {\n      apiVersion: \"apps/v1\"\n      kind:
+          \"Deployment\"\n      name: context.name\n    }\n    minReplicas: parameter.minReplicas\n
+          \   maxReplicas: parameter.maxReplicas\n    metrics: [\n      if parameter.targetCPU
+          != _|_ {\n        {\n          type: \"Resource\"\n          resource: {\n
+          \           name: \"cpu\"\n            target: {\n              type: \"Utilization\"\n
+          \             averageUtilization: parameter.targetCPU\n            }\n          }\n
+          \       }\n      },\n      if parameter.targetMemory != _|_ {\n        {\n
+          \         type: \"Resource\"\n          resource: {\n            name: \"memory\"\n
+          \           target: {\n              type: \"Utilization\"\n              averageUtilization:
+          parameter.targetMemory\n            }\n          }\n        }\n      }\n
+          \   ]\n    behavior: {\n      scaleUp: {\n        stabilizationWindowSeconds:
+          parameter.scaleUpStabilization\n        policies: [{\n          type: \"Percent\"\n
+          \         value: 100\n          periodSeconds: 15\n        }]\n      }\n
+          \     scaleDown: {\n        stabilizationWindowSeconds: parameter.scaleDownStabilization\n
+          \       policies: [{\n          type: \"Percent\"\n          value: 50\n
+          \         periodSeconds: 60\n        }]\n      }\n    }\n  }\n}\n\nparameter:
+          {\n  // Required\n  minReplicas: int\n  maxReplicas: int\n  \n  // Optional\n
+          \ targetCPU?: int\n  targetMemory?: int\n  scaleUpStabilization: *60 | int\n
+          \ scaleDownStabilization: *300 | int\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-01-02T10:45:08Z"
+      message: 'cannot store capability autoscaler in ConfigMap: cannot create or
+        update capability autoscaler-v1 in ConfigMap: the server is currently unable
+        to handle the request (put configmaps trait-schema-autoscaler-v1)'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-autoscaler
+    latestRevision:
+      name: autoscaler-v1
+      revision: 1
+      revisionHash: cc369f604358cb28
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Configure ingress routing for web services
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"core.oam.dev/v1beta1","kind":"TraitDefinition","metadata":{"annotations":{"definition.oam.dev/description":"Configure ingress routing for web services"},"name":"ingress","namespace":"default"},"spec":{"appliesToWorkloads":["webservice"],"schematic":{"cue":{"template":"outputs: ingress: {\n  apiVersion: \"networking.k8s.io/v1\"\n  kind: \"Ingress\"\n  metadata: {\n    name: context.name + \"-ingress\"\n    namespace: context.namespace\n    annotations: {\n      // Inherit cluster routing from parent component\n      if context.appAnnotations[\"app.oam.dev/cluster\"] != _|_ {\n        \"app.oam.dev/cluster\": context.appAnnotations[\"app.oam.dev/cluster\"]\n      }\n      \"kubernetes.io/ingress.class\": \"istio\"\n      if parameter.enableTLS {\n        \"cert-manager.io/cluster-issuer\": parameter.clusterIssuer\n      }\n    }\n  }\n  spec: {\n    if parameter.enableTLS {\n      tls: [{\n        hosts: [parameter.domain]\n        secretName: context.name + \"-tls\"\n      }]\n    }\n    rules: [{\n      host: parameter.domain\n      http: {\n        paths: [{\n          path: parameter.path\n          pathType: \"Prefix\"\n          backend: {\n            service: {\n              name: context.name\n              port: {\n                number: context.port\n              }\n            }\n          }\n        }]\n      }\n    }]\n  }\n}\n\nparameter: {\n  // Required\n  domain: string\n  \n  // Optional\n  path: *\"/\" | string\n  enableTLS: *true | bool\n  clusterIssuer: *\"letsencrypt-prod\" | string\n}\n"}}}}
+    creationTimestamp: "2025-08-17T00:43:14Z"
+    generation: 1
+    name: ingress
+    namespace: default
+    resourceVersion: "56970399"
+    uid: 30ad2c47-7eb6-4dd8-ac2f-bac161f4bdbd
+  spec:
+    appliesToWorkloads:
+    - webservice
+    schematic:
+      cue:
+        template: "outputs: ingress: {\n  apiVersion: \"networking.k8s.io/v1\"\n  kind:
+          \"Ingress\"\n  metadata: {\n    name: context.name + \"-ingress\"\n    namespace:
+          context.namespace\n    annotations: {\n      // Inherit cluster routing
+          from parent component\n      if context.appAnnotations[\"app.oam.dev/cluster\"]
+          != _|_ {\n        \"app.oam.dev/cluster\": context.appAnnotations[\"app.oam.dev/cluster\"]\n
+          \     }\n      \"kubernetes.io/ingress.class\": \"istio\"\n      if parameter.enableTLS
+          {\n        \"cert-manager.io/cluster-issuer\": parameter.clusterIssuer\n
+          \     }\n    }\n  }\n  spec: {\n    if parameter.enableTLS {\n      tls:
+          [{\n        hosts: [parameter.domain]\n        secretName: context.name
+          + \"-tls\"\n      }]\n    }\n    rules: [{\n      host: parameter.domain\n
+          \     http: {\n        paths: [{\n          path: parameter.path\n          pathType:
+          \"Prefix\"\n          backend: {\n            service: {\n              name:
+          context.name\n              port: {\n                number: context.port\n
+          \             }\n            }\n          }\n        }]\n      }\n    }]\n
+          \ }\n}\n\nparameter: {\n  // Required\n  domain: string\n  \n  // Optional\n
+          \ path: *\"/\" | string\n  enableTLS: *true | bool\n  clusterIssuer: *\"letsencrypt-prod\"
+          | string\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-01-02T04:13:14Z"
+      message: 'cannot store capability ingress in ConfigMap: cannot create or update
+        capability ingress in ConfigMap: resource name may not be empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-ingress
+    latestRevision:
+      name: ingress-v1
+      revision: 1
+      revisionHash: ee041da67a461090
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Configure application as Kafka consumer
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"core.oam.dev/v1beta1","kind":"TraitDefinition","metadata":{"annotations":{"definition.oam.dev/description":"Configure application as Kafka consumer"},"name":"kafka-consumer","namespace":"default"},"spec":{"appliesToWorkloads":["webservice"],"schematic":{"cue":{"template":"outputs: configmap: {\n  apiVersion: \"v1\"\n  kind: \"ConfigMap\"\n  metadata: {\n    name: context.name + \"-kafka-consumer-config\"\n    namespace: context.namespace\n  }\n  data: {\n    \"kafka.properties\": \"\"\"\n      bootstrap.servers=\\(parameter.kafkaCluster):9092\n      key.deserializer=org.apache.kafka.common.serialization.StringDeserializer\n      value.deserializer=org.apache.kafka.common.serialization.StringDeserializer\n      group.id=\\(parameter.consumerGroup)\n      auto.offset.reset=earliest\n      enable.auto.commit=true\n      auto.commit.interval.ms=1000\n      \"\"\"\n    \"topics.json\": parameter.topics\n    \"consumer.group\": parameter.consumerGroup\n  }\n}\n\n// Patch the workload to add Kafka environment variables\npatch: {\n  spec: template: spec: containers: [{\n    env: [\n      {\n        name: \"KAFKA_BOOTSTRAP_SERVERS\"\n        value: parameter.kafkaCluster + \":9092\"\n      },\n      {\n        name: \"KAFKA_TOPICS\"\n        valueFrom: {\n          configMapKeyRef: {\n            name: context.name + \"-kafka-consumer-config\"\n            key: \"topics.json\"\n          }\n        }\n      },\n      {\n        name: \"KAFKA_CONSUMER_GROUP\"\n        valueFrom: {\n          configMapKeyRef: {\n            name: context.name + \"-kafka-consumer-config\"\n            key: \"consumer.group\"\n          }\n        }\n      }\n    ]\n    volumeMounts: [{\n      name: \"kafka-config\"\n      mountPath: \"/etc/kafka\"\n    }]\n  }]\n  volumes: [{\n    name: \"kafka-config\"\n    configMap: {\n      name: context.name + \"-kafka-consumer-config\"\n    }\n  }]\n}\n\nparameter: {\n  // Required\n  topics: [...string]\n  consumerGroup: string\n  \n  // Optional\n  kafkaCluster: *\"kafka\" | string\n}\n"}}}}
+    creationTimestamp: "2025-08-17T00:43:14Z"
+    generation: 1
+    name: kafka-consumer
+    namespace: default
+    resourceVersion: "57241369"
+    uid: 833ebe5e-862d-4422-863c-a113d51ac581
+  spec:
+    appliesToWorkloads:
+    - webservice
+    schematic:
+      cue:
+        template: "outputs: configmap: {\n  apiVersion: \"v1\"\n  kind: \"ConfigMap\"\n
+          \ metadata: {\n    name: context.name + \"-kafka-consumer-config\"\n    namespace:
+          context.namespace\n  }\n  data: {\n    \"kafka.properties\": \"\"\"\n      bootstrap.servers=\\(parameter.kafkaCluster):9092\n
+          \     key.deserializer=org.apache.kafka.common.serialization.StringDeserializer\n
+          \     value.deserializer=org.apache.kafka.common.serialization.StringDeserializer\n
+          \     group.id=\\(parameter.consumerGroup)\n      auto.offset.reset=earliest\n
+          \     enable.auto.commit=true\n      auto.commit.interval.ms=1000\n      \"\"\"\n
+          \   \"topics.json\": parameter.topics\n    \"consumer.group\": parameter.consumerGroup\n
+          \ }\n}\n\n// Patch the workload to add Kafka environment variables\npatch:
+          {\n  spec: template: spec: containers: [{\n    env: [\n      {\n        name:
+          \"KAFKA_BOOTSTRAP_SERVERS\"\n        value: parameter.kafkaCluster + \":9092\"\n
+          \     },\n      {\n        name: \"KAFKA_TOPICS\"\n        valueFrom: {\n
+          \         configMapKeyRef: {\n            name: context.name + \"-kafka-consumer-config\"\n
+          \           key: \"topics.json\"\n          }\n        }\n      },\n      {\n
+          \       name: \"KAFKA_CONSUMER_GROUP\"\n        valueFrom: {\n          configMapKeyRef:
+          {\n            name: context.name + \"-kafka-consumer-config\"\n            key:
+          \"consumer.group\"\n          }\n        }\n      }\n    ]\n    volumeMounts:
+          [{\n      name: \"kafka-config\"\n      mountPath: \"/etc/kafka\"\n    }]\n
+          \ }]\n  volumes: [{\n    name: \"kafka-config\"\n    configMap: {\n      name:
+          context.name + \"-kafka-consumer-config\"\n    }\n  }]\n}\n\nparameter:
+          {\n  // Required\n  topics: [...string]\n  consumerGroup: string\n  \n  //
+          Optional\n  kafkaCluster: *\"kafka\" | string\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-01-02T12:48:59Z"
+      message: 'cannot store capability kafka-consumer in ConfigMap: cannot create
+        or update capability kafka-consumer in ConfigMap: resource name may not be
+        empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-kafka-consumer
+    latestRevision:
+      name: kafka-consumer-v1
+      revision: 1
+      revisionHash: a2d81a2043f1dbdc
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Configure application as Kafka producer
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"core.oam.dev/v1beta1","kind":"TraitDefinition","metadata":{"annotations":{"definition.oam.dev/description":"Configure application as Kafka producer"},"name":"kafka-producer","namespace":"default"},"spec":{"appliesToWorkloads":["webservice"],"schematic":{"cue":{"template":"outputs: configmap: {\n  apiVersion: \"v1\"\n  kind: \"ConfigMap\"\n  metadata: {\n    name: context.name + \"-kafka-producer-config\"\n    namespace: context.namespace\n  }\n  data: {\n    \"kafka.properties\": \"\"\"\n      bootstrap.servers=\\(parameter.kafkaCluster):9092\n      key.serializer=org.apache.kafka.common.serialization.StringSerializer\n      value.serializer=org.apache.kafka.common.serialization.StringSerializer\n      acks=all\n      retries=3\n      batch.size=16384\n      linger.ms=1\n      buffer.memory=33554432\n      \"\"\"\n    \"topics.json\": parameter.topics\n  }\n}\n\n// Patch the workload to add Kafka environment variables\npatch: {\n  spec: template: spec: containers: [{\n    env: [\n      {\n        name: \"KAFKA_BOOTSTRAP_SERVERS\"\n        value: parameter.kafkaCluster + \":9092\"\n      },\n      {\n        name: \"KAFKA_TOPICS\"\n        valueFrom: {\n          configMapKeyRef: {\n            name: context.name + \"-kafka-producer-config\"\n            key: \"topics.json\"\n          }\n        }\n      }\n    ]\n    volumeMounts: [{\n      name: \"kafka-config\"\n      mountPath: \"/etc/kafka\"\n    }]\n  }]\n  volumes: [{\n    name: \"kafka-config\"\n    configMap: {\n      name: context.name + \"-kafka-producer-config\"\n    }\n  }]\n}\n\nparameter: {\n  // Required\n  topics: [...string]\n  \n  // Optional\n  kafkaCluster: *\"kafka\" | string\n}\n"}}}}
+    creationTimestamp: "2025-08-17T00:43:14Z"
+    generation: 1
+    name: kafka-producer
+    namespace: default
+    resourceVersion: "57241382"
+    uid: 246f50cd-b159-443c-bbc2-a47997ac6ca9
+  spec:
+    appliesToWorkloads:
+    - webservice
+    schematic:
+      cue:
+        template: "outputs: configmap: {\n  apiVersion: \"v1\"\n  kind: \"ConfigMap\"\n
+          \ metadata: {\n    name: context.name + \"-kafka-producer-config\"\n    namespace:
+          context.namespace\n  }\n  data: {\n    \"kafka.properties\": \"\"\"\n      bootstrap.servers=\\(parameter.kafkaCluster):9092\n
+          \     key.serializer=org.apache.kafka.common.serialization.StringSerializer\n
+          \     value.serializer=org.apache.kafka.common.serialization.StringSerializer\n
+          \     acks=all\n      retries=3\n      batch.size=16384\n      linger.ms=1\n
+          \     buffer.memory=33554432\n      \"\"\"\n    \"topics.json\": parameter.topics\n
+          \ }\n}\n\n// Patch the workload to add Kafka environment variables\npatch:
+          {\n  spec: template: spec: containers: [{\n    env: [\n      {\n        name:
+          \"KAFKA_BOOTSTRAP_SERVERS\"\n        value: parameter.kafkaCluster + \":9092\"\n
+          \     },\n      {\n        name: \"KAFKA_TOPICS\"\n        valueFrom: {\n
+          \         configMapKeyRef: {\n            name: context.name + \"-kafka-producer-config\"\n
+          \           key: \"topics.json\"\n          }\n        }\n      }\n    ]\n
+          \   volumeMounts: [{\n      name: \"kafka-config\"\n      mountPath: \"/etc/kafka\"\n
+          \   }]\n  }]\n  volumes: [{\n    name: \"kafka-config\"\n    configMap:
+          {\n      name: context.name + \"-kafka-producer-config\"\n    }\n  }]\n}\n\nparameter:
+          {\n  // Required\n  topics: [...string]\n  \n  // Optional\n  kafkaCluster:
+          *\"kafka\" | string\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-01-02T12:49:00Z"
+      message: 'cannot store capability kafka-producer in ConfigMap: cannot create
+        or update capability kafka-producer in ConfigMap: the server is currently
+        unable to handle the request (put configmaps trait-schema-kafka-producer)'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-kafka-producer
+    latestRevision:
+      name: kafka-producer-v1
+      revision: 1
+      revisionHash: bc980941f5ba6eb2
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Affinity specifies affinity and toleration K8s
+        pod for your workload which follows the pod spec in path 'spec.template'.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+      custom.definition.oam.dev/ui-hidden: "true"
+    name: affinity
+    namespace: vela-system
+    resourceVersion: "57214924"
+    uid: a99e58b4-fde1-4126-9ae2-b3106579e0ea
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    - statefulsets.apps
+    - daemonsets.apps
+    - jobs.batch
+    podDisruptive: true
+    schematic:
+      cue:
+        template: "patch: spec: template: spec: {\n\tif parameter.podAffinity != _|_
+          {\n\t\taffinity: podAffinity: {\n\t\t\tif parameter.podAffinity.required
+          != _|_ {\n\t\t\t\trequiredDuringSchedulingIgnoredDuringExecution: [\n\t\t\t\t\tfor
+          k in parameter.podAffinity.required {\n\t\t\t\t\t\tif k.labelSelector !=
+          _|_ {\n\t\t\t\t\t\t\tlabelSelector: k.labelSelector\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif
+          k.namespace != _|_ {\n\t\t\t\t\t\t\tnamespace: k.namespace\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif
+          k.namespaces != _|_ {\n\t\t\t\t\t\t\tnamespaces: k.namespaces\n\t\t\t\t\t\t}\n\t\t\t\t\t\ttopologyKey:
+          k.topologyKey\n\t\t\t\t\t\tif k.namespaceSelector != _|_ {\n\t\t\t\t\t\t\tnamespaceSelector:
+          k.namespaceSelector\n\t\t\t\t\t\t}\n\t\t\t\t\t}]\n\t\t\t}\n\t\t\tif parameter.podAffinity.preferred
+          != _|_ {\n\t\t\t\tpreferredDuringSchedulingIgnoredDuringExecution: [\n\t\t\t\t\tfor
+          k in parameter.podAffinity.preferred {\n\t\t\t\t\t\tweight:          k.weight\n\t\t\t\t\t\tpodAffinityTerm:
+          k.podAffinityTerm\n\t\t\t\t\t}]\n\t\t\t}\n\t\t}\n\t}\n\tif parameter.podAntiAffinity
+          != _|_ {\n\t\taffinity: podAntiAffinity: {\n\t\t\tif parameter.podAntiAffinity.required
+          != _|_ {\n\t\t\t\trequiredDuringSchedulingIgnoredDuringExecution: [\n\t\t\t\t\tfor
+          k in parameter.podAntiAffinity.required {\n\t\t\t\t\t\tif k.labelSelector
+          != _|_ {\n\t\t\t\t\t\t\tlabelSelector: k.labelSelector\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif
+          k.namespace != _|_ {\n\t\t\t\t\t\t\tnamespace: k.namespace\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif
+          k.namespaces != _|_ {\n\t\t\t\t\t\t\tnamespaces: k.namespaces\n\t\t\t\t\t\t}\n\t\t\t\t\t\ttopologyKey:
+          k.topologyKey\n\t\t\t\t\t\tif k.namespaceSelector != _|_ {\n\t\t\t\t\t\t\tnamespaceSelector:
+          k.namespaceSelector\n\t\t\t\t\t\t}\n\t\t\t\t\t}]\n\t\t\t}\n\t\t\tif parameter.podAntiAffinity.preferred
+          != _|_ {\n\t\t\t\tpreferredDuringSchedulingIgnoredDuringExecution: [\n\t\t\t\t\tfor
+          k in parameter.podAntiAffinity.preferred {\n\t\t\t\t\t\tweight:          k.weight\n\t\t\t\t\t\tpodAffinityTerm:
+          k.podAffinityTerm\n\t\t\t\t\t}]\n\t\t\t}\n\t\t}\n\t}\n\tif parameter.nodeAffinity
+          != _|_ {\n\t\taffinity: nodeAffinity: {\n\t\t\tif parameter.nodeAffinity.required
+          != _|_ {\n\t\t\t\trequiredDuringSchedulingIgnoredDuringExecution: nodeSelectorTerms:
+          [\n\t\t\t\t\tfor k in parameter.nodeAffinity.required.nodeSelectorTerms
+          {\n\t\t\t\t\t\tif k.matchExpressions != _|_ {\n\t\t\t\t\t\t\tmatchExpressions:
+          k.matchExpressions\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif k.matchFields != _|_ {\n\t\t\t\t\t\t\tmatchFields:
+          k.matchFields\n\t\t\t\t\t\t}\n\t\t\t\t\t}]\n\t\t\t}\n\t\t\tif parameter.nodeAffinity.preferred
+          != _|_ {\n\t\t\t\tpreferredDuringSchedulingIgnoredDuringExecution: [\n\t\t\t\t\tfor
+          k in parameter.nodeAffinity.preferred {\n\t\t\t\t\t\tweight:     k.weight\n\t\t\t\t\t\tpreference:
+          k.preference\n\t\t\t\t\t}]\n\t\t\t}\n\t\t}\n\t}\n\tif parameter.tolerations
+          != _|_ {\n\t\ttolerations: [\n\t\t\tfor k in parameter.tolerations {\n\t\t\t\tif
+          k.key != _|_ {\n\t\t\t\t\tkey: k.key\n\t\t\t\t}\n\t\t\t\tif k.effect !=
+          _|_ {\n\t\t\t\t\teffect: k.effect\n\t\t\t\t}\n\t\t\t\tif k.value != _|_
+          {\n\t\t\t\t\tvalue: k.value\n\t\t\t\t}\n\t\t\t\toperator: k.operator\n\t\t\t\tif
+          k.tolerationSeconds != _|_ {\n\t\t\t\t\ttolerationSeconds: k.tolerationSeconds\n\t\t\t\t}\n\t\t\t}]\n\t}\n}\n\n#labelSelector:
+          {\n\tmatchLabels?: [string]: string\n\tmatchExpressions?: [...{\n\t\tkey:
+          \     string\n\t\toperator: *\"In\" | \"NotIn\" | \"Exists\" | \"DoesNotExist\"\n\t\tvalues?:
+          [...string]\n\t}]\n}\n\n#podAffinityTerm: {\n\tlabelSelector?: #labelSelector\n\tnamespaces?:
+          [...string]\n\ttopologyKey:        string\n\tnamespaceSelector?: #labelSelector\n}\n\n#nodeSelecor:
+          {\n\tkey:      string\n\toperator: *\"In\" | \"NotIn\" | \"Exists\" | \"DoesNotExist\"
+          | \"Gt\" | \"Lt\"\n\tvalues?: [...string]\n}\n\n#nodeSelectorTerm: {\n\tmatchExpressions?:
+          [...#nodeSelecor]\n\tmatchFields?: [...#nodeSelecor]\n}\n\nparameter: {\n\t//
+          +usage=Specify the pod affinity scheduling rules\n\tpodAffinity?: {\n\t\t//
+          +usage=Specify the required during scheduling ignored during execution\n\t\trequired?:
+          [...#podAffinityTerm]\n\t\t// +usage=Specify the preferred during scheduling
+          ignored during execution\n\t\tpreferred?: [...{\n\t\t\t// +usage=Specify
+          weight associated with matching the corresponding podAffinityTerm\n\t\t\tweight:
+          int & >=1 & <=100\n\t\t\t// +usage=Specify a set of pods\n\t\t\tpodAffinityTerm:
+          #podAffinityTerm\n\t\t}]\n\t}\n\t// +usage=Specify the pod anti-affinity
+          scheduling rules\n\tpodAntiAffinity?: {\n\t\t// +usage=Specify the required
+          during scheduling ignored during execution\n\t\trequired?: [...#podAffinityTerm]\n\t\t//
+          +usage=Specify the preferred during scheduling ignored during execution\n\t\tpreferred?:
+          [...{\n\t\t\t// +usage=Specify weight associated with matching the corresponding
+          podAffinityTerm\n\t\t\tweight: int & >=1 & <=100\n\t\t\t// +usage=Specify
+          a set of pods\n\t\t\tpodAffinityTerm: #podAffinityTerm\n\t\t}]\n\t}\n\t//
+          +usage=Specify the node affinity scheduling rules for the pod\n\tnodeAffinity?:
+          {\n\t\t// +usage=Specify the required during scheduling ignored during execution\n\t\trequired?:
+          {\n\t\t\t// +usage=Specify a list of node selector\n\t\t\tnodeSelectorTerms:
+          [...#nodeSelectorTerm]\n\t\t}\n\t\t// +usage=Specify the preferred during
+          scheduling ignored during execution\n\t\tpreferred?: [...{\n\t\t\t// +usage=Specify
+          weight associated with matching the corresponding nodeSelector\n\t\t\tweight:
+          int & >=1 & <=100\n\t\t\t// +usage=Specify a node selector\n\t\t\tpreference:
+          #nodeSelectorTerm\n\t\t}]\n\t}\n\t// +usage=Specify tolerant taint\n\ttolerations?:
+          [...{\n\t\tkey?:     string\n\t\toperator: *\"Equal\" | \"Exists\"\n\t\tvalue?:
+          \  string\n\t\teffect?:  \"NoSchedule\" | \"PreferNoSchedule\" | \"NoExecute\"\n\t\t//
+          +usage=Specify the period of time the toleration\n\t\ttolerationSeconds?:
+          int\n\t}]\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-01-02T11:41:42Z"
+      message: 'cannot store capability affinity in ConfigMap: cannot create or update
+        capability affinity-v1 in ConfigMap: resource name may not be empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-affinity
+    latestRevision:
+      name: affinity-v1
+      revision: 1
+      revisionHash: 7dfdd81193fceb2e
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Add annotations on your workload. If it generates
+        pod or job, add same annotations for generated pods.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: annotations
+    namespace: vela-system
+    resourceVersion: "57214865"
+    uid: 577d3e79-363a-40e6-bb98-d89af0b4837d
+  spec:
+    appliesToWorkloads:
+    - '*'
+    podDisruptive: true
+    schematic:
+      cue:
+        template: "// +patchStrategy=jsonMergePatch\npatch: {\n\tlet annotationsContent
+          = {\n\t\tfor k, v in parameter {\n\t\t\t(k): v\n\t\t}\n\t}\n\n\tmetadata:
+          annotations: annotationsContent\n\tif context.output.spec != _|_ if context.output.spec.template
+          != _|_ {\n\t\tspec: template: metadata: annotations: annotationsContent\n\t}\n\tif
+          context.output.spec != _|_ if context.output.spec.jobTemplate != _|_ {\n\t\tspec:
+          jobTemplate: metadata: annotations: annotationsContent\n\t}\n\tif context.output.spec
+          != _|_ if context.output.spec.jobTemplate != _|_ if context.output.spec.jobTemplate.spec
+          != _|_ if context.output.spec.jobTemplate.spec.template != _|_ {\n\t\tspec:
+          jobTemplate: spec: template: metadata: annotations: annotationsContent\n\t}\n}\nparameter:
+          [string]: string | null\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-01-02T11:41:38Z"
+      message: 'cannot store capability annotations in ConfigMap: cannot create or
+        update capability annotations in ConfigMap: resource name may not be empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-annotations
+    latestRevision:
+      name: annotations-v1
+      revision: 1
+      revisionHash: 9564aa12404940aa
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Add command on K8s pod for your workload which
+        follows the pod spec in path 'spec.template'
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: command
+    namespace: vela-system
+    resourceVersion: "57214889"
+    uid: 874ec931-a321-47a9-926e-2dceab2e87ea
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    - statefulsets.apps
+    - daemonsets.apps
+    - jobs.batch
+    schematic:
+      cue:
+        template: "#PatchParams: {\n\t// +usage=Specify the name of the target container,
+          if not set, use the component name\n\tcontainerName: *\"\" | string\n\t//
+          +usage=Specify the command to use in the target container, if not set, it
+          will not be changed\n\tcommand: *null | [...string]\n\t// +usage=Specify
+          the args to use in the target container, if set, it will override existing
+          args\n\targs: *null | [...string]\n\t// +usage=Specify the args to add in
+          the target container, existing args will be kept, cannot be used with `args`\n\taddArgs:
+          *null | [...string]\n\t// +usage=Specify the existing args to delete in
+          the target container, cannot be used with `args`\n\tdelArgs: *null | [...string]\n}\nPatchContainer:
+          {\n\t_params:         #PatchParams\n\tname:            _params.containerName\n\t_baseContainers:
+          context.output.spec.template.spec.containers\n\t_matchContainers_: [for
+          _container_ in _baseContainers if _container_.name == name {_container_}]\n\t_baseContainer:
+          *_|_ | {...}\n\tif len(_matchContainers_) == 0 {\n\t\terr: \"container \\(name)
+          not found\"\n\t}\n\tif len(_matchContainers_) > 0 {\n\t\t_baseContainer:
+          _matchContainers_[0]\n\t\tif _params.command != null {\n\t\t\t// +patchStrategy=replace\n\t\t\tcommand:
+          _params.command\n\t\t}\n\t\tif (_params.addArgs != null || _params.delArgs
+          != null) && _params.args != null {\n\t\t\terr: \"cannot set addArgs/delArgs
+          and args at the same time\"\n\t\t}\n\t\t_delArgs: {...}\n\t\tif _params.delArgs
+          != null {\n\t\t\t_delArgs: {for k in _params.delArgs {(k): \"\"}}\n\t\t}\n\t\tif
+          _params.delArgs == null {\n\t\t\t_delArgs: {}\n\t\t}\n\t\t_args: [...string]\n\t\tif
+          _params.args != null {\n\t\t\t_args: _params.args\n\t\t}\n\t\tif _params.args
+          == null && _baseContainer.args != _|_ {\n\t\t\t_args: _baseContainer.args\n\t\t}\n\t\tif
+          _params.args == null && _baseContainer.args == _|_ {\n\t\t\t_args: []\n\t\t}\n\t\t_argsMap:
+          {for a in _args {(a): \"\"}}\n\t\t_addArgs: [...string]\n\t\tif _params.addArgs
+          != null {\n\t\t\t_addArgs: _params.addArgs\n\t\t}\n\t\tif _params.addArgs
+          == null {\n\t\t\t_addArgs: []\n\t\t}\n\n\t\t// +patchStrategy=replace\n\t\targs:
+          [for a in _args if _delArgs[a] == _|_ {a}] + [for a in _addArgs if _delArgs[a]
+          == _|_ && _argsMap[a] == _|_ {a}]\n\t}\n}\n// +patchStrategy=open\npatch:
+          spec: template: spec: {\n\tif parameter.containers == _|_ {\n\t\t// +patchKey=name\n\t\tcontainers:
+          [{\n\t\t\tPatchContainer & {_params: {\n\t\t\t\tif parameter.containerName
+          == \"\" {\n\t\t\t\t\tcontainerName: context.name\n\t\t\t\t}\n\t\t\t\tif
+          parameter.containerName != \"\" {\n\t\t\t\t\tcontainerName: parameter.containerName\n\t\t\t\t}\n\t\t\t\tcommand:
+          parameter.command\n\t\t\t\targs:    parameter.args\n\t\t\t\taddArgs: parameter.addArgs\n\t\t\t\tdelArgs:
+          parameter.delArgs\n\t\t\t}}\n\t\t}]\n\t}\n\tif parameter.containers != _|_
+          {\n\t\t// +patchKey=name\n\t\tcontainers: [for c in parameter.containers
+          {\n\t\t\tif c.containerName == \"\" {\n\t\t\t\terr: \"container name must
+          be set for containers\"\n\t\t\t}\n\t\t\tif c.containerName != \"\" {\n\t\t\t\tPatchContainer
+          & {_params: c}\n\t\t\t}\n\t\t}]\n\t}\n}\n\nparameter: *#PatchParams | close({\n\t//
+          +usage=Specify the commands for multiple containers\n\tcontainers: [...#PatchParams]\n})\n\nerrs:
+          [for c in patch.spec.template.spec.containers if c.err != _|_ {c.err}]\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-01-02T11:41:40Z"
+      message: 'cannot store capability command in ConfigMap: cannot create or update
+        capability command in ConfigMap: the server is currently unable to handle
+        the request (put configmaps trait-schema-command)'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-command
+    latestRevision:
+      name: command-v1
+      revision: 1
+      revisionHash: 3323552e7d7b49d8
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Create/Attach configmaps on K8s pod for your
+        workload which follows the pod spec in path 'spec.template'. This definition
+        is DEPRECATED, please specify configmap in 'storage' instead.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+      custom.definition.oam.dev/deprecated: "true"
+    name: configmap
+    namespace: vela-system
+    resourceVersion: "57078430"
+    uid: 412f3d42-b8ee-4860-ac18-4b02220e0bbf
+  spec:
+    appliesToWorkloads:
+    - '*'
+    podDisruptive: true
+    schematic:
+      cue:
+        template: "patch: spec: template: spec: {\n\tcontainers: [{\n\t\t// +patchKey=name\n\t\tvolumeMounts:
+          [\n\t\t\tfor v in parameter.volumes {\n\t\t\t\t{\n\t\t\t\t\tname:      \"volume-\\(v.name)\"\n\t\t\t\t\tmountPath:
+          v.mountPath\n\t\t\t\t\treadOnly:  v.readOnly\n\t\t\t\t}\n\t\t\t},\n\t\t]\n\t},
+          ...]\n\t// +patchKey=name\n\tvolumes: [\n\t\tfor v in parameter.volumes
+          {\n\t\t\t{\n\t\t\t\tname: \"volume-\\(v.name)\"\n\t\t\t\tconfigMap: name:
+          v.name\n\t\t\t}\n\t\t},\n\t]\n}\noutputs: {\n\tfor v in parameter.volumes
+          {\n\t\tif v.data != _|_ {\n\t\t\t(v.name): {\n\t\t\t\tapiVersion: \"v1\"\n\t\t\t\tkind:
+          \      \"ConfigMap\"\n\t\t\t\tmetadata: name: v.name\n\t\t\t\tdata: v.data\n\t\t\t}\n\t\t}\n\t}\n}\nparameter:
+          {\n\t// +usage=Specify mounted configmap names and their mount paths in
+          the container\n\tvolumes: [...{\n\t\tname:      string\n\t\tmountPath: string\n\t\treadOnly:
+          \ *false | bool\n\t\tdata?: [string]: string\n\t}]\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-01-02T06:42:07Z"
+      message: 'cannot store capability configmap in ConfigMap: cannot create or update
+        capability configmap in ConfigMap: resource name may not be empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-configmap
+    latestRevision:
+      name: configmap-v1
+      revision: 1
+      revisionHash: 4fbb50d5f907a3da
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Set the image of the container.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: container-image
+    namespace: vela-system
+    resourceVersion: "57214892"
+    uid: 79978256-5111-4a0c-b53b-47901179978c
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    - statefulsets.apps
+    - daemonsets.apps
+    - jobs.batch
+    podDisruptive: true
+    schematic:
+      cue:
+        template: "#PatchParams: {\n\t// +usage=Specify the name of the target container,
+          if not set, use the component name\n\tcontainerName: *\"\" | string\n\t//
+          +usage=Specify the image of the container\n\timage: string\n\t// +usage=Specify
+          the image pull policy of the container\n\timagePullPolicy: *\"\" | \"IfNotPresent\"
+          | \"Always\" | \"Never\"\n}\nPatchContainer: {\n\t_params:         #PatchParams\n\tname:
+          \           _params.containerName\n\t_baseContainers: context.output.spec.template.spec.containers\n\t_matchContainers_:
+          [for _container_ in _baseContainers if _container_.name == name {_container_}]\n\t_baseContainer:
+          *_|_ | {...}\n\tif len(_matchContainers_) == 0 {\n\t\terr: \"container \\(name)
+          not found\"\n\t}\n\tif len(_matchContainers_) > 0 {\n\t\t// +patchStrategy=retainKeys\n\t\timage:
+          _params.image\n\n\t\tif _params.imagePullPolicy != \"\" {\n\t\t\t// +patchStrategy=retainKeys\n\t\t\timagePullPolicy:
+          _params.imagePullPolicy\n\t\t}\n\t}\n}\npatch: spec: template: spec: {\n\tif
+          parameter.containers == _|_ {\n\t\t// +patchKey=name\n\t\tcontainers: [{\n\t\t\tPatchContainer
+          & {_params: {\n\t\t\t\tif parameter.containerName == \"\" {\n\t\t\t\t\tcontainerName:
+          context.name\n\t\t\t\t}\n\t\t\t\tif parameter.containerName != \"\" {\n\t\t\t\t\tcontainerName:
+          parameter.containerName\n\t\t\t\t}\n\t\t\t\timage:           parameter.image\n\t\t\t\timagePullPolicy:
+          parameter.imagePullPolicy\n\t\t\t}}\n\t\t}]\n\t}\n\tif parameter.containers
+          != _|_ {\n\t\t// +patchKey=name\n\t\tcontainers: [for c in parameter.containers
+          {\n\t\t\tif c.containerName == \"\" {\n\t\t\t\terr: \"containerName must
+          be set for containers\"\n\t\t\t}\n\t\t\tif c.containerName != \"\" {\n\t\t\t\tPatchContainer
+          & {_params: c}\n\t\t\t}\n\t\t}]\n\t}\n}\n\nparameter: #PatchParams | close({\n\t//
+          +usage=Specify the container image for multiple containers\n\tcontainers:
+          [...#PatchParams]\n})\n\nerrs: [for c in patch.spec.template.spec.containers
+          if c.err != _|_ {c.err}]\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-01-02T11:41:40Z"
+      message: 'cannot store capability container-image in ConfigMap: cannot create
+        or update capability container-image in ConfigMap: the server is currently
+        unable to handle the request (put configmaps trait-schema-container-image)'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-container-image
+    latestRevision:
+      name: container-image-v1
+      revision: 1
+      revisionHash: 24ef6f96e6ae54c9
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Expose on the host and bind the external port
+        to host to enable web traffic for your component.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: container-ports
+    namespace: vela-system
+    resourceVersion: "57214927"
+    uid: f0110e90-a813-472f-af8b-7eab49088257
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    - statefulsets.apps
+    - daemonsets.apps
+    - jobs.batch
+    podDisruptive: true
+    schematic:
+      cue:
+        template: "import (\n\t\"strconv\"\n\t\"strings\"\n)\n\n#PatchParams: {\n\t//
+          +usage=Specify the name of the target container, if not set, use the component
+          name\n\tcontainerName: *\"\" | string\n\t// +usage=Specify ports you want
+          customer traffic sent to\n\tports: *[] | [...{\n\t\t// +usage=Number of
+          port to expose on the pod's IP address\n\t\tcontainerPort: int\n\t\t// +usage=Protocol
+          for port. Must be UDP, TCP, or SCTP\n\t\tprotocol: *\"TCP\" | \"UDP\" |
+          \"SCTP\"\n\t\t// +usage=Number of port to expose on the host\n\t\thostPort?:
+          int\n\t\t// +usage=What host IP to bind the external port to.\n\t\thostIP?:
+          string\n\t}]\n}\n\nPatchContainer: {\n\t_params:         #PatchParams\n\tname:
+          \           _params.containerName\n\t_baseContainers: context.output.spec.template.spec.containers\n\t_matchContainers_:
+          [for _container_ in _baseContainers if _container_.name == name {_container_}]\n\t_baseContainer:
+          *_|_ | {...}\n\tif len(_matchContainers_) == 0 {\n\t\terr: \"container \\(name)
+          not found\"\n\t}\n\tif len(_matchContainers_) > 0 {\n\t\t_baseContainer:
+          _matchContainers_[0]\n\t\t_basePorts:     _baseContainer.ports\n\t\tif _basePorts
+          == _|_ {\n\t\t\t// +patchStrategy=replace\n\t\t\tports: [for port in _params.ports
+          {\n\t\t\t\tcontainerPort: port.containerPort\n\t\t\t\tprotocol:      port.protocol\n\t\t\t\tif
+          port.hostPort != _|_ {\n\t\t\t\t\thostPort: port.hostPort\n\t\t\t\t}\n\t\t\t\tif
+          port.hostIP != _|_ {\n\t\t\t\t\thostIP: port.hostIP\n\t\t\t\t}\n\t\t\t}]\n\t\t}\n\t\tif
+          _basePorts != _|_ {\n\t\t\t_basePortsMap: {for _basePort in _basePorts {(strings.ToLower(_basePort.protocol)
+          + strconv.FormatInt(_basePort.containerPort, 10)): _basePort}}\n\t\t\t_portsMap:
+          {for port in _params.ports {(strings.ToLower(port.protocol) + strconv.FormatInt(port.containerPort,
+          10)): port}}\n\t\t\t// +patchStrategy=replace\n\t\t\tports: [for portVar
+          in _basePorts {\n\t\t\t\tcontainerPort: portVar.containerPort\n\t\t\t\tprotocol:
+          \     portVar.protocol\n\t\t\t\tname:          portVar.name\n\t\t\t\t_uniqueKey:
+          \   strings.ToLower(portVar.protocol) + strconv.FormatInt(portVar.containerPort,
+          10)\n\t\t\t\tif _portsMap[_uniqueKey] != _|_ {\n\t\t\t\t\tif _portsMap[_uniqueKey].hostPort
+          != _|_ {\n\t\t\t\t\t\thostPort: _portsMap[_uniqueKey].hostPort\n\t\t\t\t\t}\n\t\t\t\t\tif
+          _portsMap[_uniqueKey].hostIP != _|_ {\n\t\t\t\t\t\thostIP: _portsMap[_uniqueKey].hostIP\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}]
+          + [for port in _params.ports if _basePortsMap[strings.ToLower(port.protocol)+strconv.FormatInt(port.containerPort,
+          10)] == _|_ {\n\t\t\t\tif port.containerPort != _|_ {\n\t\t\t\t\tcontainerPort:
+          port.containerPort\n\t\t\t\t}\n\t\t\t\tif port.protocol != _|_ {\n\t\t\t\t\tprotocol:
+          port.protocol\n\t\t\t\t}\n\t\t\t\tif port.hostPort != _|_ {\n\t\t\t\t\thostPort:
+          port.hostPort\n\t\t\t\t}\n\t\t\t\tif port.hostIP != _|_ {\n\t\t\t\t\thostIP:
+          port.hostIP\n\t\t\t\t}\n\t\t\t}]\n\t\t}\n\t}\n}\n\npatch: spec: template:
+          spec: {\n\tif parameter.containers == _|_ {\n\t\t// +patchKey=name\n\t\tcontainers:
+          [{\n\t\t\tPatchContainer & {_params: {\n\t\t\t\tif parameter.containerName
+          == \"\" {\n\t\t\t\t\tcontainerName: context.name\n\t\t\t\t}\n\t\t\t\tif
+          parameter.containerName != \"\" {\n\t\t\t\t\tcontainerName: parameter.containerName\n\t\t\t\t}\n\t\t\t\tports:
+          parameter.ports\n\t\t\t}}\n\t\t}]\n\t}\n\tif parameter.containers != _|_
+          {\n\t\t// +patchKey=name\n\t\tcontainers: [for c in parameter.containers
+          {\n\t\t\tif c.containerName == \"\" {\n\t\t\t\terr: \"container name must
+          be set for containers\"\n\t\t\t}\n\t\t\tif c.containerName != \"\" {\n\t\t\t\tPatchContainer
+          & {_params: c}\n\t\t\t}\n\t\t}]\n\t}\n}\n\nparameter: *#PatchParams | close({\n\t//
+          +usage=Specify the container ports for multiple containers\n\tcontainers:
+          [...#PatchParams]\n})\n\nerrs: [for c in patch.spec.template.spec.containers
+          if c.err != _|_ {c.err}]\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-01-02T11:41:42Z"
+      message: 'cannot store capability container-ports in ConfigMap: cannot create
+        or update capability container-ports-v1 in ConfigMap: resource name may not
+        be empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-container-ports
+    latestRevision:
+      name: container-ports-v1
+      revision: 1
+      revisionHash: ca643ac20cce6e2f
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Automatically scale the component based on CPU
+        usage.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: cpuscaler
+    namespace: vela-system
+    resourceVersion: "56901250"
+    uid: 2e9c521a-fe8e-4d55-83e6-7e64524ac50c
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    - statefulsets.apps
+    schematic:
+      cue:
+        template: "outputs: cpuscaler: {\n\tapiVersion: \"autoscaling/v1\"\n\tkind:
+          \      \"HorizontalPodAutoscaler\"\n\tmetadata: name: context.name\n\tspec:
+          {\n\t\tscaleTargetRef: {\n\t\t\tapiVersion: parameter.targetAPIVersion\n\t\t\tkind:
+          \      parameter.targetKind\n\t\t\tname:       context.name\n\t\t}\n\t\tminReplicas:
+          \                   parameter.min\n\t\tmaxReplicas:                    parameter.max\n\t\ttargetCPUUtilizationPercentage:
+          parameter.cpuUtil\n\t}\n}\n\nparameter: {\n\t// +usage=Specify the minimal
+          number of replicas to which the autoscaler can scale down\n\tmin: *1 | int\n\t//
+          +usage=Specify the maximum number of of replicas to which the autoscaler
+          can scale up\n\tmax: *10 | int\n\t// +usage=Specify the average CPU utilization,
+          for example, 50 means the CPU usage is 50%\n\tcpuUtil: *50 | int\n\t// +usage=Specify
+          the apiVersion of scale target\n\ttargetAPIVersion: *\"apps/v1\" | string\n\t//
+          +usage=Specify the kind of scale target\n\ttargetKind: *\"Deployment\" |
+          string\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2025-12-30T14:22:35Z"
+      message: 'cannot store capability cpuscaler in ConfigMap: cannot create or update
+        capability cpuscaler in ConfigMap: the server is currently unable to handle
+        the request (put configmaps trait-schema-cpuscaler)'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-cpuscaler
+    latestRevision:
+      name: cpuscaler-v1
+      revision: 1
+      revisionHash: d65d6be8d4dd67d6
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Add env on K8s pod for your workload which follows
+        the pod spec in path 'spec.template'
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: env
+    namespace: vela-system
+    resourceVersion: "56901206"
+    uid: 001a9298-29f7-414c-9420-f800c9430225
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    - statefulsets.apps
+    - daemonsets.apps
+    - jobs.batch
+    schematic:
+      cue:
+        template: "#PatchParams: {\n\t// +usage=Specify the name of the target container,
+          if not set, use the component name\n\tcontainerName: *\"\" | string\n\t//
+          +usage=Specify if replacing the whole environment settings for the container\n\treplace:
+          *false | bool\n\t// +usage=Specify the  environment variables to merge,
+          if key already existing, override its value\n\tenv: [string]: string\n\t//
+          +usage=Specify which existing environment variables to unset\n\tunset: *[]
+          | [...string]\n}\nPatchContainer: {\n\t_params: #PatchParams\n\tname:    _params.containerName\n\t_delKeys:
+          {for k in _params.unset {(k): \"\"}}\n\t_baseContainers: context.output.spec.template.spec.containers\n\t_matchContainers_:
+          [for _container_ in _baseContainers if _container_.name == name {_container_}]\n\t_baseContainer:
+          *_|_ | {...}\n\tif len(_matchContainers_) == 0 {\n\t\terr: \"container \\(name)
+          not found\"\n\t}\n\tif len(_matchContainers_) > 0 {\n\t\t_baseContainer:
+          _matchContainers_[0]\n\t\t_baseEnv:       _baseContainer.env\n\t\tif _baseEnv
+          == _|_ {\n\t\t\t// +patchStrategy=replace\n\t\t\tenv: [for k, v in _params.env
+          if _delKeys[k] == _|_ {\n\t\t\t\tname:  k\n\t\t\t\tvalue: v\n\t\t\t}]\n\t\t}\n\t\tif
+          _baseEnv != _|_ {\n\t\t\t_baseEnvMap: {for envVar in _baseEnv {(envVar.name):
+          envVar}}\n\t\t\t// +patchStrategy=replace\n\t\t\tenv: [for envVar in _baseEnv
+          if _delKeys[envVar.name] == _|_ && !_params.replace {\n\t\t\t\tname: envVar.name\n\t\t\t\tif
+          _params.env[envVar.name] != _|_ {\n\t\t\t\t\tvalue: _params.env[envVar.name]\n\t\t\t\t}\n\t\t\t\tif
+          _params.env[envVar.name] == _|_ {\n\t\t\t\t\tif envVar.value != _|_ {\n\t\t\t\t\t\tvalue:
+          envVar.value\n\t\t\t\t\t}\n\t\t\t\t\tif envVar.valueFrom != _|_ {\n\t\t\t\t\t\tvalueFrom:
+          envVar.valueFrom\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}] + [for k, v in _params.env
+          if _delKeys[k] == _|_ && (_params.replace || _baseEnvMap[k] == _|_) {\n\t\t\t\tname:
+          \ k\n\t\t\t\tvalue: v\n\t\t\t}]\n\t\t}\n\t}\n}\npatch: spec: template: spec:
+          {\n\tif parameter.containers == _|_ {\n\t\t// +patchKey=name\n\t\tcontainers:
+          [{\n\t\t\tPatchContainer & {_params: {\n\t\t\t\tif parameter.containerName
+          == \"\" {\n\t\t\t\t\tcontainerName: context.name\n\t\t\t\t}\n\t\t\t\tif
+          parameter.containerName != \"\" {\n\t\t\t\t\tcontainerName: parameter.containerName\n\t\t\t\t}\n\t\t\t\treplace:
+          parameter.replace\n\t\t\t\tenv:     parameter.env\n\t\t\t\tunset:   parameter.unset\n\t\t\t}}\n\t\t}]\n\t}\n\tif
+          parameter.containers != _|_ {\n\t\t// +patchKey=name\n\t\tcontainers: [for
+          c in parameter.containers {\n\t\t\tif c.containerName == \"\" {\n\t\t\t\terr:
+          \"containerName must be set for containers\"\n\t\t\t}\n\t\t\tif c.containerName
+          != \"\" {\n\t\t\t\tPatchContainer & {_params: c}\n\t\t\t}\n\t\t}]\n\t}\n}\n\nparameter:
+          *#PatchParams | close({\n\t// +usage=Specify the environment variables for
+          multiple containers\n\tcontainers: [...#PatchParams]\n})\n\nerrs: [for c
+          in patch.spec.template.spec.containers if c.err != _|_ {c.err}]\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2025-12-30T14:22:34Z"
+      message: 'cannot store capability env in ConfigMap: cannot create or update
+        capability env in ConfigMap: resource name may not be empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-env
+    latestRevision:
+      name: env-v1
+      revision: 1
+      revisionHash: fcc4f5fa231c0edd
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Expose port to enable web traffic for your component.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: expose
+    namespace: vela-system
+    resourceVersion: "55725751"
+    uid: 2bd6f2c8-5e62-4af1-8fb0-f8a121956934
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    - statefulsets.apps
+    podDisruptive: false
+    schematic:
+      cue:
+        template: "import (\n\t\"strconv\"\n\t\"strings\"\n)\n\noutputs: service:
+          {\n\tapiVersion: \"v1\"\n\tkind:       \"Service\"\n\tmetadata: name:        context.name\n\tmetadata:
+          annotations: parameter.annotations\n\tspec: {\n\t\tif parameter[\"matchLabels\"]
+          == _|_ {\n\t\t\tselector: \"app.oam.dev/component\": context.name\n\t\t}\n\t\tif
+          parameter[\"matchLabels\"] != _|_ {\n\t\t\tselector: parameter[\"matchLabels\"]\n\t\t}\n\n\t\t//
+          compatible with the old way\n\t\tif parameter[\"port\"] != _|_ if parameter[\"ports\"]
+          == _|_ {\n\t\t\tports: [\n\t\t\t\tfor p in parameter.port {\n\t\t\t\t\tname:
+          \      \"port-\" + strconv.FormatInt(p, 10)\n\t\t\t\t\tport:       p\n\t\t\t\t\ttargetPort:
+          p\n\t\t\t\t},\n\t\t\t]\n\t\t}\n\t\tif parameter[\"ports\"] != _|_ {\n\t\t\tports:
+          [for v in parameter.ports {\n\t\t\t\tport:       v.port\n\t\t\t\ttargetPort:
+          v.port\n\t\t\t\tif v.name != _|_ {\n\t\t\t\t\tname: v.name\n\t\t\t\t}\n\t\t\t\tif
+          v.name == _|_ {\n\t\t\t\t\t_name: \"port-\" + strconv.FormatInt(v.port,
+          10)\n\t\t\t\t\tname:  *_name | string\n\t\t\t\t\tif v.protocol != \"TCP\"
+          {\n\t\t\t\t\t\tname: _name + \"-\" + strings.ToLower(v.protocol)\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tif
+          v.nodePort != _|_ if parameter.type == \"NodePort\" {\n\t\t\t\t\tnodePort:
+          v.nodePort\n\t\t\t\t}\n\t\t\t\tif v.protocol != _|_ {\n\t\t\t\t\tprotocol:
+          v.protocol\n\t\t\t\t}\n\t\t\t},\n\t\t\t]\n\t\t}\n\t\ttype: parameter.type\n\t}\n}\nparameter:
+          {\n\t// +usage=Deprecated, the old way to specify the exposion ports\n\tport?:
+          [...int]\n\n\t// +usage=Specify portsyou want customer traffic sent to\n\tports?:
+          [...{\n\t\t// +usage=Number of port to expose on the pod's IP address\n\t\tport:
+          int\n\t\t// +usage=Name of the port\n\t\tname?: string\n\t\t// +usage=Protocol
+          for port. Must be UDP, TCP, or SCTP\n\t\tprotocol: *\"TCP\" | \"UDP\" |
+          \"SCTP\"\n\t\t// +usage=exposed node port. Only Valid when exposeType is
+          NodePort\n\t\tnodePort?: int\n\t}]\n\n\t// +usage=Specify the annotations
+          of the exposed service\n\tannotations: [string]: string\n\n\tmatchLabels?:
+          [string]: string\n\n\t// +usage=Specify what kind of Service you want. options:
+          \"ClusterIP\",\"NodePort\",\"LoadBalancer\",\"ExternalName\"\n\ttype: *\"ClusterIP\"
+          | \"NodePort\" | \"LoadBalancer\" | \"ExternalName\"\n}\n"
+    stage: PostDispatch
+    status:
+      customStatus: "message: *\"\" | string\nservice: context.outputs.service\nif
+        service.spec.type == \"ClusterIP\" {\n\tmessage: \"ClusterIP: \\(service.spec.clusterIP)\"\n}\nif
+        service.spec.type == \"LoadBalancer\" {\n\tstatus: service.status\n\tisHealth:
+        *false | bool\n\tif status != _|_ if status.loadBalancer != _|_ if status.loadBalancer.ingress
+        != _|_ if len(status.loadBalancer.ingress) > 0 if status.loadBalancer.ingress[0].ip
+        != _|_ {\n\t\tisHealth: true\n\t}\n\tif !isHealth {\n\t\tmessage: \"ExternalIP:
+        Pending\"\n\t}\n\tif isHealth {\n\t\tmessage: \"ExternalIP: \\(status.loadBalancer.ingress[0].ip)\"\n\t}\n}"
+      healthPolicy: "service: context.outputs.service\nif service.spec.type == \"LoadBalancer\"
+        {\n\tstatus: service.status\n\tisHealth: *false | bool\n\tif status != _|_
+        if status.loadBalancer != _|_ if status.loadBalancer.ingress != _|_ if len(status.loadBalancer.ingress)
+        > 0 if status.loadBalancer.ingress[0].ip != _|_ {\n\t\tisHealth: true\n\t}\n}\nif
+        service.spec.type != \"LoadBalancer\" {\n\tisHealth: true\n}"
+  status:
+    conditions:
+    - lastTransitionTime: "2025-12-06T15:19:55Z"
+      message: 'cannot store capability expose in ConfigMap: cannot create or update
+        capability expose in ConfigMap: the server is currently unable to handle the
+        request (put configmaps trait-schema-expose)'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-expose
+    latestRevision:
+      name: expose-v1
+      revision: 1
+      revisionHash: 8aef0eeffa86c8e4
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Enable public web traffic for the component,
+        the ingress API matches K8s v1.20+.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: gateway
+    namespace: vela-system
+    resourceVersion: "57214940"
+    uid: 7117a156-8f04-4497-a670-e0ec539ebb80
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    - statefulsets.apps
+    podDisruptive: false
+    schematic:
+      cue:
+        template: "import \"strconv\"\n\nlet nameSuffix = {\n\tif parameter.name !=
+          _|_ {\"-\" + parameter.name}\n\tif parameter.name == _|_ {\"\"}\n}\n\nlet
+          serviceMetaName = {\n\tif (parameter.existingServiceName != _|_) {parameter.existingServiceName}\n\tif
+          (parameter.existingServiceName == _|_) {context.name + nameSuffix}\n}\n\nif
+          (parameter.existingServiceName == _|_) {\n\tlet serviceOutputName = \"service\"
+          + nameSuffix\n\toutputs: (serviceOutputName): {\n\t\tapiVersion: \"v1\"\n\t\tkind:
+          \      \"Service\"\n\t\tmetadata: name: \"\\(serviceMetaName)\"\n\t\tspec:
+          {\n\t\t\tselector: \"app.oam.dev/component\": context.name\n\t\t\tports:
+          [\n\t\t\t\tfor k, v in parameter.http {\n\t\t\t\t\tname:       \"port-\"
+          + strconv.FormatInt(v, 10)\n\t\t\t\t\tport:       v\n\t\t\t\t\ttargetPort:
+          v\n\t\t\t\t},\n\t\t\t]\n\t\t}\n\t}\n}\n\nlet ingressOutputName = \"ingress\"
+          + nameSuffix\nlet ingressMetaName = context.name + nameSuffix\nlegacyAPI:
+          context.clusterVersion.minor < 19\n\noutputs: (ingressOutputName): {\n\tif
+          legacyAPI {\n\t\tapiVersion: \"networking.k8s.io/v1beta1\"\n\t}\n\tif !legacyAPI
+          {\n\t\tapiVersion: \"networking.k8s.io/v1\"\n\t}\n\tkind: \"Ingress\"\n\tmetadata:
+          {\n\t\tname: \"\\(ingressMetaName)\"\n\t\tannotations: {\n\t\t\tif !parameter.classInSpec
+          {\n\t\t\t\t\"kubernetes.io/ingress.class\": parameter.class\n\t\t\t}\n\t\t\tif
+          parameter.gatewayHost != _|_ {\n\t\t\t\t\"ingress.controller/host\": parameter.gatewayHost\n\t\t\t}\n\t\t\tif
+          parameter.annotations != _|_ {\n\t\t\t\tfor key, value in parameter.annotations
+          {\n\t\t\t\t\t\"\\(key)\": \"\\(value)\"\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t\tlabels:
+          {\n\t\t\tif parameter.labels != _|_ {\n\t\t\t\tfor key, value in parameter.labels
+          {\n\t\t\t\t\t\"\\(key)\": \"\\(value)\"\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n\tspec:
+          {\n\t\tif parameter.classInSpec {\n\t\t\tingressClassName: parameter.class\n\t\t}\n\t\tif
+          parameter.secretName != _|_ {\n\t\t\ttls: [{\n\t\t\t\thosts: [\n\t\t\t\t\tparameter.domain,\n\t\t\t\t]\n\t\t\t\tsecretName:
+          parameter.secretName\n\t\t\t}]\n\t\t}\n\t\trules: [{\n\t\t\tif parameter.domain
+          != _|_ {\n\t\t\t\thost: parameter.domain\n\t\t\t}\n\t\t\thttp: paths: [\n\t\t\t\tfor
+          k, v in parameter.http {\n\t\t\t\t\tpath:     k\n\t\t\t\t\tpathType: parameter.pathType\n\t\t\t\t\tbackend:
+          {\n\t\t\t\t\t\tif legacyAPI {\n\t\t\t\t\t\t\tserviceName: serviceMetaName\n\t\t\t\t\t\t\tservicePort:
+          v\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif !legacyAPI {\n\t\t\t\t\t\t\tservice: {\n\t\t\t\t\t\t\t\tname:
+          serviceMetaName\n\t\t\t\t\t\t\t\tport: number: v\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t},\n\t\t\t]\n\t\t}]\n\t}\n}\n\nparameter:
+          {\n\t// +usage=Specify the domain you want to expose\n\tdomain?: string\n\n\t//
+          +usage=Specify the mapping relationship between the http path and the workload
+          port\n\thttp: [string]: int\n\n\t// +usage=Specify the class of ingress
+          to use\n\tclass: *\"nginx\" | string\n\n\t// +usage=Set ingress class in
+          '.spec.ingressClassName' instead of 'kubernetes.io/ingress.class' annotation.\n\tclassInSpec:
+          *false | bool\n\n\t// +usage=Specify the secret name you want to quote to
+          use tls.\n\tsecretName?: string\n\n\t// +usage=Specify the host of the ingress
+          gateway, which is used to generate the endpoints when the host is empty.\n\tgatewayHost?:
+          string\n\n\t// +usage=Specify a unique name for this gateway, required to
+          support multiple gateway traits on a component\n\tname?: string\n\n\t//
+          +usage=Specify a pathType for the ingress rules, defaults to \"ImplementationSpecific\"\n\tpathType:
+          *\"ImplementationSpecific\" | \"Prefix\" | \"Exact\"\n\n\t// +usage=Specify
+          the annotations to be added to the ingress\n\tannotations?: [string]: string\n\n\t//
+          +usage=Specify the labels to be added to the ingress\n\tlabels?: [string]:
+          string\n\n\t// +usage=If specified, use an existing Service rather than
+          creating one\n\texistingServiceName?: string\n}\n"
+    status:
+      customStatus: |-
+        let nameSuffix = {
+          if parameter.name != _|_ { "-" + parameter.name }
+          if parameter.name == _|_ { "" }
+        }
+        let ingressMetaName = context.name + nameSuffix
+        let ig  = [for i in context.outputs if (i.kind == "Ingress") && (i.metadata.name == ingressMetaName) {i}][0]
+        igs: *{} | {}
+        if ig != _|_ if ig.status != _|_ if ig.status.loadbalancer != _|_ {
+          igs: ig.status.loadbalancer.ingress[0]
+        }
+        igr: *{} | {}
+        if ig != _|_ if ig.spec != _|_  {
+          igr: ig.spec.rules[0]
+        }
+        if igs == _|_ {
+          message: "No loadBalancer found, visiting by using 'vela port-forward " + context.appName + "'\n"
+        }
+        if igs != _|_ {
+          if igs.ip != _|_ {
+            if igr.host != _|_ {
+              message: "Visiting URL: " + igr.host + ", IP: " + igs.ip + "\n"
+            }
+            if igr.host == _|_ {
+              message: "Host not specified, visit the cluster or load balancer in front of the cluster, IP: " + igs.ip + "\n"
+            }
+          }
+          if igs.ip == _|_ {
+            if igr.host != _|_ {
+              message: "Visiting URL: " + igr.host + "\n"
+            }
+            if igr.host == _|_ {
+              message: "Host not specified, visit the cluster or load balancer in front of the cluster\n"
+            }
+          }
+        }
+      healthPolicy: |-
+        let nameSuffix = {
+          if parameter.name != _|_ { "-" + parameter.name }
+          if parameter.name == _|_ { "" }
+        }
+        let ingressMetaName = context.name + nameSuffix
+        let igstat  = len([for i in context.outputs if (i.kind == "Ingress") && (i.metadata.name == ingressMetaName) {i}]) > 0
+        isHealth: igstat
+  status:
+    conditions:
+    - lastTransitionTime: "2026-01-02T11:41:42Z"
+      message: 'cannot store capability gateway in ConfigMap: cannot create or update
+        capability gateway in ConfigMap: resource name may not be empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-gateway
+    latestRevision:
+      name: gateway-v1
+      revision: 1
+      revisionHash: aa7620bae8f8ed48
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Add host aliases on K8s pod for your workload
+        which follows the pod spec in path 'spec.template'.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: hostalias
+    namespace: vela-system
+    resourceVersion: "55819672"
+    uid: bb97e6d7-81e4-436c-9ae4-c3659fcb350a
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    - statefulsets.apps
+    - daemonsets.apps
+    - jobs.batch
+    podDisruptive: false
+    schematic:
+      cue:
+        template: "patch: {\n\t// +patchKey=ip\n\tspec: template: spec: hostAliases:
+          parameter.hostAliases\n}\nparameter: {\n\t// +usage=Specify the hostAliases
+          to add\n\thostAliases: [...{\n\t\tip: string\n\t\thostnames: [...string]\n\t}]\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2025-12-06T16:52:04Z"
+      message: 'cannot store capability hostalias in ConfigMap: cannot create or update
+        capability hostalias in ConfigMap: resource name may not be empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-hostalias
+    latestRevision:
+      name: hostalias-v1
+      revision: 1
+      revisionHash: 6ecffd210f962ba2
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Configure k8s HPA for Deployment or Statefulsets
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: hpa
+    namespace: vela-system
+    resourceVersion: "55819678"
+    uid: e270408c-fc08-449b-b4dd-1ce98066ef0f
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    - statefulsets.apps
+    podDisruptive: false
+    schematic:
+      cue:
+        template: "outputs: hpa: {\n\tif context.clusterVersion.minor < 23 {\n\t\tapiVersion:
+          \"autoscaling/v2beta2\"\n\t}\n\tif context.clusterVersion.minor >= 23 {\n\t\tapiVersion:
+          \"autoscaling/v2\"\n\t}\n\tkind: \"HorizontalPodAutoscaler\"\n\tmetadata:
+          name: context.name\n\tspec: {\n\t\tscaleTargetRef: {\n\t\t\tapiVersion:
+          parameter.targetAPIVersion\n\t\t\tkind:       parameter.targetKind\n\t\t\tname:
+          \      context.name\n\t\t}\n\t\tminReplicas: parameter.min\n\t\tmaxReplicas:
+          parameter.max\n\t\tmetrics: [\n\t\t\t{\n\t\t\t\ttype: \"Resource\"\n\t\t\t\tresource:
+          {\n\t\t\t\t\tname: \"cpu\"\n\t\t\t\t\ttarget: {\n\t\t\t\t\t\ttype: parameter.cpu.type\n\t\t\t\t\t\tif
+          parameter.cpu.type == \"Utilization\" {\n\t\t\t\t\t\t\taverageUtilization:
+          parameter.cpu.value\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif parameter.cpu.type ==
+          \"AverageValue\" {\n\t\t\t\t\t\t\taverageValue: parameter.cpu.value\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t},\n\t\t\tif
+          parameter.mem != _|_ {\n\t\t\t\t{\n\t\t\t\t\ttype: \"Resource\"\n\t\t\t\t\tresource:
+          {\n\t\t\t\t\t\tname: \"memory\"\n\t\t\t\t\t\ttarget: {\n\t\t\t\t\t\t\ttype:
+          parameter.mem.type\n\t\t\t\t\t\t\tif parameter.mem.type == \"Utilization\"
+          {\n\t\t\t\t\t\t\t\taverageUtilization: parameter.mem.value\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tif
+          parameter.mem.type == \"AverageValue\" {\n\t\t\t\t\t\t\t\taverageValue:
+          parameter.mem.value\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t},\n\t\t\tif
+          parameter.podCustomMetrics != _|_ for m in parameter.podCustomMetrics {\n\t\t\t\ttype:
+          \"Pods\"\n\t\t\t\tpods: {\n\t\t\t\t\tmetric: name: m.name\n\t\t\t\t\ttarget:
+          {\n\t\t\t\t\t\ttype:         \"AverageValue\"\n\t\t\t\t\t\taverageValue:
+          m.value\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t},\n\t\t]\n\t}\n}\nparameter: {\n\t//
+          +usage=Specify the minimal number of replicas to which the autoscaler can
+          scale down\n\tmin: *1 | int\n\t// +usage=Specify the maximum number of of
+          replicas to which the autoscaler can scale up\n\tmax: *10 | int\n\t// +usage=Specify
+          the apiVersion of scale target\n\ttargetAPIVersion: *\"apps/v1\" | string\n\t//
+          +usage=Specify the kind of scale target\n\ttargetKind: *\"Deployment\" |
+          string\n\tcpu: {\n\t\t// +usage=Specify resource metrics in terms of percentage(\"Utilization\")
+          or direct value(\"AverageValue\")\n\t\ttype: *\"Utilization\" | \"AverageValue\"\n\t\t//
+          +usage=Specify the value of CPU utilization or averageValue\n\t\tvalue:
+          *50 | int\n\t}\n\tmem?: {\n\t\t// +usage=Specify resource metrics in terms
+          of percentage(\"Utilization\") or direct value(\"AverageValue\")\n\t\ttype:
+          *\"Utilization\" | \"AverageValue\"\n\t\t// +usage=Specify  the value of
+          MEM utilization or averageValue\n\t\tvalue: *50 | int\n\t}\n\t// +usage=Specify
+          custom metrics of pod type\n\tpodCustomMetrics?: [...{\n\t\t// +usage=Specify
+          name of custom metrics\n\t\tname: string\n\t\t// +usage=Specify target value
+          of custom metrics\n\t\tvalue: string\n\t}]\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2025-12-06T16:52:05Z"
+      message: 'cannot store capability hpa in ConfigMap: cannot create or update
+        capability hpa in ConfigMap: resource name may not be empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-hpa
+    latestRevision:
+      name: hpa-v1
+      revision: 1
+      revisionHash: 2666fd80dbbf33b5
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Enable public web traffic for the component.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+      custom.definition.oam.dev/deprecated: "true"
+    name: ingress
+    namespace: vela-system
+    resourceVersion: "54693624"
+    uid: f9736632-a59f-4202-9310-f126b3a3b5af
+  spec:
+    podDisruptive: false
+    schematic:
+      cue:
+        template: "// trait template can have multiple outputs in one trait\noutputs:
+          service: {\n\tapiVersion: \"v1\"\n\tkind:       \"Service\"\n\tmetadata:
+          name: context.name\n\tspec: {\n\t\tselector: \"app.oam.dev/component\":
+          context.name\n\t\tports: [\n\t\t\tfor k, v in parameter.http {\n\t\t\t\tport:
+          \      v\n\t\t\t\ttargetPort: v\n\t\t\t},\n\t\t]\n\t}\n}\n\noutputs: ingress:
+          {\n\tapiVersion: \"networking.k8s.io/v1beta1\"\n\tkind:       \"Ingress\"\n\tmetadata:
+          name: context.name\n\tspec: rules: [{\n\t\thost: parameter.domain\n\t\thttp:
+          paths: [\n\t\t\tfor k, v in parameter.http {\n\t\t\t\tpath: k\n\t\t\t\tbackend:
+          {\n\t\t\t\t\tserviceName: context.name\n\t\t\t\t\tservicePort: v\n\t\t\t\t}\n\t\t\t},\n\t\t]\n\t}]\n}\n\nparameter:
+          {\n\t// +usage=Specify the domain you want to expose\n\tdomain: string\n\n\t//
+          +usage=Specify the mapping relationship between the http path and the workload
+          port\n\thttp: [string]: int\n}\n"
+    status:
+      customStatus: "let igs = context.outputs.ingress.status.loadBalancer.ingress\nif
+        igs == _|_ {\n\tmessage: \"No loadBalancer found, visiting by using 'vela
+        port-forward \" + context.appName + \"'\\n\"\n}\nif len(igs) > 0 {\n\tif igs[0].ip
+        != _|_ {\n\t\tmessage: \"Visiting URL: \" + context.outputs.ingress.spec.rules[0].host
+        + \", IP: \" + igs[0].ip\n\t}\n\tif igs[0].ip == _|_ {\n\t\tmessage: \"Visiting
+        URL: \" + context.outputs.ingress.spec.rules[0].host\n\t}\n}"
+      healthPolicy: 'isHealth: len(context.outputs.service.spec.clusterIP) > 0'
+  status:
+    conditions:
+    - lastTransitionTime: "2025-12-05T10:38:20Z"
+      message: 'cannot store capability ingress in ConfigMap: cannot create or update
+        capability ingress-v1 in ConfigMap: Put "https://10.0.0.1:443/api/v1/namespaces/vela-system/configmaps/trait-schema-ingress-v1":
+        context deadline exceeded'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-ingress
+    latestRevision:
+      name: ingress-v1
+      revision: 1
+      revisionHash: 1c3273a245cbb158
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Enable public web traffic for the component,
+        the ingress API matches K8s v1.20+.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+      custom.definition.oam.dev/deprecated: "true"
+    name: ingress-1-20
+    namespace: vela-system
+    resourceVersion: "57078440"
+    uid: 50ff5981-2b61-49c3-9245-66a962a9e368
+  spec:
+    podDisruptive: false
+    schematic:
+      cue:
+        template: "// trait template can have multiple outputs in one trait\noutputs:
+          service: {\n\tapiVersion: \"v1\"\n\tkind:       \"Service\"\n\tmetadata:
+          name: context.name\n\tspec: {\n\t\tselector: \"app.oam.dev/component\":
+          context.name\n\t\tports: [\n\t\t\tfor k, v in parameter.http {\n\t\t\t\tport:
+          \      v\n\t\t\t\ttargetPort: v\n\t\t\t},\n\t\t]\n\t}\n}\n\noutputs: ingress:
+          {\n\tapiVersion: \"networking.k8s.io/v1\"\n\tkind:       \"Ingress\"\n\tmetadata:
+          {\n\t\tname: context.name\n\t\tannotations: \"kubernetes.io/ingress.class\":
+          parameter.class\n\t}\n\tspec: rules: [{\n\t\thost: parameter.domain\n\t\thttp:
+          paths: [\n\t\t\tfor k, v in parameter.http {\n\t\t\t\tpath:     k\n\t\t\t\tpathType:
+          \"ImplementationSpecific\"\n\t\t\t\tbackend: service: {\n\t\t\t\t\tname:
+          context.name\n\t\t\t\t\tport: number: v\n\t\t\t\t}\n\t\t\t},\n\t\t]\n\t}]\n}\n\nparameter:
+          {\n\t// +usage=Specify the domain you want to expose\n\tdomain: string\n\n\t//
+          +usage=Specify the mapping relationship between the http path and the workload
+          port\n\thttp: [string]: int\n\n\t// +usage=Specify the class of ingress
+          to use\n\tclass: *\"nginx\" | string\n}\n"
+    status:
+      customStatus: "let igs = context.outputs.ingress.status.loadBalancer.ingress\nif
+        igs == _|_ {\n  message: \"No loadBalancer found, visiting by using 'vela
+        port-forward \" + context.appName + \"'\\n\"\n}\nif len(igs) > 0 {\n  if igs[0].ip
+        != _|_ {\n\t  message: \"Visiting URL: \" + context.outputs.ingress.spec.rules[0].host
+        + \", IP: \" + igs[0].ip\n  }\n  if igs[0].ip == _|_ {\n\t  message: \"Visiting
+        URL: \" + context.outputs.ingress.spec.rules[0].host\n  }\n}"
+      healthPolicy: 'isHealth: len(context.outputs.service.spec.clusterIP) > 0'
+  status:
+    conditions:
+    - lastTransitionTime: "2026-01-02T06:42:08Z"
+      message: 'cannot store capability ingress-1-20 in ConfigMap: cannot create or
+        update capability ingress-1-20 in ConfigMap: resource name may not be empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-ingress-1-20
+    latestRevision:
+      name: ingress-1-20-v1
+      revision: 1
+      revisionHash: e33bdb6e5230de44
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: add an init container and use shared volume
+        with pod
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: init-container
+    namespace: vela-system
+    resourceVersion: "56902567"
+    uid: 58684e62-2878-456b-a9eb-b0b090ea5edd
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    - statefulsets.apps
+    - daemonsets.apps
+    - jobs.batch
+    podDisruptive: true
+    schematic:
+      cue:
+        template: "patch: spec: template: spec: {\n\t// +patchKey=name\n\tcontainers:
+          [{\n\t\tname: context.name\n\t\t// +patchKey=name\n\t\tvolumeMounts: [{\n\t\t\tname:
+          \     parameter.mountName\n\t\t\tmountPath: parameter.appMountPath\n\t\t}]\n\t}]\n\t//
+          +patchKey=name\n\tinitContainers: [{\n\t\tname:            parameter.name\n\t\timage:
+          \          parameter.image\n\t\timagePullPolicy: parameter.imagePullPolicy\n\t\tif
+          parameter.cmd != _|_ {\n\t\t\tcommand: parameter.cmd\n\t\t}\n\t\tif parameter.args
+          != _|_ {\n\t\t\targs: parameter.args\n\t\t}\n\t\tif parameter[\"env\"] !=
+          _|_ {\n\t\t\tenv: parameter.env\n\t\t}\n\n\t\t// +patchKey=name\n\t\tvolumeMounts:
+          [{\n\t\t\tname:      parameter.mountName\n\t\t\tmountPath: parameter.initMountPath\n\t\t}]
+          + parameter.extraVolumeMounts\n\t}]\n\t// +patchKey=name\n\tvolumes: [{\n\t\tname:
+          parameter.mountName\n\t\temptyDir: {}\n\t}]\n}\nparameter: {\n\t// +usage=Specify
+          the name of init container\n\tname: string\n\n\t// +usage=Specify the image
+          of init container\n\timage: string\n\n\t// +usage=Specify image pull policy
+          for your service\n\timagePullPolicy: *\"IfNotPresent\" | \"Always\" | \"Never\"\n\n\t//
+          +usage=Specify the commands run in the init container\n\tcmd?: [...string]\n\n\t//
+          +usage=Specify the args run in the init container\n\targs?: [...string]\n\n\t//
+          +usage=Specify the env run in the init container\n\tenv?: [...{\n\t\t//
+          +usage=Environment variable name\n\t\tname: string\n\t\t// +usage=The value
+          of the environment variable\n\t\tvalue?: string\n\t\t// +usage=Specifies
+          a source the value of this var should come from\n\t\tvalueFrom?: {\n\t\t\t//
+          +usage=Selects a key of a secret in the pod's namespace\n\t\t\tsecretKeyRef?:
+          {\n\t\t\t\t// +usage=The name of the secret in the pod's namespace to select
+          from\n\t\t\t\tname: string\n\t\t\t\t// +usage=The key of the secret to select
+          from. Must be a valid secret key\n\t\t\t\tkey: string\n\t\t\t}\n\t\t\t//
+          +usage=Selects a key of a config map in the pod's namespace\n\t\t\tconfigMapKeyRef?:
+          {\n\t\t\t\t// +usage=The name of the config map in the pod's namespace to
+          select from\n\t\t\t\tname: string\n\t\t\t\t// +usage=The key of the config
+          map to select from. Must be a valid secret key\n\t\t\t\tkey: string\n\t\t\t}\n\t\t}\n\t}]\n\n\t//
+          +usage=Specify the mount name of shared volume\n\tmountName: *\"workdir\"
+          | string\n\n\t// +usage=Specify the mount path of app container\n\tappMountPath:
+          string\n\n\t// +usage=Specify the mount path of init container\n\tinitMountPath:
+          string\n\n\t// +usage=Specify the extra volume mounts for the init container\n\textraVolumeMounts:
+          [...{\n\t\t// +usage=The name of the volume to be mounted\n\t\tname: string\n\t\t//
+          +usage=The mountPath for mount in the init container\n\t\tmountPath: string\n\t}]\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2025-12-30T14:23:30Z"
+      message: 'cannot store capability init-container in ConfigMap: cannot create
+        or update capability init-container-v1 in ConfigMap: the server is currently
+        unable to handle the request (put configmaps trait-schema-init-container-v1)'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-init-container
+    latestRevision:
+      name: init-container-v1
+      revision: 1
+      revisionHash: b021c5fa5a7ccf91
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Patch the output following Json Merge Patch
+        strategy, following RFC 7396.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+      custom.definition.oam.dev/ui-hidden: "true"
+    name: json-merge-patch
+    namespace: vela-system
+    resourceVersion: "53329568"
+    uid: 41ad0a55-7309-4c86-bb5b-7b629147e812
+  spec:
+    appliesToWorkloads:
+    - '*'
+    podDisruptive: true
+    schematic:
+      cue:
+        template: |
+          parameter: {...}
+          // +patchStrategy=jsonMergePatch
+          patch: parameter
+  status:
+    conditions:
+    - lastTransitionTime: "2025-10-29T13:36:20Z"
+      message: 'cannot store capability json-merge-patch in ConfigMap: cannot create
+        or update capability json-merge-patch in ConfigMap: resource name may not
+        be empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-json-merge-patch
+    latestRevision:
+      name: json-merge-patch-v1
+      revision: 1
+      revisionHash: d0048ae66366ac35
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Patch the output following Json Patch strategy,
+        following RFC 6902.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+      custom.definition.oam.dev/ui-hidden: "true"
+    name: json-patch
+    namespace: vela-system
+    resourceVersion: "54355324"
+    uid: a030b34a-f37c-411d-8550-5e1ce044fc08
+  spec:
+    appliesToWorkloads:
+    - '*'
+    podDisruptive: true
+    schematic:
+      cue:
+        template: |
+          parameter: operations: [...{...}]
+          // +patchStrategy=jsonPatch
+          patch: parameter
+  status:
+    conditions:
+    - lastTransitionTime: "2025-12-04T12:19:06Z"
+      message: 'cannot store capability json-patch in ConfigMap: cannot create or
+        update capability json-patch in ConfigMap: resource name may not be empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-json-patch
+    latestRevision:
+      name: json-patch-v1
+      revision: 1
+      revisionHash: cf539e4167afb010
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/alias: ""
+      definition.oam.dev/description: Set k8s update strategy for Deployment/DaemonSet/StatefulSet
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: k8s-update-strategy
+    namespace: vela-system
+    resourceVersion: "57297391"
+    uid: 9ce02f5e-7292-4265-a169-f531d4164b55
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    - statefulsets.apps
+    - daemonsets.apps
+    conflictsWith: []
+    podDisruptive: false
+    schematic:
+      cue:
+        template: "patch: spec: {\n\tif parameter.targetKind == \"Deployment\" &&
+          parameter.strategy.type != \"OnDelete\" {\n\t\t// +patchStrategy=retainKeys\n\t\tstrategy:
+          {\n\t\t\ttype: parameter.strategy.type\n\t\t\tif parameter.strategy.type
+          == \"RollingUpdate\" {\n\t\t\t\trollingUpdate: {\n\t\t\t\t\tmaxSurge:       parameter.strategy.rollingStrategy.maxSurge\n\t\t\t\t\tmaxUnavailable:
+          parameter.strategy.rollingStrategy.maxUnavailable\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n\n\tif
+          parameter.targetKind == \"StatefulSet\" && parameter.strategy.type != \"Recreate\"
+          {\n\t\t// +patchStrategy=retainKeys\n\t\tupdateStrategy: {\n\t\t\ttype:
+          parameter.strategy.type\n\t\t\tif parameter.strategy.type == \"RollingUpdate\"
+          {\n\t\t\t\trollingUpdate: partition: parameter.strategy.rollingStrategy.partition\n\t\t\t}\n\t\t}\n\t}\n\n\tif
+          parameter.targetKind == \"DaemonSet\" && parameter.strategy.type != \"Recreate\"
+          {\n\t\t// +patchStrategy=retainKeys\n\t\tupdateStrategy: {\n\t\t\ttype:
+          parameter.strategy.type\n\t\t\tif parameter.strategy.type == \"RollingUpdate\"
+          {\n\t\t\t\trollingUpdate: {\n\t\t\t\t\tmaxSurge:       parameter.strategy.rollingStrategy.maxSurge\n\t\t\t\t\tmaxUnavailable:
+          parameter.strategy.rollingStrategy.maxUnavailable\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n\n}\nparameter:
+          {\n\t// +usage=Specify the apiVersion of target\n\ttargetAPIVersion: *\"apps/v1\"
+          | string\n\t// +usage=Specify the kind of target\n\ttargetKind: *\"Deployment\"
+          | \"StatefulSet\" | \"DaemonSet\"\n\t// +usage=Specify the strategy of update\n\tstrategy:
+          {\n\t\t// +usage=Specify the strategy type\n\t\ttype: *\"RollingUpdate\"
+          | \"Recreate\" | \"OnDelete\"\n\t\t// +usage=Specify the parameters of rollong
+          update strategy\n\t\trollingStrategy?: {\n\t\t\tmaxSurge:       *\"25%\"
+          | string\n\t\t\tmaxUnavailable: *\"25%\" | string\n\t\t\tpartition:      *0
+          | int\n\t\t}\n\t}\n}\n"
+    workloadRefPath: ""
+  status:
+    conditions:
+    - lastTransitionTime: "2026-01-02T14:52:25Z"
+      message: 'cannot store capability k8s-update-strategy in ConfigMap: cannot create
+        or update capability k8s-update-strategy in ConfigMap: the server is currently
+        unable to handle the request (put configmaps trait-schema-k8s-update-strategy)'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-k8s-update-strategy
+    latestRevision:
+      name: k8s-update-strategy-v1
+      revision: 1
+      revisionHash: 919c443edab55765
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Add labels on your workload. if it generates
+        pod, add same label for generated pods.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: labels
+    namespace: vela-system
+    resourceVersion: "57462898"
+    uid: e679b133-5f44-4ed1-9e0c-4668a8181ca9
+  spec:
+    appliesToWorkloads:
+    - '*'
+    podDisruptive: true
+    schematic:
+      cue:
+        template: "// +patchStrategy=jsonMergePatch\npatch: {\n\tmetadata: labels:
+          {\n\t\tfor k, v in parameter {\n\t\t\t(k): v\n\t\t}\n\t}\n\tif context.output.spec
+          != _|_ && context.output.spec.template != _|_ {\n\t\tspec: template: metadata:
+          labels: {\n\t\t\tfor k, v in parameter {\n\t\t\t\t(k): v\n\t\t\t}\n\t\t}\n\t}\n}\nparameter:
+          [string]: string | null\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-05-27T09:08:00Z"
+      message: 'cannot store capability labels in ConfigMap: cannot create or update
+        capability labels-v1 in ConfigMap: the server is currently unable to handle
+        the request (put configmaps trait-schema-labels-v1)'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-labels
+    latestRevision:
+      name: labels-v1
+      revision: 1
+      revisionHash: f263b156f3696ff4
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Add lifecycle hooks for every container of K8s
+        pod for your workload which follows the pod spec in path 'spec.template'.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: lifecycle
+    namespace: vela-system
+    resourceVersion: "57297374"
+    uid: bbc91d4b-18a9-42dd-8716-4307288a3402
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    - statefulsets.apps
+    - daemonsets.apps
+    - jobs.batch
+    podDisruptive: true
+    schematic:
+      cue:
+        template: "patch: spec: template: spec: containers: [...{\n\tlifecycle: {\n\t\tif
+          parameter.postStart != _|_ {\n\t\t\tpostStart: parameter.postStart\n\t\t}\n\t\tif
+          parameter.preStop != _|_ {\n\t\t\tpreStop: parameter.preStop\n\t\t}\n\t}\n}]\nparameter:
+          {\n\tpostStart?: #LifeCycleHandler\n\tpreStop?:   #LifeCycleHandler\n}\n#Port:
+          int & >=1 & <=65535\n#LifeCycleHandler: {\n\texec?: command: [...string]\n\thttpGet?:
+          {\n\t\tpath?:  string\n\t\tport:   #Port\n\t\thost?:  string\n\t\tscheme:
+          *\"HTTP\" | \"HTTPS\"\n\t\thttpHeaders?: [...{\n\t\t\tname:  string\n\t\t\tvalue:
+          string\n\t\t}]\n\t}\n\ttcpSocket?: {\n\t\tport:  #Port\n\t\thost?: string\n\t}\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-01-02T14:52:26Z"
+      message: 'cannot store capability lifecycle in ConfigMap: cannot create or update
+        capability lifecycle-v1 in ConfigMap: the server is currently unable to handle
+        the request (put configmaps trait-schema-lifecycle-v1)'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-lifecycle
+    latestRevision:
+      name: lifecycle-v1
+      revision: 1
+      revisionHash: b2c91ced805b5cca
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: nocalhost develop configuration.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+      custom.definition.oam.dev/ui-hidden: "true"
+    name: nocalhost
+    namespace: vela-system
+    resourceVersion: "57463044"
+    uid: 452fedf5-f568-4933-b7e3-135aacae5b76
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    - statefulsets.apps
+    - daemonsets.apps
+    - jobs.batch
+    podDisruptive: true
+    schematic:
+      cue:
+        template: "import (\n\t\"encoding/json\"\n)\n\noutputs: nocalhostService:
+          {\n\tapiVersion: \"v1\"\n\tkind:       \"Service\"\n\tmetadata: name: context.name\n\tspec:
+          {\n\t\tselector: \"app.oam.dev/component\": context.name\n\t\tports: [\n\t\t\t{\n\t\t\t\tport:
+          \      parameter.port\n\t\t\t\ttargetPort: parameter.port\n\t\t\t},\n\t\t]\n\t\ttype:
+          \"ClusterIP\"\n\t}\n}\n\npatch: metadata: annotations: {\n\t\"dev.nocalhost/application-name\":
+          \     context.appName\n\t\"dev.nocalhost/application-namespace\": context.namespace\n\t\"dev.nocalhost\":
+          json.Marshal({\n\t\tname:        context.name\n\t\tserviceType: parameter.serviceType\n\t\tcontainers:
+          [\n\t\t\t{\n\t\t\t\tname: context.name\n\t\t\t\tdev: {\n\t\t\t\t\tif parameter.gitUrl
+          != _|_ {\n\t\t\t\t\t\tgitUrl: parameter.gitUrl\n\t\t\t\t\t}\n\t\t\t\t\tif
+          parameter.image == \"go\" {\n\t\t\t\t\t\timage: \"nocalhost-docker.pkg.coding.net/nocalhost/dev-images/golang:latest\"\n\t\t\t\t\t}\n\t\t\t\t\tif
+          parameter.image == \"java\" {\n\t\t\t\t\t\timage: \"nocalhost-docker.pkg.coding.net/nocalhost/dev-images/java:latest\"\n\t\t\t\t\t}\n\t\t\t\t\tif
+          parameter.image == \"python\" {\n\t\t\t\t\t\timage: \"nocalhost-docker.pkg.coding.net/nocalhost/dev-images/python:latest\"\n\t\t\t\t\t}\n\t\t\t\t\tif
+          parameter.image == \"node\" {\n\t\t\t\t\t\timage: \"nocalhost-docker.pkg.coding.net/nocalhost/dev-images/node:latest\"\n\t\t\t\t\t}\n\t\t\t\t\tif
+          parameter.image == \"ruby\" {\n\t\t\t\t\t\timage: \"nocalhost-docker.pkg.coding.net/nocalhost/dev-images/ruby:latest\"\n\t\t\t\t\t}\n\t\t\t\t\tif
+          parameter.image != \"go\" && parameter.image != \"java\" && parameter.image
+          != \"python\" && parameter.image != \"node\" && parameter.image != \"ruby\"
+          {\n\t\t\t\t\t\timage: parameter.image\n\t\t\t\t\t}\n\t\t\t\t\tshell:   parameter.shell\n\t\t\t\t\tworkDir:
+          parameter.workDir\n\t\t\t\t\tif parameter.storageClass != _|_ {\n\t\t\t\t\t\tstorageClass:
+          parameter.storageClass\n\t\t\t\t\t}\n\t\t\t\t\tresources: {\n\t\t\t\t\t\tlimits:
+          \  parameter.resources.limits\n\t\t\t\t\t\trequests: parameter.resources.requests\n\t\t\t\t\t}\n\t\t\t\t\tif
+          parameter.persistentVolumeDirs != _|_ {\n\t\t\t\t\t\tpersistentVolumeDirs:
+          [\n\t\t\t\t\t\t\tfor v in parameter.persistentVolumeDirs {\n\t\t\t\t\t\t\t\tpath:
+          \    v.path\n\t\t\t\t\t\t\t\tcapacity: v.capacity\n\t\t\t\t\t\t\t},\n\t\t\t\t\t\t]\n\t\t\t\t\t}\n\t\t\t\t\tif
+          parameter.command != _|_ {\n\t\t\t\t\t\tcommand: parameter.command\n\t\t\t\t\t}\n\t\t\t\t\tif
+          parameter.debug != _|_ {\n\t\t\t\t\t\tdebug: parameter.debug\n\t\t\t\t\t}\n\t\t\t\t\thotReload:
+          parameter.hotReload\n\t\t\t\t\tif parameter.sync != _|_ {\n\t\t\t\t\t\tsync:
+          parameter.sync\n\t\t\t\t\t}\n\t\t\t\t\tif parameter.env != _|_ {\n\t\t\t\t\t\tenv:
+          [\n\t\t\t\t\t\t\tfor v in parameter.env {\n\t\t\t\t\t\t\t\tname:  v.name\n\t\t\t\t\t\t\t\tvalue:
+          v.value\n\t\t\t\t\t\t\t},\n\t\t\t\t\t\t]\n\t\t\t\t\t}\n\t\t\t\t\tif parameter.portForward
+          != _|_ {\n\t\t\t\t\t\tportForward: parameter.portForward\n\t\t\t\t\t}\n\t\t\t\t\tif
+          parameter.portForward == _|_ {\n\t\t\t\t\t\tportForward: [\"\\(parameter.port):\\(parameter.port)\"]\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t},\n\t\t]\n\t})\n}\nlanguage:
+          \"go\" | \"java\" | \"python\" | \"node\" | \"ruby\"\nparameter: {\n\tport:
+          \         int\n\tserviceType:   *\"deployment\" | string\n\tgitUrl?:       string\n\timage:
+          \        language | string\n\tshell:         *\"bash\" | string\n\tworkDir:
+          \      *\"/home/nocalhost-dev\" | string\n\tstorageClass?: string\n\tcommand:
+          {\n\t\trun: *[\"sh\", \"run.sh\"] | [...string]\n\t\tdebug: *[\"sh\", \"debug.sh\"]
+          | [...string]\n\t}\n\tdebug?: remoteDebugPort?: int\n\thotReload: *true
+          | bool\n\tsync: {\n\t\ttype: *\"send\" | string\n\t\tfilePattern: *[\"./\"]
+          | [...string]\n\t\tignoreFilePattern: *[\".git\", \".vscode\", \".idea\",
+          \".gradle\", \"build\"] | [...string]\n\t}\n\tenv?: [...{\n\t\tname:  string\n\t\tvalue:
+          string\n\t}]\n\tportForward?: [...string]\n\tpersistentVolumeDirs?: [...{\n\t\tpath:
+          \    string\n\t\tcapacity: string\n\t}]\n\tresources: {\n\t\tlimits: {\n\t\t\tmemory:
+          *\"2Gi\" | string\n\t\t\tcpu:    *\"2\" | string\n\t\t}\n\t\trequests: {\n\t\t\tmemory:
+          *\"512Mi\" | string\n\t\t\tcpu:    *\"0.5\" | string\n\t\t}\n\t}\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-05-27T09:08:07Z"
+      message: 'cannot store capability nocalhost in ConfigMap: cannot create or update
+        capability nocalhost in ConfigMap: resource name may not be empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-nocalhost
+    latestRevision:
+      name: nocalhost-v1
+      revision: 1
+      revisionHash: b3c5d7cbf672ed9e
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: affinity specify node affinity and toleration
+        on K8s pod for your workload which follows the pod spec in path 'spec.template'.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+      custom.definition.oam.dev/deprecated: "true"
+      custom.definition.oam.dev/ui-hidden: "true"
+    name: node-affinity
+    namespace: vela-system
+    resourceVersion: "53533509"
+    uid: cdb9b164-261d-465f-8621-fff2b4d4b075
+  spec:
+    appliesToWorkloads:
+    - '*'
+    podDisruptive: true
+    schematic:
+      cue:
+        template: "patch: spec: template: spec: {\n\tif parameter.affinity != _|_
+          {\n\t\taffinity: nodeAffinity: requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms: [{\n\t\t\tmatchExpressions: [\n\t\t\t\tfor k, v in parameter.affinity
+          {\n\t\t\t\t\tkey:      k\n\t\t\t\t\toperator: \"In\"\n\t\t\t\t\tvalues:
+          \  v\n\t\t\t\t},\n\t\t\t]}]\n\t}\n\tif parameter.tolerations != _|_ {\n\t\ttolerations:
+          [\n\t\t\tfor k, v in parameter.tolerations {\n\t\t\t\teffect:   \"NoSchedule\"\n\t\t\t\tkey:
+          \     k\n\t\t\t\toperator: \"Equal\"\n\t\t\t\tvalue:    v\n\t\t\t}]\n\t}\n}\nparameter:
+          {\n\taffinity?: [string]: [...string]\n\ttolerations?: [string]: string\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2025-12-02T12:31:22Z"
+      message: 'cannot store capability node-affinity in ConfigMap: cannot create
+        or update capability node-affinity in ConfigMap: resource name may not be
+        empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-node-affinity
+    latestRevision:
+      name: node-affinity-v1
+      revision: 1
+      revisionHash: 2781aab4d0215d51
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Adds security context to the pod spec in path
+        'spec.template.spec.securityContext'.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: podsecuritycontext
+    namespace: vela-system
+    resourceVersion: "57426492"
+    uid: 12ade3e9-f50c-46ed-824a-98387e4721cd
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    - statefulsets.apps
+    - daemonsets.apps
+    - jobs.batch
+    podDisruptive: true
+    schematic:
+      cue:
+        template: "patch: spec: template: spec: securityContext: {\n\tif parameter.appArmorProfile
+          != _|_ {\n\t\tappArmorProfile: parameter.appArmorProfile\n\t}\n\tif parameter.fsGroup
+          != _|_ {\n\t\tfsGroup: parameter.fsGroup\n\t}\n\tif parameter.runAsGroup
+          != _|_ {\n\t\trunAsGroup: parameter.runAsGroup\n\t}\n\tif parameter.runAsUser
+          != _|_ {\n\t\trunAsUser: parameter.runAsUser\n\t}\n\tif parameter.seccompProfile
+          != _|_ {\n\t\tseccompProfile: parameter.seccompProfile\n\t}\n\trunAsNonRoot:
+          parameter.runAsNonRoot\n}\n\nparameter: {\n\t// +usage=Specify the AppArmor
+          profile for the pod\n\tappArmorProfile?: {\n\t\ttype: \"RuntimeDefault\"
+          | \"Unconfined\" | \"Localhost\"\n\t\t// +usage:  localhostProfile is required
+          when type is 'Localhost'\n\t\tlocalhostProfile?: string\n\t}\n\tfsGroup?:
+          \   int\n\trunAsGroup?: int\n\t// +usage=Specify the UID to run the entrypoint
+          of the container process\n\trunAsUser?: int\n\t// +usage=Specify if the
+          container runs as a non-root user\n\trunAsNonRoot: *true | bool\n\t// +usage=Specify
+          the seccomp profile for the pod\n\tseccompProfile?: {\n\t\ttype: \"RuntimeDefault\"
+          | \"Unconfined\" | \"Localhost\"\n\t\t// +usage:  localhostProfile is required
+          when type is 'Localhost'\n\t\tlocalhostProfile?: string\n\t}\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-05-27T08:14:45Z"
+      message: 'cannot store capability podsecuritycontext in ConfigMap: cannot create
+        or update capability podsecuritycontext in ConfigMap: resource name may not
+        be empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-podsecuritycontext
+    latestRevision:
+      name: podsecuritycontext-v1
+      revision: 1
+      revisionHash: da85b24529355cea
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Enable public web traffic for the component
+        without creating a Service.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+      custom.definition.oam.dev/deprecated: "true"
+      custom.definition.oam.dev/ui-hidden: "true"
+    name: pure-ingress
+    namespace: vela-system
+    resourceVersion: "54891465"
+    uid: 072069df-55c7-494d-bd71-ed6cd805a8ec
+  spec:
+    appliesToWorkloads:
+    - '*'
+    conflictsWith: []
+    podDisruptive: false
+    schematic:
+      cue:
+        template: "outputs: ingress: {\n\tapiVersion: \"networking.k8s.io/v1beta1\"\n\tkind:
+          \      \"Ingress\"\n\tmetadata: name: context.name\n\tspec: rules: [{\n\t\thost:
+          parameter.domain\n\t\thttp: paths: [\n\t\t\tfor k, v in parameter.http {\n\t\t\t\tpath:
+          k\n\t\t\t\tbackend: {\n\t\t\t\t\tserviceName: context.name\n\t\t\t\t\tservicePort:
+          v\n\t\t\t\t}\n\t\t\t},\n\t\t]\n\t}]\n}\nparameter: {\n\t// +usage=Specify
+          the domain you want to expose\n\tdomain: string\n\n\t// +usage=Specify the
+          mapping relationship between the http path and the workload port\n\thttp:
+          [string]: int\n}\n"
+    status:
+      customStatus: "let igs = context.outputs.ingress.status.loadBalancer.ingress\nif
+        igs == _|_ {\n\tmessage: \"No loadBalancer found, visiting by using 'vela
+        port-forward \" + context.appName + \" --route'\\n\"\n}\nif len(igs) > 0 {\n\tif
+        igs[0].ip != _|_ {\n\t\tmessage: \"Visiting URL: \" + context.outputs.ingress.spec.rules[0].host
+        + \", IP: \" + igs[0].ip\n\t}\n\tif igs[0].ip == _|_ {\n\t\tmessage: \"Visiting
+        URL: \" + context.outputs.ingress.spec.rules[0].host\n\t}\n}"
+    workloadRefPath: ""
+  status:
+    conditions:
+    - lastTransitionTime: "2025-12-05T14:30:09Z"
+      message: 'cannot store capability pure-ingress in ConfigMap: cannot create or
+        update capability pure-ingress in ConfigMap: resource name may not be empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-pure-ingress
+    latestRevision:
+      name: pure-ingress-v1
+      revision: 1
+      revisionHash: f07dc6abe77a0c9c
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Create a Persistent Volume Claim and mount the
+        PVC as volume to the  first container in the pod. This definition is DEPRECATED,
+        please specify pvc in 'storage' instead.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+      custom.definition.oam.dev/deprecated: "true"
+    name: pvc
+    namespace: vela-system
+    resourceVersion: "57462929"
+    uid: 6e3ca516-1cd4-444a-9a25-6cedb0c9308e
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    podDisruptive: true
+    schematic:
+      cue:
+        template: "patch: spec: template: spec: {\n\tcontainers: [{\n\t\tif parameter.volumeMode
+          == \"Block\" {\n\t\t\t// +patchKey=name\n\t\t\tvolumeDevices: [\n\t\t\t\tfor
+          v in parameter.volumesToMount {\n\t\t\t\t\t{\n\t\t\t\t\t\tname:       v.name\n\t\t\t\t\t\tdevicePath:
+          v.devicePath\n\t\t\t\t\t}\n\t\t\t\t},\n\t\t\t]\n\t\t}\n\t\tif parameter.volumeMode
+          == \"Filesystem\" {\n\t\t\t// +patchKey=name\n\t\t\tvolumeMounts: [\n\t\t\t\tfor
+          v in parameter.volumesToMount {\n\t\t\t\t\t{\n\t\t\t\t\t\tname:      v.name\n\t\t\t\t\t\tmountPath:
+          v.mountPath\n\t\t\t\t\t}\n\t\t\t\t},\n\t\t\t]\n\t\t}\n\t}]\n\n\t// +patchKey=name\n\tvolumes:
+          [\n\t\tfor v in parameter.volumesToMount {\n\t\t\t{\n\t\t\t\tname: v.name\n\t\t\t\tpersistentVolumeClaim:
+          claimName: parameter.claimName\n\t\t\t}\n\t\t},\n\t]\n}\noutputs: claim:
+          {\n\tapiVersion: \"v1\"\n\tkind:       \"PersistentVolumeClaim\"\n\tmetadata:
+          name: parameter.claimName\n\tspec: {\n\t\taccessModes: parameter.accessModes\n\t\tvolumeMode:
+          \ parameter.volumeMode\n\t\tif parameter.volumeName != _|_ {\n\t\t\tvolumeName:
+          parameter.volumeName\n\t\t}\n\n\t\tif parameter.storageClassName != _|_
+          {\n\t\t\tstorageClassName: parameter.storageClassName\n\t\t}\n\t\tresources:
+          requests: storage: parameter.resources.requests.storage\n\t\tif parameter.resources.limits
+          != _|_ {\n\t\t\tresources: limits: storage: parameter.resources.limits.storage\n\t\t}\n\t\tif
+          parameter.dataSourceRef != _|_ {\n\t\t\tdataSourceRef: parameter.dataSourceRef\n\t\t}\n\t\tif
+          parameter.dataSource != _|_ {\n\t\t\tdataSource: parameter.dataSource\n\t\t}\n\t\tif
+          parameter.selector != _|_ {\n\t\t\tdataSource: parameter.selector\n\t\t}\n\t}\n}\nparameter:
+          {\n\tclaimName:   string\n\tvolumeMode:  *\"Filesystem\" | string\n\tvolumeName?:
+          string\n\taccessModes: [...string]\n\tstorageClassName?: string\n\tresources:
+          {\n\t\trequests: storage: =~\"^([1-9][0-9]{0,63})(E|P|T|G|M|K|Ei|Pi|Ti|Gi|Mi|Ki)$\"\n\t\tlimits?:
+          storage:  =~\"^([1-9][0-9]{0,63})(E|P|T|G|M|K|Ei|Pi|Ti|Gi|Mi|Ki)$\"\n\t}\n\tdataSourceRef?:
+          {\n\t\tname:     string\n\t\tkind:     string\n\t\tapiGroup: string\n\t}\n\tdataSource?:
+          {\n\t\tname:     string\n\t\tkind:     string\n\t\tapiGroup: string\n\t}\n\tselector?:
+          {\n\t\tmatchLabels?: [string]: string\n\t\tmatchExpressions?: {\n\t\t\tkey:
+          string\n\t\t\tvalues: [...string]\n\t\t\toperator: string\n\t\t}\n\t}\n\tvolumesToMount:
+          [...{\n\t\tname: string\n\t\tif volumeMode == \"Block\" {\n\t\t\tdevicePath:
+          string\n\t\t}\n\t\tif volumeMode == \"Filesystem\" {\n\t\t\tmountPath: string\n\t\t}\n\t}]\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-05-27T09:08:03Z"
+      message: 'cannot store capability pvc in ConfigMap: cannot create or update
+        capability pvc-v1 in ConfigMap: resource name may not be empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-pvc
+    latestRevision:
+      name: pvc-v1
+      revision: 1
+      revisionHash: 6e1423618f642c38
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Add resource requests and limits on K8s pod
+        for your workload which follows the pod spec in path 'spec.template.'
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: resource
+    namespace: vela-system
+    resourceVersion: "57463077"
+    uid: 690b068b-756b-485c-8fe6-7aafdc2cfe43
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    - statefulsets.apps
+    - daemonsets.apps
+    - jobs.batch
+    - cronjobs.batch
+    podDisruptive: true
+    schematic:
+      cue:
+        template: "let resourceContent = {\n\tresources: {\n\t\tif parameter.cpu !=
+          _|_ if parameter.memory != _|_ if parameter.requests == _|_ if parameter.limits
+          == _|_ {\n\t\t\t// +patchStrategy=retainKeys\n\t\t\trequests: {\n\t\t\t\tcpu:
+          \   parameter.cpu\n\t\t\t\tmemory: parameter.memory\n\t\t\t}\n\t\t\t// +patchStrategy=retainKeys\n\t\t\tlimits:
+          {\n\t\t\t\tcpu:    parameter.cpu\n\t\t\t\tmemory: parameter.memory\n\t\t\t}\n\t\t}\n\n\t\tif
+          parameter.requests != _|_ {\n\t\t\t// +patchStrategy=retainKeys\n\t\t\trequests:
+          {\n\t\t\t\tcpu:    parameter.requests.cpu\n\t\t\t\tmemory: parameter.requests.memory\n\t\t\t}\n\t\t}\n\t\tif
+          parameter.limits != _|_ {\n\t\t\t// +patchStrategy=retainKeys\n\t\t\tlimits:
+          {\n\t\t\t\tcpu:    parameter.limits.cpu\n\t\t\t\tmemory: parameter.limits.memory\n\t\t\t}\n\t\t}\n\t}\n}\n\nif
+          context.output.spec != _|_ if context.output.spec.template != _|_ {\n\tpatch:
+          spec: template: spec: {\n\t\t// +patchKey=name\n\t\tcontainers: [resourceContent]\n\t}\n}\nif
+          context.output.spec != _|_ if context.output.spec.jobTemplate != _|_ {\n\tpatch:
+          spec: jobTemplate: spec: template: spec: {\n\t\t// +patchKey=name\n\t\tcontainers:
+          [resourceContent]\n\t}\n}\n\nparameter: {\n\t// +usage=Specify the amount
+          of cpu for requests and limits\n\tcpu?: *1 | number | string\n\t// +usage=Specify
+          the amount of memory for requests and limits\n\tmemory?: *\"2048Mi\" | =~\"^([1-9][0-9]{0,63})(E|P|T|G|M|K|Ei|Pi|Ti|Gi|Mi|Ki)$\"\n\t//
+          +usage=Specify the resources in requests\n\trequests?: {\n\t\t// +usage=Specify
+          the amount of cpu for requests\n\t\tcpu: *1 | number | string\n\t\t// +usage=Specify
+          the amount of memory for requests\n\t\tmemory: *\"2048Mi\" | =~\"^([1-9][0-9]{0,63})(E|P|T|G|M|K|Ei|Pi|Ti|Gi|Mi|Ki)$\"\n\t}\n\t//
+          +usage=Specify the resources in limits\n\tlimits?: {\n\t\t// +usage=Specify
+          the amount of cpu for limits\n\t\tcpu: *1 | number | string\n\t\t// +usage=Specify
+          the amount of memory for limits\n\t\tmemory: *\"2048Mi\" | =~\"^([1-9][0-9]{0,63})(E|P|T|G|M|K|Ei|Pi|Ti|Gi|Mi|Ki)$\"\n\t}\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-05-27T09:08:08Z"
+      message: 'cannot store capability resource in ConfigMap: cannot create or update
+        capability resource in ConfigMap: the server is currently unable to handle
+        the request (put configmaps trait-schema-resource)'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-resource
+    latestRevision:
+      name: resource-v1
+      revision: 1
+      revisionHash: eb31a8371817e8ad
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Manually scale K8s pod for your workload which
+        follows the pod spec in path 'spec.template'.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: scaler
+    namespace: vela-system
+    resourceVersion: "57287298"
+    uid: 9c0e269e-86e1-4fa4-aebc-de9bd4475e02
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    - statefulsets.apps
+    podDisruptive: false
+    schematic:
+      cue:
+        template: "parameter: {\n\t// +usage=Specify the number of workload\n\treplicas:
+          *1 | int\n}\n// +patchStrategy=retainKeys\npatch: spec: replicas: parameter.replicas\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-01-02T14:29:12Z"
+      message: 'cannot store capability scaler in ConfigMap: cannot create or update
+        capability scaler in ConfigMap: resource name may not be empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-scaler
+    latestRevision:
+      name: scaler-v1
+      revision: 1
+      revisionHash: 5ceecfbe58dde83a
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Adds security context to the container spec
+        in path 'spec.template.spec.containers.[].securityContext'.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: securitycontext
+    namespace: vela-system
+    resourceVersion: "57462955"
+    uid: 6d6f84e0-d7ef-494e-818c-7dc9f7bd6229
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    - statefulsets.apps
+    - daemonsets.apps
+    - jobs.batch
+    podDisruptive: true
+    schematic:
+      cue:
+        template: "#PatchParams: {\n\t// +usage=Specify the name of the target container,
+          if not set, use the component name\n\tcontainerName: *\"\" | string\n\taddCapabilities?:
+          [...string]\n\tallowPrivilegeEscalation: *false | bool\n\tdropCapabilities?:
+          [...string]\n\tprivileged:             *false | bool\n\treadOnlyRootFilesystem:
+          *false | bool\n\trunAsNonRoot:           *true | bool\n\trunAsUser?:             int\n\trunAsGroup?:
+          \           int\n}\n\nPatchContainer: {\n\t_params:         #PatchParams\n\tname:
+          \           _params.containerName\n\t_baseContainers: context.output.spec.template.spec.containers\n\t_matchContainers_:
+          [for _container_ in _baseContainers if _container_.name == name {_container_}]\n\t_baseContainer:
+          *_|_ | {...}\n\tif len(_matchContainers_) == 0 {\n\t\terr: \"container \\(name)
+          not found\"\n\t}\n\tif len(_matchContainers_) > 0 {\n\t\tsecurityContext:
+          {\n\t\t\tcapabilities: {\n\t\t\t\tif _params.addCapabilities != _|_ {\n\t\t\t\t\tadd:
+          _params.addCapabilities\n\t\t\t\t}\n\t\t\t\tif _params.dropCapabilities
+          != _|_ {\n\t\t\t\t\tdrop: _params.dropCapabilities\n\t\t\t\t}\n\t\t\t}\n\t\t\tif
+          _params.runAsUser != _|_ {\n\t\t\t\trunAsUser: _params.runAsUser\n\t\t\t}\n\t\t\tif
+          _params.runAsGroup != _|_ {\n\t\t\t\trunAsGroup: _params.runAsGroup\n\t\t\t}\n\t\t\tallowPrivilegeEscalation:
+          _params.allowPrivilegeEscalation\n\t\t\treadOnlyRootFilesystem:   _params.readOnlyRootFilesystem\n\t\t\tprivileged:
+          \              _params.privileged\n\t\t\trunAsNonRoot:             _params.runAsNonRoot\n\t\t}\n\t}\n}\npatch:
+          spec: template: spec: {\n\tif parameter.containers == _|_ {\n\t\t// +patchKey=name\n\t\tcontainers:
+          [{\n\t\t\tPatchContainer & {_params: {\n\t\t\t\tif parameter.containerName
+          == \"\" {\n\t\t\t\t\tcontainerName: context.name\n\t\t\t\t}\n\t\t\t\tif
+          parameter.containerName != \"\" {\n\t\t\t\t\tcontainerName: parameter.containerName\n\t\t\t\t}\n\t\t\t\tallowPrivilegeEscalation:
+          parameter.allowPrivilegeEscalation\n\t\t\t\treadOnlyRootFilesystem:   parameter.readOnlyRootFilesystem\n\t\t\t\tprivileged:
+          \              parameter.privileged\n\t\t\t\trunAsNonRoot:             parameter.runAsNonRoot\n\t\t\t\trunAsUser:
+          \               parameter.runAsUser\n\t\t\t\trunAsGroup:               parameter.runAsGroup\n\t\t\t\taddCapabilities:
+          \         parameter.addCapabilities\n\t\t\t\tdropCapabilities:         parameter.dropCapabilities\n\t\t\t}}\n\t\t}]\n\t}\n\n\tif
+          parameter.containers != _|_ {\n\t\t// +patchKey=name\n\t\tcontainers: [for
+          c in parameter.containers {\n\t\t\tif c.containerName == \"\" {\n\t\t\t\terr:
+          \"containerName must be set for containers\"\n\t\t\t}\n\t\t\tif c.containerName
+          != \"\" {\n\t\t\t\tPatchContainer & {_params: c}\n\t\t\t}\n\t\t}]\n\t}\n}\n\nparameter:
+          #PatchParams | close({\n\t// +usage=Specify the container image for multiple
+          containers\n\tcontainers: [...#PatchParams]\n})\n\nerrs: [for c in patch.spec.template.spec.containers
+          if c.err != _|_ {c.err}]\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-05-27T09:08:03Z"
+      message: 'cannot store capability securitycontext in ConfigMap: cannot create
+        or update capability securitycontext in ConfigMap: the server is currently
+        unable to handle the request (put configmaps trait-schema-securitycontext)'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-securitycontext
+    latestRevision:
+      name: securitycontext-v1
+      revision: 1
+      revisionHash: 2d8ba3a1fd796fb9
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Specify serviceAccount for your workload which
+        follows the pod spec in path 'spec.template'.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: service-account
+    namespace: vela-system
+    resourceVersion: "55731820"
+    uid: e1600e6e-04b3-4060-80a3-cfa45bdb8347
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    - statefulsets.apps
+    - daemonsets.apps
+    - jobs.batch
+    podDisruptive: false
+    schematic:
+      cue:
+        template: "#Privileges: {\n\t// +usage=Specify the verbs to be allowed for
+          the resource\n\tverbs: [...string]\n\t// +usage=Specify the apiGroups of
+          the resource\n\tapiGroups?: [...string]\n\t// +usage=Specify the resources
+          to be allowed\n\tresources?: [...string]\n\t// +usage=Specify the resourceNames
+          to be allowed\n\tresourceNames?: [...string]\n\t// +usage=Specify the resource
+          url to be allowed\n\tnonResourceURLs?: [...string]\n\t// +usage=Specify
+          the scope of the privileges, default to be namespace scope\n\tscope: *\"namespace\"
+          | \"cluster\"\n}\nparameter: {\n\t// +usage=Specify the name of ServiceAccount\n\tname:
+          string\n\t// +usage=Specify whether to create new ServiceAccount or not\n\tcreate:
+          *false | bool\n\t// +usage=Specify the privileges of the ServiceAccount,
+          if not empty, RoleBindings(ClusterRoleBindings) will be created\n\tprivileges?:
+          [...#Privileges]\n}\n// +patchStrategy=retainKeys\npatch: spec: template:
+          spec: serviceAccountName: parameter.name\n\n_clusterPrivileges: [if parameter.privileges
+          != _|_ for p in parameter.privileges if p.scope == \"cluster\" {p}]\n_namespacePrivileges:
+          [if parameter.privileges != _|_ for p in parameter.privileges if p.scope
+          == \"namespace\" {p}]\noutputs: {\n\tif parameter.create {\n\t\t\"service-account\":
+          {\n\t\t\tapiVersion: \"v1\"\n\t\t\tkind:       \"ServiceAccount\"\n\t\t\tmetadata:
+          name: parameter.name\n\t\t}\n\t}\n\tif parameter.privileges != _|_ {\n\t\tif
+          len(_clusterPrivileges) > 0 {\n\t\t\t\"cluster-role\": {\n\t\t\t\tapiVersion:
+          \"rbac.authorization.k8s.io/v1\"\n\t\t\t\tkind:       \"ClusterRole\"\n\t\t\t\tmetadata:
+          name: \"\\(context.namespace):\\(parameter.name)\"\n\t\t\t\trules: [for
+          p in _clusterPrivileges {\n\t\t\t\t\tverbs: p.verbs\n\t\t\t\t\tif p.apiGroups
+          != _|_ {\n\t\t\t\t\t\tapiGroups: p.apiGroups\n\t\t\t\t\t}\n\t\t\t\t\tif
+          p.resources != _|_ {\n\t\t\t\t\t\tresources: p.resources\n\t\t\t\t\t}\n\t\t\t\t\tif
+          p.resourceNames != _|_ {\n\t\t\t\t\t\tresourceNames: p.resourceNames\n\t\t\t\t\t}\n\t\t\t\t\tif
+          p.nonResourceURLs != _|_ {\n\t\t\t\t\t\tnonResourceURLs: p.nonResourceURLs\n\t\t\t\t\t}\n\t\t\t\t}]\n\t\t\t}\n\t\t\t\"cluster-role-binding\":
+          {\n\t\t\t\tapiVersion: \"rbac.authorization.k8s.io/v1\"\n\t\t\t\tkind:       \"ClusterRoleBinding\"\n\t\t\t\tmetadata:
+          name: \"\\(context.namespace):\\(parameter.name)\"\n\t\t\t\troleRef: {\n\t\t\t\t\tapiGroup:
+          \"rbac.authorization.k8s.io\"\n\t\t\t\t\tkind:     \"ClusterRole\"\n\t\t\t\t\tname:
+          \    \"\\(context.namespace):\\(parameter.name)\"\n\t\t\t\t}\n\t\t\t\tsubjects:
+          [{\n\t\t\t\t\tkind:      \"ServiceAccount\"\n\t\t\t\t\tname:      parameter.name\n\t\t\t\t\tnamespace:
+          (context.namespace)\n\t\t\t\t}]\n\t\t\t}\n\t\t}\n\t\tif len(_namespacePrivileges)
+          > 0 {\n\t\t\trole: {\n\t\t\t\tapiVersion: \"rbac.authorization.k8s.io/v1\"\n\t\t\t\tkind:
+          \      \"Role\"\n\t\t\t\tmetadata: name: parameter.name\n\t\t\t\trules:
+          [for p in _namespacePrivileges {\n\t\t\t\t\tverbs: p.verbs\n\t\t\t\t\tif
+          p.apiGroups != _|_ {\n\t\t\t\t\t\tapiGroups: p.apiGroups\n\t\t\t\t\t}\n\t\t\t\t\tif
+          p.resources != _|_ {\n\t\t\t\t\t\tresources: p.resources\n\t\t\t\t\t}\n\t\t\t\t\tif
+          p.resourceNames != _|_ {\n\t\t\t\t\t\tresourceNames: p.resourceNames\n\t\t\t\t\t}\n\t\t\t\t\tif
+          p.nonResourceURLs != _|_ {\n\t\t\t\t\t\tnonResourceURLs: p.nonResourceURLs\n\t\t\t\t\t}\n\t\t\t\t}]\n\t\t\t}\n\t\t\t\"role-binding\":
+          {\n\t\t\t\tapiVersion: \"rbac.authorization.k8s.io/v1\"\n\t\t\t\tkind:       \"RoleBinding\"\n\t\t\t\tmetadata:
+          name: parameter.name\n\t\t\t\troleRef: {\n\t\t\t\t\tapiGroup: \"rbac.authorization.k8s.io\"\n\t\t\t\t\tkind:
+          \    \"Role\"\n\t\t\t\t\tname:     parameter.name\n\t\t\t\t}\n\t\t\t\tsubjects:
+          [{\n\t\t\t\t\tkind: \"ServiceAccount\"\n\t\t\t\t\tname: parameter.name\n\t\t\t\t}]\n\t\t\t}\n\t\t}\n\t}\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2025-12-06T15:25:01Z"
+      message: 'cannot store capability service-account in ConfigMap: cannot create
+        or update capability service-account in ConfigMap: resource name may not be
+        empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-service-account
+    latestRevision:
+      name: service-account-v1
+      revision: 1
+      revisionHash: fd0292229f2b8a42
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Binding secrets of cloud resources to component
+        env. This definition is DEPRECATED, please use 'storage' instead.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+      custom.definition.oam.dev/ui-hidden: "true"
+    name: service-binding
+    namespace: vela-system
+    resourceVersion: "9630056"
+    uid: 9dce5c1b-9d3b-4ad4-a60d-3da9713e4a71
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    - statefulsets.apps
+    - daemonsets.apps
+    - jobs.batch
+    schematic:
+      cue:
+        template: "patch: spec: template: spec: {\n\t// +patchKey=name\n\tcontainers:
+          [{\n\t\tname: context.name\n\t\t// +patchKey=name\n\t\tenv: [\n\t\t\tfor
+          envName, v in parameter.envMappings {\n\t\t\t\tname: envName\n\t\t\t\tvalueFrom:
+          secretKeyRef: {\n\t\t\t\t\tname: v.secret\n\t\t\t\t\tif v[\"key\"] != _|_
+          {\n\t\t\t\t\t\tkey: v.key\n\t\t\t\t\t}\n\t\t\t\t\tif v[\"key\"] == _|_ {\n\t\t\t\t\t\tkey:
+          envName\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t},\n\t\t]\n\t}]\n}\n\nparameter:
+          {\n\t// +usage=The mapping of environment variables to secret\n\tenvMappings:
+          [string]: #KeySecret\n}\n#KeySecret: {\n\tkey?:   string\n\tsecret: string\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2025-08-24T10:17:53Z"
+      message: 'cannot store capability service-binding in ConfigMap: cannot create
+        or update capability service-binding in ConfigMap: resource name may not be
+        empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-service-binding
+    latestRevision:
+      name: service-binding-v1
+      revision: 1
+      revisionHash: abc35cd36ac93ede
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Inject a sidecar container to K8s pod for your
+        workload which follows the pod spec in path 'spec.template'.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: sidecar
+    namespace: vela-system
+    resourceVersion: "57463000"
+    uid: d95ef20a-feef-448a-8d32-d144408c9495
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    - statefulsets.apps
+    - daemonsets.apps
+    - jobs.batch
+    podDisruptive: true
+    schematic:
+      cue:
+        template: "patch: {\n\t// +patchKey=name\n\tspec: template: spec: containers:
+          [{\n\t\tname:  parameter.name\n\t\timage: parameter.image\n\t\tif parameter.cmd
+          != _|_ {\n\t\t\tcommand: parameter.cmd\n\t\t}\n\t\tif parameter.args !=
+          _|_ {\n\t\t\targs: parameter.args\n\t\t}\n\t\tif parameter[\"env\"] != _|_
+          {\n\t\t\tenv: parameter.env\n\t\t}\n\t\tif parameter[\"volumes\"] != _|_
+          {\n\t\t\tvolumeMounts: [for v in parameter.volumes {\n\t\t\t\t{\n\t\t\t\t\tmountPath:
+          v.path\n\t\t\t\t\tname:      v.name\n\t\t\t\t}\n\t\t\t}]\n\t\t}\n\t\tif
+          parameter[\"livenessProbe\"] != _|_ {\n\t\t\tlivenessProbe: parameter.livenessProbe\n\t\t}\n\n\t\tif
+          parameter[\"readinessProbe\"] != _|_ {\n\t\t\treadinessProbe: parameter.readinessProbe\n\t\t}\n\t}]\n}\nparameter:
+          {\n\t// +usage=Specify the name of sidecar container\n\tname: string\n\n\t//
+          +usage=Specify the image of sidecar container\n\timage: string\n\n\t// +usage=Specify
+          the commands run in the sidecar\n\tcmd?: [...string]\n\n\t// +usage=Specify
+          the args in the sidecar\n\targs?: [...string]\n\n\t// +usage=Specify the
+          env in the sidecar\n\tenv?: [...{\n\t\t// +usage=Environment variable name\n\t\tname:
+          string\n\t\t// +usage=The value of the environment variable\n\t\tvalue?:
+          string\n\t\t// +usage=Specifies a source the value of this var should come
+          from\n\t\tvalueFrom?: {\n\t\t\t// +usage=Selects a key of a secret in the
+          pod's namespace\n\t\t\tsecretKeyRef?: {\n\t\t\t\t// +usage=The name of the
+          secret in the pod's namespace to select from\n\t\t\t\tname: string\n\t\t\t\t//
+          +usage=The key of the secret to select from. Must be a valid secret key\n\t\t\t\tkey:
+          string\n\t\t\t}\n\t\t\t// +usage=Selects a key of a config map in the pod's
+          namespace\n\t\t\tconfigMapKeyRef?: {\n\t\t\t\t// +usage=The name of the
+          config map in the pod's namespace to select from\n\t\t\t\tname: string\n\t\t\t\t//
+          +usage=The key of the config map to select from. Must be a valid secret
+          key\n\t\t\t\tkey: string\n\t\t\t}\n\t\t\t// +usage=Specify the field reference
+          for env\n\t\t\tfieldRef?: {\n\t\t\t\t// +usage=Specify the field path for
+          env\n\t\t\t\tfieldPath: string\n\t\t\t}\n\t\t}\n\t}]\n\n\t// +usage=Specify
+          the shared volume path\n\tvolumes?: [...{\n\t\tname: string\n\t\tpath: string\n\t}]\n\n\t//
+          +usage=Instructions for assessing whether the container is alive.\n\tlivenessProbe?:
+          #HealthProbe\n\n\t// +usage=Instructions for assessing whether the container
+          is in a suitable state to serve traffic.\n\treadinessProbe?: #HealthProbe\n}\n\n#HealthProbe:
+          {\n\n\t// +usage=Instructions for assessing container health by executing
+          a command. Either this attribute or the httpGet attribute or the tcpSocket
+          attribute MUST be specified. This attribute is mutually exclusive with both
+          the httpGet attribute and the tcpSocket attribute.\n\texec?: {\n\t\t// +usage=A
+          command to be executed inside the container to assess its health. Each space
+          delimited token of the command is a separate array element. Commands exiting
+          0 are considered to be successful probes, whilst all other exit codes are
+          considered failures.\n\t\tcommand: [...string]\n\t}\n\n\t// +usage=Instructions
+          for assessing container health by executing an HTTP GET request. Either
+          this attribute or the exec attribute or the tcpSocket attribute MUST be
+          specified. This attribute is mutually exclusive with both the exec attribute
+          and the tcpSocket attribute.\n\thttpGet?: {\n\t\t// +usage=The endpoint,
+          relative to the port, to which the HTTP GET request should be directed.\n\t\tpath:
+          string\n\t\t// +usage=The TCP socket within the container to which the HTTP
+          GET request should be directed.\n\t\tport: int\n\t\thttpHeaders?: [...{\n\t\t\tname:
+          \ string\n\t\t\tvalue: string\n\t\t}]\n\t}\n\n\t// +usage=Instructions for
+          assessing container health by probing a TCP socket. Either this attribute
+          or the exec attribute or the httpGet attribute MUST be specified. This attribute
+          is mutually exclusive with both the exec attribute and the httpGet attribute.\n\ttcpSocket?:
+          {\n\t\t// +usage=The TCP socket within the container that should be probed
+          to assess container health.\n\t\tport: int\n\t}\n\n\t// +usage=Number of
+          seconds after the container is started before the first probe is initiated.\n\tinitialDelaySeconds:
+          *0 | int\n\n\t// +usage=How often, in seconds, to execute the probe.\n\tperiodSeconds:
+          *10 | int\n\n\t// +usage=Number of seconds after which the probe times out.\n\ttimeoutSeconds:
+          *1 | int\n\n\t// +usage=Minimum consecutive successes for the probe to be
+          considered successful after having failed.\n\tsuccessThreshold: *1 | int\n\n\t//
+          +usage=Number of consecutive failures required to determine the container
+          is not alive (liveness probe) or not ready (readiness probe).\n\tfailureThreshold:
+          *3 | int\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-05-27T09:08:05Z"
+      message: 'cannot store capability sidecar in ConfigMap: cannot create or update
+        capability sidecar-v1 in ConfigMap: the server is currently unable to handle
+        the request (put configmaps trait-schema-sidecar-v1)'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-sidecar
+    latestRevision:
+      name: sidecar-v1
+      revision: 1
+      revisionHash: 7caf64594d417ec4
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Add startup probe hooks for the specified container
+        of K8s pod for your workload which follows the pod spec in path 'spec.template'.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: startup-probe
+    namespace: vela-system
+    resourceVersion: "55731831"
+    uid: bba07f22-1150-4ea6-8e9e-da519e24271b
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    - statefulsets.apps
+    - daemonsets.apps
+    - jobs.batch
+    podDisruptive: true
+    schematic:
+      cue:
+        template: "#StartupProbeParams: {\n\t// +usage=Specify the name of the target
+          container, if not set, use the component name\n\tcontainerName: *\"\" |
+          string\n\t// +usage=Number of seconds after the container has started before
+          liveness probes are initiated. Minimum value is 0.\n\tinitialDelaySeconds:
+          *0 | int\n\t// +usage=How often, in seconds, to execute the probe. Minimum
+          value is 1.\n\tperiodSeconds: *10 | int\n\t// +usage=Number of seconds after
+          which the probe times out. Minimum value is 1.\n\ttimeoutSeconds: *1 | int\n\t//
+          +usage=Minimum consecutive successes for the probe to be considered successful
+          after having failed.  Minimum value is 1.\n\tsuccessThreshold: *1 | int\n\t//
+          +usage=Minimum consecutive failures for the probe to be considered failed
+          after having succeeded. Minimum value is 1.\n\tfailureThreshold: *3 | int\n\t//
+          +usage=Optional duration in seconds the pod needs to terminate gracefully
+          upon probe failure. Set this value longer than the expected cleanup time
+          for your process.\n\tterminationGracePeriodSeconds?: int\n\t// +usage=Instructions
+          for assessing container startup status by executing a command. Either this
+          attribute or the httpGet attribute or the grpc attribute or the tcpSocket
+          attribute MUST be specified. This attribute is mutually exclusive with the
+          httpGet attribute and the tcpSocket attribute and the gRPC attribute.\n\texec?:
+          {\n\t\t// +usage=A command to be executed inside the container to assess
+          its health. Each space delimited token of the command is a separate array
+          element. Commands exiting 0 are considered to be successful probes, whilst
+          all other exit codes are considered failures.\n\t\tcommand: [...string]\n\t}\n\t//
+          +usage=Instructions for assessing container startup status by executing
+          an HTTP GET request. Either this attribute or the exec attribute or the
+          grpc attribute or the tcpSocket attribute MUST be specified. This attribute
+          is mutually exclusive with the exec attribute and the tcpSocket attribute
+          and the gRPC attribute.\n\thttpGet?: {\n\t\t// +usage=The endpoint, relative
+          to the port, to which the HTTP GET request should be directed.\n\t\tpath?:
+          string\n\t\t// +usage=The port numer to access on the host or container.\n\t\tport:
+          int\n\t\t// +usage=The hostname to connect to, defaults to the pod IP. You
+          probably want to set \"Host\" in httpHeaders instead.\n\t\thost?: string\n\t\t//
+          +usage=The Scheme to use for connecting to the host.\n\t\tscheme?: *\"HTTP\"
+          | \"HTTPS\"\n\t\t// +usage=Custom headers to set in the request. HTTP allows
+          repeated headers.\n\t\thttpHeaders?: [...{\n\t\t\t// +usage=The header field
+          name\n\t\t\tname: string\n\t\t\t//+usage=The header field value\n\t\t\tvalue:
+          string\n\t\t}]\n\t}\n\t// +usage=Instructions for assessing container startup
+          status by probing a gRPC service. Either this attribute or the exec attribute
+          or the grpc attribute or the httpGet attribute MUST be specified. This attribute
+          is mutually exclusive with the exec attribute and the httpGet attribute
+          and the tcpSocket attribute.\n\tgrpc?: {\n\t\t// +usage=The port number
+          of the gRPC service.\n\t\tport: int\n\t\t// +usage=The name of the service
+          to place in the gRPC HealthCheckRequest\n\t\tservice?: string\n\t}\n\t//
+          +usage=Instructions for assessing container startup status by probing a
+          TCP socket. Either this attribute or the exec attribute or the tcpSocket
+          attribute or the httpGet attribute MUST be specified. This attribute is
+          mutually exclusive with the exec attribute and the httpGet attribute and
+          the gRPC attribute.\n\ttcpSocket?: {\n\t\t// +usage=Number or name of the
+          port to access on the container.\n\t\tport: int\n\t\t// +usage=Host name
+          to connect to, defaults to the pod IP.\n\t\thost?: string\n\t}\n}\nPatchContainer:
+          {\n\t_params:         #StartupProbeParams\n\tname:            _params.containerName\n\t_baseContainers:
+          context.output.spec.template.spec.containers\n\t_matchContainers_: [for
+          _container_ in _baseContainers if _container_.name == name {_container_}]\n\tif
+          len(_matchContainers_) == 0 {\n\t\terr: \"container \\(name) not found\"\n\t}\n\tif
+          len(_matchContainers_) > 0 {\n\t\tstartupProbe: {\n\t\t\tif _params.exec
+          != _|_ {\n\t\t\t\texec: _params.exec\n\t\t\t}\n\t\t\tif _params.httpGet
+          != _|_ {\n\t\t\t\thttpGet: _params.httpGet\n\t\t\t}\n\t\t\tif _params.grpc
+          != _|_ {\n\t\t\t\tgrpc: _params.grpc\n\t\t\t}\n\t\t\tif _params.tcpSocket
+          != _|_ {\n\t\t\t\ttcpSocket: _params.tcpSocket\n\t\t\t}\n\t\t\tif _params.initialDelaySeconds
+          != _|_ {\n\t\t\t\tinitialDelaySeconds: _params.initialDelaySeconds\n\t\t\t}\n\t\t\tif
+          _params.periodSeconds != _|_ {\n\t\t\t\tperiodSeconds: _params.periodSeconds\n\t\t\t}\n\t\t\tif
+          _params.timeoutSeconds != _|_ {\n\t\t\t\ttimeoutSeconds: _params.timeoutSeconds\n\t\t\t}\n\t\t\tif
+          _params.successThreshold != _|_ {\n\t\t\t\tsuccessThreshold: _params.successThreshold\n\t\t\t}\n\t\t\tif
+          _params.failureThreshold != _|_ {\n\t\t\t\tfailureThreshold: _params.failureThreshold\n\t\t\t}\n\t\t\tif
+          _params.terminationGracePeriodSeconds != _|_ {\n\t\t\t\tterminationGracePeriodSeconds:
+          _params.terminationGracePeriodSeconds\n\t\t\t}\n\t\t}\n\t}\n}\n\npatch:
+          spec: template: spec: {\n\tif parameter.probes == _|_ {\n\t\t// +patchKey=name\n\t\tcontainers:
+          [{\n\t\t\tPatchContainer & {_params: {\n\t\t\t\tif parameter.containerName
+          == \"\" {\n\t\t\t\t\tcontainerName: context.name\n\t\t\t\t}\n\t\t\t\tif
+          parameter.containerName != \"\" {\n\t\t\t\t\tcontainerName: parameter.containerName\n\t\t\t\t}\n\t\t\t\tperiodSeconds:
+          \                parameter.periodSeconds\n\t\t\t\tinitialDelaySeconds:           parameter.initialDelaySeconds\n\t\t\t\ttimeoutSeconds:
+          \               parameter.timeoutSeconds\n\t\t\t\tsuccessThreshold:              parameter.successThreshold\n\t\t\t\tfailureThreshold:
+          \             parameter.failureThreshold\n\t\t\t\tterminationGracePeriodSeconds:
+          parameter.terminationGracePeriodSeconds\n\t\t\t\tif parameter.exec != _|_
+          {\n\t\t\t\t\texec: parameter.exec\n\t\t\t\t}\n\t\t\t\tif parameter.httpGet
+          != _|_ {\n\t\t\t\t\thttpGet: parameter.httpGet\n\t\t\t\t}\n\t\t\t\tif parameter.grpc
+          != _|_ {\n\t\t\t\t\tgrpc: parameter.grpc\n\t\t\t\t}\n\t\t\t\tif parameter.tcpSocket
+          != _|_ {\n\t\t\t\t\ttcpSocket: parameter.tcpSocket\n\t\t\t\t}\n\t\t\t}}\n\t\t}]\n\t}\n\tif
+          parameter.probes != _|_ {\n\t\t// +patchKey=name\n\t\tcontainers: [for c
+          in parameter.probes {\n\t\t\tif c.name == \"\" {\n\t\t\t\terr: \"containerName
+          must be set when specifying startup probe for multiple containers\"\n\t\t\t}\n\t\t\tif
+          c.name != \"\" {\n\t\t\t\tPatchContainer & {_params: c}\n\t\t\t}\n\t\t}]\n\t}\n}\n\nparameter:
+          *#StartupProbeParams | close({\n\t// +usage=Specify the startup probe for
+          multiple containers\n\tprobes: [...#StartupProbeParams]\n})\n\nerrs: [for
+          c in patch.spec.template.spec.containers if c.err != _|_ {c.err}]\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2025-12-06T15:25:02Z"
+      message: 'cannot store capability startup-probe in ConfigMap: cannot create
+        or update capability startup-probe in ConfigMap: the server is currently unable
+        to handle the request (put configmaps trait-schema-startup-probe)'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-startup-probe
+    latestRevision:
+      name: startup-probe-v1
+      revision: 1
+      revisionHash: c7623537c1c00c00
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Add storages on K8s pod for your workload which
+        follows the pod spec in path 'spec.template'.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: storage
+    namespace: vela-system
+    resourceVersion: "57426463"
+    uid: 23e858e9-26a0-47f3-8930-1afc6d2979db
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    - statefulsets.apps
+    - daemonsets.apps
+    - jobs.batch
+    podDisruptive: true
+    schematic:
+      cue:
+        template: "volumesList: [\n\tif parameter.pvc != _|_ for v in parameter.pvc
+          {\n\t\t{\n\t\t\tname: \"pvc-\" + v.name\n\t\t\tpersistentVolumeClaim: claimName:
+          v.name\n\t\t}\n\t},\n\tif parameter.configMap != _|_ for v in parameter.configMap
+          if v.mountPath != _|_ {\n\t\t{\n\t\t\tname: \"configmap-\" + v.name\n\t\t\tconfigMap:
+          {\n\t\t\t\tdefaultMode: v.defaultMode\n\t\t\t\tname:        v.name\n\t\t\t\tif
+          v.items != _|_ {\n\t\t\t\t\titems: v.items\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t},\n\tif
+          parameter.secret != _|_ for v in parameter.secret if v.mountPath != _|_
+          {\n\t\t{\n\t\t\tname: \"secret-\" + v.name\n\t\t\tsecret: {\n\t\t\t\tdefaultMode:
+          v.defaultMode\n\t\t\t\tsecretName:  v.name\n\t\t\t\tif v.items != _|_ {\n\t\t\t\t\titems:
+          v.items\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t},\n\tif parameter.emptyDir != _|_
+          for v in parameter.emptyDir {\n\t\t{\n\t\t\tname: \"emptydir-\" + v.name\n\t\t\temptyDir:
+          medium: v.medium\n\t\t}\n\t},\n\tif parameter.hostPath != _|_ for v in parameter.hostPath
+          {\n\t\t{\n\t\t\tname: \"hostpath-\" + v.name\n\t\t\tpath: v.path\n\t\t}\n\t},\n]\n\nvolumeMountsList:
+          [\n\tif parameter.pvc != _|_ for v in parameter.pvc {\n\t\tif v.volumeMode
+          == \"Filesystem\" {\n\t\t\t{\n\t\t\t\tname:      \"pvc-\" + v.name\n\t\t\t\tmountPath:
+          v.mountPath\n\t\t\t\tif v.subPath != _|_ {\n\t\t\t\t\tsubPath: v.subPath\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t},\n\tif
+          parameter.configMap != _|_ for v in parameter.configMap if v.mountPath !=
+          _|_ {\n\t\t{\n\t\t\tname:      \"configmap-\" + v.name\n\t\t\tmountPath:
+          v.mountPath\n\t\t\tif v.subPath != _|_ {\n\t\t\t\tsubPath: v.subPath\n\t\t\t}\n\t\t}\n\t},\n\tif
+          parameter.secret != _|_ for v in parameter.secret if v.mountPath != _|_
+          {\n\t\t{\n\t\t\tname:      \"secret-\" + v.name\n\t\t\tmountPath: v.mountPath\n\t\t\tif
+          v.subPath != _|_ {\n\t\t\t\tsubPath: v.subPath\n\t\t\t}\n\t\t}\n\t},\n\tif
+          parameter.emptyDir != _|_ for v in parameter.emptyDir {\n\t\t{\n\t\t\tname:
+          \     \"emptydir-\" + v.name\n\t\t\tmountPath: v.mountPath\n\t\t\tif v.subPath
+          != _|_ {\n\t\t\t\tsubPath: v.subPath\n\t\t\t}\n\t\t}\n\t},\n\tif parameter.hostPath
+          != _|_ for v in parameter.hostPath {\n\t\t{\n\t\t\tname:      \"hostpath-\"
+          + v.name\n\t\t\tmountPath: v.mountPath\n\t\t}\n\t},\n]\n\nenvList: [\n\tif
+          parameter.configMap != _|_ for v in parameter.configMap if v.mountToEnv
+          != _|_ {\n\t\t{\n\t\t\tname: v.mountToEnv.envName\n\t\t\tvalueFrom: configMapKeyRef:
+          {\n\t\t\t\tname: v.name\n\t\t\t\tkey:  v.mountToEnv.configMapKey\n\t\t\t}\n\t\t}\n\t},\n\tif
+          parameter.configMap != _|_ for v in parameter.configMap if v.mountToEnvs
+          != _|_ for k in v.mountToEnvs {\n\t\t{\n\t\t\tname: k.envName\n\t\t\tvalueFrom:
+          configMapKeyRef: {\n\t\t\t\tname: v.name\n\t\t\t\tkey:  k.configMapKey\n\t\t\t}\n\t\t}\n\t},\n\tif
+          parameter.secret != _|_ for v in parameter.secret if v.mountToEnv != _|_
+          {\n\t\t{\n\t\t\tname: v.mountToEnv.envName\n\t\t\tvalueFrom: secretKeyRef:
+          {\n\t\t\t\tname: v.name\n\t\t\t\tkey:  v.mountToEnv.secretKey\n\t\t\t}\n\t\t}\n\t},\n\tif
+          parameter.secret != _|_ for v in parameter.secret if v.mountToEnvs != _|_
+          for k in v.mountToEnvs {\n\t\t{\n\t\t\tname: k.envName\n\t\t\tvalueFrom:
+          secretKeyRef: {\n\t\t\t\tname: v.name\n\t\t\t\tkey:  k.secretKey\n\t\t\t}\n\t\t}\n\t},\n]\n\nvolumeDevicesList:
+          *[\n\tfor v in parameter.pvc if v.volumeMode == \"Block\" {\n\t\t{\n\t\t\tname:
+          \      \"pvc-\" + v.name\n\t\t\tdevicePath: v.mountPath\n\t\t\tif v.subPath
+          != _|_ {\n\t\t\t\tsubPath: v.subPath\n\t\t\t}\n\t\t}\n\t},\n] | []\n\ndeDupVolumesArray:
+          [\n\tfor val in [\n\t\tfor i, vi in volumesList {\n\t\t\tfor j, vj in volumesList
+          if j < i && vi.name == vj.name {\n\t\t\t\t_ignore: true\n\t\t\t}\n\t\t\tvi\n\t\t},\n\t]
+          if val._ignore == _|_ {\n\t\tval\n\t},\n]\n\npatch: spec: template: spec:
+          {\n\t// +patchKey=name\n\tvolumes: deDupVolumesArray\n\n\tcontainers: [{\n\t\t//
+          +patchKey=name\n\t\tenv: envList\n\t\t// +patchKey=name\n\t\tvolumeDevices:
+          volumeDevicesList\n\t\t// +patchKey=name\n\t\tvolumeMounts: volumeMountsList\n\t},
+          ...]\n\n}\n\noutputs: {\n\tfor v in parameter.pvc {\n\t\tif v.mountOnly
+          == false {\n\t\t\t\"pvc-\\(v.name)\": {\n\t\t\t\tapiVersion: \"v1\"\n\t\t\t\tkind:
+          \      \"PersistentVolumeClaim\"\n\t\t\t\tmetadata: name: v.name\n\t\t\t\tspec:
+          {\n\t\t\t\t\taccessModes: v.accessModes\n\t\t\t\t\tvolumeMode:  v.volumeMode\n\t\t\t\t\tif
+          v.volumeName != _|_ {\n\t\t\t\t\t\tvolumeName: v.volumeName\n\t\t\t\t\t}\n\t\t\t\t\tif
+          v.storageClassName != _|_ {\n\t\t\t\t\t\tstorageClassName: v.storageClassName\n\t\t\t\t\t}\n\n\t\t\t\t\tif
+          v.resources.requests.storage == _|_ {\n\t\t\t\t\t\tresources: requests:
+          storage: \"8Gi\"\n\t\t\t\t\t}\n\t\t\t\t\tif v.resources.requests.storage
+          != _|_ {\n\t\t\t\t\t\tresources: requests: storage: v.resources.requests.storage\n\t\t\t\t\t}\n\t\t\t\t\tif
+          v.resources.limits.storage != _|_ {\n\t\t\t\t\t\tresources: limits: storage:
+          v.resources.limits.storage\n\t\t\t\t\t}\n\t\t\t\t\tif v.dataSourceRef !=
+          _|_ {\n\t\t\t\t\t\tdataSourceRef: v.dataSourceRef\n\t\t\t\t\t}\n\t\t\t\t\tif
+          v.dataSource != _|_ {\n\t\t\t\t\t\tdataSource: v.dataSource\n\t\t\t\t\t}\n\t\t\t\t\tif
+          v.selector != _|_ {\n\t\t\t\t\t\tdataSource: v.selector\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n\n\tfor
+          v in parameter.configMap {\n\t\tif v.mountOnly == false {\n\t\t\t\"configmap-\\(v.name)\":
+          {\n\t\t\t\tapiVersion: \"v1\"\n\t\t\t\tkind:       \"ConfigMap\"\n\t\t\t\tmetadata:
+          name: v.name\n\t\t\t\tif v.data != _|_ {\n\t\t\t\t\tdata: v.data\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n\n\tfor
+          v in parameter.secret {\n\t\tif v.mountOnly == false {\n\t\t\t\"secret-\\(v.name)\":
+          {\n\t\t\t\tapiVersion: \"v1\"\n\t\t\t\tkind:       \"Secret\"\n\t\t\t\tmetadata:
+          name: v.name\n\t\t\t\tif v.data != _|_ {\n\t\t\t\t\tdata: v.data\n\t\t\t\t}\n\t\t\t\tif
+          v.stringData != _|_ {\n\t\t\t\t\tstringData: v.stringData\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n\n}\n\nparameter:
+          {\n\t// +usage=Declare pvc type storage\n\tpvc?: [...{\n\t\tname:        string\n\t\tmountOnly:
+          \  *false | bool\n\t\tmountPath:   string\n\t\tsubPath?:    string\n\t\tvolumeMode:
+          \ *\"Filesystem\" | string\n\t\tvolumeName?: string\n\t\taccessModes: *[\"ReadWriteOnce\"]
+          | [...string]\n\t\tstorageClassName?: string\n\t\tresources?: {\n\t\t\trequests:
+          storage: =~\"^([1-9][0-9]{0,63})(E|P|T|G|M|K|Ei|Pi|Ti|Gi|Mi|Ki)$\"\n\t\t\tlimits?:
+          storage:  =~\"^([1-9][0-9]{0,63})(E|P|T|G|M|K|Ei|Pi|Ti|Gi|Mi|Ki)$\"\n\t\t}\n\t\tdataSourceRef?:
+          {\n\t\t\tname:     string\n\t\t\tkind:     string\n\t\t\tapiGroup: string\n\t\t}\n\t\tdataSource?:
+          {\n\t\t\tname:     string\n\t\t\tkind:     string\n\t\t\tapiGroup: string\n\t\t}\n\t\tselector?:
+          {\n\t\t\tmatchLabels?: [string]: string\n\t\t\tmatchExpressions?: {\n\t\t\t\tkey:
+          string\n\t\t\t\tvalues: [...string]\n\t\t\t\toperator: string\n\t\t\t}\n\t\t}\n\t}]\n\n\t//
+          +usage=Declare config map type storage\n\tconfigMap?: [...{\n\t\tname:      string\n\t\tmountOnly:
+          *false | bool\n\t\tmountToEnv?: {\n\t\t\tenvName:      string\n\t\t\tconfigMapKey:
+          string\n\t\t}\n\t\tmountToEnvs?: [...{\n\t\t\tenvName:      string\n\t\t\tconfigMapKey:
+          string\n\t\t}]\n\t\tmountPath?:  string\n\t\tsubPath?:    string\n\t\tdefaultMode:
+          *420 | int\n\t\treadOnly:    *false | bool\n\t\tdata?: {...}\n\t\titems?:
+          [...{\n\t\t\tkey:  string\n\t\t\tpath: string\n\t\t\tmode: *511 | int\n\t\t}]\n\t}]\n\n\t//
+          +usage=Declare secret type storage\n\tsecret?: [...{\n\t\tname:      string\n\t\tmountOnly:
+          *false | bool\n\t\tmountToEnv?: {\n\t\t\tenvName:   string\n\t\t\tsecretKey:
+          string\n\t\t}\n\t\tmountToEnvs?: [...{\n\t\t\tenvName:   string\n\t\t\tsecretKey:
+          string\n\t\t}]\n\t\tmountPath:   string\n\t\tsubPath?:    string\n\t\tdefaultMode:
+          *420 | int\n\t\treadOnly:    *false | bool\n\t\tstringData?: {...}\n\t\tdata?:
+          {...}\n\t\titems?: [...{\n\t\t\tkey:  string\n\t\t\tpath: string\n\t\t\tmode:
+          *511 | int\n\t\t}]\n\t}]\n\n\t// +usage=Declare empty dir type storage\n\temptyDir?:
+          [...{\n\t\tname:      string\n\t\tmountPath: string\n\t\tsubPath?:  string\n\t\tmedium:
+          \   *\"\" | \"Memory\"\n\t}]\n\n\t// +usage=Declare host path type storage\n\thostPath?:
+          [...{\n\t\tname:      string\n\t\tpath:      string\n\t\tmountPath: string\n\t\ttype:
+          \     *\"Directory\" | \"DirectoryOrCreate\" | \"FileOrCreate\" | \"File\"
+          | \"Socket\" | \"CharDevice\" | \"BlockDevice\"\n\t}]\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-05-27T08:14:44Z"
+      message: 'cannot store capability storage in ConfigMap: cannot create or update
+        capability storage-v1 in ConfigMap: resource name may not be empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-storage
+    latestRevision:
+      name: storage-v1
+      revision: 1
+      revisionHash: f7fe0ff527cc4050
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Add topology spread constraints hooks for every
+        container of K8s pod for your workload which follows the pod spec in path
+        'spec.template'.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: topologyspreadconstraints
+    namespace: vela-system
+    resourceVersion: "33568089"
+    uid: 90ae9f69-a051-4a2c-8eb8-aa06c72570fa
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    - statefulsets.apps
+    - daemonsets.apps
+    - jobs.batch
+    podDisruptive: true
+    schematic:
+      cue:
+        template: "constraintsArray: [\n\tfor v in parameter.constraints {\n\t\tmaxSkew:
+          \          v.maxSkew\n\t\ttopologyKey:       v.topologyKey\n\t\twhenUnsatisfiable:
+          v.whenUnsatisfiable\n\t\tlabelSelector:     v.labelSelector\n\t\tif v.nodeAffinityPolicy
+          != _|_ {\n\t\t\tnodeAffinityPolicy: v.nodeAffinityPolicy\n\t\t}\n\t\tif
+          v.nodeTaintsPolicy != _|_ {\n\t\t\tnodeTaintsPolicy: v.nodeTaintsPolicy\n\t\t}\n\t\tif
+          v.minDomains != _|_ {\n\t\t\tminDomains: v.minDomains\n\t\t}\n\t\tif v.matchLabelKeys
+          != _|_ {\n\t\t\tmatchLabelKeys: v.matchLabelKeys\n\t\t}\n\t},\n]\npatch:
+          spec: template: spec: topologySpreadConstraints: constraintsArray\n#labSelector:
+          {\n\tmatchLabels?: [string]: string\n\tmatchExpressions?: [...{\n\t\tkey:
+          \     string\n\t\toperator: *\"In\" | \"NotIn\" | \"Exists\" | \"DoesNotExist\"\n\t\tvalues?:
+          [...string]\n\t}]\n}\nparameter: constraints: [...{\n\t// +usage=Describe
+          the degree to which Pods may be unevenly distributed\n\tmaxSkew: int\n\t//
+          +usage=Specify the key of node labels\n\ttopologyKey: string\n\t// +usage=Indicate
+          how to deal with a Pod if it doesn't satisfy the spread constraint\n\twhenUnsatisfiable:
+          *\"DoNotSchedule\" | \"ScheduleAnyway\"\n\t// +usage=labelSelector to find
+          matching Pods\n\tlabelSelector: #labSelector\n\t// +usage=Indicate a minimum
+          number of eligible domains\n\tminDomains?: int\n\t// +usage=A list of pod
+          label keys to select the pods over which spreading will be calculated\n\tmatchLabelKeys?:
+          [...string]\n\t// +usage=Indicate how we will treat Pod's nodeAffinity/nodeSelector
+          when calculating pod topology spread skew\n\tnodeAffinityPolicy?: *\"Honor\"
+          | \"Ignore\"\n\t// +usage=Indicate how we will treat node taints when calculating
+          pod topology spread skew\n\tnodeTaintsPolicy?: *\"Honor\" | \"Ignore\"\n}]\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2025-09-15T01:17:58Z"
+      message: 'cannot store capability topologyspreadconstraints in ConfigMap: cannot
+        create or update capability topologyspreadconstraints in ConfigMap: resource
+        name may not be empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-topologyspreadconstraints
+    latestRevision:
+      name: topologyspreadconstraints-v1
+      revision: 1
+      revisionHash: e8fc22ec9ae5c9da
+- apiVersion: core.oam.dev/v1beta1
+  kind: TraitDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Add volumes on K8s pod for your workload which
+        follows the pod spec in path 'spec.template'. This definition is DEPRECATED,
+        please use 'storage' instead.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+      custom.definition.oam.dev/deprecated: "true"
+    name: volumes
+    namespace: vela-system
+    resourceVersion: "57463109"
+    uid: 6ece12f7-e2cb-4ddf-8b51-0265e3cba624
+  spec:
+    appliesToWorkloads:
+    - deployments.apps
+    podDisruptive: true
+    schematic:
+      cue:
+        template: "patch: {\n\t// +patchKey=name\n\tspec: template: spec: volumes:
+          [\n\t\tif parameter.volumes != _|_ for v in parameter.volumes {\n\t\t\t{\n\t\t\t\tname:
+          v.name\n\t\t\t\tif v.type == \"pvc\" {\n\t\t\t\t\tpersistentVolumeClaim:
+          claimName: v.claimName\n\t\t\t\t}\n\t\t\t\tif v.type == \"configMap\" {\n\t\t\t\t\tconfigMap:
+          {\n\t\t\t\t\t\tdefaultMode: v.defaultMode\n\t\t\t\t\t\tname:        v.cmName\n\t\t\t\t\t\tif
+          v.items != _|_ {\n\t\t\t\t\t\t\titems: v.items\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tif
+          v.type == \"secret\" {\n\t\t\t\t\tsecret: {\n\t\t\t\t\t\tdefaultMode: v.defaultMode\n\t\t\t\t\t\tsecretName:
+          \ v.secretName\n\t\t\t\t\t\tif v.items != _|_ {\n\t\t\t\t\t\t\titems: v.items\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tif
+          v.type == \"emptyDir\" {\n\t\t\t\t\temptyDir: medium: v.medium\n\t\t\t\t}\n\t\t\t}\n\t\t},\n\t]\n}\n\nparameter:
+          {\n\t// +usage=Declare volumes and volumeMounts\n\tvolumes?: [...{\n\t\tname:
+          string\n\t\t// +usage=Specify volume type, options: \"pvc\",\"configMap\",\"secret\",\"emptyDir\",
+          default to emptyDir\n\t\ttype: *\"emptyDir\" | \"pvc\" | \"configMap\" |
+          \"secret\"\n\t\tif type == \"pvc\" {\n\t\t\tclaimName: string\n\t\t}\n\t\tif
+          type == \"configMap\" {\n\t\t\tdefaultMode: *420 | int\n\t\t\tcmName:      string\n\t\t\titems?:
+          [...{\n\t\t\t\tkey:  string\n\t\t\t\tpath: string\n\t\t\t\tmode: *511 |
+          int\n\t\t\t}]\n\t\t}\n\t\tif type == \"secret\" {\n\t\t\tdefaultMode: *420
+          | int\n\t\t\tsecretName:  string\n\t\t\titems?: [...{\n\t\t\t\tkey:  string\n\t\t\t\tpath:
+          string\n\t\t\t\tmode: *511 | int\n\t\t\t}]\n\t\t}\n\t\tif type == \"emptyDir\"
+          {\n\t\t\tmedium: *\"\" | \"Memory\"\n\t\t}\n\t}]\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-05-27T09:08:08Z"
+      message: 'cannot store capability volumes in ConfigMap: cannot create or update
+        capability volumes-v1 in ConfigMap: resource name may not be empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: trait-schema-volumes
+    latestRevision:
+      name: volumes-v1
+      revision: 1
+      revisionHash: 6bce94f44d9f0f64
+kind: List
+metadata:
+  resourceVersion: ""
