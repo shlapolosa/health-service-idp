@@ -71,6 +71,53 @@ for either the whole factory (cross-mfg) or for a specific production line.
 | Observe | cross-mfg | (sibling `cafe-spec/adapters/observe-audit-sink/`) |
 | Factory routing | cross-mfg | `factory/adapters/mcp-read-gateway/` (factory.route, lifecycle.state) |
 
+## Bringing the factory up (one command)
+
+```bash
+make up                    # full bring-up: substrate → factory → production-line → verify
+make up-fast               # same, skip image rebuild
+```
+
+Or via the underlying bootstrap script with phase control:
+
+```bash
+./utilities/bootstrap.sh up                                   # everything
+./utilities/bootstrap.sh phase substrate                      # substrate only
+./utilities/bootstrap.sh phase production-line:traditional-cloud
+./utilities/bootstrap.sh status                               # health check
+./utilities/bootstrap.sh down --keep-data                     # tear down, preserve volumes
+```
+
+Phase order — each is idempotent and re-runnable:
+
+| # | Phase | What it does |
+|---|---|---|
+| 1 | `secrets` | k8s secrets from `.env` + ACR pull secret |
+| 2 | `substrate` | Crossplane providers + XRDs + Compositions + Argo Workflows + Argo Events + ArgoCD + Knative |
+| 3 | `images` | `docker build` + `docker push` for all factory + per-line services |
+| 4 | `factory` | Deploy cross-line adapter Knative services (intake-slack, mcp gateways) |
+| 5 | `production-line:<id>` | Apply per-line catalog + composition + execute + compose-mcp |
+| 6 | `verify` | Health checks across all phases + parity audit + Knative Ready checks |
+
+Make targets:
+
+```
+make help        # list all targets
+make up          # full bring-up
+make substrate   # just substrate
+make factory     # just cross-mfg adapters
+make tc          # just production-line:traditional-cloud
+make images      # build + push everything
+make test        # run unit tests
+make parity      # MFG-TC catalog parity audit
+make status      # health checks
+make down        # tear down (keep data)
+```
+
+The bootstrap orchestrator lives at `utilities/bootstrap.sh` with phase
+scripts in `utilities/bootstrap/`. Each phase script is independently
+runnable for diagnostics or partial recovery.
+
 ## Extending the Traditional Cloud production line
 
 Adding a new capability to MFG-TC is **definition-only**. See
