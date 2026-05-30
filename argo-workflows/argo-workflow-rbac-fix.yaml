@@ -38,6 +38,13 @@ rules:
 - apiGroups: ["serving.knative.dev"]
   resources: ["services", "configurations", "revisions", "routes"]
   verbs: ["get", "list", "watch"]
+# Permissions for ArgoCD Applications — oam-apply.create-argocd-application step needs to
+# create/update ArgoCD Applications in the argocd namespace so they sync the OAM manifest
+# that capability-mcp committed to the gitops repo. Without this, the step fails with
+# `applications.argoproj.io is forbidden`.
+- apiGroups: ["argoproj.io"]
+  resources: ["applications", "applicationsets", "appprojects"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

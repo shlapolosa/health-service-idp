@@ -165,6 +165,24 @@ spec:
         TGT="{{inputs.parameters.target-vcluster}}"
         DEST="$TGT"
         if [ "$TGT" = "host" ]; then DEST="in-cluster"; fi
+        # Split gitops-path into dirname + basename.
+        # ArgoCD requires source.path to be a DIRECTORY. capability-mcp's submit_use_case.py
+        # passes the full file path (e.g. "oam/applications/<name>.yaml") because it's also
+        # used as the gitops-commit path. We need:
+        #   source.path           = oam/applications
+        #   source.directory.include = <name>.yaml
+        # so ArgoCD syncs ONLY this app's file (the directory has files for other apps too).
+        # Empirically: prior shape `path: oam/applications/<name>.yaml` produced
+        # `ComparisonError: app path is not a directory` and no sync ever happened.
+        GP="{{inputs.parameters.gitops-path}}"
+        if echo "$GP" | grep -q "\.yaml$"; then
+          PATH_DIR=$(dirname "$GP")
+          PATH_FILE=$(basename "$GP")
+        else
+          # Backward compat: if caller passes a directory (no .yaml suffix), sync the whole dir.
+          PATH_DIR="$GP"
+          PATH_FILE=""
+        fi
         cat > /tmp/argocd-app.yaml <<EOF
         apiVersion: argoproj.io/v1alpha1
         kind: Application
@@ -182,7 +200,15 @@ spec:
           source:
             repoURL: https://github.com/{{inputs.parameters.github-org}}/{{inputs.parameters.gitops-repo}}
             targetRevision: main
-            path: {{inputs.parameters.gitops-path}}
+            path: ${PATH_DIR}
+        EOF
+        if [ -n "$PATH_FILE" ]; then
+          cat >> /tmp/argocd-app.yaml <<EOF
+            directory:
+              include: ${PATH_FILE}
+        EOF
+        fi
+        cat >> /tmp/argocd-app.yaml <<EOF
           destination:
             name: ${DEST}
             namespace: ${NS}
