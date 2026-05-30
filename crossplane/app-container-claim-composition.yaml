@@ -640,8 +640,12 @@ spec:
                     - -c
                     - |
                       set -e
+                      # S-CP-002 fix: alpine/git lacks curl/jq; the secret-setup
+                      # block below uses curl + jq to call api.github.com. Install
+                      # them once at the top so `set -e` never sees `curl: not found`.
+                      apk add --no-cache curl jq >/dev/null
                       echo "Setting up GitOps repository structure for $APP_NAME..."
-                      
+
                       TEMP_DIR="/tmp/gitops-$APP_NAME"
                       mkdir -p $TEMP_DIR
                       cd $TEMP_DIR
