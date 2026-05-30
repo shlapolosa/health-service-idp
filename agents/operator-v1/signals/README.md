@@ -20,10 +20,13 @@ Signals are authored *before* tools are selected. Each signal implies one or mor
 
 ## Index
 
-| ID | Source | One-line | File |
-|---|---|---|---|
-| S-CP-001 | Crossplane Object Job | gitops/source-setup git commit not idempotent on retry → BackoffLimitExceeded | [s-cp-001-gitops-setup-not-idempotent.md](s-cp-001-gitops-setup-not-idempotent.md) |
-| S-CP-002 | Crossplane Object Job | gitops-setup image (alpine/git) missing curl/jq → secret-setup step exits 127 | [s-cp-002-gitops-setup-missing-curl.md](s-cp-002-gitops-setup-missing-curl.md) |
+The **Consumer Impact** column is the gate the operator must check before raising a PR. A failure with no consumer impact is dead-code noise — don't burn cycles fixing it unless a real consumer is added.
+
+| ID | Source | Consumer Impact | One-line | File |
+|---|---|---|---|---|
+| S-CP-001 | Crossplane Object Job | **HIGH** — blocks AppContainerClaim Ready=True; wait-for-microservice-ready times out | gitops/source-setup git commit not idempotent on retry → BackoffLimitExceeded | [s-cp-001-gitops-setup-not-idempotent.md](s-cp-001-gitops-setup-not-idempotent.md) |
+| S-CP-002 | Crossplane Object Job | **NONE** — PERSONAL_ACCESS_TOKEN secret not referenced by any generated workflow (verified: `deployment-update.yml`, `oam-sync-trigger.yml` only use `secrets.GITHUB_TOKEN`). Job exits non-zero but consumers are healthy. | gitops-setup image (alpine/git) missing curl/jq → secret-setup step exits 127 | [s-cp-002-gitops-setup-missing-curl.md](s-cp-002-gitops-setup-missing-curl.md) |
+| S-CP-005 | Crossplane Object Job | **HIGH** — gitops-setup unconditionally overwrites `oam/applications/application.yaml` on retry, clobbering oam-updater's correct OAM with a stale blank template that hardcodes `clusters: ["$APP_NAME"]`. OAM Application then targets a non-existent vCluster → `deploy-deploy-to-vcluster` fails → no ksvc ever appears. | gitops-setup blank template clobbers oam-updater's commits | [s-cp-005-gitops-setup-clobbers-oam-updater.md](s-cp-005-gitops-setup-clobbers-oam-updater.md) |
 | S-WF-001 | Argo `wait-for-microservice-ready` | timeout has no awareness of Crossplane Object retry cycle | [s-wf-001-wait-for-msvc-timeout-no-retry-awareness.md](s-wf-001-wait-for-msvc-timeout-no-retry-awareness.md) |
 | S-OAM-001 | KubeVela | component name + CD suffix exceeds 63-char DNS label | [s-oam-001-dns-label-63.md](s-oam-001-dns-label-63.md) |
 | S-OAM-002 | KubeVela `workflowFailed` | won't re-render until `app.oam.dev/publishVersion` bumps | [s-oam-002-publishversion-stuck.md](s-oam-002-publishversion-stuck.md) |
