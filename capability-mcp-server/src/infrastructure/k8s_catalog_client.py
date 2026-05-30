@@ -1,9 +1,17 @@
 """Kubernetes catalog client — live reads of the OAM catalog.
 
-Lists/gets KubeVela ComponentDefinitions + TraitDefinitions via the CustomObjectsApi (in-cluster
-config). Parameter *schemas* are NOT read here — only `webservice` has a `component-schema-*`
-ConfigMap, so schemas are rendered live by vela_client (see docs decision). This client supplies
-name + description + workload kind + catalog annotations (category/status/revision).
+Lists/gets KubeVela ComponentDefinitions, TraitDefinitions, PolicyDefinitions,
+WorkflowStepDefinitions via the CustomObjectsApi (in-cluster config). Parameter *schemas* are
+NOT read here for ComponentDefinitions/TraitDefinitions — those are rendered live by
+vela_client via `vela show`. For PolicyDefinitions + WorkflowStepDefinitions (which vela show
+does not support) we expose the raw `spec.schematic.cue.template` so the use case can run it
+through `cue_param_parser`.
+
+Listing scope:
+- `list_components()` stays NAMESPACED (default ns) — platform-curated CDs deliberately scoped.
+- `list_traits()`, `list_policies()`, `list_workflow_steps()` are CLUSTER-WIDE — the agent
+  should see vanilla vela-system traits (affinity, annotations, command, ...) alongside the
+  platform's autoscaler/ingress/kafka-* traits.
 """
 from __future__ import annotations
 
@@ -40,6 +48,11 @@ class K8sCatalogClient:
             _GROUP, _VERSION, self.namespace, plural
         ).get("items", [])
 
+    def _list_all_namespaces(self, plural: str) -> list[dict[str, Any]]:
+        return self.api.list_cluster_custom_object(
+            _GROUP, _VERSION, plural
+        ).get("items", [])
+
     def list_components(self) -> list[dict[str, Any]]:
         out = []
         for it in self._list("componentdefinitions"):
@@ -57,11 +70,97 @@ class K8sCatalogClient:
             })
         return out
 
-    def list_traits(self) -> list[str]:
-        return [it.get("metadata", {}).get("name", "") for it in self._list("traitdefinitions")]
-
     def get_component(self, name: str) -> dict[str, Any] | None:
         for c in self.list_components():
             if c["name"] == name:
                 return c
+        return None
+
+    # ----------------------------------------------------------------------
+    # TraitDefinitions — cluster-wide. Returns rich dicts with appliesToWorkloads.
+    # ----------------------------------------------------------------------
+
+    def list_traits(self) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        for it in self._list_all_namespaces("traitdefinitions"):
+            md = it.get("metadata", {})
+            ann = md.get("annotations", {}) or {}
+            spec = it.get("spec", {}) or {}
+            out.append({
+                "name": md.get("name", ""),
+                "namespace": md.get("namespace", ""),
+                "description": ann.get(_DESC_ANN, ""),
+                "appliesToWorkloads": spec.get("appliesToWorkloads", []) or [],
+                "conflictsWith": spec.get("conflictsWith", []) or [],
+                "podDisruptive": bool(spec.get("podDisruptive", False)),
+            })
+        return out
+
+    def get_trait(self, name: str) -> dict[str, Any] | None:
+        for t in self.list_traits():
+            if t["name"] == name:
+                return t
+        return None
+
+    # ----------------------------------------------------------------------
+    # PolicyDefinitions — cluster-wide. Includes raw CUE template for local parsing
+    # (vela show does not support PolicyDefinitions).
+    # ----------------------------------------------------------------------
+
+    def list_policies(self) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        for it in self._list_all_namespaces("policydefinitions"):
+            md = it.get("metadata", {})
+            ann = md.get("annotations", {}) or {}
+            out.append({
+                "name": md.get("name", ""),
+                "namespace": md.get("namespace", ""),
+                "description": ann.get(_DESC_ANN, ""),
+            })
+        return out
+
+    def get_policy(self, name: str) -> dict[str, Any] | None:
+        for it in self._list_all_namespaces("policydefinitions"):
+            md = it.get("metadata", {})
+            if md.get("name") != name:
+                continue
+            ann = md.get("annotations", {}) or {}
+            spec = it.get("spec", {}) or {}
+            return {
+                "name": md.get("name", ""),
+                "namespace": md.get("namespace", ""),
+                "description": ann.get(_DESC_ANN, ""),
+                "cue_template": ((spec.get("schematic") or {}).get("cue") or {}).get("template", ""),
+            }
+        return None
+
+    # ----------------------------------------------------------------------
+    # WorkflowStepDefinitions — cluster-wide. Same shape as PolicyDefinitions.
+    # ----------------------------------------------------------------------
+
+    def list_workflow_steps(self) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        for it in self._list_all_namespaces("workflowstepdefinitions"):
+            md = it.get("metadata", {})
+            ann = md.get("annotations", {}) or {}
+            out.append({
+                "name": md.get("name", ""),
+                "namespace": md.get("namespace", ""),
+                "description": ann.get(_DESC_ANN, ""),
+            })
+        return out
+
+    def get_workflow_step(self, name: str) -> dict[str, Any] | None:
+        for it in self._list_all_namespaces("workflowstepdefinitions"):
+            md = it.get("metadata", {})
+            if md.get("name") != name:
+                continue
+            ann = md.get("annotations", {}) or {}
+            spec = it.get("spec", {}) or {}
+            return {
+                "name": md.get("name", ""),
+                "namespace": md.get("namespace", ""),
+                "description": ann.get(_DESC_ANN, ""),
+                "cue_template": ((spec.get("schematic") or {}).get("cue") or {}).get("template", ""),
+            }
         return None

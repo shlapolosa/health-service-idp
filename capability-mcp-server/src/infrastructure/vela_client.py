@@ -24,11 +24,27 @@ class VelaClient:
         self.vela_bin = vela_bin
         self.timeout = timeout
 
+    def render_trait_schema(self, trait: str) -> list[dict[str, Any]]:
+        """Return parameter rows for a TraitDefinition, rendered live by vela.
+
+        Empirically (2026-05-30): `vela show <trait>` accepts TraitDefinitions and emits the
+        same markdown table format as ComponentDefinitions. Delegating preserves a single CLI
+        invocation + parser path. PolicyDefinitions + WorkflowStepDefinitions do NOT work with
+        vela show; use `cue_param_parser.parse_parameter_block` against their CUE template
+        fetched from the k8s API instead.
+        """
+        return self.render_schema(trait)
+
     def render_schema(self, component: str) -> list[dict[str, Any]]:
-        """Return parameter rows for a ComponentDefinition, rendered live by vela."""
+        """Return parameter rows for a ComponentDefinition or TraitDefinition, rendered live by vela.
+
+        Uses the default `vela show` table format (ASCII +---+---+ borders + `|` separators) —
+        NOT `--format markdown`, which emits a different shape (`name | desc | type | ...`
+        without leading/trailing `|`) that the row regex below does not match.
+        """
         try:
             out = subprocess.run(
-                [self.vela_bin, "show", component, "--format", "markdown"],
+                [self.vela_bin, "show", component],
                 capture_output=True, text=True, timeout=self.timeout,
             )
         except (FileNotFoundError, subprocess.TimeoutExpired) as e:  # noqa: BLE001
