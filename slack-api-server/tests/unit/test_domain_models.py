@@ -355,7 +355,8 @@ class TestAppContainerRequest:
             "observability": "false",
             "security": "true",
             "vcluster-name": "",
-            "auto-create-vcluster": "true",
+            # 3-tier change (models.py): default auto_create_vcluster=False; vcluster opt-in.
+            "auto-create-vcluster": "false",
             "user": "alice",
             "slack-channel": "C456",
             "slack-user-id": "alice",
