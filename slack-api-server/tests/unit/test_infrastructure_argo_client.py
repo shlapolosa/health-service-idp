@@ -172,9 +172,11 @@ class TestArgoWorkflowsClient:
         mock_post.assert_called_once()
         call_args = mock_post.call_args
         
-        # Verify workflow spec structure uses microservice-standard-contract template
+        # Verify workflow spec structure uses oam-driven-contract template (Stage 6 cutover
+        # of microservice-standard-contract → oam-driven-contract; identical behaviour when
+        # `oam-application` is not passed)
         workflow_spec = call_args[1]["json"]
-        assert workflow_spec["workflow"]["spec"]["workflowTemplateRef"]["name"] == "microservice-standard-contract"
+        assert workflow_spec["workflow"]["spec"]["workflowTemplateRef"]["name"] == "oam-driven-contract"
         
         # Verify 4-tier standardized contract parameters
         params = {p["name"]: p["value"] for p in workflow_spec["workflow"]["spec"]["arguments"]["parameters"]}
