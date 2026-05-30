@@ -433,6 +433,12 @@ spec:
       apiVersion: kubernetes.crossplane.io/v1alpha1
       kind: Object
       spec:
+        # S-CP-007: Job.spec.template is immutable in Kubernetes. Without this,
+        # Crossplane's Object controller tries to patch the Job on every reconcile
+        # and fails with `CannotUpdateExternalResource: spec.template: Invalid value`.
+        # Result: Object stays Ready=False forever, Job appears "Running" with 0 pods.
+        # Limit to Create+Observe+Delete so Crossplane never tries to Update.
+        managementPolicies: ["Create", "Observe", "Delete"]
         forProvider:
           manifest:
             apiVersion: batch/v1
