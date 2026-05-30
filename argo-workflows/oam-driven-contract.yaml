@@ -395,7 +395,11 @@ spec:
             value: "❌ Microservice creation failed\n\nCheck workflow logs for detailed error information"
           - name: notification-type
             value: "error"
-        when: "'{{steps.validate-parameters.status}}' != 'Succeeded' || '{{steps.ensure-repositories.status}}' != 'Succeeded' || '{{steps.create-microservice-claim.status}}' != 'Succeeded' || '{{steps.wait-for-microservice-ready.status}}' != 'Succeeded'"
+        # Notify-failure must cover EVERY step that can fail OR the chain goes silent
+        # (workflow Failed in Argo UI but no Slack message). Stage 2 added apply-consumer-oam
+        # AFTER wait-for-microservice-ready; we also explicitly include extract-microservice-info
+        # so the caller is notified if either of those fail.
+        when: "'{{steps.validate-parameters.status}}' != 'Succeeded' || '{{steps.ensure-repositories.status}}' != 'Succeeded' || '{{steps.create-microservice-claim.status}}' != 'Succeeded' || '{{steps.wait-for-microservice-ready.status}}' != 'Succeeded' || '{{steps.apply-consumer-oam.status}}' == 'Failed' || '{{steps.extract-microservice-info.status}}' == 'Failed'"
 
   # =============================================================================
   # PARAMETER VALIDATION
