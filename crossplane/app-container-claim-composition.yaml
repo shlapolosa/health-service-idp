@@ -478,8 +478,10 @@ spec:
                         echo "Warning: Could not retrieve public key for repository secrets"
                       else
                         # Install python for encryption
+                        # S-CP-004: Alpine 3.19+ python is PEP 668 externally-managed;
+                        # pip3 install needs --break-system-packages or a venv.
                         apk add --no-cache python3 py3-pip
-                        pip3 install pynacl
+                        pip3 install --break-system-packages pynacl
                         
                         # Create encryption script
                         cat > /tmp/encrypt_secret.py << 'ENCRYPT_EOF'
@@ -886,6 +888,10 @@ spec:
                       EOF
                       
                       # Create App of Apps ArgoCD Application
+                      # S-CP-006: app-of-apps manages other Application resources, which live in
+                      # the argocd namespace — destination MUST be argocd, NOT $APP_NAME. Previous
+                      # value caused permanent OutOfSync drift (parent app tries to create child
+                      # Applications in service ns, but they actually live in argocd ns).
                       cat > apps/app-of-apps.yaml << EOF
                       apiVersion: argoproj.io/v1alpha1
                       kind: Application
@@ -902,7 +908,7 @@ spec:
                           path: apps
                         destination:
                           server: https://kubernetes.default.svc
-                          namespace: $APP_NAME
+                          namespace: argocd
                         syncPolicy:
                           automated:
                             prune: true
@@ -1200,8 +1206,10 @@ spec:
                         echo "Warning: Could not retrieve public key for repository secrets"
                       else
                         # Install python for encryption
+                        # S-CP-004: Alpine 3.19+ python is PEP 668 externally-managed;
+                        # pip3 install needs --break-system-packages or a venv.
                         apk add --no-cache python3 py3-pip
-                        pip3 install pynacl
+                        pip3 install --break-system-packages pynacl
                         
                         # Create encryption script
                         cat > /tmp/encrypt_secret.py << 'ENCRYPT_EOF'
@@ -1314,7 +1322,8 @@ spec:
                     - |
                       # Install required packages
                       apt-get update && apt-get install -y curl jq git
-                      pip install pynacl requests
+                      # S-CP-004: defensive --break-system-packages for newer python images
+                      pip install --break-system-packages pynacl requests 2>/dev/null || pip install pynacl requests
                       
                       echo "Setting up repository secrets and variables..."
                       
