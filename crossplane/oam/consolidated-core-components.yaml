@@ -327,16 +327,30 @@ spec:
         }
         
         parameter: {
-          // Required Parameters - Support both old and new style
-          image: string  // Full image path for backward compatibility
-          
+          // Image source policy (Option C — 2026-05-30):
+          //   image is now OPTIONAL with a computed default of
+          //   "healthidpuaeacr.azurecr.io/<service-name>:latest". Consumers who set it explicitly
+          //   must point at the org's ACR — the regex below rejects upstream runtime placeholders
+          //   like nginx:1.27, node:20-alpine, python:3.11-slim, etc. This closes the wearables
+          //   /need-a-service-class failure mode where agents hallucinated public images that
+          //   passed dry-run but produced broken ksvcs.
+          //
+          //   If you have no concrete image, omit `image:` entirely AND set `language:` — the
+          //   platform's auto-scaffold workflow will build + push the image to ACR for you.
+          //
+          //   NOTE: no `?` on `image:` even though it's effectively optional from the consumer's
+          //   view. CUE only materialises defaults on REQUIRED fields; with `image?:` the
+          //   `output:` block's reference to `parameter.image` would resolve to bottom (_|_).
+          //   The default value makes consumer-side omission safe.
+          image: *"healthidpuaeacr.azurecr.io/\(context.name):latest" | =~"^healthidpuaeacr\\.azurecr\\.io/"
+
           // New multi-registry parameters
           imageName?: string  // Image name without registry (e.g., "slack-api-server")
           imageTag?: *"latest" | string  // Image tag
           registry?: "dockerhub" | "acr" | "custom"  // Registry selection
           customRegistry?: string  // Custom registry URL if registry == "custom"
           registrySecret?: string  // Secret name for registry authentication
-          
+
           port: *8080 | int
           version: *"latest" | string
           healthPath: *"/health" | string
@@ -353,8 +367,17 @@ spec:
               name: string
             }
           }]
-          language?: string
-          framework?: string
+          // Auto-scaffold language enum. When set, the platform's microservice-creation workflow
+          // builds + pushes the image to ACR. Free-form strings were previously accepted but only
+          // python/java/nodejs/rasa are actually supported by the builder — enum makes the contract
+          // explicit and rejects unsupported values at dry-run time.
+          language?: "python" | "java" | "nodejs" | "rasa"
+          // framework default = "auto" so the platform builder picks the canonical framework per
+          // language (fastapi for python, springboot for java, express for nodejs, rasa-server for
+          // rasa). NO `?` — CUE only materialises defaults on REQUIRED fields. With `framework?:`
+          // the default would never be applied, leaving `parameter.framework` as bottom (_|_)
+          // and breaking the `output:` block's reference at line ~46.
+          framework: *"auto" | string
           source?: string
           realtime?: string
           repository?: string
