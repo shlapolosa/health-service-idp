@@ -326,7 +326,12 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
                 },
                 "spec": {
                     "workflowTemplateRef": {
-                        "name": "microservice-standard-contract"
+                        # Stage 6 of oam-apply consolidation (2026-05-30): switched to
+                        # oam-driven-contract. The new template behaves IDENTICALLY to
+                        # microservice-standard-contract when no `oam-application` parameter
+                        # is passed (Slack doesn't pass it). One workflow source of truth
+                        # across slack-api-server and capability-mcp app.submit.
+                        "name": "oam-driven-contract"
                     },
                     "arguments": {
                         "parameters": [
