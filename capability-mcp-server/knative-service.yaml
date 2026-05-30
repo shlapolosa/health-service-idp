@@ -22,7 +22,7 @@ spec:
           secretName: argo-token
       containers:
       - name: capability-mcp-server
-        image: healthidpuaeacr.azurecr.io/capability-mcp-server:latest
+        image: healthidpuaeacr.azurecr.io/capability-mcp-server:v0.9
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
@@ -55,6 +55,9 @@ spec:
           value: ""              # <tenant-id>        (DEFERRED P0)
         - name: ALLOWED_OIDS
           value: ""              # agent SP + n8n app OIDs (optional allow-list)
+        # --- DNS-rebinding allow-list (FastMCP transport security). CSV. Empty=disabled. ---
+        - name: ALLOWED_HOSTS
+          value: "capability-mcp-server.default.20.233.105.82.nip.io,capability-mcp-server.default,capability-mcp-server.default.svc,capability-mcp-server.default.svc.cluster.local,localhost"
         volumeMounts:
         - name: argo-token
           mountPath: /var/run/secrets/argo
