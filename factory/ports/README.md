@@ -32,9 +32,9 @@ Authoritative classification per
 | **Approve** | cross-mfg | — (PR approval via GitHub; surfaced via write gateway) |
 | **Govern** | cross-mfg | [`../adapters/operator`](../adapters/operator) + OPA reference adapter (sibling repo) |
 | **Observe** | cross-mfg | [`../adapters/operator`](../adapters/operator) |
-| **Compose** | **per-mfg** | lives under `production-lines/<mfg>/` |
-| **Catalog** | **per-mfg** | lives under `production-lines/<mfg>/`; factory read/write tooling is in [`../adapters/mcp-read-gateway`](../adapters/mcp-read-gateway) and [`../adapters/mcp-write-gateway`](../adapters/mcp-write-gateway) |
-| **Execute** | **per-mfg** | lives under `production-lines/<mfg>/`; factory PR-path entry is in [`../adapters/mcp-write-gateway`](../adapters/mcp-write-gateway) |
+| **Compose** | **per-mfg** | lives under `factory/production-lines/<mfg>/` |
+| **Catalog** | **per-mfg** | lives under `factory/production-lines/<mfg>/`; factory read/write tooling is in [`../adapters/mcp-read-gateway`](../adapters/mcp-read-gateway) and [`../adapters/mcp-write-gateway`](../adapters/mcp-write-gateway) |
+| **Execute** | **per-mfg** | lives under `factory/production-lines/<mfg>/`; factory PR-path entry is in [`../adapters/mcp-write-gateway`](../adapters/mcp-write-gateway) |
 
 Six cross-mfg ports are configured at the **deployment** level (this repo).
 Three per-mfg ports are declared in each manufacturer's `manifest.yaml`.

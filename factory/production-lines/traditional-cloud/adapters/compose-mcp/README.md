@@ -4,12 +4,12 @@ The **Compose adapter** for the Traditional Cloud production line —
 exposes MFG-TC's line-scoped MCP tool surface used by architect-v1
 and other Foundry consumers.
 
-Path: `production-lines/traditional-cloud/adapters/compose-mcp/`
+Path: `factory/production-lines/traditional-cloud/adapters/compose-mcp/`
 Image name (preserved for APIM routes): `capability-mcp-mfg-tc`
 
 ## Role within MFG-TC's adapter set
 
-MFG-TC's adapters (siblings under `production-lines/traditional-cloud/adapters/`):
+MFG-TC's adapters (siblings under `factory/production-lines/traditional-cloud/adapters/`):
 
 | Adapter | Role |
 |---|---|
@@ -42,14 +42,14 @@ the factory/production-line abstraction in `docs/architecture/MANUFACTURER.md`.
 ## Adding new capabilities (definition-only)
 
 A new MFG-TC capability = a new ComponentDefinition under
-`production-lines/traditional-cloud/adapters/catalog/`. This service's
+`factory/production-lines/traditional-cloud/adapters/catalog/`. This service's
 `catalog.list` auto-discovers the CD via the k8s API — no code change here.
 
 Full procedure: see `cafe-spec/manufacturers/traditional-cloud/EXTENDING.md`.
 
 ## Implementation note
 
-Imports use cases from `shared-libs/capability-mcp-core/` (baked in
+Imports use cases from `factory/shared-libs/capability-mcp-core/` (baked in
 as `capability_mcp_core` at image build time). The shared core is the
 same library used by every per-line compose-mcp adapter, ensuring
 identical use-case behaviour across manufacturers.
@@ -59,11 +59,11 @@ identical use-case behaviour across manufacturers.
 Build context is always the repo root.
 
 ```bash
-docker build -f production-lines/traditional-cloud/adapters/compose-mcp/Dockerfile \
+docker build -f factory/production-lines/traditional-cloud/adapters/compose-mcp/Dockerfile \
   -t healthidpuaeacr.azurecr.io/capability-mcp-mfg-tc:v0.2 .
 az acr login --name healthidpuaeacr
 docker push healthidpuaeacr.azurecr.io/capability-mcp-mfg-tc:v0.2
-kubectl apply -f production-lines/traditional-cloud/adapters/compose-mcp/knative-service.yaml
+kubectl apply -f factory/production-lines/traditional-cloud/adapters/compose-mcp/knative-service.yaml
 ```
 
 The image name `capability-mcp-mfg-tc` is intentionally preserved to

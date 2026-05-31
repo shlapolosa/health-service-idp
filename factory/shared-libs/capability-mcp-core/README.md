@@ -41,7 +41,7 @@ This library is consumed by:
 | Consumer | Path | Role |
 |---|---|---|
 | **factory MCP (read gateway)** | `factory/adapters/mcp-read-gateway/` | factory.route + factory.propose; read-only catalog surface |
-| **per-line compose MCP** | `production-lines/traditional-cloud/adapters/compose-mcp/` | resolves OAM compositions for the traditional-cloud manufacturer line |
+| **per-line compose MCP** | `factory/production-lines/traditional-cloud/adapters/compose-mcp/` | resolves OAM compositions for the traditional-cloud manufacturer line |
 
 Each consumer adds its own thin `mcp_server.py` (FastMCP tool registration) +
 `main.py` + `Dockerfile` + `knative-service.yaml`, but pulls all use-cases and
@@ -65,8 +65,8 @@ Consumers reference this library via Docker `COPY` in their Dockerfile (no
 publish step; everything lives in the monorepo):
 
 ```dockerfile
-COPY shared-libs/capability-mcp-core/src/ /app/capability_mcp_core/
-COPY shared-libs/capability-mcp-core/requirements.txt /tmp/core-req.txt
+COPY factory/shared-libs/capability-mcp-core/src/ /app/capability_mcp_core/
+COPY factory/shared-libs/capability-mcp-core/requirements.txt /tmp/core-req.txt
 RUN pip install -r /tmp/core-req.txt
 ```
 
@@ -80,7 +80,7 @@ from capability_mcp_core.interface.dependencies import build_catalog_container
 ## Testing
 
 ```bash
-cd shared-libs/capability-mcp-core
+cd factory/shared-libs/capability-mcp-core
 pip install -r requirements.txt
 pytest tests/
 ```

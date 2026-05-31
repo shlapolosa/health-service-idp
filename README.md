@@ -12,8 +12,8 @@ factory-level MCP gateways) and the **substrate** they run on.
 
 ```
 health-service-idp/
-├── factory/                                # cross-manufacturer adapters
-│   ├── adapters/
+├── factory/                                # the factory: contains production lines, sits on substrate, owns shared tooling
+│   ├── adapters/                           # cross-manufacturer adapters
 │   │   ├── intake-slack/                   # Intake port adapter (Slack)
 │   │   ├── operator/                       # Operator agent (factory steward)
 │   │   ├── mcp-read-gateway/               # factory MCP read gateway
@@ -21,33 +21,33 @@ health-service-idp/
 │   │   └── mcp-web-gateway/                # factory MCP discover gateway
 │   ├── core/
 │   │   └── knowledge-base/                 # KB, recipes, schemas, weightings
-│   └── ports/                              # pointers to canonical port specs
+│   ├── ports/                              # pointers to canonical port specs
+│   │
+│   ├── production-lines/
+│   │   └── traditional-cloud/              # MFG-TC production line
+│   │       ├── adapters/
+│   │       │   ├── compose/                # architect-v1 Foundry prompt
+│   │       │   ├── compose-mcp/            # per-line MCP (Catalog port)
+│   │       │   ├── catalog/                # OAM ComponentDefinitions / Traits / Policies
+│   │       │   ├── composition/            # Crossplane Composition
+│   │       │   └── execute/                # Argo workflow templates (Execute port)
+│   │       ├── core/                       # pointer to sibling cafe-spec specs
+│   │       ├── ports/                      # MFG-TC port refinements
+│   │       ├── evals/                      # architect-v1 eval suite
+│   │       └── examples/                   # sample OAM apps
+│   │
+│   ├── substrate/                          # platform that hosts the factory
+│   │   ├── argo/                           # Argo Workflows server config + RBAC
+│   │   ├── argocd/                         # ArgoCD app templates
+│   │   ├── argo-events/                    # OAM webhook + watcher sensors
+│   │   ├── crossplane/                     # XRDs, Compositions, providers, RBAC
+│   │   └── knative/                        # Knative install + autoscaler config
+│   │
+│   └── shared-libs/
+│       ├── capability-mcp-core/            # extracted MCP business logic library
+│       └── common/                         # existing shared utilities
 │
-├── production-lines/
-│   └── traditional-cloud/                  # MFG-TC production line
-│       ├── adapters/
-│       │   ├── compose/                    # architect-v1 Foundry prompt
-│       │   ├── compose-mcp/                # per-line MCP (Catalog port)
-│       │   ├── catalog/                    # OAM ComponentDefinitions / Traits / Policies
-│       │   ├── composition/                # Crossplane Composition
-│       │   └── execute/                    # Argo workflow templates (Execute port)
-│       ├── core/                           # pointer to sibling cafe-spec specs
-│       ├── ports/                          # MFG-TC port refinements
-│       ├── evals/                          # architect-v1 eval suite
-│       └── examples/                       # sample OAM apps
-│
-├── substrate/                              # platform that hosts the factory
-│   ├── argo/                               # Argo Workflows server config + RBAC
-│   ├── argocd/                             # ArgoCD app templates
-│   ├── argo-events/                        # OAM webhook + watcher sensors
-│   ├── crossplane/                         # XRDs, Compositions, providers, RBAC
-│   └── knative/                            # Knative install + autoscaler config
-│
-├── shared-libs/
-│   ├── capability-mcp-core/                # extracted MCP business logic library
-│   └── common/                             # existing shared utilities
-│
-├── utilities/                              # human-operated scripts (health checks, secrets, etc.)
+│   └── utilities/                          # human-operated scripts (health checks, secrets, etc.)
 ├── microservices/                          # sample products the factory makes (out of refactor scope)
 ├── docs/                                   # architecture docs
 └── archive/                                # deprecated historical artifacts
@@ -63,11 +63,11 @@ for either the whole factory (cross-mfg) or for a specific production line.
 |---|---|---|
 | Intake | cross-mfg | `factory/adapters/intake-slack/` |
 | Classify | cross-mfg | (sibling `cafe-spec/adapters/classify-router/`) |
-| Compose | per-mfg | `production-lines/traditional-cloud/adapters/compose/` |
-| Catalog | per-mfg | `production-lines/traditional-cloud/adapters/compose-mcp/` + `…/catalog/` (the data) |
+| Compose | per-mfg | `factory/production-lines/traditional-cloud/adapters/compose/` |
+| Catalog | per-mfg | `factory/production-lines/traditional-cloud/adapters/compose-mcp/` + `…/catalog/` (the data) |
 | Govern | cross-mfg | (sibling `cafe-spec/adapters/govern-opa/`) |
 | Approve | cross-mfg | (sibling `cafe-spec/adapters/approve-pr/`) |
-| Execute | per-mfg | `production-lines/traditional-cloud/adapters/execute/` + `…/composition/` |
+| Execute | per-mfg | `factory/production-lines/traditional-cloud/adapters/execute/` + `…/composition/` |
 | Observe | cross-mfg | (sibling `cafe-spec/adapters/observe-audit-sink/`) |
 | Factory routing | cross-mfg | `factory/adapters/mcp-read-gateway/` (factory.route, lifecycle.state) |
 
@@ -81,11 +81,11 @@ make up-fast               # same, skip image rebuild
 Or via the underlying bootstrap script with phase control:
 
 ```bash
-./utilities/bootstrap.sh up                                   # everything
-./utilities/bootstrap.sh phase substrate                      # substrate only
-./utilities/bootstrap.sh phase production-line:traditional-cloud
-./utilities/bootstrap.sh status                               # health check
-./utilities/bootstrap.sh down --keep-data                     # tear down, preserve volumes
+./factory/utilities/bootstrap.sh up                                   # everything
+./factory/utilities/bootstrap.sh phase substrate                      # substrate only
+./factory/utilities/bootstrap.sh phase production-line:traditional-cloud
+./factory/utilities/bootstrap.sh status                               # health check
+./factory/utilities/bootstrap.sh down --keep-data                     # tear down, preserve volumes
 ```
 
 Phase order — each is idempotent and re-runnable:
@@ -114,14 +114,14 @@ make status      # health checks
 make down        # tear down (keep data)
 ```
 
-The bootstrap orchestrator lives at `utilities/bootstrap.sh` with phase
-scripts in `utilities/bootstrap/`. Each phase script is independently
+The bootstrap orchestrator lives at `factory/utilities/bootstrap.sh` with phase
+scripts in `factory/utilities/bootstrap/`. Each phase script is independently
 runnable for diagnostics or partial recovery.
 
 ## Extending the Traditional Cloud production line
 
 Adding a new capability to MFG-TC is **definition-only**. See
-[production-lines/traditional-cloud/](production-lines/traditional-cloud/README.md)
+[factory/production-lines/traditional-cloud/](factory/production-lines/traditional-cloud/README.md)
 and the sibling [`cafe-spec/manufacturers/traditional-cloud/EXTENDING.md`](https://github.com/shlapolosa/cafe-spec/blob/main/manufacturers/traditional-cloud/EXTENDING.md)
 for the 5-file checklist (1 in this repo, 2 in sibling, 2 optional).
 
@@ -129,7 +129,7 @@ The audit script verifies parity between the runtime catalog and the
 spec-side wire-shape schemas:
 
 ```bash
-./utilities/check-mfg-tc-parity.sh
+./factory/utilities/check-mfg-tc-parity.sh
 ```
 
 ## Architecture Overview

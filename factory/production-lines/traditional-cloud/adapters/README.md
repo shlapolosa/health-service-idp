@@ -12,4 +12,4 @@ MFG-TC's per-line adapter set. Each subdir implements one **port** (a factory-wi
 
 ## Why ports-and-adapters?
 
-The factory layer (`/factory/`) defines port contracts once. Each manufacturer (TC, on-prem, edge, mobile, ...) supplies its own adapter set under `production-lines/<name>/adapters/`. The lifecycle orchestrator never needs to know which manufacturer handled a request — it only speaks to ports.
+The factory layer (`/factory/`) defines port contracts once. Each manufacturer (TC, on-prem, edge, mobile, ...) supplies its own adapter set under `factory/production-lines/<name>/adapters/`. The lifecycle orchestrator never needs to know which manufacturer handled a request — it only speaks to ports.

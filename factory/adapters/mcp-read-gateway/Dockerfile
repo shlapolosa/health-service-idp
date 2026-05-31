@@ -1,8 +1,8 @@
 # Build context MUST be repo root. The image bakes in:
 #   - this service's own source (factory/adapters/mcp-read-gateway/)
-#   - the shared capability-mcp-core library (shared-libs/capability-mcp-core/)
+#   - the shared capability-mcp-core library (factory/shared-libs/capability-mcp-core/)
 #   - the factory knowledge-base data (factory/core/knowledge-base/)
-#   - the catalog + composition YAML from production-lines/traditional-cloud/
+#   - the catalog + composition YAML from factory/production-lines/traditional-cloud/
 # Build from repo root:
 #   docker build -f factory/adapters/mcp-read-gateway/Dockerfile \
 #     -t <acr>/capability-mcp-factory:<tag> .
@@ -32,12 +32,12 @@ COPY factory/adapters/mcp-read-gateway/main.py /app/main.py
 # package. We rename the path to `capability_mcp_core` (underscores)
 # to match the import in src/mcp_server.py. The src tree already ships
 # its own __init__.py files, so no `touch` is needed.
-COPY shared-libs/capability-mcp-core/src/ /app/capability_mcp_core/
+COPY factory/shared-libs/capability-mcp-core/src/ /app/capability_mcp_core/
 
 # Bake in the data trees the shared use cases need.
 COPY factory/core/knowledge-base/ /capability-factory/
-COPY production-lines/traditional-cloud/adapters/catalog/ /repo/crossplane/oam/
-COPY production-lines/traditional-cloud/adapters/composition/application-claim-composition.yaml /repo/crossplane/application-claim-composition.yaml
+COPY factory/production-lines/traditional-cloud/adapters/catalog/ /repo/crossplane/oam/
+COPY factory/production-lines/traditional-cloud/adapters/composition/application-claim-composition.yaml /repo/crossplane/application-claim-composition.yaml
 
 # Bake the sibling cafe-spec manifests so factory.list_manufacturers
 # returns real data. The build-helpers/stage-cafe-spec.sh script copies

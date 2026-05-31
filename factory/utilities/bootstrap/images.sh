@@ -26,7 +26,7 @@ declare -A SERVICES=(
     ["capability-mcp-factory"]="factory/adapters/mcp-read-gateway/Dockerfile"
     ["capability-factory-mcp"]="factory/adapters/mcp-write-gateway/Dockerfile"
     ["capability-web-mcp"]="factory/adapters/mcp-web-gateway/Dockerfile"
-    ["capability-mcp-mfg-tc"]="production-lines/traditional-cloud/adapters/compose-mcp/Dockerfile"
+    ["capability-mcp-mfg-tc"]="factory/production-lines/traditional-cloud/adapters/compose-mcp/Dockerfile"
     ["slack-api-server"]="factory/adapters/intake-slack/Dockerfile"
 )
 
@@ -34,7 +34,7 @@ declare -A KSVC_FILES=(
     ["capability-mcp-factory"]="factory/adapters/mcp-read-gateway/knative-service.yaml"
     ["capability-factory-mcp"]="factory/adapters/mcp-write-gateway/knative-service.yaml"
     ["capability-web-mcp"]="factory/adapters/mcp-web-gateway/knative-service.yaml"
-    ["capability-mcp-mfg-tc"]="production-lines/traditional-cloud/adapters/compose-mcp/knative-service.yaml"
+    ["capability-mcp-mfg-tc"]="factory/production-lines/traditional-cloud/adapters/compose-mcp/knative-service.yaml"
     ["slack-api-server"]="factory/adapters/intake-slack/knative-service.yaml"
 )
 

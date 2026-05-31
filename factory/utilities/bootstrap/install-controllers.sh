@@ -15,15 +15,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "${SCRIPT_DIR}/helpers/common.sh"
 
 # ───── Pinned versions ─────
-KNATIVE_VERSION="v1.13.0"
+KNATIVE_VERSION="v1.21.0"                  # cap at v1.21 — v1.22+ requires k8s 1.34 (AKS currently 1.30)
 ARGOCD_CHART_VERSION="7.6.12"
 ARGO_WF_CHART_VERSION="0.41.14"
-ARGO_EVENTS_CHART_VERSION="2.4.8"
+ARGO_EVENTS_CHART_VERSION="2.4.15"          # patch line — bug fixes for Sensor validation, retry semantics
 CROSSPLANE_CHART_VERSION="1.17.2"          # MATCH live cluster
 PROVIDER_KUBERNETES_VERSION="v0.14.1"
 PROVIDER_HELM_VERSION="v0.20.4"
 PROVIDER_GITHUB_VERSION="v0.18.0"          # upbound/provider-github
-KUBEVELA_CHART_VERSION="1.10.3"            # MATCH live cluster
+KUBEVELA_CHART_VERSION="1.10.6"            # patch — escapes known 1.10.4 CUE-import bug
 EXTERNAL_SECRETS_CHART_VERSION="0.19.2"
 
 HELM_TIMEOUT="${HELM_TIMEOUT:-5m}"
@@ -314,13 +314,13 @@ install_external_secrets() {
         "$EXTERNAL_SECRETS_CHART_VERSION" external-secrets
 }
 
-# ───── Post-install configs (substrate/knative overlays etc.) ─────
+# ───── Post-install configs (factory/substrate/knative overlays etc.) ─────
 apply_post_install_configs() {
     phase "post-install configs"
-    if [[ -d "$REPO_ROOT/substrate/knative" ]]; then
-        apply_dir_recursive "$REPO_ROOT/substrate/knative"
+    if [[ -d "$REPO_ROOT/factory/substrate/knative" ]]; then
+        apply_dir_recursive "$REPO_ROOT/factory/substrate/knative"
     else
-        info "no substrate/knative dir — skipping"
+        info "no factory/substrate/knative dir — skipping"
     fi
 }
 

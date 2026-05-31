@@ -104,7 +104,7 @@ cmd_down() {
         warn "removing substrate (CRDs, providers) — destructive"
         # Skipped by default; user must explicitly request full substrate teardown.
         info "(substrate teardown intentionally skipped — too destructive for default flow)"
-        info "to fully tear down substrate, run: kubectl delete -f substrate/ --recursive"
+        info "to fully tear down substrate, run: kubectl delete -f factory/substrate/ --recursive"
     fi
 
     ok "tear-down complete"

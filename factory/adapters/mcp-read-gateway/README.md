@@ -16,9 +16,9 @@ the factory / production-line abstraction (see
 
 The monolith has since been split:
 
-- shared use cases → `shared-libs/capability-mcp-core/` (importable library)
+- shared use cases → `factory/shared-libs/capability-mcp-core/` (importable library)
 - this gateway → `factory/adapters/mcp-read-gateway/` (factory-scoped tools)
-- per-line tools → `production-lines/traditional-cloud/adapters/...`
+- per-line tools → `factory/production-lines/traditional-cloud/adapters/...`
 
 ## Tools surface
 
@@ -42,7 +42,7 @@ per-line (MFG-TC) and live in the MFG-TC adapter MCP.
 ## Implementation note
 
 This service imports use cases directly from
-`shared-libs/capability-mcp-core/src/` (baked in as the `capability_mcp_core`
+`factory/shared-libs/capability-mcp-core/src/` (baked in as the `capability_mcp_core`
 package at image build time). No HTTP-proxy hop. Identical results to the
 former monolith by construction.
 

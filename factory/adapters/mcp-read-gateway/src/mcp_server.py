@@ -34,7 +34,7 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 # Import the shared use-case + dependency wiring from capability-mcp-core
-# (the extracted shared library at shared-libs/capability-mcp-core/). At build
+# (the extracted shared library at factory/shared-libs/capability-mcp-core/). At build
 # time the src tree is baked into the image as the `capability_mcp_core`
 # package; at runtime it is on PYTHONPATH (see Dockerfile).
 from capability_mcp_core.interface import dependencies as deps  # type: ignore
