@@ -104,8 +104,15 @@ spec:
             port: 8080
           initialDelaySeconds: 30
           periodSeconds: 10
-        # securityContext removed 2026-05-31 — Knative `secure-pod-defaults: enabled`
-        # in config-features injects equivalent secure defaults at admission time.
+        # securityContext minimised 2026-05-31 — Knative `secure-pod-defaults: enabled`
+        # injects allowPrivilegeEscalation/capabilities/runAsNonRoot/seccompProfile.
+        # We only set runAsUser explicitly because the image's USER directive is
+        # `appuser` (name, not numeric), which can't satisfy runAsNonRoot=true.
+        # readOnlyRootFilesystem stays false — slack-api-server writes to /tmp.
+        # TODO: bump Dockerfile to `USER 1000` then drop runAsUser too.
+        securityContext:
+          runAsUser: 1000
+          readOnlyRootFilesystem: false
   # Always route 100% to the latest revision (avoids stale pinned-revision RevisionMissing)
   traffic:
   - latestRevision: true
