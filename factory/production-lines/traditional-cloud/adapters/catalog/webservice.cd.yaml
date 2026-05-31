@@ -96,14 +96,6 @@ spec:
                       memory: "128Mi"
                     }
                   }
-                  // Knative `secure-pod-defaults: enabled` injects runAsNonRoot=true.
-                  // Many consumer images use non-numeric USER (e.g. `appuser`, `app`)
-                  // which the kubelet cannot verify against runAsNonRoot. Force
-                  // runAsUser=1000 so the pod admits regardless of image USER.
-                  // TODO: drop once all consumer Dockerfiles bump to numeric USER.
-                  securityContext: {
-                    runAsUser: 1000
-                  }
                   env: [
                     for k, v in parameter.environment {
                       name: k
