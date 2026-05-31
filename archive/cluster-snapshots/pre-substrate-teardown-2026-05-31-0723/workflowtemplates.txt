@@ -1,0 +1,12 @@
+NAMESPACE   NAME                               AGE
+argo        appcontainer-standard-contract     287d
+argo        graphql-gateway-template           8h
+argo        oam-apply                          2d21h
+argo        oam-apply-wait                     2d12h
+argo        oam-driven-contract                14h
+argo        pattern2-compositional-workflow    287d
+argo        pattern3-infrastructure-workflow   287d
+argo        pattern3-provider-workflow         287d
+argo        slack-standard-notifications       287d
+argo        vcluster-standard-contract         287d
+default     identity-service-generator         8h

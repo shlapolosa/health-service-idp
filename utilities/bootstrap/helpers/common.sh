@@ -5,8 +5,10 @@
 set -euo pipefail
 
 # ───── Repo root discovery ─────
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+# NOTE: use HELPERS_DIR (not SCRIPT_DIR) so we don't overwrite the
+# SCRIPT_DIR variable in the calling script.
+HELPERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${HELPERS_DIR}/../../.." && pwd)"
 export REPO_ROOT
 
 # ───── Colours ─────

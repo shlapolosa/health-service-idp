@@ -1,0 +1,6 @@
+NAME                            	NAMESPACE        	REVISION	UPDATED                                	STATUS  	CHART                                                    	APP VERSION
+aks-managed-overlay-upgrade-data	kube-system      	70956   	2026-05-31 03:22:49.421163531 +0000 UTC	deployed	overlay-upgrade-data-addon-0.1.0-v20260520-addon-260521-1	           
+aks-managed-workload-identity   	kube-system      	2153    	2026-05-31 03:23:26.531215043 +0000 UTC	deployed	workload-identity-addon-0.1.0-v20260520-addon-260521-1   	           
+crossplane                      	crossplane-system	1       	2025-08-17 10:00:49.636974 +0400 +04   	deployed	crossplane-1.17.2                                        	1.17.2     
+external-secrets                	external-secrets 	1       	2025-08-17 04:38:23.661269 +0400 +04   	deployed	external-secrets-0.19.2                                  	v0.19.2    
+kubevela                        	vela-system      	1       	2025-08-17 04:36:29.225619 +0400 +04   	deployed	vela-core-1.10.3                                         	1.10.3     

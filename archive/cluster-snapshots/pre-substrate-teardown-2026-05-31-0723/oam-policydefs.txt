@@ -1,0 +1,11 @@
+NAMESPACE     NAME              AGE
+vela-system   apply-once        287d
+vela-system   envbinding        287d
+vela-system   garbage-collect   287d
+vela-system   override          287d
+vela-system   read-only         287d
+vela-system   replication       287d
+vela-system   resource-update   287d
+vela-system   shared-resource   287d
+vela-system   take-over         287d
+vela-system   topology          287d

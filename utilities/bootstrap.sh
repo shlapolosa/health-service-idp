@@ -127,6 +127,12 @@ cmd_phase() {
 run_phase() {
     local phase=$1
     case "$phase" in
+        install-controllers)
+            bash "$SCRIPT_DIR/bootstrap/install-controllers.sh"
+            ;;
+        uninstall-controllers)
+            bash "$SCRIPT_DIR/bootstrap/uninstall-controllers.sh" "${@:2}"
+            ;;
         secrets)
             bash "$SCRIPT_DIR/bootstrap/secrets.sh"
             ;;
@@ -148,7 +154,7 @@ run_phase() {
             ;;
         *)
             err "unknown phase: $phase"
-            err "known phases: secrets, substrate, images, factory, production-line:<id>, verify"
+            err "known phases: install-controllers, uninstall-controllers, secrets, substrate, images, factory, production-line:<id>, verify"
             exit 2
             ;;
     esac
