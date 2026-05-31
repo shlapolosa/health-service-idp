@@ -76,3 +76,10 @@ spec:
           limits:
             cpu: "500m"
             memory: "512Mi"
+        # securityContext minimised 2026-05-31 — Knative `secure-pod-defaults: enabled`
+        # injects allowPrivilegeEscalation/capabilities/runAsNonRoot/seccompProfile.
+        # We only set runAsUser explicitly because the image's USER directive is
+        # `appuser` (name, not numeric), which can't satisfy runAsNonRoot=true.
+        # TODO: bump Dockerfile to `USER 1000` then drop this block too.
+        securityContext:
+          runAsUser: 1000

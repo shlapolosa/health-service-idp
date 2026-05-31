@@ -1,7 +1,17 @@
-# AUTO-CONVERTED 2026-05-31 from native patch-and-transform to function-patch-and-transform.
-# Semantically equivalent; same patches/bases. Wraps existing resources in a Pipeline
-# step calling the Function. Required by Crossplane v2; works on v1.14+ as a shim.
-# Comments from the original were lost in PyYAML round-trip; use git for the prior version.
+# Crossplane v2 Composition: application-claim-composition
+# Rendered via function-go-templating (replaces function-patch-and-transform).
+# Behavioural equivalent to the prior P&T shim — same 7 provider-kubernetes Objects,
+# same Job manifests, shell scripts preserved verbatim. Env-var wiring moved from
+# P&T patches to Go-template substitution on the XR spec.
+#
+# WHY: function-patch-and-transform under Crossplane v2.3.1 fatally rejects string
+# transforms missing the required `string.type` field. Instead of bandaiding ~50
+# transforms, we rewrote the function input in the idiomatic v2 language.
+#
+# OUT OF SCOPE (handled in later PRs):
+#   - dropping the provider-kubernetes Object wrapping (Crossplane Operations)
+#   - converting XRD to mode: Namespaced
+#   - refactoring the embedded shell scripts
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
 metadata:
@@ -16,788 +26,399 @@ spec:
     kind: XApplicationClaim
   mode: Pipeline
   pipeline:
-    - step: patch-and-transform
-      functionRef:
-        name: function-patch-and-transform
-      input:
-        apiVersion: pt.fn.crossplane.io/v1beta1
-        kind: Resources
-        resources:
-          - name: add-microservice-to-container
-            base:
-              apiVersion: kubernetes.crossplane.io/v1alpha1
-              kind: Object
-              spec:
-                forProvider:
-                  manifest:
-                    apiVersion: batch/v1
-                    kind: Job
+  - step: render
+    functionRef:
+      name: function-go-templating
+    input:
+      apiVersion: gotemplating.fn.crossplane.io/v1beta1
+      kind: GoTemplate
+      source: Inline
+      inline:
+        template: |
+          apiVersion: kubernetes.crossplane.io/v1alpha2
+          kind: Object
+          metadata:
+            name: '{{ .observed.composite.resource.spec.name }}-microservice-creator'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: '{{ .observed.composite.resource.spec.name }}-microservice-creator-rn'
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: batch/v1
+                kind: Job
+                metadata:
+                  name: '{{ .observed.composite.resource.spec.name }}-microservice-creator'
+                  namespace: default
+                spec:
+                  ttlSecondsAfterFinished: 600
+                  backoffLimit: 2
+                  template:
                     metadata:
-                      name: placeholder
-                      namespace: default
+                      annotations:
+                        sidecar.istio.io/inject: 'false'
                     spec:
-                      ttlSecondsAfterFinished: 600
-                      backoffLimit: 2
-                      template:
-                        metadata:
-                          annotations:
-                            sidecar.istio.io/inject: 'false'
-                        spec:
-                          serviceAccountName: crossplane-github-provider
-                          restartPolicy: OnFailure
-                          containers:
-                            - name: microservice-creator
-                              image: alpine:3.18
-                              command:
-                                - /bin/sh
-                                - -c
-                                - "set -euo pipefail\n# Install git, curl, and jq\napk add --no-cache git curl jq\necho \"Adding microservice $SERVICE_NAME to AppContainer $APP_CONTAINER...\"\n\nTEMP_DIR=\"\
-                                  /tmp/app-container-$APP_CONTAINER\"\nmkdir -p $TEMP_DIR\ncd $TEMP_DIR\n\n# Clone the AppContainer repository using GitHub token\ngit clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/$APP_CONTAINER.git\
-                                  \ .\n\n# Determine template repository based on service type\nif [ \"$LANGUAGE\" = \"python\" ] && [ \"$FRAMEWORK\" = \"fastapi\" ]; then\n  TEMPLATE_REPO=\"onion-architecture-template\"\
-                                  \n  echo \"\U0001F3D7\uFE0F Using onion architecture template for Python/FastAPI service\"\nelif [ \"$LANGUAGE\" = \"rasa\" ] && [ \"$FRAMEWORK\" = \"chatbot\" ]; then\n\
-                                  \  TEMPLATE_REPO=\"chat-template\"\n  echo \"\U0001F916 Using chat template for RASA chatbot service\"\nelif [ \"$LANGUAGE\" = \"nodejs\" ] && [ \"$FRAMEWORK\" = \"graphql-gateway\"\
-                                  \ ]; then\n  TEMPLATE_REPO=\"graphql-federation-gateway-template\"\n  echo \"\U0001F310 Using GraphQL federation gateway template for Node.js/GraphQL service\"\nelse\n\
-                                  \  echo \"\u274C Unsupported service type: $LANGUAGE/$FRAMEWORK\"\n  exit 1\nfi\n\n# Clone template repository\nTEMPLATE_DIR=\"/tmp/template-$SERVICE_NAME\"\nmkdir -p $TEMPLATE_DIR\n\
-                                  git clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/$TEMPLATE_REPO.git $TEMPLATE_DIR\n\n# Create microservice directory and copy template\nmkdir -p microservices/$SERVICE_NAME\n\
-                                  \nif [ \"$LANGUAGE\" = \"python\" ] && [ \"$FRAMEWORK\" = \"fastapi\" ]; then\n  # Copy onion architecture template\n  cp -r $TEMPLATE_DIR/* microservices/$SERVICE_NAME/\n\
-                                  \  cd microservices/$SERVICE_NAME\n  \n  # Customize template for the specific service\n  sed -i \"s/template-service/$SERVICE_NAME/g\" pyproject.toml README.md\n  sed\
-                                  \ -i \"s/Template Service/$SERVICE_NAME Service/g\" README.md\n  \n  # Update any hardcoded references\n  find . -name \"*.py\" -exec sed -i \"s/template_service/$SERVICE_NAME/g\"\
-                                  \ {} \\;\n  find . -name \"*.md\" -exec sed -i \"s/template-service/$SERVICE_NAME/g\" {} \\;\n  \n  echo \"\u2705 Successfully created onion architecture microservice from\
-                                  \ template\"\nelif [ \"$LANGUAGE\" = \"rasa\" ] && [ \"$FRAMEWORK\" = \"chatbot\" ]; then\n  # Copy chat template structure \n  cp -r $TEMPLATE_DIR/microservices/chat-template/*\
-                                  \ microservices/$SERVICE_NAME/\n  cd microservices/$SERVICE_NAME\n  \n  # Customize template for the specific service\n  sed -i \"s/chat-template/$SERVICE_NAME/g\" README.md\
-                                  \ docker-compose.yml\n  sed -i \"s/Development Bot/$SERVICE_NAME Bot/g\" docker-compose.yml\n  sed -i \"s/Customer Support Bot/$SERVICE_NAME Support Bot/g\" domain.yml\n\
-                                  \  \n  # Update OAM files\n  find oam/ -name \"*.yaml\" -exec sed -i \"s/chat-template/$SERVICE_NAME/g\" {} \\;\n  \n  echo \"\u2705 Successfully created RASA chatbot microservice\
-                                  \ from template\"\nelif [ \"$LANGUAGE\" = \"nodejs\" ] && [ \"$FRAMEWORK\" = \"graphql-gateway\" ]; then\n  # Copy GraphQL gateway template structure\n  cp -r $TEMPLATE_DIR/microservices/graphql-gateway/*\
-                                  \ microservices/$SERVICE_NAME/\n  cd microservices/$SERVICE_NAME\n  \n  # Debug: Show what was actually copied\n  echo \"\U0001F4CB Files copied from template:\"\n  ls\
-                                  \ -la\n  echo \"\U0001F4CB Template package.json content:\"\n  [ -f \"package.json\" ] && head -20 package.json || echo \"\u274C package.json not found\"\n  \n  # Customize\
-                                  \ template for the specific service (handle missing files gracefully)\n  [ -f \"package.json\" ] && sed -i \"s/graphql-gateway/$SERVICE_NAME/g\" package.json\n  [ -f \"\
-                                  README.md\" ] && sed -i \"s/graphql-gateway/$SERVICE_NAME/g\" README.md && sed -i \"s/GraphQL Gateway/$SERVICE_NAME Gateway/g\" README.md\n  [ -f \"docker-compose.yml\"\
-                                  \ ] && sed -i \"s/graphql-gateway/$SERVICE_NAME/g\" docker-compose.yml\n  [ -f \"package.json\" ] && sed -i \"s/Federation Gateway/$SERVICE_NAME Federation Gateway/g\"\
-                                  \ package.json\n  \n  # Ensure we have the latest GraphQL Mesh dependencies\n  if [ -f \"package.json\" ]; then\n    echo \"\U0001F4E6 Verifying GraphQL Mesh dependencies...\"\
-                                  \n    if ! grep -q \"@graphql-mesh/runtime\" package.json; then\n      echo \"\u26A0\uFE0F  Missing GraphQL Mesh dependencies - force updating from latest template\"\n\
-                                  \      # Re-copy package.json and package-lock.json from template to ensure latest dependencies\n      cp $TEMPLATE_DIR/microservices/graphql-gateway/package.json .\n \
-                                  \     cp $TEMPLATE_DIR/microservices/graphql-gateway/package-lock.json .\n      # Re-apply service name customization\n      sed -i \"s/graphql-gateway/$SERVICE_NAME/g\"\
-                                  \ package.json\n      sed -i \"s/Federation Gateway/$SERVICE_NAME Federation Gateway/g\" package.json\n      echo \"\u2705 Updated package.json with latest GraphQL Mesh\
-                                  \ dependencies\"\n    else\n      echo \"\u2705 GraphQL Mesh dependencies already present\"\n    fi\n  fi\n  \n  # Update Kubernetes manifests\n  find . -name \"*.yaml\"\
-                                  \ -exec sed -i \"s/graphql-gateway/$SERVICE_NAME/g\" {} \\;\n  find . -name \"*.yaml\" -exec sed -i \"s/APP_CONTAINER_PLACEHOLDER/$APP_CONTAINER/g\" {} \\;\n  \n  echo\
-                                  \ \"\u2705 Successfully created GraphQL federation gateway microservice from template\"\nfi\n\n# Create service README\ncat > README.md << EOF\n# $SERVICE_NAME\n\nCLAUDE.md-compliant\
-                                  \ microservice with Onion Architecture and 12-Factor principles.\n\n## Architecture\n\nThis microservice follows the Onion Architecture pattern:\n\n- **Domain Layer**:\
-                                  \ Business rules (`src/domain/`)\n- **Application Layer**: Use cases (`src/application/`)\n- **Interface Layer**: REST/API endpoints (`src/interface/`)\n- **Infrastructure\
-                                  \ Layer**: Database, external services (`src/infrastructure/`)\n\n## Development\n\n### Prerequisites\n- Python 3.11+\n- Poetry\n\n### Setup\n```bash\npoetry install\n\
-                                  poetry run pytest  # Run TDD tests\npoetry run python src/main.py  # Run locally\n```\n\n### Testing (TDD)\n```bash\npoetry run pytest -v\n```\n\n### Linting\n```bash\n\
-                                  poetry run black src/\npoetry run isort src/\npoetry run mypy src/\n```\n\n## Deployment\n\nThis service is automatically deployed via the AppContainer CI/CD pipeline when\
-                                  \ changes are pushed to the main branch.\nEOF\n\n# Update microservices README\ncd ../../\nif grep -q \"- (Services will be listed here as they are added)\" microservices/README.md;\
-                                  \ then\n  sed -i \"s/- (Services will be listed here as they are added)/- $SERVICE_NAME ($LANGUAGE\\/$FRAMEWORK)/\" microservices/README.md\nelse\n  echo \"- $SERVICE_NAME\
-                                  \ ($LANGUAGE/$FRAMEWORK)\" >> microservices/README.md\nfi\n\n# Commit and push\ngit config user.name \"ApplicationClaim\"\ngit config user.email \"applicationclaim@platform.local\"\
-                                  \ngit add .\ngit commit -m \"Add $SERVICE_NAME microservice ($LANGUAGE/$FRAMEWORK)\n\n- Implements CLAUDE.md Onion Architecture\n- Follows 12-Factor App principles\n- Includes\
-                                  \ TDD test structure with pytest\n- Dependency injection ready\n- FastAPI with health checks\n- Multi-stage Dockerfile\n- Poetry for dependency management\"\ngit push\n\
-                                  \necho \"Microservice $SERVICE_NAME added to AppContainer $APP_CONTAINER successfully\"\n"
-                              env:
-                                - name: APP_CONTAINER
-                                  value: placeholder
-                                - name: SERVICE_NAME
-                                  value: placeholder
-                                - name: LANGUAGE
-                                  value: placeholder
-                                - name: FRAMEWORK
-                                  value: placeholder
-                                - name: GITHUB_TOKEN
-                                  valueFrom:
-                                    secretKeyRef:
-                                      name: github-credentials
-                                      key: token
-                                - name: GITHUB_USER
-                                  valueFrom:
-                                    secretKeyRef:
-                                      name: github-credentials
-                                      key: user
-                                - name: DOCKER_REGISTRY
-                                  valueFrom:
-                                    secretKeyRef:
-                                      name: docker-credentials
-                                      key: registry
-                                - name: DOCKER_USER
-                                  valueFrom:
-                                    secretKeyRef:
-                                      name: docker-credentials
-                                      key: username
-                providerConfigRef:
-                  name: kubernetes-provider
-            patches:
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.name
-                toFieldPath: spec.forProvider.manifest.metadata.name
-                transforms:
-                  - type: string
-                    string:
-                      fmt: '%s-microservice-creator'
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.appContainer
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[0].value
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.name
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[1].value
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.language
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[2].value
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.framework
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[3].value
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.name
-                toFieldPath: metadata.name
-                transforms:
-                  - type: string
-                    string:
-                      fmt: '%s-microservice-creator'
-          - name: add-gitops-manifests
-            base:
-              apiVersion: kubernetes.crossplane.io/v1alpha1
-              kind: Object
-              spec:
-                forProvider:
-                  manifest:
-                    apiVersion: batch/v1
-                    kind: Job
+                      serviceAccountName: crossplane-github-provider
+                      restartPolicy: OnFailure
+                      containers:
+                      - name: microservice-creator
+                        image: alpine:3.18
+                        command:
+                        - /bin/sh
+                        - -c
+                        - "set -euo pipefail\n# Install git, curl, and jq\napk add --no-cache git curl jq\necho \"Adding microservice $SERVICE_NAME to AppContainer $APP_CONTAINER...\"\n\nTEMP_DIR=\"/tmp/app-container-$APP_CONTAINER\"\nmkdir -p $TEMP_DIR\ncd $TEMP_DIR\n\n# Clone the AppContainer repository using GitHub token\ngit clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/$APP_CONTAINER.git .\n\n# Determine template repository based on service type\nif [ \"$LANGUAGE\" = \"python\" ] && [ \"$FRAMEWORK\" = \"fastapi\" ]; then\n  TEMPLATE_REPO=\"onion-architecture-template\"\n  echo \"\U0001F3D7\uFE0F Using onion architecture template for Python/FastAPI service\"\nelif [ \"$LANGUAGE\" = \"rasa\" ] && [ \"$FRAMEWORK\" = \"chatbot\" ]; then\n  TEMPLATE_REPO=\"chat-template\"\n  echo \"\U0001F916 Using chat template for RASA chatbot service\"\nelif [ \"$LANGUAGE\" = \"nodejs\" ] && [ \"$FRAMEWORK\" = \"graphql-gateway\" ]; then\n  TEMPLATE_REPO=\"graphql-federation-gateway-template\"\n  echo \"\U0001F310 Using GraphQL federation gateway template for Node.js/GraphQL service\"\nelse\n  echo \"\u274C Unsupported service type: $LANGUAGE/$FRAMEWORK\"\n  exit 1\nfi\n\n# Clone template repository\nTEMPLATE_DIR=\"/tmp/template-$SERVICE_NAME\"\nmkdir -p $TEMPLATE_DIR\ngit clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/$TEMPLATE_REPO.git $TEMPLATE_DIR\n\n# Create microservice directory and copy template\nmkdir -p microservices/$SERVICE_NAME\n\nif [ \"$LANGUAGE\" = \"python\" ] && [ \"$FRAMEWORK\" = \"fastapi\" ]; then\n  # Copy onion architecture template\n  cp -r $TEMPLATE_DIR/* microservices/$SERVICE_NAME/\n  cd microservices/$SERVICE_NAME\n  \n  # Customize template for the specific service\n  sed -i \"s/template-service/$SERVICE_NAME/g\" pyproject.toml README.md\n  sed -i \"s/Template Service/$SERVICE_NAME Service/g\" README.md\n  \n  # Update any hardcoded references\n  find . -name \"*.py\" -exec sed -i \"s/template_service/$SERVICE_NAME/g\" {} \\;\n  find . -name \"*.md\" -exec sed -i \"s/template-service/$SERVICE_NAME/g\" {} \\;\n  \n  echo \"\u2705 Successfully created onion architecture microservice from template\"\nelif [ \"$LANGUAGE\" = \"rasa\" ] && [ \"$FRAMEWORK\" = \"chatbot\" ]; then\n  # Copy chat template structure \n  cp -r $TEMPLATE_DIR/microservices/chat-template/* microservices/$SERVICE_NAME/\n  cd microservices/$SERVICE_NAME\n  \n  # Customize template for the specific service\n  sed -i \"s/chat-template/$SERVICE_NAME/g\" README.md docker-compose.yml\n  sed -i \"s/Development Bot/$SERVICE_NAME Bot/g\" docker-compose.yml\n  sed -i \"s/Customer Support Bot/$SERVICE_NAME Support Bot/g\" domain.yml\n  \n  # Update OAM files\n  find oam/ -name \"*.yaml\" -exec sed -i \"s/chat-template/$SERVICE_NAME/g\" {} \\;\n  \n  echo \"\u2705 Successfully created RASA chatbot microservice from template\"\nelif [ \"$LANGUAGE\" = \"nodejs\" ] && [ \"$FRAMEWORK\" = \"graphql-gateway\" ]; then\n  # Copy GraphQL gateway template structure\n  cp -r $TEMPLATE_DIR/microservices/graphql-gateway/* microservices/$SERVICE_NAME/\n  cd microservices/$SERVICE_NAME\n  \n  # Debug: Show what was actually copied\n  echo \"\U0001F4CB Files copied from template:\"\n  ls -la\n  echo \"\U0001F4CB Template package.json content:\"\n  [ -f \"package.json\" ] && head -20 package.json || echo \"\u274C package.json not found\"\n  \n  # Customize template for the specific service (handle missing files gracefully)\n  [ -f \"package.json\" ] && sed -i \"s/graphql-gateway/$SERVICE_NAME/g\" package.json\n  [ -f \"README.md\" ] && sed -i \"s/graphql-gateway/$SERVICE_NAME/g\" README.md && sed -i \"s/GraphQL Gateway/$SERVICE_NAME Gateway/g\" README.md\n  [ -f \"docker-compose.yml\" ] && sed -i \"s/graphql-gateway/$SERVICE_NAME/g\" docker-compose.yml\n  [ -f \"package.json\" ] && sed -i \"s/Federation Gateway/$SERVICE_NAME Federation Gateway/g\" package.json\n  \n  # Ensure we have the latest GraphQL Mesh dependencies\n  if [ -f \"package.json\" ]; then\n    echo \"\U0001F4E6 Verifying GraphQL Mesh dependencies...\"\n    if ! grep -q \"@graphql-mesh/runtime\" package.json; then\n      echo \"\u26A0\uFE0F  Missing GraphQL Mesh dependencies - force updating from latest template\"\n      # Re-copy package.json and package-lock.json from template to ensure latest dependencies\n      cp $TEMPLATE_DIR/microservices/graphql-gateway/package.json .\n      cp $TEMPLATE_DIR/microservices/graphql-gateway/package-lock.json .\n      # Re-apply service name customization\n      sed -i \"s/graphql-gateway/$SERVICE_NAME/g\" package.json\n      sed -i \"s/Federation Gateway/$SERVICE_NAME Federation Gateway/g\" package.json\n      echo \"\u2705 Updated package.json with latest GraphQL Mesh dependencies\"\n    else\n      echo \"\u2705 GraphQL Mesh dependencies already present\"\n    fi\n  fi\n  \n  # Update Kubernetes manifests\n  find . -name \"*.yaml\" -exec sed -i \"s/graphql-gateway/$SERVICE_NAME/g\" {} \\;\n  find . -name \"*.yaml\" -exec sed -i \"s/APP_CONTAINER_PLACEHOLDER/$APP_CONTAINER/g\" {} \\;\n  \n  echo \"\u2705 Successfully created GraphQL federation gateway microservice from template\"\nfi\n\n# Create service README\ncat > README.md << EOF\n# $SERVICE_NAME\n\nCLAUDE.md-compliant microservice with Onion Architecture and 12-Factor principles.\n\n## Architecture\n\nThis microservice follows the Onion Architecture pattern:\n\n- **Domain Layer**: Business rules (`src/domain/`)\n- **Application Layer**: Use cases (`src/application/`)\n- **Interface Layer**: REST/API endpoints (`src/interface/`)\n- **Infrastructure Layer**: Database, external services (`src/infrastructure/`)\n\n## Development\n\n### Prerequisites\n- Python 3.11+\n- Poetry\n\n### Setup\n```bash\npoetry install\npoetry run pytest  # Run TDD tests\npoetry run python src/main.py  # Run locally\n```\n\n### Testing (TDD)\n```bash\npoetry run pytest -v\n```\n\n### Linting\n```bash\npoetry run black src/\npoetry run isort src/\npoetry run mypy src/\n```\n\n## Deployment\n\nThis service is automatically deployed via the AppContainer CI/CD pipeline when changes are pushed to the main branch.\nEOF\n\n# Update microservices README\ncd ../../\nif grep -q \"- (Services will be listed here as they are added)\" microservices/README.md; then\n  sed -i \"s/- (Services will be listed here as they are added)/- $SERVICE_NAME ($LANGUAGE\\/$FRAMEWORK)/\" microservices/README.md\nelse\n  echo \"- $SERVICE_NAME ($LANGUAGE/$FRAMEWORK)\" >> microservices/README.md\nfi\n\n# Commit and push\ngit config user.name \"ApplicationClaim\"\ngit config user.email \"applicationclaim@platform.local\"\ngit add .\ngit commit -m \"Add $SERVICE_NAME microservice ($LANGUAGE/$FRAMEWORK)\n\n- Implements CLAUDE.md Onion Architecture\n- Follows 12-Factor App principles\n- Includes TDD test structure with pytest\n- Dependency injection ready\n- FastAPI with health checks\n- Multi-stage Dockerfile\n- Poetry for dependency management\"\ngit push\n\necho \"Microservice $SERVICE_NAME added to AppContainer $APP_CONTAINER successfully\"\n"
+                        env:
+                        - name: APP_CONTAINER
+                          value: '{{ .observed.composite.resource.spec.appContainer }}'
+                        - name: SERVICE_NAME
+                          value: '{{ .observed.composite.resource.spec.name }}'
+                        - name: LANGUAGE
+                          value: '{{ .observed.composite.resource.spec.language }}'
+                        - name: FRAMEWORK
+                          value: '{{ .observed.composite.resource.spec.framework }}'
+                        - name: GITHUB_TOKEN
+                          valueFrom:
+                            secretKeyRef:
+                              name: github-credentials
+                              key: token
+                        - name: GITHUB_USER
+                          valueFrom:
+                            secretKeyRef:
+                              name: github-credentials
+                              key: user
+                        - name: DOCKER_REGISTRY
+                          valueFrom:
+                            secretKeyRef:
+                              name: docker-credentials
+                              key: registry
+                        - name: DOCKER_USER
+                          valueFrom:
+                            secretKeyRef:
+                              name: docker-credentials
+                              key: username
+            providerConfigRef:
+              name: kubernetes-provider
+          ---
+          apiVersion: kubernetes.crossplane.io/v1alpha2
+          kind: Object
+          metadata:
+            name: '{{ .observed.composite.resource.spec.name }}-gitops-creator'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: '{{ .observed.composite.resource.spec.name }}-gitops-creator-rn'
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: batch/v1
+                kind: Job
+                metadata:
+                  name: '{{ .observed.composite.resource.spec.name }}-gitops-creator'
+                  namespace: default
+                spec:
+                  ttlSecondsAfterFinished: 600
+                  backoffLimit: 2
+                  template:
                     metadata:
-                      name: placeholder
-                      namespace: default
+                      annotations:
+                        sidecar.istio.io/inject: 'false'
                     spec:
-                      ttlSecondsAfterFinished: 600
-                      backoffLimit: 2
-                      template:
-                        metadata:
-                          annotations:
-                            sidecar.istio.io/inject: 'false'
-                        spec:
-                          serviceAccountName: crossplane-github-provider
-                          restartPolicy: OnFailure
-                          containers:
-                            - name: gitops-manifest-creator
-                              image: alpine:3.18
-                              command:
-                                - /bin/sh
-                                - -c
-                                - "set -euo pipefail\n# Install git, curl, and jq\napk add --no-cache git curl jq\necho \"Adding GitOps manifests for $SERVICE_NAME in $APP_CONTAINER-gitops...\"\n\nTEMP_DIR=\"\
-                                  /tmp/gitops-$APP_CONTAINER\"\nmkdir -p $TEMP_DIR\ncd $TEMP_DIR\n\n# Clone the AppContainer GitOps repository\ngit clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/$APP_CONTAINER-gitops.git\
-                                  \ .\n\n# Create manifests directory for the service\nmkdir -p manifests/$SERVICE_NAME\ncd manifests/$SERVICE_NAME\n\n# Create ConfigMap for environment variables\ncat >\
-                                  \ configmap.yaml << EOF\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: $SERVICE_NAME-config\n  namespace: default\ndata:\n  APP_ENV: \"production\"\n  SERVICE_NAME:\
-                                  \ \"$SERVICE_NAME\"\nEOF\n\n# Add database config if needed\nif [ \"$DATABASE\" = \"postgres\" ]; then\n  cat >> configmap.yaml << EOF\n  DATABASE_URL: \"postgresql://\\\
-                                  $DATABASE_USER:\\$DATABASE_PASSWORD@$APP_CONTAINER-postgres-rw.$APP_CONTAINER.svc.cluster.local:5432/$SERVICE_NAME\"\nEOF\nfi\n\n# Add cache config if needed  \nif [ \"\
-                                  $CACHE\" = \"redis\" ]; then\n  cat >> configmap.yaml << EOF\n  REDIS_URL: \"redis://:\\$REDIS_PASSWORD@$APP_CONTAINER-redis-master.$APP_CONTAINER.svc.cluster.local:6379/0\"\
-                                  \nEOF\nfi\n\n\n# Commit and push GitOps manifests\ncd ../..\ngit config user.name \"ApplicationClaim GitOps\"\ngit config user.email \"applicationclaim-gitops@platform.local\"\
-                                  \ngit add manifests/$SERVICE_NAME/\n\n# Only commit if there are changes\nif ! git diff --cached --quiet; then\n  git commit -m \"Add GitOps manifests for $SERVICE_NAME\
-                                  \ microservice\n\n- Add ConfigMap for environment variables\n- Ready for ArgoCD deployment  \n- Service: $SERVICE_NAME in AppContainer: $APP_CONTAINER\"\n  git push\n \
-                                  \ echo \"\u2705 GitOps manifests added for $SERVICE_NAME\"\nelse\n  echo \"\u2705 GitOps manifests already exist for $SERVICE_NAME\"\nfi\n"
-                              env:
-                                - name: APP_CONTAINER
-                                  value: placeholder
-                                - name: SERVICE_NAME
-                                  value: placeholder
-                                - name: DATABASE
-                                  value: placeholder
-                                - name: CACHE
-                                  value: placeholder
-                                - name: GITHUB_TOKEN
-                                  valueFrom:
-                                    secretKeyRef:
-                                      name: github-credentials
-                                      key: token
-                                - name: GITHUB_USER
-                                  valueFrom:
-                                    secretKeyRef:
-                                      name: github-credentials
-                                      key: user
-                                - name: DOCKER_REGISTRY
-                                  valueFrom:
-                                    secretKeyRef:
-                                      name: docker-credentials
-                                      key: registry
-                                - name: DOCKER_USER
-                                  valueFrom:
-                                    secretKeyRef:
-                                      name: docker-credentials
-                                      key: username
-                providerConfigRef:
-                  name: kubernetes-provider
-            patches:
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.name
-                toFieldPath: spec.forProvider.manifest.metadata.name
-                transforms:
-                  - type: string
-                    string:
-                      fmt: '%s-gitops-creator'
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.appContainer
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[0].value
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.name
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[1].value
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.database
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[2].value
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.cache
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[3].value
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.name
-                toFieldPath: metadata.name
-                transforms:
-                  - type: string
-                    string:
-                      fmt: '%s-gitops-creator'
-          - name: register-vcluster-argocd
-            base:
-              apiVersion: kubernetes.crossplane.io/v1alpha1
-              kind: Object
-              spec:
-                managementPolicies:
-                  - Create
-                  - Observe
-                  - Delete
-                forProvider:
-                  manifest:
-                    apiVersion: batch/v1
-                    kind: Job
+                      serviceAccountName: crossplane-github-provider
+                      restartPolicy: OnFailure
+                      containers:
+                      - name: gitops-manifest-creator
+                        image: alpine:3.18
+                        command:
+                        - /bin/sh
+                        - -c
+                        - "set -euo pipefail\n# Install git, curl, and jq\napk add --no-cache git curl jq\necho \"Adding GitOps manifests for $SERVICE_NAME in $APP_CONTAINER-gitops...\"\n\nTEMP_DIR=\"/tmp/gitops-$APP_CONTAINER\"\nmkdir -p $TEMP_DIR\ncd $TEMP_DIR\n\n# Clone the AppContainer GitOps repository\ngit clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/$APP_CONTAINER-gitops.git .\n\n# Create manifests directory for the service\nmkdir -p manifests/$SERVICE_NAME\ncd manifests/$SERVICE_NAME\n\n# Create ConfigMap for environment variables\ncat > configmap.yaml << EOF\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: $SERVICE_NAME-config\n  namespace: default\ndata:\n  APP_ENV: \"production\"\n  SERVICE_NAME: \"$SERVICE_NAME\"\nEOF\n\n# Add database config if needed\nif [ \"$DATABASE\" = \"postgres\" ]; then\n  cat >> configmap.yaml << EOF\n  DATABASE_URL: \"postgresql://\\$DATABASE_USER:\\$DATABASE_PASSWORD@$APP_CONTAINER-postgres-rw.$APP_CONTAINER.svc.cluster.local:5432/$SERVICE_NAME\"\nEOF\nfi\n\n# Add cache config if needed  \nif [ \"$CACHE\" = \"redis\" ]; then\n  cat >> configmap.yaml << EOF\n  REDIS_URL: \"redis://:\\$REDIS_PASSWORD@$APP_CONTAINER-redis-master.$APP_CONTAINER.svc.cluster.local:6379/0\"\nEOF\nfi\n\n\n# Commit and push GitOps manifests\ncd ../..\ngit config user.name \"ApplicationClaim GitOps\"\ngit config user.email \"applicationclaim-gitops@platform.local\"\ngit add manifests/$SERVICE_NAME/\n\n# Only commit if there are changes\nif ! git diff --cached --quiet; then\n  git commit -m \"Add GitOps manifests for $SERVICE_NAME microservice\n\n- Add ConfigMap for environment variables\n- Ready for ArgoCD deployment  \n- Service: $SERVICE_NAME in AppContainer: $APP_CONTAINER\"\n  git push\n  echo \"\u2705 GitOps manifests added for $SERVICE_NAME\"\nelse\n  echo \"\u2705 GitOps manifests already exist for $SERVICE_NAME\"\nfi\n"
+                        env:
+                        - name: APP_CONTAINER
+                          value: '{{ .observed.composite.resource.spec.appContainer }}'
+                        - name: SERVICE_NAME
+                          value: '{{ .observed.composite.resource.spec.name }}'
+                        - name: DATABASE
+                          value: '{{ .observed.composite.resource.spec.database }}'
+                        - name: CACHE
+                          value: '{{ .observed.composite.resource.spec.cache }}'
+                        - name: GITHUB_TOKEN
+                          valueFrom:
+                            secretKeyRef:
+                              name: github-credentials
+                              key: token
+                        - name: GITHUB_USER
+                          valueFrom:
+                            secretKeyRef:
+                              name: github-credentials
+                              key: user
+                        - name: DOCKER_REGISTRY
+                          valueFrom:
+                            secretKeyRef:
+                              name: docker-credentials
+                              key: registry
+                        - name: DOCKER_USER
+                          valueFrom:
+                            secretKeyRef:
+                              name: docker-credentials
+                              key: username
+            providerConfigRef:
+              name: kubernetes-provider
+          ---
+          apiVersion: kubernetes.crossplane.io/v1alpha2
+          kind: Object
+          metadata:
+            name: '{{ .observed.composite.resource.spec.name }}-register-argocd'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: '{{ .observed.composite.resource.spec.name }}-register-argocd-rn'
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: batch/v1
+                kind: Job
+                metadata:
+                  name: '{{ .observed.composite.resource.spec.name }}-register-argocd'
+                  namespace: default
+                spec:
+                  ttlSecondsAfterFinished: 600
+                  backoffLimit: 2
+                  template:
                     metadata:
-                      name: placeholder
-                      namespace: default
+                      annotations:
+                        sidecar.istio.io/inject: 'false'
                     spec:
-                      ttlSecondsAfterFinished: 600
-                      backoffLimit: 2
-                      template:
-                        metadata:
-                          annotations:
-                            sidecar.istio.io/inject: 'false'
-                        spec:
-                          serviceAccountName: crossplane-admin
-                          restartPolicy: OnFailure
-                          containers:
-                            - name: register-argocd
-                              image: alpine/k8s:1.28.4
-                              command:
-                                - /bin/sh
-                                - -c
-                                - "set -euo pipefail\necho \"\U0001F517 Registering vCluster with ArgoCD for OAM deployment...\"\n\n# Skip if deploying to host cluster\nif [ \"${VCLUSTER_NAME}\" = \"host\"\
-                                  \ ] || [ -z \"${VCLUSTER_NAME}\" ]; then\n  echo \"\U0001F3E0 Deploying to host cluster - skipping vCluster registration\"\n  exit 0\nfi\n\n# Install required tools\napk\
-                                  \ add --no-cache curl jq\n\n# Install ArgoCD CLI\necho \"\U0001F4E6 Installing ArgoCD CLI...\"\ncurl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/download/v2.13.0/argocd-linux-amd64\n\
-                                  chmod +x /usr/local/bin/argocd\n\n# Install vcluster CLI\necho \"\U0001F4E6 Installing vCluster CLI...\"\ncurl -L -o /usr/local/bin/vcluster https://github.com/loft-sh/vcluster/releases/download/v0.19.5/vcluster-linux-amd64\n\
-                                  chmod +x /usr/local/bin/vcluster\n\n# Wait for vCluster to be ready\necho \"\u23F3 Waiting for vCluster to be ready...\"\nfor i in $(seq 1 60); do\n  if kubectl get secret\
-                                  \ -n ${VCLUSTER_NAMESPACE} | grep -q \"vc-${VCLUSTER_NAME}\"; then\n    echo \"\u2705 vCluster secret found\"\n    break\n  fi\n  echo \"Waiting for vCluster secret...\
-                                  \ ($i/60)\"\n  sleep 5\ndone\n\n# Get vCluster kubeconfig using vcluster CLI\necho \"\U0001F4E5 Getting vCluster kubeconfig...\"\nvcluster connect ${VCLUSTER_NAME} -n ${VCLUSTER_NAMESPACE}\
-                                  \ --print > /tmp/vcluster.kubeconfig || {\n  # Fallback to manual extraction\n  kubectl get secret vc-${VCLUSTER_NAME} -n ${VCLUSTER_NAMESPACE} \\\n    -o jsonpath='{.data.config}'\
-                                  \ | base64 -d > /tmp/vcluster.kubeconfig\n}\n\n# ArgoCD Configuration\nARGOCD_INGRESS_URL=\"${ARGOCD_INGRESS_URL:-af433f091b55640038c23af3a641d716-112208284.us-west-2.elb.amazonaws.com}\"\
-                                  \nARGOCD_PASSWORD=$(kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath=\"{.data.password}\" | base64 -d)\n\n# Login to ArgoCD\necho \"\U0001F510 Logging\
-                                  \ into ArgoCD...\"\nargocd login ${ARGOCD_INGRESS_URL}:80 \\\n  --grpc-web-root-path /argocd \\\n  --username admin \\\n  --password ${ARGOCD_PASSWORD} \\\n  --insecure\
-                                  \ \\\n  --plaintext || {\n    echo \"\u26A0\uFE0F Failed to login to ArgoCD, continuing anyway\"\n  }\n\n# Register vCluster with ArgoCD using CLI\necho \"\U0001F4DD Registering\
-                                  \ vCluster with ArgoCD...\"\n\n# Check if already registered\nif argocd cluster list | grep -q \"${VCLUSTER_NAME}\"; then\n  echo \"Cluster already registered, removing\
-                                  \ old registration\"\n  argocd cluster rm ${VCLUSTER_NAME} -y 2>/dev/null || true\nfi\n\n# Add the cluster\nCONTEXT_NAME=$(kubectl config get-contexts --kubeconfig=/tmp/vcluster.kubeconfig\
-                                  \ -o name | head -1)\nargocd cluster add ${CONTEXT_NAME} \\\n  --kubeconfig /tmp/vcluster.kubeconfig \\\n  --name ${VCLUSTER_NAME} \\\n  --yes || {\n    echo \"\u26A0\uFE0F\
-                                  \ Failed to add vCluster to ArgoCD\"\n    # Continue anyway as this might be a transient issue\n  }\n\necho \"\u2705 vCluster registered with ArgoCD successfully\"\n"
-                              env:
-                                - name: VCLUSTER_NAME
-                                  value: placeholder
-                                - name: VCLUSTER_NAMESPACE
-                                  value: placeholder
-                                - name: APP_NAME
-                                  value: placeholder
-                providerConfigRef:
-                  name: kubernetes-provider
-            patches:
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.name
-                toFieldPath: spec.forProvider.manifest.metadata.name
-                transforms:
-                  - type: string
-                    string:
-                      fmt: '%s-register-argocd'
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.name
-                toFieldPath: metadata.name
-                transforms:
-                  - type: string
-                    string:
-                      fmt: '%s-register-argocd'
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.targetVCluster
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[0].value
-                policy:
-                  fromFieldPath: Optional
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.targetVCluster
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[1].value
-                policy:
-                  fromFieldPath: Optional
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.name
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[2].value
-          - name: update-oam-application
-            base:
-              apiVersion: kubernetes.crossplane.io/v1alpha1
-              kind: Object
-              spec:
-                forProvider:
-                  manifest:
-                    apiVersion: batch/v1
-                    kind: Job
+                      serviceAccountName: crossplane-admin
+                      restartPolicy: OnFailure
+                      containers:
+                      - name: register-argocd
+                        image: alpine/k8s:1.28.4
+                        command:
+                        - /bin/sh
+                        - -c
+                        - "set -euo pipefail\necho \"\U0001F517 Registering vCluster with ArgoCD for OAM deployment...\"\n\n# Skip if deploying to host cluster\nif [ \"${VCLUSTER_NAME}\" = \"host\" ] || [ -z \"${VCLUSTER_NAME}\" ]; then\n  echo \"\U0001F3E0 Deploying to host cluster - skipping vCluster registration\"\n  exit 0\nfi\n\n# Install required tools\napk add --no-cache curl jq\n\n# Install ArgoCD CLI\necho \"\U0001F4E6 Installing ArgoCD CLI...\"\ncurl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/download/v2.13.0/argocd-linux-amd64\nchmod +x /usr/local/bin/argocd\n\n# Install vcluster CLI\necho \"\U0001F4E6 Installing vCluster CLI...\"\ncurl -L -o /usr/local/bin/vcluster https://github.com/loft-sh/vcluster/releases/download/v0.19.5/vcluster-linux-amd64\nchmod +x /usr/local/bin/vcluster\n\n# Wait for vCluster to be ready\necho \"\u23F3 Waiting for vCluster to be ready...\"\nfor i in $(seq 1 60); do\n  if kubectl get secret -n ${VCLUSTER_NAMESPACE} | grep -q \"vc-${VCLUSTER_NAME}\"; then\n    echo \"\u2705 vCluster secret found\"\n    break\n  fi\n  echo \"Waiting for vCluster secret... ($i/60)\"\n  sleep 5\ndone\n\n# Get vCluster kubeconfig using vcluster CLI\necho \"\U0001F4E5 Getting vCluster kubeconfig...\"\nvcluster connect ${VCLUSTER_NAME} -n ${VCLUSTER_NAMESPACE} --print > /tmp/vcluster.kubeconfig || {\n  # Fallback to manual extraction\n  kubectl get secret vc-${VCLUSTER_NAME} -n ${VCLUSTER_NAMESPACE} \\\n    -o jsonpath='{.data.config}' | base64 -d > /tmp/vcluster.kubeconfig\n}\n\n# ArgoCD Configuration\nARGOCD_INGRESS_URL=\"${ARGOCD_INGRESS_URL:-af433f091b55640038c23af3a641d716-112208284.us-west-2.elb.amazonaws.com}\"\nARGOCD_PASSWORD=$(kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath=\"{.data.password}\" | base64 -d)\n\n# Login to ArgoCD\necho \"\U0001F510 Logging into ArgoCD...\"\nargocd login ${ARGOCD_INGRESS_URL}:80 \\\n  --grpc-web-root-path /argocd \\\n  --username admin \\\n  --password ${ARGOCD_PASSWORD} \\\n  --insecure \\\n  --plaintext || {\n    echo \"\u26A0\uFE0F Failed to login to ArgoCD, continuing anyway\"\n  }\n\n# Register vCluster with ArgoCD using CLI\necho \"\U0001F4DD Registering vCluster with ArgoCD...\"\n\n# Check if already registered\nif argocd cluster list | grep -q \"${VCLUSTER_NAME}\"; then\n  echo \"Cluster already registered, removing old registration\"\n  argocd cluster rm ${VCLUSTER_NAME} -y 2>/dev/null || true\nfi\n\n# Add the cluster\nCONTEXT_NAME=$(kubectl config get-contexts --kubeconfig=/tmp/vcluster.kubeconfig -o name | head -1)\nargocd cluster add ${CONTEXT_NAME} \\\n  --kubeconfig /tmp/vcluster.kubeconfig \\\n  --name ${VCLUSTER_NAME} \\\n  --yes || {\n    echo \"\u26A0\uFE0F Failed to add vCluster to ArgoCD\"\n    # Continue anyway as this might be a transient issue\n  }\n\necho \"\u2705 vCluster registered with ArgoCD successfully\"\n"
+                        env:
+                        - name: VCLUSTER_NAME
+                          value: '{{ .observed.composite.resource.spec.targetVCluster | default "" }}'
+                        - name: VCLUSTER_NAMESPACE
+                          value: '{{ .observed.composite.resource.spec.targetVCluster | default "" }}'
+                        - name: APP_NAME
+                          value: '{{ .observed.composite.resource.spec.name }}'
+            providerConfigRef:
+              name: kubernetes-provider
+            # v1alpha2 Object supports the plural list (storage version, no
+            # conversion webhook involved — see provider-kubernetes-conversion
+            # task #100 for the underlying webhook flake).
+            managementPolicies:
+            - Create
+            - Observe
+            - Delete
+          ---
+          apiVersion: kubernetes.crossplane.io/v1alpha2
+          kind: Object
+          metadata:
+            name: '{{ .observed.composite.resource.spec.name }}-oam-updater'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: '{{ .observed.composite.resource.spec.name }}-oam-updater-rn'
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: batch/v1
+                kind: Job
+                metadata:
+                  name: '{{ .observed.composite.resource.spec.name }}-oam-updater'
+                  namespace: default
+                spec:
+                  ttlSecondsAfterFinished: 600
+                  backoffLimit: 2
+                  template:
                     metadata:
-                      name: placeholder
-                      namespace: default
+                      annotations:
+                        sidecar.istio.io/inject: 'false'
                     spec:
-                      ttlSecondsAfterFinished: 600
-                      backoffLimit: 2
-                      template:
-                        metadata:
-                          annotations:
-                            sidecar.istio.io/inject: 'false'
-                        spec:
-                          serviceAccountName: crossplane-github-provider
-                          restartPolicy: OnFailure
-                          containers:
-                            - name: oam-updater
-                              image: alpine/k8s:1.28.4
-                              command:
-                                - /bin/sh
-                                - -c
-                                - "set -euo pipefail\n# kubectl, git, jq already on PATH in alpine/k8s:1.28.4\necho \"Updating OAM Application with webservice component for $SERVICE_NAME...\"\n\nTEMP_DIR=\"\
-                                  /tmp/oam-update-$APP_CONTAINER\"\nmkdir -p $TEMP_DIR\ncd $TEMP_DIR\n\n# Clone the GitOps repository\ngit clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/$APP_CONTAINER-gitops.git\
-                                  \ .\n\n# Configure git\ngit config user.name \"ApplicationClaim OAM Updater\"\ngit config user.email \"applicationclaim@platform.local\"\n\n# Determine target vCluster\
-                                  \ from ApplicationClaim spec or annotation\n# CLAIM_NAMESPACE is patched from spec.claimRef.namespace (see patches below).\n# Fall back to \"default\" only when the claimRef\
-                                  \ namespace is empty (legacy callers).\nCLAIM_NS=\"${CLAIM_NAMESPACE:-default}\"\necho \"\U0001F50D Looking up ApplicationClaim: $SERVICE_NAME in namespace: $CLAIM_NS\"\
-                                  \nkubectl get applicationclaim $SERVICE_NAME -n \"$CLAIM_NS\" -o yaml | head -20 || {\n  echo \"\u26A0\uFE0F  Not found by name in $CLAIM_NS \u2014 falling back to cross-namespace\
-                                  \ lookup by spec.appName\"\n  FOUND_NS=$(kubectl get applicationclaim -A -o jsonpath=\"{range .items[?(@.spec.appName=='$SERVICE_NAME')]}{.metadata.namespace}{'\\n'}{end}\"\
-                                  \ | head -1)\n  if [ -n \"$FOUND_NS\" ]; then\n    echo \"   resolved namespace via -A lookup: $FOUND_NS\"\n    CLAIM_NS=\"$FOUND_NS\"\n  fi\n}\n\nVCLUSTER_TARGET=$(kubectl\
-                                  \ get applicationclaim $SERVICE_NAME -n \"$CLAIM_NS\" -o jsonpath='{.spec.targetVCluster}' 2>/dev/null || echo \"\")\necho \"   spec.targetVCluster value: '$VCLUSTER_TARGET'\"\
-                                  \n\nif [ -z \"$VCLUSTER_TARGET\" ]; then\n  echo \"   spec.targetVCluster is empty, checking annotation...\"\n  VCLUSTER_TARGET=$(kubectl get applicationclaim $SERVICE_NAME\
-                                  \ -n \"$CLAIM_NS\" -o jsonpath='{.metadata.annotations.webservice\\.oam\\.dev/vcluster}' 2>/dev/null || echo \"\")\n  echo \"   annotation value: '$VCLUSTER_TARGET'\"\n\
-                                  fi\n\nif [ -z \"$VCLUSTER_TARGET\" ]; then\n  echo \"   No vCluster target found, using default...\"\n  VCLUSTER_TARGET=\"development-vcluster\"\nfi\necho \"\U0001F3AF\
-                                  \ Target vCluster: $VCLUSTER_TARGET\"\n\n# Create vCluster-specific directory structure\nmkdir -p vcluster/$VCLUSTER_TARGET/applications/$SERVICE_NAME\n\n# Check if this\
-                                  \ is an OAM-driven ApplicationClaim (should NOT update OAM to avoid circular dependency)\n# Default to api-driven if not explicitly set\nSOURCE=\"${BOOTSTRAP_SOURCE:-api-driven}\"\
-                                  \n\nif [ \"$SOURCE\" == \"OAM-driven\" ]; then\n  echo \"\U0001F504 OAM-driven ApplicationClaim detected (source: $SOURCE)\"\n  echo \"\u26A0\uFE0F  Skipping OAM update\
-                                  \ to avoid circular dependency\"\n  echo \"\u2139\uFE0F  User should manually update OAM Application if needed\"\n  exit 0\nfi\n\necho \"\u2705 Processing ApplicationClaim\
-                                  \ (source: $SOURCE)\"\n\necho \"\U0001F504 API-driven ApplicationClaim detected - proceeding with OAM update\"\n\n# Check if OAM application file exists\nif [ ! -f \"oam/applications/application.yaml\"\
-                                  \ ]; then\n  echo \"\u274C OAM application file not found\"\n  exit 1\nfi\n\necho \"\U0001F4CB Current OAM Application:\"\ncat oam/applications/application.yaml\n\n# Check\
-                                  \ if component already exists in OAM Application\nCOMPONENT_EXISTS=false\nif grep -q \"name: $SERVICE_NAME\" oam/applications/application.yaml; then\n  echo \"\u26A0\uFE0F\
-                                  \  Component '$SERVICE_NAME' already exists in OAM Application\"\n  echo \"\U0001F504 Component will be replaced with ApplicationClaim specifications...\"\n  COMPONENT_EXISTS=true\n\
-                                  else\n  echo \"\u2705 Component '$SERVICE_NAME' not found - proceeding with addition\"\nfi\n\n# Create new component definition - choose correct ComponentDefinition based\
-                                  \ on framework\nif [ \"$FRAMEWORK\" = \"chatbot\" ]; then\n  COMPONENT_TYPE=\"rasa-chatbot\"\n  COMPONENT_PORT=\"5005\"\nelse\n  COMPONENT_TYPE=\"webservice\"\n  COMPONENT_PORT=\"\
-                                  8080\"\nfi\n\n# Determine registry based on configuration\n# Check if we should use ACR or Docker Hub\nDEFAULT_REGISTRY=\"${DEFAULT_REGISTRY:-acr}\"  # Default to ACR\n\
-                                  \nif [ \"$DEFAULT_REGISTRY\" = \"acr\" ]; then\n  IMAGE_REGISTRY=\"healthidpuaeacr.azurecr.io\"\n  IMAGE_PREFIX=\"\"\nelse\n  IMAGE_REGISTRY=\"docker.io\"\n  IMAGE_PREFIX=\"\
-                                  socrates12345/\"\nfi\n\n# Bug-B: image tag defaults to ${DEFAULT_IMAGE_TAG:-latest}.\n# WARN: bypasses image-source-policy when defaulted \u2014 callers\n# SHOULD set DEFAULT_IMAGE_TAG\
-                                  \ (or override the image entirely\n# via the consumer OAM) so an immutable digest/tag is used.\nIMAGE_TAG_DEFAULT=\"${DEFAULT_IMAGE_TAG:-latest}\"\nCOMPONENT_YAML=\"\n\
-                                  \  - name: $SERVICE_NAME\n    type: $COMPONENT_TYPE\n    properties:\n      name: $SERVICE_NAME\n      image: ${IMAGE_REGISTRY}/${IMAGE_PREFIX}$SERVICE_NAME:${IMAGE_TAG_DEFAULT}\n\
-                                  \      language: $LANGUAGE\n      framework: $FRAMEWORK\n      port: $COMPONENT_PORT\n      healthPath: /health\"\n\n# Add realtime platform integration if specified\n\
-                                  if [ -n \"$REALTIME_PLATFORM\" ] && [ \"$REALTIME_PLATFORM\" != \"none\" ]; then\n  COMPONENT_YAML=\"${COMPONENT_YAML}\n      realtime: $REALTIME_PLATFORM\n      websocket:\
-                                  \ true\"\nfi\n\n# Add database if specified\nif [ \"$DATABASE\" != \"none\" ] && [ -n \"$DATABASE\" ]; then\n  COMPONENT_YAML=\"${COMPONENT_YAML}\n      database: $DATABASE\"\
-                                  \nfi\n\n# Add cache if specified\nif [ \"$CACHE\" != \"none\" ] && [ -n \"$CACHE\" ]; then\n  COMPONENT_YAML=\"${COMPONENT_YAML}\n      cache: $CACHE\"\nfi\n\n# Add AppContainer\
-                                  \ reference\nCOMPONENT_YAML=\"${COMPONENT_YAML}\n      appContainer: $APP_CONTAINER\n      exposeApi: true\"\n\n# If component exists, we'll replace it entirely\nif [ \"\
-                                  $COMPONENT_EXISTS\" = \"true\" ]; then\n  echo \"\U0001F504 Replacing existing component...\"\n  \n  # Create a new OAM application with just our component (simpler approach)\n\
-                                  \  # Keep everything before components section\n  sed -n '1,/components:/p' oam/applications/application.yaml > temp_app.yaml\n  \n  # Add our component\n  echo \"$COMPONENT_YAML\"\
-                                  \ | sed 's/^/        /' >> temp_app.yaml\n  \n  # Keep everything after policies (if exists) or add policies section\n  if grep -q \"policies:\" oam/applications/application.yaml;\
-                                  \ then\n    sed -n '/policies:/,$p' oam/applications/application.yaml >> temp_app.yaml\n  fi\n  \n  mv temp_app.yaml oam/applications/application.yaml\n  \nelif grep -q\
-                                  \ \"components: \\[\\]\" oam/applications/application.yaml; then\n  echo \"\U0001F504 Adding first component to empty OAM Application...\"\n  \n  # Replace empty components\
-                                  \ array with the new component\n  sed -i \"s/components: \\[\\]/components:$COMPONENT_YAML/\" oam/applications/application.yaml\n  \nelif grep -q \"components:\" oam/applications/application.yaml;\
-                                  \ then\n  echo \"\U0001F504 Adding component to existing OAM Application...\"\n  \n  # Find the line number of components: and add the new component\n  COMPONENTS_LINE=$(grep\
-                                  \ -n \"components:\" oam/applications/application.yaml | cut -d: -f1)\n  \n  # Create temp file with the new component added\n  head -n $COMPONENTS_LINE oam/applications/application.yaml\
-                                  \ > temp_app.yaml\n  echo \"$COMPONENT_YAML\" | sed 's/^/        /' >> temp_app.yaml\n  tail -n +$((COMPONENTS_LINE + 1)) oam/applications/application.yaml >> temp_app.yaml\n\
-                                  \  \n  mv temp_app.yaml oam/applications/application.yaml\n  \nelse\n  echo \"\u274C No components section found in OAM Application\"\n  exit 1\nfi\n\n# Add or update topology\
-                                  \ policy for multi-cluster deployment\n# Check if targetVCluster is \"host\" - if so, skip topology policy\nif [ \"$VCLUSTER_TARGET\" = \"host\" ]; then\n  echo \"\U0001F3E0\
-                                  \ Deploying to host cluster - skipping topology policy\"\n  # Remove any existing topology policy if present\n  if grep -q \"deploy-to-vcluster\" oam/applications/application.yaml;\
-                                  \ then\n    echo \"Removing existing topology policy for host deployment...\"\n    # Remove the policy section\n    sed -i '/- name: deploy-to-vcluster/,+4d' oam/applications/application.yaml\n\
-                                  \    # If policies section is now empty, remove it too\n    if grep -q \"policies: \\[\\]\" oam/applications/application.yaml; then\n      sed -i '/policies: \\[\\]/d'\
-                                  \ oam/applications/application.yaml\n    fi\n  fi\nelse\n  echo \"\U0001F3AF Adding topology policy for vCluster deployment...\"\n  if ! grep -q \"policies:\" oam/applications/application.yaml;\
-                                  \ then\n    echo \"  policies:\" >> oam/applications/application.yaml\n    echo \"  - name: deploy-to-vcluster\" >> oam/applications/application.yaml\n    echo \"    type:\
-                                  \ topology\" >> oam/applications/application.yaml\n    echo \"    properties:\" >> oam/applications/application.yaml\n    echo \"      clusters: [\\\"$VCLUSTER_TARGET\\\
-                                  \"]\" >> oam/applications/application.yaml\n    echo \"      namespace: \\\"default\\\"\" >> oam/applications/application.yaml\n  else\n    # Update existing policy\n \
-                                  \   if grep -q \"deploy-to-vcluster\" oam/applications/application.yaml; then\n      echo \"\U0001F504 Updating existing topology policy...\"\n      # Update the clusters\
-                                  \ line\n      sed -i \"s/clusters: \\[.*\\]/clusters: [\\\"$VCLUSTER_TARGET\\\"]/\" oam/applications/application.yaml\n      sed -i \"s/namespace: \\\".*\\\"/namespace:\
-                                  \ \\\"default\\\"/\" oam/applications/application.yaml\n    else\n      # Add new policy to existing policies section\n      echo \"  - name: deploy-to-vcluster\" >> oam/applications/application.yaml\n\
-                                  \      echo \"    type: topology\" >> oam/applications/application.yaml\n      echo \"    properties:\" >> oam/applications/application.yaml\n      echo \"      clusters:\
-                                  \ [\\\"$VCLUSTER_TARGET\\\"]\" >> oam/applications/application.yaml\n      echo \"      namespace: \\\"default\\\"\" >> oam/applications/application.yaml\n    fi\n  fi\n\
-                                  fi\n\necho \"\u2705 Updated OAM Application with topology policy:\"\ncat oam/applications/application.yaml\n\n# Create vCluster-specific manifests\necho \"\U0001F4C1 Creating\
-                                  \ vCluster-specific manifests for $VCLUSTER_TARGET...\"\n\n# Create ApplicationClaim for vCluster processing\ncat > vcluster/$VCLUSTER_TARGET/applications/$SERVICE_NAME/application-claim.yaml\
-                                  \ << EOF\napiVersion: platform.example.org/v1alpha1\nkind: ApplicationClaim\nmetadata:\n  name: $SERVICE_NAME\n  namespace: default\n  annotations:\n    webservice.oam.dev/source:\
-                                  \ \"$BOOTSTRAP_SOURCE\"\n    webservice.oam.dev/processed-by: \"host-cluster-composition\"\nspec:\n  appContainer: $APP_CONTAINER\n  name: $SERVICE_NAME\n  language: $LANGUAGE\n\
-                                  \  framework: $FRAMEWORK\n  database: $DATABASE\n  cache: $CACHE\nEOF\n\n# Create OAM Application for vCluster KubeVela processing\n# ALWAYS use default namespace for OAM\
-                                  \ Application (where WorkloadDefinitions exist)\n# The topology policy will handle deployment to the correct location\nOAM_NAMESPACE=\"default\"\n\n# Bug-B: image tag defaults\
-                                  \ to ${DEFAULT_IMAGE_TAG:-v1.0.0}.\n# WARN: bypasses image-source-policy when defaulted \u2014 callers\n# SHOULD set DEFAULT_IMAGE_TAG (or override via consumer OAM).\n\
-                                  IMAGE_TAG_DEFAULT=\"${DEFAULT_IMAGE_TAG:-v1.0.0}\"\ncat > vcluster/$VCLUSTER_TARGET/applications/$SERVICE_NAME/oam-application.yaml << EOF\napiVersion: core.oam.dev/v1beta1\n\
-                                  kind: Application\nmetadata:\n  name: $SERVICE_NAME-app\n  namespace: $OAM_NAMESPACE\nspec:\n  components:\n  - name: $SERVICE_NAME\n    type: webservice\n    properties:\n\
-                                  \      image: \"${IMAGE_REGISTRY}/${IMAGE_PREFIX}$SERVICE_NAME:${IMAGE_TAG_DEFAULT}\"\n      port: 8080\n      healthPath: \"/health\"\n      language: $LANGUAGE\n    \
-                                  \  framework: $FRAMEWORK\n$(if [ \"$DATABASE\" != \"none\" ]; then\necho \"      database: $DATABASE\n      envFrom:\n      - secretRef:\n          name: \\\"${SERVICE_NAME}-db-secret\\\
-                                  \"\"\nfi)\n      environment:\n        LOG_LEVEL: \"INFO\"\n        AGENT_TYPE: \"$SERVICE_NAME\"\n  policies:\n  - name: deploy-to-vcluster\n    type: topology\n    properties:\n\
-                                  \      clusters: [\"$VCLUSTER_TARGET\"]\n      namespace: \"default\"\nEOF\n\n# Create ArgoCD Application for this service\ncat > vcluster/$VCLUSTER_TARGET/applications/$SERVICE_NAME/argocd-app.yaml\
-                                  \ << EOF\napiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: $SERVICE_NAME\n  namespace: argocd\nspec:\n  project: default\n  source:\n    repoURL:\
-                                  \ https://github.com/$GITHUB_USER/$APP_CONTAINER-gitops\n    targetRevision: main\n    path: vcluster/$VCLUSTER_TARGET/applications/$SERVICE_NAME\n    directory:\n    \
-                                  \  include: '{application-claim.yaml,oam-application.yaml}'\n  destination:\n    server: https://kubernetes.default.svc\n    namespace: default\n  syncPolicy:\n    automated:\n\
-                                  \      prune: true\n      selfHeal: true\nEOF\n\necho \"\u2705 Created vCluster-specific manifests in vcluster/$VCLUSTER_TARGET/applications/$SERVICE_NAME/\"\n\n# Commit\
-                                  \ and push changes\ngit add oam/applications/application.yaml\ngit add vcluster/$VCLUSTER_TARGET/applications/$SERVICE_NAME/\ngit commit -m \"Add $SERVICE_NAME webservice\
-                                  \ component to OAM Application (Target: $VCLUSTER_TARGET, Lang: $LANGUAGE, Framework: $FRAMEWORK, DB: $DATABASE, Cache: $CACHE)\"\n\ngit push\n\necho \"\U0001F389 Successfully\
-                                  \ updated OAM Application with $SERVICE_NAME webservice component\"\n"
-                              env:
-                                - name: SERVICE_NAME
-                                  value: placeholder
-                                - name: APP_CONTAINER
-                                  value: placeholder
-                                - name: LANGUAGE
-                                  value: placeholder
-                                - name: FRAMEWORK
-                                  value: placeholder
-                                - name: DATABASE
-                                  value: placeholder
-                                - name: CACHE
-                                  value: placeholder
-                                - name: DEFAULT_REGISTRY
-                                  value: acr
-                                - name: REALTIME_PLATFORM
-                                  value: ''
-                                - name: BOOTSTRAP_SOURCE
-                                  value: placeholder
-                                - name: CLAIM_NAMESPACE
-                                  value: default
-                                - name: GITHUB_TOKEN
-                                  valueFrom:
-                                    secretKeyRef:
-                                      name: github-credentials
-                                      key: token
-                                - name: GITHUB_USER
-                                  valueFrom:
-                                    secretKeyRef:
-                                      name: github-credentials
-                                      key: user
-                providerConfigRef:
-                  name: kubernetes-provider
-            patches:
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.name
-                toFieldPath: metadata.name
-                transforms:
-                  - type: string
-                    string:
-                      fmt: '%s-oam-updater'
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.name
-                toFieldPath: spec.forProvider.manifest.metadata.name
-                transforms:
-                  - type: string
-                    string:
-                      fmt: '%s-oam-updater'
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.name
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[0].value
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.appContainer
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[1].value
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.language
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[2].value
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.framework
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[3].value
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.database
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[4].value
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.cache
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[5].value
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.realtime
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[7].value
-                policy:
-                  fromFieldPath: Optional
-              - type: FromCompositeFieldPath
-                fromFieldPath: metadata.annotations["webservice.oam.dev/source"]
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[8].value
-                policy:
-                  fromFieldPath: Optional
-                transforms:
-                  - type: string
-                    string:
-                      fmt: '%s'
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.claimRef.namespace
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[9].value
-                policy:
-                  fromFieldPath: Optional
-          - name: create-chat-service-repository
-            base:
-              apiVersion: kubernetes.crossplane.io/v1alpha1
-              kind: Object
-              spec:
-                forProvider:
-                  manifest:
-                    apiVersion: batch/v1
-                    kind: Job
+                      serviceAccountName: crossplane-github-provider
+                      restartPolicy: OnFailure
+                      containers:
+                      - name: oam-updater
+                        image: alpine/k8s:1.28.4
+                        command:
+                        - /bin/sh
+                        - -c
+                        - "set -euo pipefail\n# kubectl, git, jq already on PATH in alpine/k8s:1.28.4\necho \"Updating OAM Application with webservice component for $SERVICE_NAME...\"\n\nTEMP_DIR=\"/tmp/oam-update-$APP_CONTAINER\"\nmkdir -p $TEMP_DIR\ncd $TEMP_DIR\n\n# Clone the GitOps repository\ngit clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/$APP_CONTAINER-gitops.git .\n\n# Configure git\ngit config user.name \"ApplicationClaim OAM Updater\"\ngit config user.email \"applicationclaim@platform.local\"\n\n# Determine target vCluster from ApplicationClaim spec or annotation\n# CLAIM_NAMESPACE is patched from spec.claimRef.namespace (see patches below).\n# Fall back to \"default\" only when the claimRef namespace is empty (legacy callers).\nCLAIM_NS=\"${CLAIM_NAMESPACE:-default}\"\necho \"\U0001F50D Looking up ApplicationClaim: $SERVICE_NAME in namespace: $CLAIM_NS\"\nkubectl get applicationclaim $SERVICE_NAME -n \"$CLAIM_NS\" -o yaml | head -20 || {\n  echo \"\u26A0\uFE0F  Not found by name in $CLAIM_NS \u2014 falling back to cross-namespace lookup by spec.appName\"\n  FOUND_NS=$(kubectl get applicationclaim -A -o jsonpath=\"{range .items[?(@.spec.appName=='$SERVICE_NAME')]}{.metadata.namespace}{'\\n'}{end}\" | head -1)\n  if [ -n \"$FOUND_NS\" ]; then\n    echo \"   resolved namespace via -A lookup: $FOUND_NS\"\n    CLAIM_NS=\"$FOUND_NS\"\n  fi\n}\n\nVCLUSTER_TARGET=$(kubectl get applicationclaim $SERVICE_NAME -n \"$CLAIM_NS\" -o jsonpath='{.spec.targetVCluster}' 2>/dev/null || echo \"\")\necho \"   spec.targetVCluster value: '$VCLUSTER_TARGET'\"\n\nif [ -z \"$VCLUSTER_TARGET\" ]; then\n  echo \"   spec.targetVCluster is empty, checking annotation...\"\n  VCLUSTER_TARGET=$(kubectl get applicationclaim $SERVICE_NAME -n \"$CLAIM_NS\" -o jsonpath='{.metadata.annotations.webservice\\.oam\\.dev/vcluster}' 2>/dev/null || echo \"\")\n  echo \"   annotation value: '$VCLUSTER_TARGET'\"\nfi\n\nif [ -z \"$VCLUSTER_TARGET\" ]; then\n  echo \"   No vCluster target found, using default...\"\n  VCLUSTER_TARGET=\"development-vcluster\"\nfi\necho \"\U0001F3AF Target vCluster: $VCLUSTER_TARGET\"\n\n# Create vCluster-specific directory structure\nmkdir -p vcluster/$VCLUSTER_TARGET/applications/$SERVICE_NAME\n\n# Check if this is an OAM-driven ApplicationClaim (should NOT update OAM to avoid circular dependency)\n# Default to api-driven if not explicitly set\nSOURCE=\"${BOOTSTRAP_SOURCE:-api-driven}\"\n\nif [ \"$SOURCE\" == \"OAM-driven\" ]; then\n  echo \"\U0001F504 OAM-driven ApplicationClaim detected (source: $SOURCE)\"\n  echo \"\u26A0\uFE0F  Skipping OAM update to avoid circular dependency\"\n  echo \"\u2139\uFE0F  User should manually update OAM Application if needed\"\n  exit 0\nfi\n\necho \"\u2705 Processing ApplicationClaim (source: $SOURCE)\"\n\necho \"\U0001F504 API-driven ApplicationClaim detected - proceeding with OAM update\"\n\n# Check if OAM application file exists\nif [ ! -f \"oam/applications/application.yaml\" ]; then\n  echo \"\u274C OAM application file not found\"\n  exit 1\nfi\n\necho \"\U0001F4CB Current OAM Application:\"\ncat oam/applications/application.yaml\n\n# Check if component already exists in OAM Application\nCOMPONENT_EXISTS=false\nif grep -q \"name: $SERVICE_NAME\" oam/applications/application.yaml; then\n  echo \"\u26A0\uFE0F  Component '$SERVICE_NAME' already exists in OAM Application\"\n  echo \"\U0001F504 Component will be replaced with ApplicationClaim specifications...\"\n  COMPONENT_EXISTS=true\nelse\n  echo \"\u2705 Component '$SERVICE_NAME' not found - proceeding with addition\"\nfi\n\n# Create new component definition - choose correct ComponentDefinition based on framework\nif [ \"$FRAMEWORK\" = \"chatbot\" ]; then\n  COMPONENT_TYPE=\"rasa-chatbot\"\n  COMPONENT_PORT=\"5005\"\nelse\n  COMPONENT_TYPE=\"webservice\"\n  COMPONENT_PORT=\"8080\"\nfi\n\n# Determine registry based on configuration\n# Check if we should use ACR or Docker Hub\nDEFAULT_REGISTRY=\"${DEFAULT_REGISTRY:-acr}\"  # Default to ACR\n\nif [ \"$DEFAULT_REGISTRY\" = \"acr\" ]; then\n  IMAGE_REGISTRY=\"healthidpuaeacr.azurecr.io\"\n  IMAGE_PREFIX=\"\"\nelse\n  IMAGE_REGISTRY=\"docker.io\"\n  IMAGE_PREFIX=\"socrates12345/\"\nfi\n\n# Bug-B: image tag defaults to ${DEFAULT_IMAGE_TAG:-latest}.\n# WARN: bypasses image-source-policy when defaulted \u2014 callers\n# SHOULD set DEFAULT_IMAGE_TAG (or override the image entirely\n# via the consumer OAM) so an immutable digest/tag is used.\nIMAGE_TAG_DEFAULT=\"${DEFAULT_IMAGE_TAG:-latest}\"\nCOMPONENT_YAML=\"\n  - name: $SERVICE_NAME\n    type: $COMPONENT_TYPE\n    properties:\n      name: $SERVICE_NAME\n      image: ${IMAGE_REGISTRY}/${IMAGE_PREFIX}$SERVICE_NAME:${IMAGE_TAG_DEFAULT}\n      language: $LANGUAGE\n      framework: $FRAMEWORK\n      port: $COMPONENT_PORT\n      healthPath: /health\"\n\n# Add realtime platform integration if specified\nif [ -n \"$REALTIME_PLATFORM\" ] && [ \"$REALTIME_PLATFORM\" != \"none\" ]; then\n  COMPONENT_YAML=\"${COMPONENT_YAML}\n      realtime: $REALTIME_PLATFORM\n      websocket: true\"\nfi\n\n# Add database if specified\nif [ \"$DATABASE\" != \"none\" ] && [ -n \"$DATABASE\" ]; then\n  COMPONENT_YAML=\"${COMPONENT_YAML}\n      database: $DATABASE\"\nfi\n\n# Add cache if specified\nif [ \"$CACHE\" != \"none\" ] && [ -n \"$CACHE\" ]; then\n  COMPONENT_YAML=\"${COMPONENT_YAML}\n      cache: $CACHE\"\nfi\n\n# Add AppContainer reference\nCOMPONENT_YAML=\"${COMPONENT_YAML}\n      appContainer: $APP_CONTAINER\n      exposeApi: true\"\n\n# If component exists, we'll replace it entirely\nif [ \"$COMPONENT_EXISTS\" = \"true\" ]; then\n  echo \"\U0001F504 Replacing existing component...\"\n  \n  # Create a new OAM application with just our component (simpler approach)\n  # Keep everything before components section\n  sed -n '1,/components:/p' oam/applications/application.yaml > temp_app.yaml\n  \n  # Add our component\n  echo \"$COMPONENT_YAML\" | sed 's/^/        /' >> temp_app.yaml\n  \n  # Keep everything after policies (if exists) or add policies section\n  if grep -q \"policies:\" oam/applications/application.yaml; then\n    sed -n '/policies:/,$p' oam/applications/application.yaml >> temp_app.yaml\n  fi\n  \n  mv temp_app.yaml oam/applications/application.yaml\n  \nelif grep -q \"components: \\[\\]\" oam/applications/application.yaml; then\n  echo \"\U0001F504 Adding first component to empty OAM Application...\"\n  \n  # Replace empty components array with the new component\n  sed -i \"s/components: \\[\\]/components:$COMPONENT_YAML/\" oam/applications/application.yaml\n  \nelif grep -q \"components:\" oam/applications/application.yaml; then\n  echo \"\U0001F504 Adding component to existing OAM Application...\"\n  \n  # Find the line number of components: and add the new component\n  COMPONENTS_LINE=$(grep -n \"components:\" oam/applications/application.yaml | cut -d: -f1)\n  \n  # Create temp file with the new component added\n  head -n $COMPONENTS_LINE oam/applications/application.yaml > temp_app.yaml\n  echo \"$COMPONENT_YAML\" | sed 's/^/        /' >> temp_app.yaml\n  tail -n +$((COMPONENTS_LINE + 1)) oam/applications/application.yaml >> temp_app.yaml\n  \n  mv temp_app.yaml oam/applications/application.yaml\n  \nelse\n  echo \"\u274C No components section found in OAM Application\"\n  exit 1\nfi\n\n# Add or update topology policy for multi-cluster deployment\n# Check if targetVCluster is \"host\" - if so, skip topology policy\nif [ \"$VCLUSTER_TARGET\" = \"host\" ]; then\n  echo \"\U0001F3E0 Deploying to host cluster - skipping topology policy\"\n  # Remove any existing topology policy if present\n  if grep -q \"deploy-to-vcluster\" oam/applications/application.yaml; then\n    echo \"Removing existing topology policy for host deployment...\"\n    # Remove the policy section\n    sed -i '/- name: deploy-to-vcluster/,+4d' oam/applications/application.yaml\n    # If policies section is now empty, remove it too\n    if grep -q \"policies: \\[\\]\" oam/applications/application.yaml; then\n      sed -i '/policies: \\[\\]/d' oam/applications/application.yaml\n    fi\n  fi\nelse\n  echo \"\U0001F3AF Adding topology policy for vCluster deployment...\"\n  if ! grep -q \"policies:\" oam/applications/application.yaml; then\n    echo \"  policies:\" >> oam/applications/application.yaml\n    echo \"  - name: deploy-to-vcluster\" >> oam/applications/application.yaml\n    echo \"    type: topology\" >> oam/applications/application.yaml\n    echo \"    properties:\" >> oam/applications/application.yaml\n    echo \"      clusters: [\\\"$VCLUSTER_TARGET\\\"]\" >> oam/applications/application.yaml\n    echo \"      namespace: \\\"default\\\"\" >> oam/applications/application.yaml\n  else\n    # Update existing policy\n    if grep -q \"deploy-to-vcluster\" oam/applications/application.yaml; then\n      echo \"\U0001F504 Updating existing topology policy...\"\n      # Update the clusters line\n      sed -i \"s/clusters: \\[.*\\]/clusters: [\\\"$VCLUSTER_TARGET\\\"]/\" oam/applications/application.yaml\n      sed -i \"s/namespace: \\\".*\\\"/namespace: \\\"default\\\"/\" oam/applications/application.yaml\n    else\n      # Add new policy to existing policies section\n      echo \"  - name: deploy-to-vcluster\" >> oam/applications/application.yaml\n      echo \"    type: topology\" >> oam/applications/application.yaml\n      echo \"    properties:\" >> oam/applications/application.yaml\n      echo \"      clusters: [\\\"$VCLUSTER_TARGET\\\"]\" >> oam/applications/application.yaml\n      echo \"      namespace: \\\"default\\\"\" >> oam/applications/application.yaml\n    fi\n  fi\nfi\n\necho \"\u2705 Updated OAM Application with topology policy:\"\ncat oam/applications/application.yaml\n\n# Create vCluster-specific manifests\necho \"\U0001F4C1 Creating vCluster-specific manifests for $VCLUSTER_TARGET...\"\n\n# Create ApplicationClaim for vCluster processing\ncat > vcluster/$VCLUSTER_TARGET/applications/$SERVICE_NAME/application-claim.yaml << EOF\napiVersion: platform.example.org/v1alpha1\n\
+                          kind: ApplicationClaim\nmetadata:\n  name: $SERVICE_NAME\n  namespace: default\n  annotations:\n    webservice.oam.dev/source: \"$BOOTSTRAP_SOURCE\"\n    webservice.oam.dev/processed-by: \"host-cluster-composition\"\nspec:\n  appContainer: $APP_CONTAINER\n  name: $SERVICE_NAME\n  language: $LANGUAGE\n  framework: $FRAMEWORK\n  database: $DATABASE\n  cache: $CACHE\nEOF\n\n# Create OAM Application for vCluster KubeVela processing\n# ALWAYS use default namespace for OAM Application (where WorkloadDefinitions exist)\n# The topology policy will handle deployment to the correct location\nOAM_NAMESPACE=\"default\"\n\n# Bug-B: image tag defaults to ${DEFAULT_IMAGE_TAG:-v1.0.0}.\n# WARN: bypasses image-source-policy when defaulted \u2014 callers\n# SHOULD set DEFAULT_IMAGE_TAG (or override via consumer OAM).\nIMAGE_TAG_DEFAULT=\"${DEFAULT_IMAGE_TAG:-v1.0.0}\"\ncat > vcluster/$VCLUSTER_TARGET/applications/$SERVICE_NAME/oam-application.yaml << EOF\napiVersion: core.oam.dev/v1beta1\nkind: Application\nmetadata:\n  name: $SERVICE_NAME-app\n  namespace: $OAM_NAMESPACE\nspec:\n  components:\n  - name: $SERVICE_NAME\n    type: webservice\n    properties:\n      image: \"${IMAGE_REGISTRY}/${IMAGE_PREFIX}$SERVICE_NAME:${IMAGE_TAG_DEFAULT}\"\n      port: 8080\n      healthPath: \"/health\"\n      language: $LANGUAGE\n      framework: $FRAMEWORK\n$(if [ \"$DATABASE\" != \"none\" ]; then\necho \"      database: $DATABASE\n      envFrom:\n      - secretRef:\n          name: \\\"${SERVICE_NAME}-db-secret\\\"\"\nfi)\n      environment:\n        LOG_LEVEL: \"INFO\"\n        AGENT_TYPE: \"$SERVICE_NAME\"\n  policies:\n  - name: deploy-to-vcluster\n    type: topology\n    properties:\n      clusters: [\"$VCLUSTER_TARGET\"]\n      namespace: \"default\"\nEOF\n\n# Create ArgoCD Application for this service\ncat > vcluster/$VCLUSTER_TARGET/applications/$SERVICE_NAME/argocd-app.yaml << EOF\napiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: $SERVICE_NAME\n  namespace: argocd\nspec:\n  project: default\n  source:\n    repoURL: https://github.com/$GITHUB_USER/$APP_CONTAINER-gitops\n    targetRevision: main\n    path: vcluster/$VCLUSTER_TARGET/applications/$SERVICE_NAME\n    directory:\n      include: '{application-claim.yaml,oam-application.yaml}'\n  destination:\n    server: https://kubernetes.default.svc\n    namespace: default\n  syncPolicy:\n    automated:\n      prune: true\n      selfHeal: true\nEOF\n\necho \"\u2705 Created vCluster-specific manifests in vcluster/$VCLUSTER_TARGET/applications/$SERVICE_NAME/\"\n\n# Commit and push changes\ngit add oam/applications/application.yaml\ngit add vcluster/$VCLUSTER_TARGET/applications/$SERVICE_NAME/\ngit commit -m \"Add $SERVICE_NAME webservice component to OAM Application (Target: $VCLUSTER_TARGET, Lang: $LANGUAGE, Framework: $FRAMEWORK, DB: $DATABASE, Cache: $CACHE)\"\n\ngit push\n\necho \"\U0001F389 Successfully updated OAM Application with $SERVICE_NAME webservice component\"\n"
+                        env:
+                        - name: SERVICE_NAME
+                          value: '{{ .observed.composite.resource.spec.name }}'
+                        - name: APP_CONTAINER
+                          value: '{{ .observed.composite.resource.spec.appContainer }}'
+                        - name: LANGUAGE
+                          value: '{{ .observed.composite.resource.spec.language }}'
+                        - name: FRAMEWORK
+                          value: '{{ .observed.composite.resource.spec.framework }}'
+                        - name: DATABASE
+                          value: '{{ .observed.composite.resource.spec.database }}'
+                        - name: CACHE
+                          value: '{{ .observed.composite.resource.spec.cache }}'
+                        - name: DEFAULT_REGISTRY
+                          value: acr
+                        - name: REALTIME_PLATFORM
+                          value: '{{ .observed.composite.resource.spec.realtime | default "" }}'
+                        - name: BOOTSTRAP_SOURCE
+                          value: '{{ dig "metadata" "annotations" "webservice.oam.dev/source" "" .observed.composite.resource }}'
+                        - name: CLAIM_NAMESPACE
+                          value: '{{ dig "spec" "claimRef" "namespace" "default" .observed.composite.resource }}'
+                        - name: GITHUB_TOKEN
+                          valueFrom:
+                            secretKeyRef:
+                              name: github-credentials
+                              key: token
+                        - name: GITHUB_USER
+                          valueFrom:
+                            secretKeyRef:
+                              name: github-credentials
+                              key: user
+            providerConfigRef:
+              name: kubernetes-provider
+          ---
+          apiVersion: kubernetes.crossplane.io/v1alpha2
+          kind: Object
+          metadata:
+            name: '{{ .observed.composite.resource.spec.name }}-chat-repo-creator'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: '{{ .observed.composite.resource.spec.name }}-chat-repo-creator-rn'
+            labels:
+              crossplane.io/enable: '{{ if eq .observed.composite.resource.spec.language "rasa" }}true{{ else }}false{{ end }}'
+              crossplane.io/chatbot-enable: '{{ if eq .observed.composite.resource.spec.framework "chatbot" }}true{{ else }}false{{ end }}'
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: batch/v1
+                kind: Job
+                metadata:
+                  name: '{{ .observed.composite.resource.spec.name }}-chat-repo-creator'
+                  namespace: default
+                spec:
+                  ttlSecondsAfterFinished: 600
+                  backoffLimit: 2
+                  template:
                     metadata:
-                      name: placeholder
-                      namespace: default
+                      annotations:
+                        sidecar.istio.io/inject: 'false'
                     spec:
-                      ttlSecondsAfterFinished: 600
-                      backoffLimit: 2
-                      template:
-                        metadata:
-                          annotations:
-                            sidecar.istio.io/inject: 'false'
-                        spec:
-                          serviceAccountName: crossplane-github-provider
-                          restartPolicy: OnFailure
-                          containers:
-                            - name: chat-repo-creator
-                              image: alpine:3.18
-                              command:
-                                - /bin/sh
-                                - -c
-                                - "set -euo pipefail\n\n# Check if this is a RASA chatbot service\nif [ \"$LANGUAGE\" != \"rasa\" ] || [ \"$FRAMEWORK\" != \"chatbot\" ]; then\n  echo \"\u274C Skipping chat\
-                                  \ repository creation - not a RASA chatbot service\"\n  echo \"   Language: $LANGUAGE (expected: rasa)\"  \n  echo \"   Framework: $FRAMEWORK (expected: chatbot)\"\n  echo\
-                                  \ \"\u2705 Chat repository creation skipped successfully\"\n  exit 0\nfi\n\n# Install git, curl, and jq\napk add --no-cache git curl jq\necho \"Adding Rasa chatbot microservice\
-                                  \ $SERVICE_NAME to unified repository $APP_CONTAINER...\"\n\n# Clone unified AppContainer repository\nTEMP_DIR=\"/tmp/unified-repo-$SERVICE_NAME\"\nmkdir -p $TEMP_DIR\n\
-                                  cd $TEMP_DIR\n\n# First check if AppContainer repository exists\nREPO_EXISTS=$(curl -s -H \"Authorization: token $GITHUB_TOKEN\" \\\n  https://api.github.com/repos/$GITHUB_USER/$APP_CONTAINER\
-                                  \ | jq -r '.name // \"null\"')\n\nif [ \"$REPO_EXISTS\" = \"null\" ]; then\n  echo \"\u274C AppContainer repository $APP_CONTAINER does not exist yet\"\n  echo \"\u23F3\
-                                  \ Waiting for AppContainer to be created by other jobs...\"\n  exit 1\nfi\n\necho \"\u2705 AppContainer repository exists, cloning...\"\ngit clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/$APP_CONTAINER.git\
-                                  \ .\n\n# Check if microservice already exists\nif [ -d \"microservices/$SERVICE_NAME\" ]; then\n  echo \"\u26A0\uFE0F  Microservice $SERVICE_NAME already exists in $APP_CONTAINER\"\
-                                  \n  echo \"\U0001F504 Updating existing microservice...\"\nelse\n  echo \"\u2795 Adding new microservice $SERVICE_NAME to $APP_CONTAINER\"\n  \n  # Clone chat-template\
-                                  \ to get the template\n  TEMPLATE_DIR=\"/tmp/chat-template\"\n  git clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/chat-template.git $TEMPLATE_DIR\n  \n  # Copy template\
-                                  \ microservice structure\n  mkdir -p microservices/$SERVICE_NAME\n  cp -r $TEMPLATE_DIR/microservices/chat-template/* microservices/$SERVICE_NAME/\n  \n  # Add chat-specific\
-                                  \ GitHub Actions workflow if not exists\n  if [ ! -f \".github/workflows/chat-gitops.yml\" ]; then\n    cp $TEMPLATE_DIR/.github/workflows/chat-gitops.yml .github/workflows/\n\
-                                  \  fi\n  \n  rm -rf $TEMPLATE_DIR\nfi\n\n# Customize for the specific service\nsed -i \"s/chat-template/$SERVICE_NAME/g\" microservices/$SERVICE_NAME/docker-compose.yml\n\
-                                  sed -i \"s/Development Bot/$SERVICE_NAME Bot/g\" microservices/$SERVICE_NAME/docker-compose.yml\nsed -i \"s/Customer Support Bot/$SERVICE_NAME Support Bot/g\" microservices/$SERVICE_NAME/domain.yml\n\
-                                  \n# Update OAM files with correct service name\nfind microservices/$SERVICE_NAME/oam/ -name \"*.yaml\" -exec sed -i \"s/chat-template/$SERVICE_NAME/g\" {} \\;\n\n# Set\
-                                  \ git configuration\ngit config user.name \"Crossplane Bot\"\ngit config user.email \"crossplane@health-service-idp.local\"\n\n# Add and commit changes to unified repository\n\
-                                  git add microservices/$SERVICE_NAME/\nif [ -f \".github/workflows/chat-gitops.yml\" ]; then\n  git add .github/workflows/chat-gitops.yml\nfi\n\n# Check if there are changes\
-                                  \ to commit\nif git diff --staged --quiet; then\n  echo \"\u26A0\uFE0F  No changes to commit for $SERVICE_NAME\"\nelse\n  git commit -m \"feat: add RASA chatbot microservice\
-                                  \ $SERVICE_NAME\" -m \"- Add complete RASA chatbot implementation with dual-container pattern\" -m \"- Include Rasa server and Actions server configurations\" -m \"- Add\
-                                  \ chat-specific GitHub Actions workflow for Docker builds\" -m \"- Support for natural language understanding and custom actions\" -m \"- Ready for OAM deployment with\
-                                  \ knative services\" -m \"\U0001F916 Generated with [Claude Code](https://claude.ai/code)\" -m \"Co-Authored-By: Claude <noreply@anthropic.com>\"\n  \n  git push origin\
-                                  \ main\n  echo \"\u2705 RASA chatbot microservice $SERVICE_NAME added to unified repository $APP_CONTAINER\"\nfi\n"
-                              env:
-                                - name: SERVICE_NAME
-                                  value: placeholder
-                                - name: LANGUAGE
-                                  value: placeholder
-                                - name: FRAMEWORK
-                                  value: placeholder
-                                - name: APP_CONTAINER
-                                  value: placeholder
-                                - name: GITHUB_TOKEN
-                                  valueFrom:
-                                    secretKeyRef:
-                                      name: github-credentials
-                                      key: token
-                                - name: GITHUB_USER
-                                  valueFrom:
-                                    secretKeyRef:
-                                      name: github-credentials
-                                      key: user
-                providerConfigRef:
-                  name: kubernetes-provider
-            patches:
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.name
-                toFieldPath: spec.forProvider.manifest.metadata.name
-                transforms:
-                  - type: string
-                    string:
-                      fmt: '%s-chat-repo-creator'
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.name
-                toFieldPath: metadata.name
-                transforms:
-                  - type: string
-                    string:
-                      fmt: '%s-chat-repo-creator'
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.name
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[0].value
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.language
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[1].value
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.framework
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[2].value
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.appContainer
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[3].value
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.language
-                toFieldPath: metadata.labels["crossplane.io/enable"]
-                transforms:
-                  - type: map
-                    map:
-                      rasa: 'true'
-                      python: 'false'
-                      java: 'false'
-                      nodejs: 'false'
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.framework
-                toFieldPath: metadata.labels["crossplane.io/chatbot-enable"]
-                transforms:
-                  - type: map
-                    map:
-                      chatbot: 'true'
-                      fastapi: 'false'
-                      springboot: 'false'
-                      graphql-gateway: 'false'
-          - name: repository-status-sync
-            base:
-              apiVersion: kubernetes.crossplane.io/v1alpha1
-              kind: Object
-              spec:
-                forProvider:
-                  manifest:
-                    apiVersion: batch/v1
-                    kind: Job
+                      serviceAccountName: crossplane-github-provider
+                      restartPolicy: OnFailure
+                      containers:
+                      - name: chat-repo-creator
+                        image: alpine:3.18
+                        command:
+                        - /bin/sh
+                        - -c
+                        - "set -euo pipefail\n\n# Check if this is a RASA chatbot service\nif [ \"$LANGUAGE\" != \"rasa\" ] || [ \"$FRAMEWORK\" != \"chatbot\" ]; then\n  echo \"\u274C Skipping chat repository creation - not a RASA chatbot service\"\n  echo \"   Language: $LANGUAGE (expected: rasa)\"  \n  echo \"   Framework: $FRAMEWORK (expected: chatbot)\"\n  echo \"\u2705 Chat repository creation skipped successfully\"\n  exit 0\nfi\n\n# Install git, curl, and jq\napk add --no-cache git curl jq\necho \"Adding Rasa chatbot microservice $SERVICE_NAME to unified repository $APP_CONTAINER...\"\n\n# Clone unified AppContainer repository\nTEMP_DIR=\"/tmp/unified-repo-$SERVICE_NAME\"\nmkdir -p $TEMP_DIR\ncd $TEMP_DIR\n\n# First check if AppContainer repository exists\nREPO_EXISTS=$(curl -s -H \"Authorization: token $GITHUB_TOKEN\" \\\n  https://api.github.com/repos/$GITHUB_USER/$APP_CONTAINER | jq -r '.name // \"null\"')\n\nif [ \"$REPO_EXISTS\" = \"null\" ]; then\n  echo \"\u274C AppContainer repository $APP_CONTAINER does not exist yet\"\n  echo \"\u23F3 Waiting for AppContainer to be created by other jobs...\"\n  exit 1\nfi\n\necho \"\u2705 AppContainer repository exists, cloning...\"\ngit clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/$APP_CONTAINER.git .\n\n# Check if microservice already exists\nif [ -d \"microservices/$SERVICE_NAME\" ]; then\n  echo \"\u26A0\uFE0F  Microservice $SERVICE_NAME already exists in $APP_CONTAINER\"\n  echo \"\U0001F504 Updating existing microservice...\"\nelse\n  echo \"\u2795 Adding new microservice $SERVICE_NAME to $APP_CONTAINER\"\n  \n  # Clone chat-template to get the template\n  TEMPLATE_DIR=\"/tmp/chat-template\"\n  git clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/chat-template.git $TEMPLATE_DIR\n  \n  # Copy template microservice structure\n  mkdir -p microservices/$SERVICE_NAME\n  cp -r $TEMPLATE_DIR/microservices/chat-template/* microservices/$SERVICE_NAME/\n  \n  # Add chat-specific GitHub Actions workflow if not exists\n  if [ ! -f \".github/workflows/chat-gitops.yml\" ]; then\n    cp $TEMPLATE_DIR/.github/workflows/chat-gitops.yml .github/workflows/\n  fi\n  \n  rm -rf $TEMPLATE_DIR\nfi\n\n# Customize for the specific service\nsed -i \"s/chat-template/$SERVICE_NAME/g\" microservices/$SERVICE_NAME/docker-compose.yml\nsed -i \"s/Development Bot/$SERVICE_NAME Bot/g\" microservices/$SERVICE_NAME/docker-compose.yml\nsed -i \"s/Customer Support Bot/$SERVICE_NAME Support Bot/g\" microservices/$SERVICE_NAME/domain.yml\n\n# Update OAM files with correct service name\nfind microservices/$SERVICE_NAME/oam/ -name \"*.yaml\" -exec sed -i \"s/chat-template/$SERVICE_NAME/g\" {} \\;\n\n# Set git configuration\ngit config user.name \"Crossplane Bot\"\ngit config user.email \"crossplane@health-service-idp.local\"\n\n# Add and commit changes to unified repository\ngit add microservices/$SERVICE_NAME/\nif [ -f \".github/workflows/chat-gitops.yml\" ]; then\n  git add .github/workflows/chat-gitops.yml\nfi\n\n# Check if there are changes to commit\nif git diff --staged --quiet; then\n  echo \"\u26A0\uFE0F  No changes to commit for $SERVICE_NAME\"\nelse\n  git commit -m \"feat: add RASA chatbot microservice $SERVICE_NAME\" -m \"- Add complete RASA chatbot implementation with dual-container pattern\" -m \"- Include Rasa server and Actions server configurations\" -m \"- Add chat-specific GitHub Actions workflow for Docker builds\" -m \"- Support for natural language understanding and custom actions\" -m \"- Ready for OAM deployment with knative services\" -m \"\U0001F916 Generated with [Claude Code](https://claude.ai/code)\" -m \"Co-Authored-By: Claude <noreply@anthropic.com>\"\n  \n  git push origin main\n  echo \"\u2705 RASA chatbot microservice $SERVICE_NAME added to unified repository $APP_CONTAINER\"\nfi\n"
+                        env:
+                        - name: SERVICE_NAME
+                          value: '{{ .observed.composite.resource.spec.name }}'
+                        - name: LANGUAGE
+                          value: '{{ .observed.composite.resource.spec.language }}'
+                        - name: FRAMEWORK
+                          value: '{{ .observed.composite.resource.spec.framework }}'
+                        - name: APP_CONTAINER
+                          value: '{{ .observed.composite.resource.spec.appContainer }}'
+                        - name: GITHUB_TOKEN
+                          valueFrom:
+                            secretKeyRef:
+                              name: github-credentials
+                              key: token
+                        - name: GITHUB_USER
+                          valueFrom:
+                            secretKeyRef:
+                              name: github-credentials
+                              key: user
+            providerConfigRef:
+              name: kubernetes-provider
+          ---
+          apiVersion: kubernetes.crossplane.io/v1alpha2
+          kind: Object
+          metadata:
+            name: '{{ .observed.composite.resource.spec.name }}-repo-sync'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: '{{ .observed.composite.resource.spec.name }}-repo-sync-rn'
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: batch/v1
+                kind: Job
+                metadata:
+                  name: '{{ .observed.composite.resource.spec.name }}-repo-sync'
+                  namespace: '{{ .observed.composite.resource.metadata.namespace | default "default" }}'
+                spec:
+                  ttlSecondsAfterFinished: 600
+                  backoffLimit: 2
+                  template:
                     metadata:
-                      name: placeholder
-                      namespace: default
+                      annotations:
+                        sidecar.istio.io/inject: 'false'
                     spec:
-                      ttlSecondsAfterFinished: 600
-                      backoffLimit: 2
-                      template:
-                        metadata:
-                          annotations:
-                            sidecar.istio.io/inject: 'false'
-                        spec:
-                          serviceAccountName: crossplane-github-provider
-                          restartPolicy: OnFailure
-                          containers:
-                            - name: repository-sync
-                              image: alpine/k8s:1.28.4
-                              command:
-                                - /bin/sh
-                                - -c
-                                - "set -euo pipefail\necho \"\U0001F504 Synchronizing repository status from AppContainerClaim...\"\n\n# Wait for AppContainerClaim to be ready and get repository URL\nAPP_CONTAINER=\"\
-                                  $APP_CONTAINER_NAME\"\nSERVICE_NAME=\"$SERVICE_NAME\"\nNAMESPACE=\"$NAMESPACE\"\n\necho \"Waiting for AppContainerClaim $APP_CONTAINER to be ready...\"\n\nTIMEOUT=300\n\
-                                  ELAPSED=0\n\nwhile [ $ELAPSED -lt $TIMEOUT ]; do\n  # Check if AppContainerClaim exists and get repository URL\n  REPO_URL=$(kubectl get appcontainerclaim \"$APP_CONTAINER\"\
-                                  \ -n \"$NAMESPACE\" -o jsonpath='{.status.sourceRepository.url}' 2>/dev/null || echo \"\")\n  CLONE_URL=$(kubectl get appcontainerclaim \"$APP_CONTAINER\" -n \"$NAMESPACE\"\
-                                  \ -o jsonpath='{.status.sourceRepository.cloneUrl}' 2>/dev/null || echo \"\")\n  \n  if [ -n \"$REPO_URL\" ]; then\n    echo \"\u2705 Found repository URL: $REPO_URL\"\n\
-                                  \    echo \"\u2705 Found clone URL: $CLONE_URL\"\n    \n    # Find associated Knative service\n    KNATIVE_SERVICE=\"\"\n    if kubectl get ksvc \"$SERVICE_NAME\" -n \"\
-                                  $NAMESPACE\" >/dev/null 2>&1; then\n      KNATIVE_SERVICE=\"$SERVICE_NAME\"\n    elif kubectl get ksvc \"${SERVICE_NAME}-realtime-service\" -n \"$NAMESPACE\" >/dev/null\
-                                  \ 2>&1; then\n      KNATIVE_SERVICE=\"${SERVICE_NAME}-realtime-service\"\n    elif kubectl get ksvc \"${SERVICE_NAME}-service\" -n \"$NAMESPACE\" >/dev/null 2>&1; then\n\
-                                  \      KNATIVE_SERVICE=\"${SERVICE_NAME}-service\"\n    fi\n    \n    echo \"Found Knative Service: $KNATIVE_SERVICE\"\n    \n    # Update ApplicationClaim status\n   \
-                                  \ kubectl patch applicationclaim \"$SERVICE_NAME\" -n \"$NAMESPACE\" --type=merge --subresource=status -p \"{\n      \\\"status\\\": {\n        \\\"repository\\\": {\n\
-                                  \          \\\"url\\\": \\\"$REPO_URL\\\",\n          \\\"cloneUrl\\\": \\\"$CLONE_URL\\\"\n        },\n        \\\"application\\\": {\n          \\\"knativeService\\\"\
-                                  : \\\"$KNATIVE_SERVICE\\\"\n        }\n      }\n    }\"\n    \n    echo \"\u2705 ApplicationClaim status synchronized from AppContainerClaim\"\n    exit 0\n  fi\n  \n \
-                                  \ echo \"Waiting for AppContainerClaim repository status... (${ELAPSED}s/${TIMEOUT}s)\"\n  sleep 10\n  ELAPSED=$((ELAPSED + 10))\ndone\n\necho \"\u274C Timeout waiting\
-                                  \ for AppContainerClaim repository status\"\nexit 1\n"
-                              env:
-                                - name: SERVICE_NAME
-                                  value: placeholder
-                                - name: APP_CONTAINER_NAME
-                                  value: placeholder
-                                - name: NAMESPACE
-                                  value: placeholder
-                providerConfigRef:
-                  name: kubernetes-provider
-            patches:
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.name
-                toFieldPath: spec.forProvider.manifest.metadata.name
-                transforms:
-                  - type: string
-                    string:
-                      fmt: '%s-repo-sync'
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.name
-                toFieldPath: metadata.name
-                transforms:
-                  - type: string
-                    string:
-                      fmt: '%s-repo-sync'
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.name
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[0].value
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.appContainer
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[1].value
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.namespace
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[2].value
-              - type: FromCompositeFieldPath
-                fromFieldPath: metadata.namespace
-                toFieldPath: spec.forProvider.manifest.metadata.namespace
-          - name: argocd-app-setup
-            base:
-              apiVersion: kubernetes.crossplane.io/v1alpha1
-              kind: Object
-              spec:
-                forProvider:
-                  manifest:
-                    apiVersion: batch/v1
-                    kind: Job
+                      serviceAccountName: crossplane-github-provider
+                      restartPolicy: OnFailure
+                      containers:
+                      - name: repository-sync
+                        image: alpine/k8s:1.28.4
+                        command:
+                        - /bin/sh
+                        - -c
+                        - "set -euo pipefail\necho \"\U0001F504 Synchronizing repository status from AppContainerClaim...\"\n\n# Wait for AppContainerClaim to be ready and get repository URL\nAPP_CONTAINER=\"$APP_CONTAINER_NAME\"\nSERVICE_NAME=\"$SERVICE_NAME\"\nNAMESPACE=\"$NAMESPACE\"\n\necho \"Waiting for AppContainerClaim $APP_CONTAINER to be ready...\"\n\nTIMEOUT=300\nELAPSED=0\n\nwhile [ $ELAPSED -lt $TIMEOUT ]; do\n  # Check if AppContainerClaim exists and get repository URL\n  REPO_URL=$(kubectl get appcontainerclaim \"$APP_CONTAINER\" -n \"$NAMESPACE\" -o jsonpath='{.status.sourceRepository.url}' 2>/dev/null || echo \"\")\n  CLONE_URL=$(kubectl get appcontainerclaim \"$APP_CONTAINER\" -n \"$NAMESPACE\" -o jsonpath='{.status.sourceRepository.cloneUrl}' 2>/dev/null || echo \"\")\n  \n  if [ -n \"$REPO_URL\" ]; then\n    echo \"\u2705 Found repository URL: $REPO_URL\"\n    echo \"\u2705 Found clone URL: $CLONE_URL\"\n    \n    # Find associated Knative service\n    KNATIVE_SERVICE=\"\"\n    if kubectl get ksvc \"$SERVICE_NAME\" -n \"$NAMESPACE\" >/dev/null 2>&1; then\n      KNATIVE_SERVICE=\"$SERVICE_NAME\"\n    elif kubectl get ksvc \"${SERVICE_NAME}-realtime-service\" -n \"$NAMESPACE\" >/dev/null 2>&1; then\n      KNATIVE_SERVICE=\"${SERVICE_NAME}-realtime-service\"\n    elif kubectl get ksvc \"${SERVICE_NAME}-service\" -n \"$NAMESPACE\" >/dev/null 2>&1; then\n      KNATIVE_SERVICE=\"${SERVICE_NAME}-service\"\n    fi\n    \n    echo \"Found Knative Service: $KNATIVE_SERVICE\"\n    \n    # Update ApplicationClaim status\n    kubectl patch applicationclaim \"$SERVICE_NAME\" -n \"$NAMESPACE\" --type=merge --subresource=status -p \"{\n      \\\"status\\\": {\n        \\\"repository\\\": {\n          \\\"url\\\": \\\"$REPO_URL\\\",\n          \\\"cloneUrl\\\": \\\"$CLONE_URL\\\"\n        },\n        \\\"application\\\": {\n          \\\"knativeService\\\": \\\"$KNATIVE_SERVICE\\\"\n        }\n      }\n    }\"\n    \n    echo \"\u2705 ApplicationClaim status synchronized from AppContainerClaim\"\n    exit 0\n  fi\n  \n  echo \"Waiting for AppContainerClaim repository status... (${ELAPSED}s/${TIMEOUT}s)\"\n  sleep 10\n  ELAPSED=$((ELAPSED + 10))\ndone\n\necho \"\u274C Timeout waiting for AppContainerClaim repository status\"\nexit 1\n"
+                        env:
+                        - name: SERVICE_NAME
+                          value: '{{ .observed.composite.resource.spec.name }}'
+                        - name: APP_CONTAINER_NAME
+                          value: '{{ .observed.composite.resource.spec.appContainer }}'
+                        - name: NAMESPACE
+                          value: '{{ .observed.composite.resource.spec.namespace | default "default" }}'
+            providerConfigRef:
+              name: kubernetes-provider
+          ---
+          apiVersion: kubernetes.crossplane.io/v1alpha2
+          kind: Object
+          metadata:
+            name: '{{ .observed.composite.resource.spec.name }}-argocd-setup'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: '{{ .observed.composite.resource.spec.name }}-argocd-setup-rn'
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: batch/v1
+                kind: Job
+                metadata:
+                  name: '{{ .observed.composite.resource.spec.name }}-argocd-setup'
+                  namespace: default
+                spec:
+                  ttlSecondsAfterFinished: 600
+                  backoffLimit: 2
+                  template:
                     metadata:
-                      name: placeholder
-                      namespace: default
+                      annotations:
+                        sidecar.istio.io/inject: 'false'
                     spec:
-                      ttlSecondsAfterFinished: 600
-                      backoffLimit: 2
-                      template:
-                        metadata:
-                          annotations:
-                            sidecar.istio.io/inject: 'false'
-                        spec:
-                          serviceAccountName: crossplane-github-provider
-                          restartPolicy: OnFailure
-                          containers:
-                            - name: argocd-setup
-                              image: alpine/k8s:1.28.4
-                              command:
-                                - /bin/sh
-                                - -c
-                                - "set -euo pipefail\necho \"\U0001F527 Setting up ArgoCD for $SERVICE_NAME...\"\n\n# Wait for GitOps repo to be ready\nsleep 30\n\n# Direct kubectl approach (simpler for\
-                                  \ in-cluster)\necho \"\U0001F4DD Creating ArgoCD Application via kubectl...\"\n\n# Add repository secret for authentication\necho \"\U0001F511 Creating repository secret...\"\
-                                  \ncat <<EOFS | kubectl apply -f -\napiVersion: v1\nkind: Secret\nmetadata:\n  name: repo-$APP_CONTAINER-gitops\n  namespace: argocd\n  labels:\n    argocd.argoproj.io/secret-type:\
-                                  \ repository\ntype: Opaque\nstringData:\n  type: git\n  url: https://github.com/$GITHUB_USER/$APP_CONTAINER-gitops\n  username: $GITHUB_USER\n  password: $GITHUB_TOKEN\n\
-                                  EOFS\n\necho \"\u2705 Repository secret created\"\n\n# Determine target vCluster\nif [ -n \"$TARGET_VCLUSTER\" ] && [ \"$TARGET_VCLUSTER\" != \"\" ]; then\n  echo \"\U0001F3AF\
-                                  \ Deploying to vCluster: $TARGET_VCLUSTER\"\n  # For vCluster deployments, we need to register the vCluster first\n  # The actual application will be applied to the vCluster\
-                                  \ once registered\n  DEST_SERVER=\"https://kubernetes.default.svc\"\n  # Use apps directory which contains the App of Apps pattern\n  APP_PATH=\"apps\"\nelse\n  echo \"\
-                                  \U0001F3AF Deploying to default cluster\"\n  DEST_SERVER=\"https://kubernetes.default.svc\"\n  APP_PATH=\"apps\"\nfi\n\n# Create ArgoCD Application\ncat <<EOFA | kubectl\
-                                  \ apply -f -\napiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: $SERVICE_NAME-app\n  namespace: argocd\n  finalizers:\n    - resources-finalizer.argocd.argoproj.io\n\
-                                  spec:\n  project: default\n  source:\n    repoURL: https://github.com/$GITHUB_USER/$APP_CONTAINER-gitops\n    targetRevision: main\n    path: $APP_PATH\n  destination:\n\
-                                  \    server: $DEST_SERVER\n    namespace: default\n  syncPolicy:\n    automated:\n      prune: true\n      selfHeal: true\n    syncOptions:\n      - CreateNamespace=true\n\
-                                  EOFA\n\necho \"\u2705 ArgoCD Application created\"\n\n# Trigger initial sync\necho \"\U0001F504 Triggering initial sync...\"\nkubectl patch application $SERVICE_NAME-app\
-                                  \ -n argocd --type merge -p '{\"operation\":{\"sync\":{\"revision\":\"HEAD\"}}}' || echo \"Sync triggered\"\n\necho \"\U0001F389 ArgoCD setup completed for $SERVICE_NAME\"\
-                                  \necho \"\U0001F4CA Application will be synced to namespace: default\"\necho \"\U0001F517 Repository: https://github.com/$GITHUB_USER/$APP_CONTAINER-gitops\"\n"
-                              env:
-                                - name: SERVICE_NAME
-                                  value: placeholder
-                                - name: APP_CONTAINER
-                                  value: placeholder
-                                - name: TARGET_VCLUSTER
-                                  value: placeholder
-                                - name: GITHUB_TOKEN
-                                  valueFrom:
-                                    secretKeyRef:
-                                      name: github-credentials
-                                      key: token
-                                - name: GITHUB_USER
-                                  valueFrom:
-                                    secretKeyRef:
-                                      name: github-credentials
-                                      key: user
-                providerConfigRef:
-                  name: kubernetes-provider
-            patches:
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.name
-                toFieldPath: spec.forProvider.manifest.metadata.name
-                transforms:
-                  - type: string
-                    string:
-                      fmt: '%s-argocd-setup'
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.name
-                toFieldPath: metadata.name
-                transforms:
-                  - type: string
-                    string:
-                      fmt: '%s-argocd-setup'
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.name
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[0].value
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.appContainer
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[1].value
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.targetVCluster
-                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[2].value
+                      serviceAccountName: crossplane-github-provider
+                      restartPolicy: OnFailure
+                      containers:
+                      - name: argocd-setup
+                        image: alpine/k8s:1.28.4
+                        command:
+                        - /bin/sh
+                        - -c
+                        - "set -euo pipefail\necho \"\U0001F527 Setting up ArgoCD for $SERVICE_NAME...\"\n\n# Wait for GitOps repo to be ready\nsleep 30\n\n# Direct kubectl approach (simpler for in-cluster)\necho \"\U0001F4DD Creating ArgoCD Application via kubectl...\"\n\n# Add repository secret for authentication\necho \"\U0001F511 Creating repository secret...\"\ncat <<EOFS | kubectl apply -f -\napiVersion: v1\nkind: Secret\nmetadata:\n  name: repo-$APP_CONTAINER-gitops\n  namespace: argocd\n  labels:\n    argocd.argoproj.io/secret-type: repository\ntype: Opaque\nstringData:\n  type: git\n  url: https://github.com/$GITHUB_USER/$APP_CONTAINER-gitops\n  username: $GITHUB_USER\n  password: $GITHUB_TOKEN\nEOFS\n\necho \"\u2705 Repository secret created\"\n\n# Determine target vCluster\nif [ -n \"$TARGET_VCLUSTER\" ] && [ \"$TARGET_VCLUSTER\" != \"\" ]; then\n  echo \"\U0001F3AF Deploying to vCluster: $TARGET_VCLUSTER\"\n  # For vCluster deployments, we need to register the vCluster first\n  # The actual application will be applied to the vCluster once registered\n  DEST_SERVER=\"https://kubernetes.default.svc\"\n  # Use apps directory which contains the App of Apps pattern\n  APP_PATH=\"apps\"\nelse\n  echo \"\U0001F3AF Deploying to default cluster\"\n  DEST_SERVER=\"https://kubernetes.default.svc\"\n  APP_PATH=\"apps\"\nfi\n\n# Create ArgoCD Application\ncat <<EOFA | kubectl apply -f -\napiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: $SERVICE_NAME-app\n  namespace: argocd\n  finalizers:\n    - resources-finalizer.argocd.argoproj.io\nspec:\n  project: default\n  source:\n    repoURL: https://github.com/$GITHUB_USER/$APP_CONTAINER-gitops\n    targetRevision: main\n    path: $APP_PATH\n  destination:\n    server: $DEST_SERVER\n    namespace: default\n  syncPolicy:\n    automated:\n      prune: true\n      selfHeal: true\n    syncOptions:\n      - CreateNamespace=true\nEOFA\n\necho \"\u2705 ArgoCD Application created\"\n\n# Trigger initial sync\necho \"\U0001F504 Triggering initial sync...\"\nkubectl patch application $SERVICE_NAME-app -n argocd --type merge -p '{\"operation\":{\"sync\":{\"revision\":\"HEAD\"}}}' || echo \"Sync triggered\"\n\necho \"\U0001F389 ArgoCD setup completed for $SERVICE_NAME\"\necho \"\U0001F4CA Application will be synced to namespace: default\"\necho \"\U0001F517 Repository: https://github.com/$GITHUB_USER/$APP_CONTAINER-gitops\"\n"
+                        env:
+                        - name: SERVICE_NAME
+                          value: '{{ .observed.composite.resource.spec.name }}'
+                        - name: APP_CONTAINER
+                          value: '{{ .observed.composite.resource.spec.appContainer }}'
+                        - name: TARGET_VCLUSTER
+                          value: '{{ .observed.composite.resource.spec.targetVCluster | default "" }}'
+                        - name: GITHUB_TOKEN
+                          valueFrom:
+                            secretKeyRef:
+                              name: github-credentials
+                              key: token
+                        - name: GITHUB_USER
+                          valueFrom:
+                            secretKeyRef:
+                              name: github-credentials
+                              key: user
+            providerConfigRef:
+              name: kubernetes-provider
