@@ -17,13 +17,13 @@ kind: Composition
 metadata:
   name: application-claim-composition
   labels:
-    crossplane.io/xrd: xapplicationclaims.platform.example.org
+    crossplane.io/xrd: applicationclaims.platform.example.org
     provider: github-kubernetes-helm
 spec:
   writeConnectionSecretsToNamespace: crossplane-system
   compositeTypeRef:
     apiVersion: platform.example.org/v1alpha1
-    kind: XApplicationClaim
+    kind: ApplicationClaim
   mode: Pipeline
   pipeline:
   - step: render
@@ -35,10 +35,11 @@ spec:
       source: Inline
       inline:
         template: |
-          apiVersion: kubernetes.crossplane.io/v1alpha2
+          apiVersion: kubernetes.m.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ .observed.composite.resource.spec.name }}-microservice-creator'
+            namespace: '{{ .observed.composite.resource.metadata.namespace | default "default" }}'
             annotations:
               gotemplating.fn.crossplane.io/composition-resource-name: '{{ .observed.composite.resource.spec.name }}-microservice-creator-rn'
           spec:
@@ -96,12 +97,14 @@ spec:
                               name: docker-credentials
                               key: username
             providerConfigRef:
+              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.crossplane.io/v1alpha2
+          apiVersion: kubernetes.m.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ .observed.composite.resource.spec.name }}-gitops-creator'
+            namespace: '{{ .observed.composite.resource.metadata.namespace | default "default" }}'
             annotations:
               gotemplating.fn.crossplane.io/composition-resource-name: '{{ .observed.composite.resource.spec.name }}-gitops-creator-rn'
           spec:
@@ -159,12 +162,14 @@ spec:
                               name: docker-credentials
                               key: username
             providerConfigRef:
+              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.crossplane.io/v1alpha2
+          apiVersion: kubernetes.m.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ .observed.composite.resource.spec.name }}-register-argocd'
+            namespace: '{{ .observed.composite.resource.metadata.namespace | default "default" }}'
             annotations:
               gotemplating.fn.crossplane.io/composition-resource-name: '{{ .observed.composite.resource.spec.name }}-register-argocd-rn'
           spec:
@@ -200,6 +205,7 @@ spec:
                         - name: APP_NAME
                           value: '{{ .observed.composite.resource.spec.name }}'
             providerConfigRef:
+              kind: ClusterProviderConfig
               name: kubernetes-provider
             # v1alpha2 Object supports the plural list (storage version, no
             # conversion webhook involved — see provider-kubernetes-conversion
@@ -209,10 +215,11 @@ spec:
             - Observe
             - Delete
           ---
-          apiVersion: kubernetes.crossplane.io/v1alpha2
+          apiVersion: kubernetes.m.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ .observed.composite.resource.spec.name }}-oam-updater'
+            namespace: '{{ .observed.composite.resource.metadata.namespace | default "default" }}'
             annotations:
               gotemplating.fn.crossplane.io/composition-resource-name: '{{ .observed.composite.resource.spec.name }}-oam-updater-rn'
           spec:
@@ -261,7 +268,7 @@ spec:
                         - name: BOOTSTRAP_SOURCE
                           value: '{{ dig "metadata" "annotations" "webservice.oam.dev/source" "" .observed.composite.resource }}'
                         - name: CLAIM_NAMESPACE
-                          value: '{{ dig "spec" "claimRef" "namespace" "default" .observed.composite.resource }}'
+                          value: '{{ dig "metadata" "namespace" "default" .observed.composite.resource }}'
                         - name: GITHUB_TOKEN
                           valueFrom:
                             secretKeyRef:
@@ -273,12 +280,14 @@ spec:
                               name: github-credentials
                               key: user
             providerConfigRef:
+              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.crossplane.io/v1alpha2
+          apiVersion: kubernetes.m.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ .observed.composite.resource.spec.name }}-chat-repo-creator'
+            namespace: '{{ .observed.composite.resource.metadata.namespace | default "default" }}'
             annotations:
               gotemplating.fn.crossplane.io/composition-resource-name: '{{ .observed.composite.resource.spec.name }}-chat-repo-creator-rn'
             labels:
@@ -329,12 +338,14 @@ spec:
                               name: github-credentials
                               key: user
             providerConfigRef:
+              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.crossplane.io/v1alpha2
+          apiVersion: kubernetes.m.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ .observed.composite.resource.spec.name }}-repo-sync'
+            namespace: '{{ .observed.composite.resource.metadata.namespace | default "default" }}'
             annotations:
               gotemplating.fn.crossplane.io/composition-resource-name: '{{ .observed.composite.resource.spec.name }}-repo-sync-rn'
           spec:
@@ -370,12 +381,14 @@ spec:
                         - name: NAMESPACE
                           value: '{{ .observed.composite.resource.spec.namespace | default "default" }}'
             providerConfigRef:
+              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.crossplane.io/v1alpha2
+          apiVersion: kubernetes.m.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ .observed.composite.resource.spec.name }}-argocd-setup'
+            namespace: '{{ .observed.composite.resource.metadata.namespace | default "default" }}'
             annotations:
               gotemplating.fn.crossplane.io/composition-resource-name: '{{ .observed.composite.resource.spec.name }}-argocd-setup-rn'
           spec:
@@ -421,4 +434,5 @@ spec:
                               name: github-credentials
                               key: user
             providerConfigRef:
+              kind: ClusterProviderConfig
               name: kubernetes-provider

@@ -24,4 +24,4 @@ kind: Provider
 metadata:
   name: provider-kubernetes
 spec:
-  package: xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v0.10.0
+  package: xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v1.2.1

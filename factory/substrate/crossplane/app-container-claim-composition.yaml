@@ -3,13 +3,13 @@ kind: Composition
 metadata:
   name: app-container-claim-composition
   labels:
-    crossplane.io/xrd: xappcontainerclaims.platform.example.org
+    crossplane.io/xrd: appcontainerclaims.platform.example.org
     provider: github-kubernetes-helm
 spec:
   writeConnectionSecretsToNamespace: crossplane-system
   compositeTypeRef:
     apiVersion: platform.example.org/v1alpha1
-    kind: XAppContainerClaim
+    kind: AppContainerClaim
   resources:
   
   # Create Source Repository (microservices container)
