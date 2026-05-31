@@ -48,6 +48,8 @@ warn "    - Argo Events (helm release + ns)"
 warn "    - Argo Workflows (helm release + CRDs + ns)"
 warn "    - ArgoCD (helm release + CRDs + ns)"
 warn "    - Knative Serving (net-istio, serving-core, serving-crds + ns)"
+warn "    - legacy cluster-scoped resources (ArgoCD/ArgoEvents ClusterRoles/Bindings"
+warn "      + KubeVela/ArgoEvents CRDs left over from pre-Helm kubectl-apply installs)"
 warn "  Istio is NOT removed by default."
 warn "═══════════════════════════════════════════════════════════════════════"
 if [[ "$KEEP_DATA" == "true" ]]; then
@@ -501,6 +503,73 @@ maybe_uninstall_istio() {
     ok "istio removed"
 }
 
+# ────────────────────────────────────────────────────────────────────────────
+# Phase 12 — Legacy cluster-scoped leftovers (pre-Helm kubectl-apply installs)
+# ────────────────────────────────────────────────────────────────────────────
+# Some controllers (ArgoCD, Argo Events, KubeVela) were originally installed
+# via `kubectl apply -f <url>` BEFORE we standardised on Helm. `helm uninstall`
+# does not know about those objects, so ClusterRoles/Bindings + a handful of
+# CRDs persist and then BLOCK re-install with:
+#   "ClusterRole X exists and cannot be imported into the current release"
+# This sweep deletes the known set.
+cleanup_legacy_cluster_scoped() {
+    phase "legacy cluster-scoped leftovers (pre-Helm kubectl-apply installs)"
+
+    # ── ClusterRoles ──
+    local cr
+    while read -r cr; do
+        [[ -z "$cr" ]] && continue
+        step "kubectl delete $cr"
+        kubectl delete "$cr" --wait=false --ignore-not-found \
+            >/dev/null 2>&1 || true
+    done < <(kubectl get clusterrole -o name 2>/dev/null \
+        | grep -iE '^clusterrole\.rbac\.authorization\.k8s\.io/(argocd-|argo-events-|eventbus-)' \
+        || true)
+
+    # ── ClusterRoleBindings ──
+    local crb
+    while read -r crb; do
+        [[ -z "$crb" ]] && continue
+        step "kubectl delete $crb"
+        kubectl delete "$crb" --wait=false --ignore-not-found \
+            >/dev/null 2>&1 || true
+    done < <(kubectl get clusterrolebinding -o name 2>/dev/null \
+        | grep -iE '^clusterrolebinding\.rbac\.authorization\.k8s\.io/(argocd-|argo-events-|eventbus-)' \
+        || true)
+
+    # ── Legacy CRDs (KubeVela/ArgoEvents/ArgoCD remnants) ──
+    # These can stick around with finalizers after their controllers vanish.
+    local legacy_crds=(
+        resourcetrackers.core.oam.dev
+        policies.core.oam.dev
+        packages.cue.oam.dev
+        workloaddefinitions.core.oam.dev
+        clustergateways.cluster.core.oam.dev
+        clustergateways.core.oam.dev
+        virtualclusters.cluster.core.oam.dev
+        sensors.argoproj.io
+        eventbus.argoproj.io
+        eventsources.argoproj.io
+        applications.argoproj.io
+        applicationsets.argoproj.io
+        appprojects.argoproj.io
+    )
+    local lcrd
+    for lcrd in "${legacy_crds[@]}"; do
+        if kubectl get crd "$lcrd" >/dev/null 2>&1; then
+            step "strip finalizers + delete crd $lcrd"
+            strip_finalizers "$lcrd"
+            kubectl patch crd "$lcrd" \
+                --type=merge -p '{"metadata":{"finalizers":[]}}' \
+                >/dev/null 2>&1 || true
+            kubectl delete crd "$lcrd" --wait=false --ignore-not-found \
+                >/dev/null 2>&1 || true
+        fi
+    done
+
+    info "legacy cluster-scoped sweep complete"
+}
+
 # ───── Execute in reverse-install order ─────
 cleanup_oam_definitions
 cleanup_crossplane_claims_and_xrds
@@ -512,6 +581,7 @@ uninstall_argo_events
 uninstall_argo_workflows
 uninstall_argocd
 uninstall_knative
+cleanup_legacy_cluster_scoped
 maybe_uninstall_istio
 
 # ───── Summary ─────

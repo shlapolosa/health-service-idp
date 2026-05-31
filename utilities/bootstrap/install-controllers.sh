@@ -179,6 +179,124 @@ EOF
     info "providers will install asynchronously; run 'kubectl get providers' to check"
 }
 
+# ───── AKS konnectivity webhook workaround ─────
+# On fresh AKS installs the managed kube-apiserver can't reach a newly-created
+# webhook pod IP through the konnectivity tunnel for ~1-5 min, so any apply of
+# Crossplane Compositions/XRDs fails with `code 504: 504 Gateway Timeout` from
+# the validation webhook. We temporarily relax failurePolicy from Fail→Ignore,
+# run the apply, then restore. Stored state is per-webhook-index so configs
+# with any number of webhooks are handled.
+#
+# Usage:  with_relaxed_webhook kubectl apply -f some/dir/
+# Safe to call multiple times; only touches webhooks currently set to Fail.
+with_relaxed_webhook() {
+    local vwc="crossplane"
+    local restored=0
+    # Build list of indices currently set to Fail (the ones we will flip).
+    local indices_to_restore=()
+
+    if ! kubectl get validatingwebhookconfiguration "$vwc" >/dev/null 2>&1; then
+        info "validatingwebhookconfiguration/$vwc not found — running command as-is"
+        "$@"
+        return $?
+    fi
+
+    local webhook_count
+    webhook_count=$(kubectl get validatingwebhookconfiguration "$vwc" \
+        -o jsonpath='{.webhooks[*].name}' 2>/dev/null | wc -w | tr -d ' ')
+    if [[ "$webhook_count" -eq 0 ]]; then
+        info "$vwc has no webhooks — running command as-is"
+        "$@"
+        return $?
+    fi
+
+    local patches=()
+    local i policy
+    for ((i=0; i<webhook_count; i++)); do
+        policy=$(kubectl get validatingwebhookconfiguration "$vwc" \
+            -o jsonpath="{.webhooks[$i].failurePolicy}" 2>/dev/null || echo "")
+        if [[ "$policy" == "Fail" ]]; then
+            patches+=("{\"op\":\"replace\",\"path\":\"/webhooks/$i/failurePolicy\",\"value\":\"Ignore\"}")
+            indices_to_restore+=("$i")
+        fi
+    done
+
+    if [[ ${#patches[@]} -eq 0 ]]; then
+        info "all $vwc webhooks already failurePolicy!=Fail — no relax needed"
+        "$@"
+        return $?
+    fi
+
+    info "AKS konnectivity workaround: relaxing $vwc failurePolicy Fail→Ignore on indices [${indices_to_restore[*]}] for this apply"
+    local relax_patch="[$(IFS=,; echo "${patches[*]}")]"
+
+    restore_webhook() {
+        if [[ "$restored" -eq 1 ]]; then return 0; fi
+        restored=1
+        local restore_patches=()
+        local idx
+        for idx in "${indices_to_restore[@]}"; do
+            restore_patches+=("{\"op\":\"replace\",\"path\":\"/webhooks/$idx/failurePolicy\",\"value\":\"Fail\"}")
+        done
+        local restore_patch="[$(IFS=,; echo "${restore_patches[*]}")]"
+        kubectl patch validatingwebhookconfiguration "$vwc" --type=json \
+            -p="$restore_patch" >/dev/null 2>&1 \
+            && ok "restored $vwc failurePolicy → Fail on indices [${indices_to_restore[*]}]" \
+            || warn "failed to restore $vwc failurePolicy — check manually"
+    }
+    trap 'restore_webhook' RETURN
+
+    if ! kubectl patch validatingwebhookconfiguration "$vwc" --type=json \
+            -p="$relax_patch" >/dev/null 2>&1; then
+        warn "failed to patch $vwc to Ignore — running command anyway"
+    fi
+
+    local rc=0
+    "$@" || rc=$?
+    restore_webhook
+    trap - RETURN
+    return $rc
+}
+
+# ───── Post-install substrate (XRDs / Compositions) ─────
+# Applies XRDs + Compositions AFTER providers are scheduled. Wrapped with
+# with_relaxed_webhook so AKS konnectivity 504s don't block the apply.
+apply_post_install_substrate() {
+    phase "post-install substrate (XRDs / Compositions)"
+    # Brief grace period for crossplane core + providers to become reachable
+    # before we touch the validating webhook.
+    local elapsed=0
+    while ! kubectl -n crossplane-system get deploy crossplane >/dev/null 2>&1; do
+        sleep 3; elapsed=$((elapsed+3))
+        [[ "$elapsed" -ge 30 ]] && break
+    done
+    kubectl -n crossplane-system wait --for=condition=Available \
+        deploy/crossplane --timeout=120s >/dev/null 2>&1 || \
+        warn "crossplane deploy not yet Available — proceeding anyway"
+
+    local applied=0 errored=0
+    local targets=(
+        "$REPO_ROOT/substrate/crossplane/"
+        "$REPO_ROOT/production-lines/traditional-cloud/adapters/composition/"
+    )
+    local t
+    for t in "${targets[@]}"; do
+        if [[ ! -d "$t" ]]; then
+            info "skip (not found): $t"
+            continue
+        fi
+        step "apply $t"
+        if with_relaxed_webhook kubectl apply -f "$t"; then
+            applied=$((applied+1))
+            ok "applied: $t"
+        else
+            errored=$((errored+1))
+            warn "errored: $t"
+        fi
+    done
+    info "post-install substrate: applied=$applied errored=$errored"
+}
+
 # ───── KubeVela ─────
 install_kubevela() {
     phase "kubevela $KUBEVELA_CHART_VERSION"
@@ -235,6 +353,7 @@ install_argo_workflows       || true
 install_argo_events          || true
 install_crossplane           || true
 install_crossplane_providers || true
+apply_post_install_substrate || true
 install_kubevela             || true
 install_external_secrets     || true
 apply_post_install_configs   || true
