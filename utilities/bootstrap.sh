@@ -120,8 +120,9 @@ cmd_images() {
 }
 
 cmd_phase() {
-    local phase="${1:?usage: bootstrap.sh phase <phase>}"
-    run_phase "$phase"
+    local phase="${1:?usage: bootstrap.sh phase <phase> [flags...]}"
+    shift
+    run_phase "$phase" "$@"
 }
 
 run_phase() {
