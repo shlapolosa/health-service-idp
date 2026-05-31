@@ -47,11 +47,9 @@ spec:
           httpGet: { path: /healthz, port: 8080 }
           initialDelaySeconds: 30
           periodSeconds: 10
-        securityContext:
-          allowPrivilegeEscalation: false
-          runAsNonRoot: true
-          runAsUser: 1000
-          capabilities: { drop: ["ALL"] }
+        # securityContext removed 2026-05-31 — Knative `secure-pod-defaults: enabled`
+        # in config-features injects equivalent secure defaults at admission time
+        # (plus seccompProfile: RuntimeDefault, which we didn't set explicitly).
   traffic:
   - latestRevision: true
     percent: 100
