@@ -14,10 +14,19 @@ plan documented in `/Users/socrateshlapolosa/.claude/plans/buzzing-hugging-sunse
 
 | File | Kind | Responsibility |
 |---|---|---|
-| `webservice-shape.yaml` | ComponentDefinition | ONLY container shape (image, port, probes, resources, env) |
-| `auto-scaffold-bootstrap.yaml` | TraitDefinition | Fires oam-driven-contract workflow to scaffold source repo + build pipeline |
-| `image-source-policy.yaml` | PolicyDefinition | Validates image registry against an allowlist (catches `nginx:1.27` hallucinations) |
-| `language-enum-policy.yaml` | PolicyDefinition | Validates bootstrap language against an allowlist |
+| `webservice-shape.yaml` | ComponentDefinition | Container shape (image, port, probes, resources, env). Image **regex-enforced** to `^(healthidpuaeacr\.azurecr\.io/\|docker\.io/socrates12345/)` at the param type level |
+| `auto-scaffold-bootstrap.yaml` | TraitDefinition | Fires oam-driven-contract workflow to scaffold source repo + build pipeline. Language **enum-enforced** to `python\|java\|nodejs\|rasa` at the param type level |
+
+## Note on policies (removed)
+
+This dir previously included `image-source-policy.yaml` and `language-enum-policy.yaml`
+as standalone `PolicyDefinition`s. They were removed because:
+1. Vela's PolicyDefinition contract requires an `output:` block (they affect placement,
+   not validation), so a validate-only template raises `field not found: output` at apply time.
+2. The same constraints are cleaner expressed at the CUE type level on the CD/Trait params —
+   vela dry-run rejects non-conforming values before the workflow ever fires.
+3. Genuine cross-cutting validation belongs in the Govern port (sibling `cafe-spec/adapters/govern-opa/`)
+   via OPA rules, not in OAM PolicyDefinitions.
 
 ## What's NOT here
 

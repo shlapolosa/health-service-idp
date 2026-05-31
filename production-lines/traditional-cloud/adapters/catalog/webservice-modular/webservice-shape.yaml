@@ -102,8 +102,8 @@ spec:
         }
 
         parameter: {
-          // +usage=Full container image including registry, e.g. healthidpuaeacr.azurecr.io/my-svc:v1
-          image: string
+          // +usage=Full container image. MUST be from healthidpuaeacr.azurecr.io or docker.io/socrates12345 (regex-enforced at vela dry-run; supersedes the deleted image-source PolicyDefinition).
+          image: =~"^(healthidpuaeacr\\.azurecr\\.io/|docker\\.io/socrates12345/)"
 
           // +usage=Optional secret name for private-registry pulls (defaults to none).
           registrySecret?: string

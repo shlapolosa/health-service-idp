@@ -39,15 +39,12 @@ COPY factory/core/knowledge-base/ /capability-factory/
 COPY production-lines/traditional-cloud/adapters/catalog/ /repo/crossplane/oam/
 COPY production-lines/traditional-cloud/adapters/composition/application-claim-composition.yaml /repo/crossplane/application-claim-composition.yaml
 
-# Bake the cafe-spec manufacturers/ tree at build time too, so
-# factory.list_manufacturers works without runtime mount.
-# NOTE: cafe-spec is a SIBLING repo. CI must clone it into the build context
-# (e.g. via repository_dispatch) before `docker build`. For local-dev this
-# COPY will fail; the workaround is to symlink ../cafe-spec into the build
-# context or mount at runtime via CAFE_SPEC_ROOT env.
-# Until CI updates: tolerate missing dir gracefully (factory.list_manufacturers
-# returns []).
-RUN mkdir -p /cafe-spec/manufacturers
+# Bake the sibling cafe-spec manifests so factory.list_manufacturers
+# returns real data. The build-helpers/stage-cafe-spec.sh script copies
+# ../cafe-spec/manufacturers/<id>/manifest.yaml into the local
+# cafe-spec-staging/ dir (Docker build context can't reach outside the repo).
+# Run that script BEFORE `docker build`. CI must do the same.
+COPY factory/adapters/mcp-read-gateway/cafe-spec-staging/ /cafe-spec/
 
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app /capability-factory /repo /cafe-spec
 USER appuser

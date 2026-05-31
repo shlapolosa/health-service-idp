@@ -48,6 +48,15 @@ discover_tag() {
 
 if [[ "$MODE" != "push-only" ]]; then
     info "building images locally"
+
+    # Pre-build helpers — some services need to stage content from outside
+    # the repo (e.g. mcp-read-gateway bakes sibling cafe-spec manifests).
+    if [[ -x "$REPO_ROOT/factory/adapters/mcp-read-gateway/build-helpers/stage-cafe-spec.sh" ]]; then
+        step "staging sibling cafe-spec manifests for mcp-read-gateway"
+        bash "$REPO_ROOT/factory/adapters/mcp-read-gateway/build-helpers/stage-cafe-spec.sh" \
+            | sed 's/^/    /'
+    fi
+
     for svc in "${!SERVICES[@]}"; do
         local_dockerfile="${SERVICES[$svc]}"
         if [[ ! -f "$REPO_ROOT/$local_dockerfile" ]]; then
@@ -57,7 +66,9 @@ if [[ "$MODE" != "push-only" ]]; then
         tag=$(discover_tag "$svc" || echo "latest")
         image="$ACR_REGISTRY.azurecr.io/$svc:$tag"
         step "build  $image"
-        docker build -f "$REPO_ROOT/$local_dockerfile" -t "$image" "$REPO_ROOT"
+        # --platform linux/amd64 — Mac M-series defaults to arm64 only;
+        # AKS nodes are AMD64. See memory: docker-build-amd64-mandatory.
+        docker build --platform linux/amd64 -f "$REPO_ROOT/$local_dockerfile" -t "$image" "$REPO_ROOT"
     done
 fi
 

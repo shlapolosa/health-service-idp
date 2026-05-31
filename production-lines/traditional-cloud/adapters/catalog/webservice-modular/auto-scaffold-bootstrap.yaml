@@ -75,8 +75,8 @@ spec:
         }
 
         parameter: {
-          // +usage=Language of the service to scaffold. Must be in the language-enum policy allowlist.
-          language: string
+          // +usage=Language of the service to scaffold. CUE-enforced enum (supersedes the deleted language-enum PolicyDefinition).
+          language: "python" | "java" | "nodejs" | "rasa"
 
           // +usage=Framework matching the language (e.g. fastapi for python, springboot for java).
           framework: string
