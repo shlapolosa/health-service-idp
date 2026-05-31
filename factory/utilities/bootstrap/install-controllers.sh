@@ -15,16 +15,17 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "${SCRIPT_DIR}/helpers/common.sh"
 
 # ───── Pinned versions ─────
-KNATIVE_VERSION="v1.21.0"                  # cap at v1.21 — v1.22+ requires k8s 1.34 (AKS currently 1.30)
-ARGOCD_CHART_VERSION="7.6.12"
-ARGO_WF_CHART_VERSION="0.41.14"
-ARGO_EVENTS_CHART_VERSION="2.4.15"          # patch line — bug fixes for Sensor validation, retry semantics
-CROSSPLANE_CHART_VERSION="1.17.2"          # MATCH live cluster
-PROVIDER_KUBERNETES_VERSION="v0.14.1"
-PROVIDER_HELM_VERSION="v0.20.4"
-PROVIDER_GITHUB_VERSION="v0.18.0"          # upbound/provider-github
+KNATIVE_VERSION="v1.21.0"                  # k8s 1.33-compatible; v1.22 needs k8s 1.34 (AKS UAE max available is 1.33.11)
+ISTIO_VERSION="1.30.0"                     # matches istioctl client; supports Knative v1.21+; data plane verified 2026-05-31
+ARGOCD_CHART_VERSION="9.5.17"              # AppVersion v3.4.3 — RBAC default-deny + source-hydrator GA
+ARGO_WF_CHART_VERSION="1.0.14"             # AppVersion v4.0.5 — major
+ARGO_EVENTS_CHART_VERSION="2.4.15"         # patch — Sensor validation, retry semantics
+CROSSPLANE_CHART_VERSION="1.17.2"          # STAY at v1 — v2 needs Composition Function rewrite of application-claim-composition.yaml (separate project: see substrate-upgrade-priorities-2026-05-31.md)
+PROVIDER_KUBERNETES_VERSION="v0.14.1"      # v1-compatible (do not bump until Crossplane v2 ADR)
+PROVIDER_HELM_VERSION="v0.20.4"            # v1-compatible
+PROVIDER_GITHUB_VERSION="v0.18.0"          # v1-compatible (upbound/provider-github)
 KUBEVELA_CHART_VERSION="1.10.6"            # patch — escapes known 1.10.4 CUE-import bug
-EXTERNAL_SECRETS_CHART_VERSION="0.19.2"
+EXTERNAL_SECRETS_CHART_VERSION="2.5.0"     # AppVersion v2.5.0 — CRD migration; we don't actively use ESO so risk low
 
 HELM_TIMEOUT="${HELM_TIMEOUT:-5m}"
 
