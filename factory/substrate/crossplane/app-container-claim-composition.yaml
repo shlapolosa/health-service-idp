@@ -3,1455 +3,373 @@ kind: Composition
 metadata:
   name: app-container-claim-composition
   labels:
-    crossplane.io/xrd: appcontainerclaims.platform.example.org
+    crossplane.io/xrd: xappcontainerclaims.platform.example.org
     provider: github-kubernetes-helm
 spec:
   writeConnectionSecretsToNamespace: crossplane-system
+  # REVERTED to XAppContainerClaim (cluster-scoped XR) 2026-05-31. See XRD
+  # for full rationale (provider-upjet-github cluster-scoped MR constraint).
   compositeTypeRef:
     apiVersion: platform.example.org/v1alpha1
-    kind: AppContainerClaim
-  resources:
-  
-  # Create Source Repository (microservices container)
-  - name: source-repository
-    base:
-      apiVersion: repo.github.upbound.io/v1alpha1
-      kind: Repository
-      spec:
-        forProvider:
-          name: placeholder
-          description: "CLAUDE.md-compliant microservices container"
-          private: false
-          autoInit: true
-          gitIgnoreTemplate: "Python"
-          licenseTemplate: mit
-          topics: ["microservices", "crossplane", "claude-compliant", "app-container"]
-        providerConfigRef:
-          name: github-provider
-    patches:
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.name
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.description
-      toFieldPath: spec.forProvider.description
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: metadata.name
-      transforms:
-      - type: string
-        string:
-          fmt: "%s-source-repo"
-    - type: ToCompositeFieldPath
-      fromFieldPath: status.atProvider.htmlUrl
-      toFieldPath: status.sourceRepository.url
-      policy:
-        fromFieldPath: Optional
-    - type: ToCompositeFieldPath
-      fromFieldPath: status.atProvider.httpCloneUrl
-      toFieldPath: status.sourceRepository.cloneUrl
-      policy:
-        fromFieldPath: Optional
-    - type: ToCompositeFieldPath
-      fromFieldPath: status.atProvider.defaultBranch
-      toFieldPath: status.sourceRepository.branch
-      policy:
-        fromFieldPath: Optional
-
-  # Create GitOps Repository
-  - name: gitops-repository
-    base:
-      apiVersion: repo.github.upbound.io/v1alpha1
-      kind: Repository
-      spec:
-        forProvider:
-          name: placeholder
-          description: "GitOps repository for app container deployment manifests"
-          private: false
-          autoInit: true
-          gitIgnoreTemplate: "Go"
-          licenseTemplate: mit
-          topics: ["gitops", "argocd", "oam", "kubernetes"]
-        providerConfigRef:
-          name: github-provider
-    patches:
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.name
-      transforms:
-      - type: string
-        string:
-          fmt: "%s-gitops"
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: metadata.name
-      transforms:
-      - type: string
-        string:
-          fmt: "%s-gitops-repo"
-    - type: ToCompositeFieldPath
-      fromFieldPath: status.atProvider.htmlUrl
-      toFieldPath: status.gitopsRepository.url
-      policy:
-        fromFieldPath: Optional
-    - type: ToCompositeFieldPath
-      fromFieldPath: status.atProvider.httpCloneUrl
-      toFieldPath: status.gitopsRepository.cloneUrl
-      policy:
-        fromFieldPath: Optional
-    - type: ToCompositeFieldPath
-      fromFieldPath: status.atProvider.defaultBranch
-      toFieldPath: status.gitopsRepository.branch
-      policy:
-        fromFieldPath: Optional
-
-  # Setup Source Repository Structure
-  - name: source-repo-setup
-    base:
-      apiVersion: kubernetes.crossplane.io/v1alpha1
-      kind: Object
-      spec:
-        forProvider:
-          manifest:
-            apiVersion: batch/v1
-            kind: Job
-            metadata:
+    kind: XAppContainerClaim
+  mode: Pipeline
+  pipeline:
+  - step: patch-and-transform
+    functionRef:
+      name: function-patch-and-transform
+    input:
+      apiVersion: pt.fn.crossplane.io/v1beta1
+      kind: Resources
+      resources:
+      - name: source-repository
+        base:
+          apiVersion: repo.github.upbound.io/v1alpha1
+          kind: Repository
+          spec:
+            forProvider:
               name: placeholder
-              namespace: default
-            spec:
-              ttlSecondsAfterFinished: 600
-              backoffLimit: 2
-              template:
-                spec:
-                  serviceAccountName: crossplane-github-provider
-                  restartPolicy: OnFailure
-                  containers:
-                  - name: source-repo-setup
-                    image: alpine:3.18
-                    command:
-                    - /bin/sh
-                    - -c
-                    - |
-                      set -e
-                      echo "Setting up source repository structure for $APP_NAME..."
-                      
-                      # Install required tools (including jq for JSON parsing)
-                      # Note: kubectl is not in Alpine repos, use curl to download it
-                      apk add --no-cache git curl jq python3 py3-pip
-                      
-                      # Download kubectl binary
-                      curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-                      chmod +x kubectl
-                      mv kubectl /usr/local/bin/
-                      
-                      TEMP_DIR="/tmp/repo-$APP_NAME"
-                      mkdir -p $TEMP_DIR
-                      cd $TEMP_DIR
-                      
-                      # Clone the repository
-                      git clone $SOURCE_CLONE_URL .
-                      
-                      # Configure git with authentication for push
-                      git config user.name "AppContainer Setup"
-                      git config user.email "appcontainer@platform.local"
-                      git remote set-url origin "https://${GITHUB_TOKEN}@github.com/${GITHUB_REPO}.git"
-                      
-                      # Create microservices container structure
-                      mkdir -p microservices
-                      mkdir -p shared-libs/common
-                      mkdir -p .github/workflows
-                      mkdir -p .github/scripts
-                      
-                      # Copy the version manager script
-                      cat > .github/scripts/version-manager.sh << 'EOF'
-                      #!/bin/bash
-                      set -e
-                      
-                      # Semantic Versioning Manager for GitOps
-                      # Generates semantic versions with commit SHA for container tagging
-                      
-                      SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-                      PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-                      
-                      # Default values
-                      MAJOR_VERSION=1
-                      MINOR_VERSION=1
-                      BASE_VERSION_FILE="$PROJECT_ROOT/.version"
-                      
-                      # Read base version from file if it exists
-                      if [ -f "$BASE_VERSION_FILE" ]; then
-                          BASE_VERSION=$(cat "$BASE_VERSION_FILE")
-                          MAJOR_VERSION=$(echo "$BASE_VERSION" | cut -d. -f1)
-                          MINOR_VERSION=$(echo "$BASE_VERSION" | cut -d. -f2)
-                      fi
-                      
-                      # Function to get commit count for patch version
-                      get_patch_version() {
-                          git rev-list --count HEAD 2>/dev/null || echo "0"
-                      }
-                      
-                      # Function to get short commit SHA
-                      get_commit_sha() {
-                          git rev-parse --short=7 HEAD 2>/dev/null || echo "unknown"
-                      }
-                      
-                      # Function to get branch name (sanitized for container tags)
-                      get_branch_name() {
-                          local branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
-                          # Sanitize branch name for container registry
-                          echo "$branch" | sed 's/[^a-zA-Z0-9._-]/-/g' | tr '[:upper:]' '[:lower:]'
-                      }
-                      
-                      # Function to check if this is a release branch
-                      is_release_branch() {
-                          local branch=$(get_branch_name)
-                          [[ "$branch" == "main" || "$branch" == "master" || "$branch" =~ ^release/.* ]]
-                      }
-                      
-                      # Function to generate semantic version
-                      generate_semantic_version() {
-                          local service_name="$1"
-                          local commit_sha=$(get_commit_sha)
-                          
-                          # Use major.minor.sha format for Docker compatibility
-                          local semver="$MAJOR_VERSION.$MINOR_VERSION.$commit_sha"
-                          
-                          echo "$semver"
-                      }
-                      
-                      # Function to generate container tags
-                      generate_container_tags() {
-                          local service_name="$1"
-                          local registry="${2:-docker.io/socrates12345}"
-                          local commit_sha=$(get_commit_sha)
-                          local branch=$(get_branch_name)
-                          local semver=$(generate_semantic_version "$service_name")
-                          
-                          # Base image name
-                          local image_base="$registry/$service_name"
-                          
-                          # Generate multiple tags
-                          local tags=()
-                          
-                          # 1. Full semantic version tag
-                          tags+=("$image_base:$semver")
-                          
-                          # 2. Short SHA tag
-                          tags+=("$image_base:$commit_sha")
-                          
-                          # 3. Branch-specific tag
-                          tags+=("$image_base:$branch-$commit_sha")
-                          
-                          # 4. Latest tag for main/master branch
-                          if is_release_branch; then
-                              tags+=("$image_base:latest")
-                              tags+=("$image_base:$MAJOR_VERSION")
-                              tags+=("$image_base:$MAJOR_VERSION.$MINOR_VERSION")
-                          fi
-                          
-                          # 5. Development tag for feature branches
-                          if [[ "$branch" == "develop" ]]; then
-                              tags+=("$image_base:develop")
-                          fi
-                          
-                          # Return as comma-separated string
-                          IFS=','
-                          echo "${tags[*]}"
-                      }
-                      
-                      # Main function
-                      main() {
-                          local command="$1"
-                          local service_name="$2"
-                          local registry="${3:-docker.io/socrates12345}"
-                          
-                          case "$command" in
-                              "version")
-                                  generate_semantic_version "$service_name"
-                                  ;;
-                              "tags")
-                                  generate_container_tags "$service_name" "$registry"
-                                  ;;
-                              "help"|*)
-                                  cat << HELP_EOF
-                      Usage: $0 <command> [service_name] [registry]
-                      
-                      Commands:
-                        version <service>           Generate semantic version
-                        tags <service> [registry]   Generate container tags
-                        help                        Show this help
-                      
-                      Examples:
-                        $0 version accommodation-service
-                        $0 tags accommodation-service
-                      HELP_EOF
-                                  ;;
-                          esac
-                      }
-                      
-                      # Run main function with all arguments
-                      main "$@"
-                      EOF
-                      
-                      # Make version manager executable
-                      chmod +x .github/scripts/version-manager.sh
-                      
-                      # Create .version file
-                      echo "1.1" > .version
-                      
-                      # Copy the comprehensive GitOps workflow from template
-                      wget -q -O .github/workflows/comprehensive-gitops.yml https://raw.githubusercontent.com/shlapolosa/health-service-idp/main/crossplane/templates/comprehensive-gitops-template.yml || {
-                        echo "Failed to download workflow template, using fallback..."
-                        # Fallback: minimal workflow if template download fails
-                        cat > .github/workflows/comprehensive-gitops.yml << 'FALLBACK_EOF'
-                      name: Comprehensive GitOps Pipeline
-                      on:
-                        push:
-                          branches: [ main ]
-                          paths: [ 'microservices/**' ]
-                      env:
-                        # Docker Hub settings (default)
-                        DOCKERHUB_REGISTRY: docker.io
-                        DOCKERHUB_USERNAME: socrates12345
-                        # ACR settings
-                        ACR_REGISTRY: healthidpuaeacr.azurecr.io
-                        ACR_NAME: healthidpuaeacr
-                        # Default registry selection
-                        DEFAULT_REGISTRY: acr  # or 'dockerhub' or 'both'
-                        # Legacy variables
-                        REGISTRY: docker.io
-                        REGISTRY_USERNAME: socrates12345
-                        GITOPS_REPO: APP_NAME_PLACEHOLDER-gitops
-                      jobs:
-                        minimal-deploy:
-                          runs-on: ubuntu-latest
-                          steps:
-                            - uses: actions/checkout@v4
-                            - name: Build and deploy
-                              run: echo "Minimal deployment pipeline activated"
-                      FALLBACK_EOF
-                      }
-                      
-                      # Substitute app name in the workflow  
-                      sed -i "s/APP_NAME_PLACEHOLDER/$APP_NAME/g" .github/workflows/comprehensive-gitops.yml
-                      
-                      # Replace placeholders in workflow file
-                      
-                      # Create shared library structure
-                      cat > shared-libs/common/README.md << 'EOF'
-                      # Common Shared Library
-                      
-                      This directory contains shared code and utilities used across all microservices in this app container.
-                      
-                      ## Structure
-                      - src/ - Shared source code
-                      - tests/ - Shared tests
-                      - docs/ - Shared documentation
-                      EOF
-                      
-                      # Create microservices README
-                      cat > microservices/README.md << EOF
-                      # Microservices
-                      
-                      This directory contains all microservices for the application container.
-                      Each subdirectory represents a single microservice following CLAUDE.md standards.
-                      
-                      ## Adding New Microservices
-                      
-                      Use ApplicationClaim to add new microservices:
-                      
-                      \`\`\`yaml
-                      apiVersion: platform.example.org/v1alpha1
-                      kind: ApplicationClaim
-                      metadata:
-                        name: my-service
-                      spec:
-                        appContainer: $APP_NAME
-                        name: my-service
-                        language: python
-                        framework: fastapi
-                        database: postgres
-                        cache: redis
-                      \`\`\`
-                      
-                      ## Current Services
-                      
-                      - (Services will be listed here as they are added)
-                      EOF
-                      
-                      # Create main README
-                      cat > README.md << EOF
-                      # $APP_NAME Application Container
-                      
-                      CLAUDE.md-compliant microservices application container with GitOps deployment.
-                      
-                      ## Architecture
-                      
-                      This application container follows the CLAUDE.md development methodology:
-                      
-                      - **Microservices**: Each service in `microservices/` follows Onion Architecture
-                      - **Shared Libraries**: Common code in `shared-libs/`
-                      - **GitOps**: Automated deployment via companion GitOps repository
-                      - **CI/CD**: Automatic building and deployment of changed services
-                      
-                      ## Structure
-                      
-                      \`\`\`
-                      $APP_NAME/
-                      ├── microservices/          # Individual microservices
-                      ├── shared-libs/           # Shared libraries and utilities  
-                      ├── .github/workflows/     # CI/CD pipelines
-                      └── README.md              # This file
-                      \`\`\`
-                      
-                      ## Development Workflow
-                      
-                      1. Create microservices using ApplicationClaim in your vCluster
-                      2. CI/CD automatically detects changes in `microservices/`
-                      3. Changed services are built and deployed via GitOps
-                      4. Monitor deployments in ArgoCD
-                      
-                      ## Adding New Services
-                      
-                      Edit the OAM Application in the GitOps repository:
-                      
-                      \`\`\`yaml
-                      # File: oam/application.yaml
-                      apiVersion: core.oam.dev/v1beta1
-                      kind: Application
-                      metadata:
-                        name: $APP_NAME
-                      spec:
-                        components:
-                        - name: my-service
-                          type: microservice-with-db
-                          properties:
-                            language: python
-                            framework: fastapi
-                            database: postgres
-                            cache: redis
-                      \`\`\`
-                      
-                      ## GitOps Repository
-                      
-                      Deployment manifests are managed in the companion GitOps repository:
-                      `$GITOPS_CLONE_URL`
-                      EOF
-                      
-                      # Create two separate commits to ensure GitHub Actions detect-changes works
-                      git config user.name "AppContainer Setup"
-                      git config user.email "appcontainer@platform.local"
-                      
-                      # First commit: Initial README only
-                      # Idempotent: skip commit/push if nothing changed (handles Crossplane Object retries)
-                      echo "# $APP_NAME" > README.md
-                      echo "" >> README.md
-                      echo "CLAUDE.md-compliant microservice application container." >> README.md
-                      git add README.md
-                      git diff --cached --quiet || git commit -m "Initial commit - create repository"
-
-                      # Second commit: Add all microservice structure
-                      git add .
-                      git diff --cached --quiet || git commit -m "Initialize CLAUDE.md-compliant app container structure
-
-                      - Add microservices directory structure
-                      - Add comprehensive GitOps CI/CD pipeline
-                      - Add shared libraries framework
-                      - Add documentation and examples
-                      - Follow CLAUDE.md development methodology"
-
-                      git push origin HEAD || true
-                      
-                      echo "Source repository structure created successfully with 2 commits"
-                      
-                      # Setup GitHub repository secrets for CI/CD
-                      echo "Setting up GitHub repository secrets..."
-                      
-                      # Get repository public key for secret encryption
-                      PUBLIC_KEY_RESPONSE=$(curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
-                        "https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/public-key")
-                      
-                      PUBLIC_KEY=$(echo "$PUBLIC_KEY_RESPONSE" | jq -r '.key')
-                      KEY_ID=$(echo "$PUBLIC_KEY_RESPONSE" | jq -r '.key_id')
-                      
-                      if [ -z "$PUBLIC_KEY" ] || [ -z "$KEY_ID" ]; then
-                        echo "Warning: Could not retrieve public key for repository secrets"
-                      else
-                        # Install python for encryption
-                        # S-CP-004: Alpine 3.19+ python is PEP 668 externally-managed;
-                        # pip3 install needs --break-system-packages or a venv.
-                        apk add --no-cache python3 py3-pip
-                        pip3 install --break-system-packages pynacl
-                        
-                        # Create encryption script
-                        cat > /tmp/encrypt_secret.py << 'ENCRYPT_EOF'
-                      import sys
-                      import base64
-                      from nacl import encoding, public
-                      
-                      def encrypt_secret(public_key: str, secret_value: str) -> str:
-                          public_key = public.PublicKey(public_key.encode("utf-8"), encoding.Base64Encoder())
-                          sealed_box = public.SealedBox(public_key)
-                          encrypted = sealed_box.encrypt(secret_value.encode("utf-8"))
-                          return base64.b64encode(encrypted).decode("utf-8")
-                      
-                      if __name__ == "__main__":
-                          print(encrypt_secret(sys.argv[1], sys.argv[2]))
-                      ENCRYPT_EOF
-                        
-                        # Create PERSONAL_ACCESS_TOKEN secret
-                        ENCRYPTED_TOKEN=$(python3 /tmp/encrypt_secret.py "$PUBLIC_KEY" "$GITHUB_TOKEN")
-                        curl -X PUT \
-                          -H "Authorization: token ${GITHUB_TOKEN}" \
-                          -H "Accept: application/vnd.github.v3+json" \
-                          "https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/PERSONAL_ACCESS_TOKEN" \
-                          -d "{\"encrypted_value\":\"$ENCRYPTED_TOKEN\",\"key_id\":\"$KEY_ID\"}"
-                        
-                        # Get Docker password from secret (using docker-credentials which has plain password field)
-                        DOCKER_PASSWORD=$(kubectl get secret docker-credentials -n default -o jsonpath='{.data.password}' | base64 -d)
-                        
-                        if [ -n "$DOCKER_PASSWORD" ]; then
-                          # Create DOCKER_PASSWORD secret
-                          ENCRYPTED_PASSWORD=$(python3 /tmp/encrypt_secret.py "$PUBLIC_KEY" "$DOCKER_PASSWORD")
-                          curl -X PUT \
-                            -H "Authorization: token ${GITHUB_TOKEN}" \
-                            -H "Accept: application/vnd.github.v3+json" \
-                            "https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/DOCKER_PASSWORD" \
-                            -d "{\"encrypted_value\":\"$ENCRYPTED_PASSWORD\",\"key_id\":\"$KEY_ID\"}"
-                          
-                          echo "✅ Docker Hub secret created"
-                        else
-                          echo "⚠️  Docker password not found in secret"
-                        fi
-                        
-                        # Get Azure credentials from secret if it exists
-                        AZURE_CREDS=$(kubectl get secret azure-credentials -n default -o jsonpath='{.data.azure-creds\.json}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
-                        
-                        if [ -n "$AZURE_CREDS" ]; then
-                          # Create AZURE_CREDENTIALS secret for GitHub Actions
-                          ENCRYPTED_AZURE=$(python3 /tmp/encrypt_secret.py "$PUBLIC_KEY" "$AZURE_CREDS")
-                          curl -X PUT \
-                            -H "Authorization: token ${GITHUB_TOKEN}" \
-                            -H "Accept: application/vnd.github.v3+json" \
-                            "https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/AZURE_CREDENTIALS" \
-                            -d "{\"encrypted_value\":\"$ENCRYPTED_AZURE\",\"key_id\":\"$KEY_ID\"}"
-                          
-                          echo "✅ Azure credentials secret created"
-                        else
-                          echo "⚠️  Azure credentials not found (optional)"
-                        fi
-                        
-                        echo "✅ GitHub secrets setup completed"
-                      fi
-                      
-                      echo "Source repository setup completed successfully"
-                    env:
-                    - name: APP_NAME
-                      value: placeholder
-                    - name: SOURCE_CLONE_URL
-                      value: placeholder
-                    - name: GITOPS_CLONE_URL
-                      value: placeholder
-                    - name: DOCKER_REGISTRY_USER
-                      value: placeholder
-                    - name: GITHUB_TOKEN
-                      valueFrom:
-                        secretKeyRef:
-                          name: github-credentials
-                          key: token
-                    - name: GITHUB_REPO
-                      value: placeholder
-        providerConfigRef:
-          name: kubernetes-provider
-    patches:
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.manifest.metadata.name
-      transforms:
-      - type: string
-        string:
-          fmt: "%s-source-setup"
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[0].value
-    - type: CombineFromComposite
-      combine:
-        variables:
-        - fromFieldPath: spec.gitHubOrg
-        - fromFieldPath: spec.name
-        strategy: string
-        string:
-          fmt: "https://github.com/%s/%s.git"
-      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[1].value
-    - type: CombineFromComposite
-      combine:
-        variables:
-        - fromFieldPath: spec.gitHubOrg
-        - fromFieldPath: spec.name
-        strategy: string
-        string:
-          fmt: "https://github.com/%s/%s-gitops.git"
-      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[2].value
-      policy:
-        fromFieldPath: Required
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.gitHubOrg
-      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[3].value
-    - type: CombineFromComposite
-      combine:
-        variables:
-        - fromFieldPath: spec.gitHubOrg
-        - fromFieldPath: spec.name
-        strategy: string
-        string:
-          fmt: "%s/%s"
-      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[5].value
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: metadata.name
-      transforms:
-      - type: string
-        string:
-          fmt: "%s-source-setup"
-
-  # Setup GitOps Repository Structure 
-  - name: gitops-repo-setup
-    base:
-      apiVersion: kubernetes.crossplane.io/v1alpha1
-      kind: Object
-      spec:
-        forProvider:
-          manifest:
-            apiVersion: batch/v1
-            kind: Job
-            metadata:
+              description: CLAUDE.md-compliant microservices container
+              private: false
+              autoInit: true
+              gitignoreTemplate: Python
+              licenseTemplate: mit
+              topics:
+              - microservices
+              - crossplane
+              - claude-compliant
+              - app-container
+            providerConfigRef:
+              name: github-provider
+        patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.name
+          toFieldPath: spec.forProvider.name
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.description
+          toFieldPath: spec.forProvider.description
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.name
+          toFieldPath: metadata.name
+          transforms:
+          - type: string
+            string:
+              fmt: '%s-source-repo'
+              type: Format
+        - type: ToCompositeFieldPath
+          fromFieldPath: status.atProvider.htmlUrl
+          toFieldPath: status.sourceRepository.url
+          policy:
+            fromFieldPath: Optional
+        - type: ToCompositeFieldPath
+          fromFieldPath: status.atProvider.httpCloneUrl
+          toFieldPath: status.sourceRepository.cloneUrl
+          policy:
+            fromFieldPath: Optional
+        - type: ToCompositeFieldPath
+          fromFieldPath: status.atProvider.defaultBranch
+          toFieldPath: status.sourceRepository.branch
+          policy:
+            fromFieldPath: Optional
+      - name: gitops-repository
+        base:
+          apiVersion: repo.github.upbound.io/v1alpha1
+          kind: Repository
+          spec:
+            forProvider:
               name: placeholder
-              namespace: default
-            spec:
-              ttlSecondsAfterFinished: 600
-              backoffLimit: 2
-              template:
+              description: GitOps repository for app container deployment manifests
+              private: false
+              autoInit: true
+              gitignoreTemplate: Go
+              licenseTemplate: mit
+              topics:
+              - gitops
+              - argocd
+              - oam
+              - kubernetes
+            providerConfigRef:
+              name: github-provider
+        patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.name
+          toFieldPath: spec.forProvider.name
+          transforms:
+          - type: string
+            string:
+              fmt: '%s-gitops'
+              type: Format
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.name
+          toFieldPath: metadata.name
+          transforms:
+          - type: string
+            string:
+              fmt: '%s-gitops-repo'
+              type: Format
+        - type: ToCompositeFieldPath
+          fromFieldPath: status.atProvider.htmlUrl
+          toFieldPath: status.gitopsRepository.url
+          policy:
+            fromFieldPath: Optional
+        - type: ToCompositeFieldPath
+          fromFieldPath: status.atProvider.httpCloneUrl
+          toFieldPath: status.gitopsRepository.cloneUrl
+          policy:
+            fromFieldPath: Optional
+        - type: ToCompositeFieldPath
+          fromFieldPath: status.atProvider.defaultBranch
+          toFieldPath: status.gitopsRepository.branch
+          policy:
+            fromFieldPath: Optional
+      - name: source-repo-setup
+        base:
+          apiVersion: kubernetes.crossplane.io/v1alpha1
+          kind: Object
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: batch/v1
+                kind: Job
+                metadata:
+                  name: placeholder
+                  namespace: default
                 spec:
-                  serviceAccountName: crossplane-github-provider
-                  restartPolicy: OnFailure
-                  containers:
-                  - name: gitops-repo-setup
-                    image: alpine/git:2.43.0
-                    command:
-                    - /bin/sh
-                    - -c
-                    - |
-                      set -e
-                      # S-CP-002 fix: alpine/git lacks curl/jq; the secret-setup
-                      # block below uses curl + jq to call api.github.com. Install
-                      # them once at the top so `set -e` never sees `curl: not found`.
-                      apk add --no-cache curl jq >/dev/null
-                      echo "Setting up GitOps repository structure for $APP_NAME..."
-
-                      TEMP_DIR="/tmp/gitops-$APP_NAME"
-                      mkdir -p $TEMP_DIR
-                      cd $TEMP_DIR
-                      
-                      # Clone the GitOps repository with authentication
-                      git clone "https://${GITHUB_TOKEN}@github.com/${GITHUB_REPO}-gitops.git" .
-                      
-                      # Configure git for commits
-                      git config user.name "GitOps Setup"
-                      git config user.email "gitops@platform.local"
-                      
-                      # Create GitOps structure matching OAM-DRIVEN-DEVELOPMENT-GUIDE.md
-                      mkdir -p apps
-                      mkdir -p apps/environments/{dev,staging,production}
-                      mkdir -p oam/applications
-                      mkdir -p oam/components  
-                      mkdir -p oam/workflows
-                      mkdir -p manifests
-                      mkdir -p .github/workflows
-                      
-                      # Determine registry based on configuration
-                      DEFAULT_REGISTRY="${DEFAULT_REGISTRY:-acr}"  # Default to ACR
-                      
-                      if [ "$DEFAULT_REGISTRY" = "acr" ]; then
-                        IMAGE_REGISTRY="healthidpuaeacr.azurecr.io"
-                        IMAGE_PREFIX=""
-                      else
-                        IMAGE_REGISTRY="docker.io"
-                        IMAGE_PREFIX="socrates12345/"
-                      fi
-                      
-                      # Create blank OAM Application template
-                      # Always use default namespace for OAM (where WorkloadDefinitions exist)
-                      # S-CP-005 fix: only write if file does not already exist (or contains
-                      # only the placeholder shape). On Crossplane Object retry this Job re-runs,
-                      # and previously it clobbered oam-updater's commits — which had correctly
-                      # written `clusters: ["host"]` (or removed the topology policy entirely
-                      # for host deployments) — with this stale placeholder.
-                      # The topology policy is added by oam-updater (application-claim-composition)
-                      # based on ApplicationClaim.spec.targetVCluster. Do NOT bake it into the
-                      # blank template — for host deployments the topology policy must be ABSENT,
-                      # and hardcoding `clusters: ["$APP_NAME"]` here misroutes deploys when the
-                      # template is the file the workflow ends up with.
-                      if [ -f oam/applications/application.yaml ] && ! grep -q "Will be updated with actual vCluster name" oam/applications/application.yaml; then
-                        echo "📄 oam/applications/application.yaml already exists with non-template content — preserving"
-                      else
-                      cat > oam/applications/application.yaml << EOF
-                      apiVersion: core.oam.dev/v1beta1
-                      kind: Application
-                      metadata:
-                        name: $APP_NAME
-                        namespace: default
-                      spec:
-                        components:
-                        - name: $APP_NAME
-                          type: webservice
-                          properties:
-                            name: $APP_NAME
-                            image: ${IMAGE_REGISTRY}/${IMAGE_PREFIX}$APP_NAME:latest
-                            language: python
-                            framework: fastapi
-                            port: 8080
-                            healthPath: /health
-                            database: postgres
-                            cache: redis
-                        # NOTE: topology policy intentionally omitted — added by oam-updater
-                        # when targetVCluster != "host". Host deployments need no topology policy.
-                        # Add your components here using the following types:
-                        # - microservice-with-db: Full-featured microservice with database and cache
-                        # - react-frontend: React TypeScript frontend with Material-UI
-                        # - static-site: Static website hosting
-                        # - kafka-service: Event streaming service
-                        # - data-pipeline: ETL and data processing workflows
-                        # 
-                        # Example:
-                        # components:
-                        # - name: api-backend
-                        #   type: microservice-with-db
-                        #   properties:
-                        #     language: python
-                        #     framework: fastapi
-                        #     database: postgres
-                        #     cache: redis
-                        #     exposeApi: true
-                        # - name: web-frontend
-                        #   type: react-frontend
-                        #   properties:
-                        #     framework: react
-                        #     styling: material-ui
-                        #     apiEndpoint: /api
-                        
-                        # Note: Workflow orchestration is handled by KubeVela WorkflowStepDefinitions
-                        # installed in the cluster, not embedded in the application spec.
-                        # See /crossplane/oam/workflow-step-definitions.yaml for orchestration logic.
-                      EOF
-                      fi
-                      
-                      # Create workflow templates directory
-                      cat > oam/workflows/README.md << 'EOF'
-                      # OAM Workflows
-                      
-                      This directory contains KubeVela workflow definitions for managing application lifecycle.
-                      
-                      ## Available Workflows
-                      
-                      - crossplane-integration.yaml - Handles OAM → Crossplane ApplicationClaim creation
-                      - dependency-management.yaml - Manages component dependencies and ordering
-                      - failure-recovery.yaml - Handles failure scenarios and cleanup
-                      
-                      ## Usage
-                      
-                      Workflows are automatically triggered when OAM Applications are created or updated.
-                      The system handles:
-                      
-                      1. **Infrastructure Provisioning**: Databases, caches, messaging systems
-                      2. **Application Deployment**: Microservices, frontends, static sites
-                      3. **Pipeline Orchestration**: Data processing workflows
-                      4. **Dependency Management**: Proper ordering and readiness checks
-                      5. **Failure Recovery**: Cleanup and retry mechanisms
-                      EOF
-                      
-                      # Create components directory with examples
-                      cat > oam/components/README.md << EOF
-                      # OAM Components
-                      
-                      This directory contains generated OAM Component definitions created by ApplicationClaims.
-                      
-                      ## Generated Components
-                      
-                      When you add components to `oam/applications/application.yaml`, the system automatically:
-                      
-                      1. Creates ApplicationClaims in the vCluster
-                      2. Generates OAM Component definitions here
-                      3. Creates Kubernetes manifests in `../manifests/`
-                      4. Updates ArgoCD applications for deployment
-                      
-                      ## Component Types
-                      
-                      - **microservice-with-db**: Full-featured microservice with database and cache
-                      - **react-frontend**: React TypeScript frontend with Material-UI
-                      - **static-site**: Static website hosting
-                      - **kafka-service**: Event streaming service
-                      - **data-pipeline**: ETL and data processing workflows
-                      
-                      ## Example Generated Component
-                      
-                      \`\`\`yaml
-                      apiVersion: core.oam.dev/v1beta1
-                      kind: Component
-                      metadata:
-                        name: user-service
-                        namespace: $APP_NAME
-                      spec:
-                        workload:
-                          apiVersion: serving.knative.dev/v1
-                          kind: Service
-                          metadata:
-                            name: user-service
-                          spec:
-                            template:
-                              spec:
-                                containers:
-                                - name: user-service
-                                  image: docker.io/socrates12345/user-service:latest
-                        parameters:
-                        - name: image
-                          fieldPaths: ["spec.template.spec.containers[0].image"]
-                      \`\`\`
-                      EOF
-                      
-                      # Create OAM Application ArgoCD Application
-                      cat > apps/oam-application.yaml << EOF
-                      apiVersion: argoproj.io/v1alpha1
-                      kind: Application
-                      metadata:
-                        name: $APP_NAME-oam-app
-                        namespace: argocd
-                        finalizers:
-                          - resources-finalizer.argocd.argoproj.io
-                        annotations:
-                          argocd.argoproj.io/sync-wave: "1"
-                          notifications.argoproj.io/subscribe.on-sync-succeeded.slack: "deployments"
-                      spec:
-                        project: default
-                        source:
-                          repoURL: $GITOPS_CLONE_URL
-                          targetRevision: HEAD
-                          path: oam/applications
-                        destination:
-                          server: https://kubernetes.default.svc
-                          namespace: $APP_NAME
-                        syncPolicy:
-                          automated:
-                            prune: true
-                            selfHeal: true
-                          syncOptions:
-                            - CreateNamespace=true
-                            - RespectIgnoreDifferences=true
-                          retry:
-                            limit: 5
-                            backoff:
-                              duration: 5s
-                              factor: 2
-                              maxDuration: 3m
-                        # Watch for changes in OAM Application
-                        info:
-                        - name: Description
-                          value: OAM Application that drives Crossplane ApplicationClaim creation
-                        - name: Workflow
-                          value: Automatically creates ApplicationClaims when OAM components are added
-                      EOF
-                      
-                      # Create ArgoCD Application for OAM Applications
-                      cat > apps/oam-application.yaml << EOF
-                      apiVersion: argoproj.io/v1alpha1
-                      kind: Application
-                      metadata:
-                        name: $APP_NAME-oam-application
-                        namespace: argocd
-                        annotations:
-                          argocd.argoproj.io/sync-wave: "2"
-                      spec:
-                        project: default
-                        source:
-                          repoURL: $GITOPS_CLONE_URL
-                          targetRevision: HEAD
-                          path: oam/applications
-                        destination:
-                          server: https://kubernetes.default.svc
-                          namespace: vela-system
-                        syncPolicy:
-                          automated:
-                            prune: true
-                            selfHeal: true
-                          syncOptions:
-                            - CreateNamespace=true
-                            - ServerSideApply=true
-                      EOF
-                      
-                      # Create App of Apps ArgoCD Application
-                      # S-CP-006: app-of-apps manages other Application resources, which live in
-                      # the argocd namespace — destination MUST be argocd, NOT $APP_NAME. Previous
-                      # value caused permanent OutOfSync drift (parent app tries to create child
-                      # Applications in service ns, but they actually live in argocd ns).
-                      cat > apps/app-of-apps.yaml << EOF
-                      apiVersion: argoproj.io/v1alpha1
-                      kind: Application
-                      metadata:
-                        name: $APP_NAME-app-of-apps
-                        namespace: argocd
-                        finalizers:
-                          - resources-finalizer.argocd.argoproj.io
-                      spec:
-                        project: default
-                        source:
-                          repoURL: $GITOPS_CLONE_URL
-                          targetRevision: HEAD
-                          path: apps
-                        destination:
-                          server: https://kubernetes.default.svc
-                          namespace: argocd
-                        syncPolicy:
-                          automated:
-                            prune: true
-                            selfHeal: true
-                          syncOptions:
-                            - CreateNamespace=true
-                      EOF
-                      
-                      # Create ApplicationSet for microservices
-                      
-                      # Create OAM trigger workflow for GitOps changes
-                      cat > .github/workflows/oam-sync-trigger.yml << 'EOF'
-                      name: OAM Sync Trigger
-                      
-                      on:
-                        push:
-                          branches: [ main ]
-                          paths:
-                            - 'oam/applications/**'
-                            - 'oam/components/**'
-                        workflow_dispatch:
-                      
-                      jobs:
-                        trigger-argocd-sync:
-                          runs-on: ubuntu-latest
-                          steps:
-                            - name: Checkout code
-                              uses: actions/checkout@v4
-                            
-                            - name: Trigger ArgoCD Sync
-                              run: |
-                                echo "🔄 OAM files changed, triggering ArgoCD sync..."
-                                # ArgoCD will automatically sync due to automated sync policy
-                                # This workflow ensures the change is tracked and logged
-                                
-                            - name: Log OAM Changes
-                              run: |
-                                echo "📝 OAM Application changes detected:"
-                                git diff HEAD~1 HEAD -- oam/applications/ oam/components/ || true
-                                echo "✅ Changes will be synced to cluster via ArgoCD"
-                      EOF
-                      
-                      # Create GitOps update workflow from template
-                      cat > .github/workflows/deployment-update.yml << 'EOF'
-                      name: GitOps Deployment Update
-                      
-                      on:
-                        repository_dispatch:
-                          types: [update-deployments, simple-update]
-                      
-                      permissions:
-                        contents: write
-                      
-                      jobs:
-                        update-manifests:
-                          runs-on: ubuntu-latest
-                          steps:
-                            - name: Checkout GitOps repository
-                              uses: actions/checkout@v4
-                              with:
-                                token: ${{ secrets.GITHUB_TOKEN }}
-                      
-                            - name: Update deployment manifests
-                              run: |
-                                echo "🚀 Processing GitOps deployment update..."
-                                
-                                # Extract dispatch payload
-                                SERVICES="${{ github.event.client_payload.services }}"
-                                VERSION_INFO="${{ github.event.client_payload.version_info }}"
-                                SOURCE_COMMIT="${{ github.event.client_payload.source_commit }}"
-                                REGISTRY="${{ github.event.client_payload.registry }}"
-                                WORKFLOW_RUN="${{ github.event.client_payload.workflow_run }}"
-                                
-                                echo "Services to update: $SERVICES"
-                                echo "Version info: $VERSION_INFO" 
-                                echo "Source commit: $SOURCE_COMMIT"
-                                echo "Registry: $REGISTRY"
-                                
-                                # Handle different event types
-                                if [ "${{ github.event.action }}" = "simple-update" ]; then
-                                  echo "📋 Processing simple-update event"
-                                  COMMIT_SHA="${{ github.event.client_payload.commit_sha }}"
-                                else
-                                  echo "📋 Processing update-deployments event"
-                                  # Parse deployments from payload
-                                  DEPLOYMENTS='${{ toJson(github.event.client_payload.deployments) }}'
-                                  echo "Deployments: $DEPLOYMENTS"
-                                fi
-                                
-                                # Update each service's manifest
-                                IFS=',' read -ra SERVICE_ARRAY <<< "$SERVICES"
-                                
-                                for service in "${SERVICE_ARRAY[@]}"; do
-                                  echo "🔄 Updating $service manifest..."
-                                  
-                                  if [ "${{ github.event.action }}" = "simple-update" ]; then
-                                    # Simple update: construct image from registry and commit
-                                    NEW_IMAGE="${REGISTRY}/$service:$COMMIT_SHA"
-                                  else
-                                    # Complex update: extract from deployments JSON
-                                    echo "🔍 Parsing deployments JSON for service: $service"
-                                    echo "Raw deployments: $DEPLOYMENTS"
-                                    
-                                    # Parse the JSON string (it comes as a string, not object)
-                                    DEPLOYMENTS_PARSED=$(echo "$DEPLOYMENTS" | jq -r '. // empty')
-                                    if [ "$DEPLOYMENTS_PARSED" = "null" ] || [ -z "$DEPLOYMENTS_PARSED" ]; then
-                                      # Try parsing as raw string
-                                      DEPLOYMENTS_PARSED="$DEPLOYMENTS"
-                                    fi
-                                    
-                                    NEW_IMAGE=$(echo "$DEPLOYMENTS_PARSED" | jq -r ".\"$service\".image // empty")
-                                    COMMIT_SHA=$(echo "$DEPLOYMENTS_PARSED" | jq -r ".\"$service\".commit // empty")
-                                    
-                                    echo "Extracted - Image: $NEW_IMAGE, Commit: $COMMIT_SHA"
-                                    
-                                    if [ -z "$NEW_IMAGE" ] || [ "$NEW_IMAGE" = "null" ]; then
-                                      echo "⚠️ No image found for service $service in deployments payload"
-                                      echo "Available keys in deployments:"
-                                      echo "$DEPLOYMENTS_PARSED" | jq -r 'keys[]?' 2>/dev/null || echo "Failed to parse keys"
-                                      continue
-                                    fi
-                                  fi
-                                  
-                                  echo "📝 Updating $service to image: $NEW_IMAGE"
-                                  
-                                  # Update multiple OAM file locations
-                                  # 1. Main OAM application file
-                                  MAIN_OAM="oam/applications/application.yaml"
-                                  
-                                  # 2. Service-specific OAM files in vcluster directories
-                                  VCLUSTER_OAM_FILES=$(find . -path "*/vcluster/*/applications/${service}/oam-application.yaml" 2>/dev/null)
-                                  
-                                  # 3. Look for any OAM file containing the service
-                                  OTHER_OAM_FILES=$(grep -l "name: ${service}" oam/**/*.yaml 2>/dev/null || true)
-                                  
-                                  # Update main OAM file if it exists and contains the service
-                                  if [ -f "$MAIN_OAM" ] && grep -q "name: ${service}" "$MAIN_OAM"; then
-                                    echo "📄 Updating main OAM: $MAIN_OAM"
-                                    echo "Current image line:"
-                                    grep "image:" "$MAIN_OAM" | head -1
-                                    # Update image - handle both with and without registry prefix
-                                    sed -i "s|image: docker.io/socrates12345/${service}:.*|image: $NEW_IMAGE|g" "$MAIN_OAM"
-                                    sed -i "s|image: ${service}:.*|image: $NEW_IMAGE|g" "$MAIN_OAM"
-                                    echo "Updated image line:"
-                                    grep "image:" "$MAIN_OAM" | head -1
-                                    echo "✅ Updated main OAM manifest"
-                                  fi
-                                  
-                                  # Update vCluster-specific OAM files
-                                  if [ ! -z "$VCLUSTER_OAM_FILES" ]; then
-                                    for oam_file in $VCLUSTER_OAM_FILES; do
-                                      echo "📄 Updating vCluster OAM: $oam_file"
-                                      sed -i "s|image: .*/${service}:.*|image: $NEW_IMAGE|g" "$oam_file"
-                                      
-                                      # Update version labels if they exist
-                                      if [ ! -z "$COMMIT_SHA" ]; then
-                                        sed -i "s|version: .*|version: $COMMIT_SHA|g" "$oam_file"
-                                      fi
-                                      echo "✅ Updated vCluster OAM: $oam_file"
-                                    done
-                                  fi
-                                  
-                                  # Update any other OAM files containing the service
-                                  if [ ! -z "$OTHER_OAM_FILES" ]; then
-                                    for oam_file in $OTHER_OAM_FILES; do
-                                      if [ "$oam_file" != "$MAIN_OAM" ]; then
-                                        echo "📄 Updating additional OAM: $oam_file"
-                                        sed -i "s|image: .*/${service}:.*|image: $NEW_IMAGE|g" "$oam_file"
-                                        echo "✅ Updated: $oam_file"
-                                      fi
-                                    done
-                                  fi
-                                  
-                                  # Report if no files were found
-                                  if [ ! -f "$MAIN_OAM" ] && [ -z "$VCLUSTER_OAM_FILES" ] && [ -z "$OTHER_OAM_FILES" ]; then
-                                    echo "⚠️ Warning: Could not find any OAM files for $service"
-                                    echo "Available OAM files:"
-                                    find . -name "*.yaml" -path "*/oam/*" -o -path "*/vcluster/*" | head -20
-                                  fi
-                                done
-                      
-                            - name: Commit and push changes
-                              run: |
-                                # Configure git
-                                git config user.name "GitOps Bot"
-                                git config user.email "gitops-bot@github.com"
-                                
-                                # Check if there are changes
-                                if git diff --quiet; then
-                                  echo "ℹ️ No changes detected in GitOps manifests"
-                                else
-                                  echo "📋 Changes detected:"
-                                  git diff --name-only
-                                  
-                                  # Show what changed
-                                  echo "📝 Detailed changes:"
-                                  git diff
-                                  
-                                  # Commit changes
-                                  git add .
-                                  git commit -m "chore: update service deployments from source commit ${{ github.event.client_payload.source_commit }}
-                      
-                                  Services updated: ${{ github.event.client_payload.services }}
-                                  Source workflow: ${{ github.event.client_payload.workflow_run }}
-                                  Triggered by: repository_dispatch
-                                  
-                                  Updated images:
-                                  $(echo '${{ toJson(github.event.client_payload.deployments) }}' | jq -r 'to_entries[] | "- \(.key): \(.value.image)"' 2>/dev/null || echo "- Services: ${{ github.event.client_payload.services }}")"
-                                  
-                                  git push
-                                  
-                                  echo "✅ GitOps manifests updated and pushed successfully!"
-                                  echo "🔄 ArgoCD will now detect and deploy the changes"
-                                fi
-                      
-                            - name: Summary
-                              run: |
-                                echo "## 🎯 GitOps Deployment Update Complete" >> $GITHUB_STEP_SUMMARY
-                                echo "" >> $GITHUB_STEP_SUMMARY
-                                echo "**Services Updated:** ${{ github.event.client_payload.services }}" >> $GITHUB_STEP_SUMMARY
-                                echo "**Source Commit:** \`${{ github.event.client_payload.source_commit }}\`" >> $GITHUB_STEP_SUMMARY
-                                echo "**Registry:** ${{ github.event.client_payload.registry }}" >> $GITHUB_STEP_SUMMARY
-                                echo "" >> $GITHUB_STEP_SUMMARY
-                                echo "🚀 **Next Steps:** ArgoCD will detect manifest changes and deploy to cluster" >> $GITHUB_STEP_SUMMARY
-                      EOF
-                      
-                      # Create README
-                      cat > README.md << EOF
-                      # $APP_NAME GitOps Repository
-                      
-                      This repository contains the GitOps deployment manifests for the $APP_NAME application container.
-                      
-                      ## Structure
-                      
-                      \`\`\`
-                      $APP_NAME-gitops/
-                      ├── apps/                    # ArgoCD Applications
-                      │   ├── app-of-apps.yaml    # Main App of Apps
-                      │   └── environments/       # Environment-specific configs
-                      ├── oam/                     # OAM Applications and Components
-                      │   ├── applications/        # OAM Applications (edit here)
-                      │   ├── components/          # Generated OAM Components
-                      │   └── workflows/           # Workflow definitions
-                      ├── manifests/               # Kubernetes manifests per service
-                      │   ├── service-1/          # Each microservice directory
-                      │   └── service-2/
-                      └── .github/workflows/       # GitOps automation
-                      \`\`\`
-                      
-                      ## Deployment Flow
-                      
-                      1. Source repository CI/CD builds and pushes images
-                      2. Source CI/CD sends repository_dispatch to this repo
-                      3. GitOps workflow updates manifest files with new image tags
-                      4. ArgoCD detects changes and deploys to cluster
-                      
-                      ## ArgoCD Applications
-                      
-                      - **App of Apps**: `$APP_NAME-app-of-apps` - Main application managing all microservices
-                      - **ApplicationSet**: Automatically creates ArgoCD apps for each service in `manifests/`
-                      
-                      ## Adding New Services
-                      
-                      When ApplicationClaim creates a new microservice, it automatically:
-                      1. Creates a directory in manifests/[service-name]/
-                      2. Generates Knative service and OAM component manifests
-                      3. Updates the ApplicationSet to include the new service
-                      EOF
-                      
-                      # Commit and push
-                      # Idempotent: skip commit/push if nothing changed (handles Crossplane Object retries)
-                      git config user.name "GitOps Setup"
-                      git config user.email "gitops@platform.local"
-                      git add .
-                      git diff --cached --quiet || git commit -m "Initialize GitOps repository structure
-
-                      - Add ArgoCD App of Apps pattern
-                      - Add ApplicationSet for microservices
-                      - Add GitOps update automation
-                      - Add environment structure
-                      - Add OAM and manifests directories"
-                      git push origin HEAD || true
-                      
-                      # Setup GitHub repository secrets for GitOps workflows
-                      echo "Setting up GitHub repository secrets for GitOps..."
-                      
-                      # Get repository public key for secret encryption
-                      PUBLIC_KEY_RESPONSE=$(curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
-                        "https://api.github.com/repos/${GITHUB_REPO}-gitops/actions/secrets/public-key")
-                      
-                      PUBLIC_KEY=$(echo "$PUBLIC_KEY_RESPONSE" | jq -r '.key')
-                      KEY_ID=$(echo "$PUBLIC_KEY_RESPONSE" | jq -r '.key_id')
-                      
-                      if [ -z "$PUBLIC_KEY" ] || [ -z "$KEY_ID" ]; then
-                        echo "Warning: Could not retrieve public key for repository secrets"
-                      else
-                        # Install python for encryption
-                        # S-CP-004: Alpine 3.19+ python is PEP 668 externally-managed;
-                        # pip3 install needs --break-system-packages or a venv.
-                        apk add --no-cache python3 py3-pip
-                        pip3 install --break-system-packages pynacl
-                        
-                        # Create encryption script
-                        cat > /tmp/encrypt_secret.py << 'ENCRYPT_EOF'
-                      import sys
-                      import base64
-                      from nacl import encoding, public
-                      
-                      def encrypt_secret(public_key: str, secret_value: str) -> str:
-                          public_key = public.PublicKey(public_key.encode("utf-8"), encoding.Base64Encoder())
-                          sealed_box = public.SealedBox(public_key)
-                          encrypted = sealed_box.encrypt(secret_value.encode("utf-8"))
-                          return base64.b64encode(encrypted).decode("utf-8")
-                      
-                      if __name__ == "__main__":
-                          print(encrypt_secret(sys.argv[1], sys.argv[2]))
-                      ENCRYPT_EOF
-                        
-                        # Create PERSONAL_ACCESS_TOKEN secret for GitOps operations
-                        ENCRYPTED_TOKEN=$(python3 /tmp/encrypt_secret.py "$PUBLIC_KEY" "$GITHUB_TOKEN")
-                        curl -X PUT \
-                          -H "Authorization: token ${GITHUB_TOKEN}" \
-                          -H "Accept: application/vnd.github.v3+json" \
-                          "https://api.github.com/repos/${GITHUB_REPO}-gitops/actions/secrets/PERSONAL_ACCESS_TOKEN" \
-                          -d "{\"encrypted_value\":\"$ENCRYPTED_TOKEN\",\"key_id\":\"$KEY_ID\"}"
-                        
-                        echo "✅ GitOps repository secrets created successfully"
-                      fi
-                      
-                      echo "GitOps repository setup completed successfully"
-                    env:
-                    - name: APP_NAME
-                      value: placeholder
-                    - name: GITOPS_CLONE_URL
-                      value: placeholder
-                    - name: DEFAULT_REGISTRY
-                      value: acr  # Default to ACR for UAE deployment
-                    - name: GITHUB_TOKEN
-                      valueFrom:
-                        secretKeyRef:
-                          name: github-credentials
-                          key: token
-                    - name: GITHUB_REPO
-                      value: placeholder
-        providerConfigRef:
-          name: kubernetes-provider
-    patches:
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.manifest.metadata.name
-      transforms:
-      - type: string
-        string:
-          fmt: "%s-gitops-setup"
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[0].value
-    - type: CombineFromComposite
-      combine:
-        variables:
-        - fromFieldPath: spec.gitHubOrg
-        - fromFieldPath: spec.name
-        strategy: string
-        string:
-          fmt: "https://github.com/%s/%s-gitops.git"
-      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[1].value
-      policy:
-        fromFieldPath: Required
-    - type: CombineFromComposite
-      combine:
-        variables:
-        - fromFieldPath: spec.gitHubOrg
-        - fromFieldPath: spec.name
-        strategy: string
-        string:
-          fmt: "%s/%s"
-      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[4].value
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: metadata.name
-      transforms:
-      - type: string
-        string:
-          fmt: "%s-gitops-setup"
-
-  # Setup Repository Secrets and Variables
-  - name: repository-secrets-setup
-    base:
-      apiVersion: kubernetes.crossplane.io/v1alpha1
-      kind: Object
-      spec:
-        forProvider:
-          manifest:
-            apiVersion: batch/v1
-            kind: Job
-            metadata:
-              name: placeholder-secrets-setup
-              namespace: default
-            spec:
-              ttlSecondsAfterFinished: 600
-              backoffLimit: 2
-              template:
+                  ttlSecondsAfterFinished: 600
+                  backoffLimit: 2
+                  template:
+                    spec:
+                      serviceAccountName: crossplane-github-provider
+                      restartPolicy: OnFailure
+                      containers:
+                      - name: source-repo-setup
+                        image: alpine:3.18
+                        command:
+                        - /bin/sh
+                        - -c
+                        - "set -e\necho \"Setting up source repository structure for $APP_NAME...\"\n\n# Install required tools (including jq for JSON parsing)\n# Note: kubectl is not in Alpine repos, use curl to download it\napk add --no-cache git curl jq python3 py3-pip\n\n# Download kubectl binary\ncurl -LO \"https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl\"\nchmod +x kubectl\nmv kubectl /usr/local/bin/\n\nTEMP_DIR=\"/tmp/repo-$APP_NAME\"\nmkdir -p $TEMP_DIR\ncd $TEMP_DIR\n\n# Clone the repository\ngit clone $SOURCE_CLONE_URL .\n\n# Configure git with authentication for push\ngit config user.name \"AppContainer Setup\"\ngit config user.email \"appcontainer@platform.local\"\ngit remote set-url origin \"https://${GITHUB_TOKEN}@github.com/${GITHUB_REPO}.git\"\n\n# Create microservices container structure\nmkdir -p microservices\nmkdir -p shared-libs/common\nmkdir -p .github/workflows\nmkdir -p .github/scripts\n\n# Copy the version manager script\ncat > .github/scripts/version-manager.sh << 'EOF'\n#!/bin/bash\nset -e\n\n# Semantic Versioning Manager for GitOps\n# Generates semantic versions with commit SHA for container tagging\n\nSCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\nPROJECT_ROOT=\"$(cd \"$SCRIPT_DIR/../..\" && pwd)\"\n\n# Default values\nMAJOR_VERSION=1\nMINOR_VERSION=1\nBASE_VERSION_FILE=\"$PROJECT_ROOT/.version\"\n\n# Read base version from file if it exists\nif [ -f \"$BASE_VERSION_FILE\" ]; then\n    BASE_VERSION=$(cat \"$BASE_VERSION_FILE\")\n    MAJOR_VERSION=$(echo \"$BASE_VERSION\" | cut -d. -f1)\n    MINOR_VERSION=$(echo \"$BASE_VERSION\" | cut -d. -f2)\nfi\n\n# Function to get commit count for patch version\nget_patch_version() {\n    git rev-list --count HEAD 2>/dev/null || echo \"0\"\n}\n\n# Function to get short commit SHA\nget_commit_sha() {\n    git rev-parse --short=7 HEAD 2>/dev/null || echo \"unknown\"\n}\n\n# Function to get branch name (sanitized for container tags)\nget_branch_name() {\n    local branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo \"unknown\")\n    # Sanitize branch name for container registry\n    echo \"$branch\" | sed 's/[^a-zA-Z0-9._-]/-/g' | tr '[:upper:]' '[:lower:]'\n}\n\n# Function to check if this is a release branch\nis_release_branch() {\n    local branch=$(get_branch_name)\n    [[ \"$branch\" == \"main\" || \"$branch\" == \"master\" || \"$branch\" =~ ^release/.* ]]\n}\n\n# Function to generate semantic version\ngenerate_semantic_version() {\n    local service_name=\"$1\"\n    local commit_sha=$(get_commit_sha)\n    \n    # Use major.minor.sha format for Docker compatibility\n    local semver=\"$MAJOR_VERSION.$MINOR_VERSION.$commit_sha\"\n    \n    echo \"$semver\"\n}\n\n# Function to generate container tags\ngenerate_container_tags() {\n    local service_name=\"$1\"\n    local registry=\"${2:-docker.io/socrates12345}\"\n    local commit_sha=$(get_commit_sha)\n    local branch=$(get_branch_name)\n    local semver=$(generate_semantic_version \"$service_name\")\n    \n    # Base image name\n    local image_base=\"$registry/$service_name\"\n    \n    # Generate multiple tags\n    local tags=()\n    \n    # 1. Full semantic version tag\n    tags+=(\"$image_base:$semver\")\n    \n    # 2. Short SHA tag\n    tags+=(\"$image_base:$commit_sha\")\n    \n    # 3. Branch-specific tag\n    tags+=(\"$image_base:$branch-$commit_sha\")\n    \n    # 4. Latest tag for main/master branch\n    if is_release_branch; then\n        tags+=(\"$image_base:latest\")\n        tags+=(\"$image_base:$MAJOR_VERSION\")\n        tags+=(\"$image_base:$MAJOR_VERSION.$MINOR_VERSION\")\n    fi\n    \n    # 5. Development tag for feature branches\n    if [[ \"$branch\" == \"develop\" ]]; then\n        tags+=(\"$image_base:develop\")\n    fi\n    \n    # Return as comma-separated string\n    IFS=','\n    echo \"${tags[*]}\"\n}\n\n# Main function\nmain() {\n    local command=\"$1\"\n    local service_name=\"$2\"\n    local registry=\"${3:-docker.io/socrates12345}\"\n    \n    case \"$command\" in\n        \"version\")\n            generate_semantic_version \"$service_name\"\n            ;;\n        \"tags\")\n            generate_container_tags \"$service_name\" \"$registry\"\n            ;;\n        \"help\"|*)\n            cat << HELP_EOF\nUsage: $0 <command> [service_name] [registry]\n\nCommands:\n  version <service>           Generate semantic version\n  tags <service> [registry]   Generate container tags\n  help                        Show this help\n\nExamples:\n  $0 version accommodation-service\n  $0 tags accommodation-service\nHELP_EOF\n            ;;\n    esac\n}\n\n# Run main function with all arguments\nmain \"$@\"\nEOF\n\n# Make version manager executable\nchmod +x .github/scripts/version-manager.sh\n\n# Create .version file\necho \"1.1\" > .version\n\n# Copy the comprehensive GitOps workflow from template\nwget -q -O .github/workflows/comprehensive-gitops.yml https://raw.githubusercontent.com/shlapolosa/health-service-idp/main/crossplane/templates/comprehensive-gitops-template.yml || {\n  echo \"Failed to download workflow template, using fallback...\"\n  # Fallback: minimal workflow if template download fails\n  cat > .github/workflows/comprehensive-gitops.yml << 'FALLBACK_EOF'\nname: Comprehensive GitOps Pipeline\non:\n  push:\n    branches: [ main ]\n    paths: [ 'microservices/**' ]\nenv:\n  # Docker Hub settings (default)\n  DOCKERHUB_REGISTRY: docker.io\n  DOCKERHUB_USERNAME: socrates12345\n  # ACR settings\n  ACR_REGISTRY: healthidpuaeacr.azurecr.io\n  ACR_NAME: healthidpuaeacr\n  # Default registry selection\n  DEFAULT_REGISTRY: acr  # or 'dockerhub' or 'both'\n  # Legacy variables\n  REGISTRY: docker.io\n  REGISTRY_USERNAME: socrates12345\n  GITOPS_REPO: APP_NAME_PLACEHOLDER-gitops\njobs:\n  minimal-deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - name: Build and deploy\n        run: echo \"Minimal deployment pipeline activated\"\nFALLBACK_EOF\n}\n\n# Substitute app name in the workflow  \nsed -i \"s/APP_NAME_PLACEHOLDER/$APP_NAME/g\" .github/workflows/comprehensive-gitops.yml\n\n# Replace placeholders in workflow file\n\n# Create shared library structure\ncat > shared-libs/common/README.md << 'EOF'\n# Common Shared Library\n\nThis directory contains shared code and utilities used across all microservices in this app container.\n\n## Structure\n- src/ - Shared source code\n- tests/ - Shared tests\n- docs/ - Shared documentation\nEOF\n\n# Create microservices README\ncat > microservices/README.md << EOF\n# Microservices\n\nThis directory contains all microservices for the application container.\nEach subdirectory represents a single microservice following CLAUDE.md standards.\n\n## Adding New Microservices\n\nUse ApplicationClaim to add new microservices:\n\n\\`\\`\\`yaml\napiVersion: platform.example.org/v1alpha1\nkind: ApplicationClaim\nmetadata:\n  name: my-service\nspec:\n  appContainer: $APP_NAME\n  name: my-service\n  language: python\n  framework: fastapi\n  database: postgres\n  cache: redis\n\\`\\`\\`\n\n## Current Services\n\n- (Services will be listed here as they are added)\nEOF\n\n# Create main README\ncat > README.md << EOF\n# $APP_NAME Application Container\n\nCLAUDE.md-compliant microservices application container with GitOps deployment.\n\n## Architecture\n\nThis application container follows the CLAUDE.md development methodology:\n\n- **Microservices**: Each service in `microservices/` follows Onion Architecture\n- **Shared Libraries**: Common code in `shared-libs/`\n- **GitOps**: Automated deployment via companion GitOps repository\n- **CI/CD**: Automatic building and deployment of changed services\n\n## Structure\n\n\\`\\`\\`\n$APP_NAME/\n\u251C\u2500\u2500 microservices/          # Individual microservices\n\u251C\u2500\u2500 shared-libs/           # Shared libraries and utilities  \n\u251C\u2500\u2500 .github/workflows/     # CI/CD pipelines\n\u2514\u2500\u2500 README.md              # This file\n\\`\\`\\`\n\n## Development Workflow\n\n1. Create microservices using ApplicationClaim in your vCluster\n2. CI/CD automatically detects changes in `microservices/`\n3. Changed services are built and deployed via GitOps\n4. Monitor deployments in ArgoCD\n\n## Adding New Services\n\nEdit the OAM Application in the GitOps repository:\n\n\\`\\`\\`yaml\n# File: oam/application.yaml\napiVersion: core.oam.dev/v1beta1\nkind: Application\nmetadata:\n  name: $APP_NAME\nspec:\n  components:\n  - name: my-service\n    type: microservice-with-db\n    properties:\n      language: python\n      framework: fastapi\n      database: postgres\n      cache: redis\n\\`\\`\\`\n\n## GitOps Repository\n\nDeployment manifests are managed in the companion GitOps repository:\n`$GITOPS_CLONE_URL`\nEOF\n\n# Create two separate commits to ensure GitHub Actions detect-changes works\ngit config user.name \"AppContainer Setup\"\ngit config user.email \"appcontainer@platform.local\"\n\n# First commit: Initial README only\n# Idempotent: skip commit/push if nothing changed (handles Crossplane Object retries)\necho \"# $APP_NAME\" > README.md\necho \"\" >> README.md\necho \"CLAUDE.md-compliant microservice application container.\" >> README.md\ngit add README.md\ngit diff --cached --quiet || git commit -m \"Initial commit - create repository\"\n\n# Second commit: Add all microservice structure\ngit add .\ngit diff --cached --quiet || git commit -m \"Initialize CLAUDE.md-compliant app container structure\n\n- Add microservices directory structure\n- Add comprehensive GitOps CI/CD pipeline\n- Add shared libraries framework\n- Add documentation and examples\n- Follow CLAUDE.md development methodology\"\n\ngit push origin HEAD || true\n\necho \"Source repository structure created successfully with 2 commits\"\n\n# Setup GitHub repository secrets for CI/CD\necho \"Setting up GitHub repository secrets...\"\n\n# Get repository public key for secret encryption\nPUBLIC_KEY_RESPONSE=$(curl\
+                          \ -s -H \"Authorization: token ${GITHUB_TOKEN}\" \\\n  \"https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/public-key\")\n\nPUBLIC_KEY=$(echo \"$PUBLIC_KEY_RESPONSE\" | jq -r '.key')\nKEY_ID=$(echo \"$PUBLIC_KEY_RESPONSE\" | jq -r '.key_id')\n\nif [ -z \"$PUBLIC_KEY\" ] || [ -z \"$KEY_ID\" ]; then\n  echo \"Warning: Could not retrieve public key for repository secrets\"\nelse\n  # Install python for encryption\n  # S-CP-004: Alpine 3.19+ python is PEP 668 externally-managed;\n  # pip3 install needs --break-system-packages or a venv.\n  apk add --no-cache python3 py3-pip\n  pip3 install --break-system-packages pynacl\n  \n  # Create encryption script\n  cat > /tmp/encrypt_secret.py << 'ENCRYPT_EOF'\nimport sys\nimport base64\nfrom nacl import encoding, public\n\ndef encrypt_secret(public_key: str, secret_value: str) -> str:\n    public_key = public.PublicKey(public_key.encode(\"utf-8\"), encoding.Base64Encoder())\n    sealed_box = public.SealedBox(public_key)\n    encrypted = sealed_box.encrypt(secret_value.encode(\"utf-8\"))\n    return base64.b64encode(encrypted).decode(\"utf-8\")\n\nif __name__ == \"__main__\":\n    print(encrypt_secret(sys.argv[1], sys.argv[2]))\nENCRYPT_EOF\n  \n  # Create PERSONAL_ACCESS_TOKEN secret\n  ENCRYPTED_TOKEN=$(python3 /tmp/encrypt_secret.py \"$PUBLIC_KEY\" \"$GITHUB_TOKEN\")\n  curl -X PUT \\\n    -H \"Authorization: token ${GITHUB_TOKEN}\" \\\n    -H \"Accept: application/vnd.github.v3+json\" \\\n    \"https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/PERSONAL_ACCESS_TOKEN\" \\\n    -d \"{\\\"encrypted_value\\\":\\\"$ENCRYPTED_TOKEN\\\",\\\"key_id\\\":\\\"$KEY_ID\\\"}\"\n  \n  # Get Docker password from secret (using docker-credentials which has plain password field)\n  DOCKER_PASSWORD=$(kubectl get secret docker-credentials -n default -o jsonpath='{.data.password}' | base64 -d)\n  \n  if [ -n \"$DOCKER_PASSWORD\" ]; then\n    # Create DOCKER_PASSWORD secret\n    ENCRYPTED_PASSWORD=$(python3 /tmp/encrypt_secret.py \"$PUBLIC_KEY\" \"$DOCKER_PASSWORD\")\n    curl -X PUT \\\n      -H \"Authorization: token ${GITHUB_TOKEN}\" \\\n      -H \"Accept: application/vnd.github.v3+json\" \\\n      \"https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/DOCKER_PASSWORD\" \\\n      -d \"{\\\"encrypted_value\\\":\\\"$ENCRYPTED_PASSWORD\\\",\\\"key_id\\\":\\\"$KEY_ID\\\"}\"\n    \n    echo \"\u2705 Docker Hub secret created\"\n  else\n    echo \"\u26A0\uFE0F  Docker password not found in secret\"\n  fi\n  \n  # Get Azure credentials from secret if it exists\n  AZURE_CREDS=$(kubectl get secret azure-credentials -n default -o jsonpath='{.data.azure-creds\\.json}' 2>/dev/null | base64 -d 2>/dev/null || echo \"\")\n  \n  if [ -n \"$AZURE_CREDS\" ]; then\n    # Create AZURE_CREDENTIALS secret for GitHub Actions\n    ENCRYPTED_AZURE=$(python3 /tmp/encrypt_secret.py \"$PUBLIC_KEY\" \"$AZURE_CREDS\")\n    curl -X PUT \\\n      -H \"Authorization: token ${GITHUB_TOKEN}\" \\\n      -H \"Accept: application/vnd.github.v3+json\" \\\n      \"https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/AZURE_CREDENTIALS\" \\\n      -d \"{\\\"encrypted_value\\\":\\\"$ENCRYPTED_AZURE\\\",\\\"key_id\\\":\\\"$KEY_ID\\\"}\"\n    \n    echo \"\u2705 Azure credentials secret created\"\n  else\n    echo \"\u26A0\uFE0F  Azure credentials not found (optional)\"\n  fi\n  \n  echo \"\u2705 GitHub secrets setup completed\"\nfi\n\necho \"Source repository setup completed successfully\"\n"
+                        env:
+                        - name: APP_NAME
+                          value: placeholder
+                        - name: SOURCE_CLONE_URL
+                          value: placeholder
+                        - name: GITOPS_CLONE_URL
+                          value: placeholder
+                        - name: DOCKER_REGISTRY_USER
+                          value: placeholder
+                        - name: GITHUB_TOKEN
+                          valueFrom:
+                            secretKeyRef:
+                              name: github-credentials
+                              key: token
+                        - name: GITHUB_REPO
+                          value: placeholder
+            providerConfigRef:
+              name: kubernetes-provider
+        patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.name
+          toFieldPath: spec.forProvider.manifest.metadata.name
+          transforms:
+          - type: string
+            string:
+              fmt: '%s-source-setup'
+              type: Format
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.name
+          toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[0].value
+        - type: CombineFromComposite
+          combine:
+            variables:
+            - fromFieldPath: spec.gitHubOrg
+            - fromFieldPath: spec.name
+            strategy: string
+            string:
+              fmt: https://github.com/%s/%s.git
+          toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[1].value
+        - type: CombineFromComposite
+          combine:
+            variables:
+            - fromFieldPath: spec.gitHubOrg
+            - fromFieldPath: spec.name
+            strategy: string
+            string:
+              fmt: https://github.com/%s/%s-gitops.git
+          toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[2].value
+          policy:
+            fromFieldPath: Required
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.gitHubOrg
+          toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[3].value
+        - type: CombineFromComposite
+          combine:
+            variables:
+            - fromFieldPath: spec.gitHubOrg
+            - fromFieldPath: spec.name
+            strategy: string
+            string:
+              fmt: '%s/%s'
+          toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[5].value
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.name
+          toFieldPath: metadata.name
+          transforms:
+          - type: string
+            string:
+              fmt: '%s-source-setup'
+              type: Format
+      - name: gitops-repo-setup
+        base:
+          apiVersion: kubernetes.crossplane.io/v1alpha1
+          kind: Object
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: batch/v1
+                kind: Job
+                metadata:
+                  name: placeholder
+                  namespace: default
                 spec:
-                  restartPolicy: Never
-                  containers:
-                  - name: setup
-                    image: python:3.11-slim
-                    command:
-                    - /bin/sh
-                    - -c
-                    - |
-                      # Install required packages
-                      apt-get update && apt-get install -y curl jq git
-                      # S-CP-004: defensive --break-system-packages for newer python images
-                      pip install --break-system-packages pynacl requests 2>/dev/null || pip install pynacl requests
-                      
-                      echo "Setting up repository secrets and variables..."
-                      
-                      # Set repository variables for GitHub Actions
-                      echo "Creating repository variables..."
-                      curl -X PATCH \
-                        -H "Authorization: token ${GITHUB_TOKEN}" \
-                        -H "Accept: application/vnd.github.v3+json" \
-                        "https://api.github.com/repos/${GITHUB_REPO}/actions/variables/DOCKER_REGISTRY_USER" \
-                        -d '{"name":"DOCKER_REGISTRY_USER","value":"socrates12345"}' || \
-                      curl -X POST \
-                        -H "Authorization: token ${GITHUB_TOKEN}" \
-                        -H "Accept: application/vnd.github.v3+json" \
-                        "https://api.github.com/repos/${GITHUB_REPO}/actions/variables" \
-                        -d '{"name":"DOCKER_REGISTRY_USER","value":"socrates12345"}'
-                      
-                      curl -X PATCH \
-                        -H "Authorization: token ${GITHUB_TOKEN}" \
-                        -H "Accept: application/vnd.github.v3+json" \
-                        "https://api.github.com/repos/${GITHUB_REPO}/actions/variables/APP_NAME" \
-                        -d "{\"name\":\"APP_NAME\",\"value\":\"${APP_NAME}\"}" || \
-                      curl -X POST \
-                        -H "Authorization: token ${GITHUB_TOKEN}" \
-                        -H "Accept: application/vnd.github.v3+json" \
-                        "https://api.github.com/repos/${GITHUB_REPO}/actions/variables" \
-                        -d "{\"name\":\"APP_NAME\",\"value\":\"${APP_NAME}\"}"
-                      
-                      # Get public key for secret encryption
-                      echo "Creating repository secrets..."
-                      PUBLIC_KEY_DATA=$(curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
-                        "https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/public-key")
-                      
-                      PUBLIC_KEY=$(echo "$PUBLIC_KEY_DATA" | jq -r .key)
-                      KEY_ID=$(echo "$PUBLIC_KEY_DATA" | jq -r .key_id)
-                      
-                      # Create Python script to properly encrypt secrets
-                      cat > encrypt_secret.py << 'EOF'
-                      import base64
-                      import sys
-                      from nacl import encoding, public
-                      
-                      def encrypt_secret(public_key_b64, secret_value):
-                          """Encrypt a secret using GitHub's public key"""
-                          public_key = public.PublicKey(public_key_b64.encode("utf-8"), encoding.Base64Encoder())
-                          sealed_box = public.SealedBox(public_key)
-                          encrypted = sealed_box.encrypt(secret_value.encode("utf-8"))
-                          return base64.b64encode(encrypted).decode("utf-8")
-                      
-                      if __name__ == "__main__":
-                          public_key = sys.argv[1]
-                          secret_value = sys.argv[2]
-                          print(encrypt_secret(public_key, secret_value))
-                      EOF
-                      
-                      # Create PERSONAL_ACCESS_TOKEN secret with proper encryption
-                      ENCRYPTED_TOKEN=$(python encrypt_secret.py "$PUBLIC_KEY" "$GITHUB_TOKEN")
-                      curl -X PUT \
-                        -H "Authorization: token ${GITHUB_TOKEN}" \
-                        -H "Accept: application/vnd.github.v3+json" \
-                        "https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/PERSONAL_ACCESS_TOKEN" \
-                        -d "{\"encrypted_value\":\"$ENCRYPTED_TOKEN\",\"key_id\":\"$KEY_ID\"}"
-                      
-                      # Create DOCKER_PASSWORD secret with proper encryption
-                      ENCRYPTED_PASSWORD=$(python encrypt_secret.py "$PUBLIC_KEY" "$DOCKER_PASSWORD")
-                      curl -X PUT \
-                        -H "Authorization: token ${GITHUB_TOKEN}" \
-                        -H "Accept: application/vnd.github.v3+json" \
-                        "https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/DOCKER_PASSWORD" \
-                        -d "{\"encrypted_value\":\"$ENCRYPTED_PASSWORD\",\"key_id\":\"$KEY_ID\"}"
-                      
-                      # Get Azure credentials from secret if it exists
-                      AZURE_CREDS=$(kubectl get secret azure-credentials -n default -o jsonpath='{.data.azure-creds\.json}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
-                      
-                      if [ -n "$AZURE_CREDS" ]; then
-                        # Create AZURE_CREDENTIALS secret for GitHub Actions
-                        ENCRYPTED_AZURE=$(python encrypt_secret.py "$PUBLIC_KEY" "$AZURE_CREDS")
-                        curl -X PUT \
-                          -H "Authorization: token ${GITHUB_TOKEN}" \
-                          -H "Accept: application/vnd.github.v3+json" \
-                          "https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/AZURE_CREDENTIALS" \
-                          -d "{\"encrypted_value\":\"$ENCRYPTED_AZURE\",\"key_id\":\"$KEY_ID\"}"
-                        echo "✅ Azure credentials secret created"
-                      else
-                        echo "⚠️  Azure credentials not found (optional)"
-                      fi
-                      
-                      echo "Repository setup completed successfully!"
-                    env:
-                    - name: GITHUB_TOKEN
-                      valueFrom:
-                        secretKeyRef:
-                          name: github-credentials
-                          key: token
-                    - name: DOCKER_PASSWORD
-                      valueFrom:
-                        secretKeyRef:
-                          name: docker-credentials
-                          key: password
-                    - name: GITHUB_REPO
-                      value: placeholder
-                    - name: APP_NAME
-                      value: placeholder
-        providerConfigRef:
-          name: kubernetes-provider
-    patches:
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.manifest.metadata.name
-      transforms:
-      - type: string
-        string:
-          fmt: "%s-secrets-setup"
-    - type: CombineFromComposite
-      combine:
-        variables:
-        - fromFieldPath: spec.gitHubOrg
-        - fromFieldPath: spec.name
-        strategy: string
-        string:
-          fmt: "%s/%s"
-      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[2].value
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[3].value
-    - type: FromCompositeFieldPath
-      fromFieldPath: spec.name
-      toFieldPath: metadata.name
-      transforms:
-      - type: string
-        string:
-          fmt: "%s-secrets-setup"
+                  ttlSecondsAfterFinished: 600
+                  backoffLimit: 2
+                  template:
+                    spec:
+                      serviceAccountName: crossplane-github-provider
+                      restartPolicy: OnFailure
+                      containers:
+                      - name: gitops-repo-setup
+                        image: alpine/git:2.43.0
+                        command:
+                        - /bin/sh
+                        - -c
+                        - "set -e\n# S-CP-002 fix: alpine/git lacks curl/jq; the secret-setup\n# block below uses curl + jq to call api.github.com. Install\n# them once at the top so `set -e` never sees `curl: not found`.\napk add --no-cache curl jq >/dev/null\necho \"Setting up GitOps repository structure for $APP_NAME...\"\n\nTEMP_DIR=\"/tmp/gitops-$APP_NAME\"\nmkdir -p $TEMP_DIR\ncd $TEMP_DIR\n\n# Clone the GitOps repository with authentication\ngit clone \"https://${GITHUB_TOKEN}@github.com/${GITHUB_REPO}-gitops.git\" .\n\n# Configure git for commits\ngit config user.name \"GitOps Setup\"\ngit config user.email \"gitops@platform.local\"\n\n# Create GitOps structure matching OAM-DRIVEN-DEVELOPMENT-GUIDE.md\nmkdir -p apps\nmkdir -p apps/environments/{dev,staging,production}\nmkdir -p oam/applications\nmkdir -p oam/components  \nmkdir -p oam/workflows\nmkdir -p manifests\nmkdir -p .github/workflows\n\n# Determine registry based on configuration\nDEFAULT_REGISTRY=\"${DEFAULT_REGISTRY:-acr}\"  # Default to ACR\n\nif [ \"$DEFAULT_REGISTRY\" = \"acr\" ]; then\n  IMAGE_REGISTRY=\"healthidpuaeacr.azurecr.io\"\n  IMAGE_PREFIX=\"\"\nelse\n  IMAGE_REGISTRY=\"docker.io\"\n  IMAGE_PREFIX=\"socrates12345/\"\nfi\n\n# Create blank OAM Application template\n# Always use default namespace for OAM (where WorkloadDefinitions exist)\n# S-CP-005 fix: only write if file does not already exist (or contains\n# only the placeholder shape). On Crossplane Object retry this Job re-runs,\n# and previously it clobbered oam-updater's commits \u2014 which had correctly\n# written `clusters: [\"host\"]` (or removed the topology policy entirely\n# for host deployments) \u2014 with this stale placeholder.\n# The topology policy is added by oam-updater (application-claim-composition)\n# based on ApplicationClaim.spec.targetVCluster. Do NOT bake it into the\n# blank template \u2014 for host deployments the topology policy must be ABSENT,\n# and hardcoding `clusters: [\"$APP_NAME\"]` here misroutes deploys when the\n# template is the file the workflow ends up with.\nif [ -f oam/applications/application.yaml ] && ! grep -q \"Will be updated with actual vCluster name\" oam/applications/application.yaml; then\n  echo \"\U0001F4C4 oam/applications/application.yaml already exists with non-template content \u2014 preserving\"\nelse\ncat > oam/applications/application.yaml << EOF\napiVersion: core.oam.dev/v1beta1\nkind: Application\nmetadata:\n  name: $APP_NAME\n  namespace: default\nspec:\n  components:\n  - name: $APP_NAME\n    type: webservice\n    properties:\n      name: $APP_NAME\n      image: ${IMAGE_REGISTRY}/${IMAGE_PREFIX}$APP_NAME:latest\n      language: python\n      framework: fastapi\n      port: 8080\n      healthPath: /health\n      database: postgres\n      cache: redis\n  # NOTE: topology policy intentionally omitted \u2014 added by oam-updater\n  # when targetVCluster != \"host\". Host deployments need no topology policy.\n  # Add your components here using the following types:\n  # - microservice-with-db: Full-featured microservice with database and cache\n  # - react-frontend: React TypeScript frontend with Material-UI\n  # - static-site: Static website hosting\n  # - kafka-service: Event streaming service\n  # - data-pipeline: ETL and data processing workflows\n  # \n  # Example:\n  # components:\n  # - name: api-backend\n  #   type: microservice-with-db\n  #   properties:\n  #     language: python\n  #     framework: fastapi\n  #     database: postgres\n  #     cache: redis\n  #     exposeApi: true\n  # - name: web-frontend\n  #   type: react-frontend\n  #   properties:\n  #     framework: react\n  #     styling: material-ui\n  #     apiEndpoint: /api\n  \n  # Note: Workflow orchestration is handled by KubeVela WorkflowStepDefinitions\n  # installed in the cluster, not embedded in the application spec.\n  # See /crossplane/oam/workflow-step-definitions.yaml for orchestration logic.\nEOF\nfi\n\n# Create workflow templates directory\ncat > oam/workflows/README.md << 'EOF'\n# OAM Workflows\n\nThis directory contains KubeVela workflow definitions for managing application lifecycle.\n\n## Available Workflows\n\n- crossplane-integration.yaml - Handles OAM \u2192 Crossplane ApplicationClaim creation\n- dependency-management.yaml - Manages component dependencies and ordering\n- failure-recovery.yaml - Handles failure scenarios and cleanup\n\n## Usage\n\nWorkflows are automatically triggered when OAM Applications are created or updated.\nThe system handles:\n\n1. **Infrastructure Provisioning**: Databases, caches, messaging systems\n2. **Application Deployment**: Microservices, frontends, static sites\n3. **Pipeline Orchestration**: Data processing workflows\n4. **Dependency Management**: Proper ordering and readiness checks\n5. **Failure Recovery**: Cleanup and retry mechanisms\nEOF\n\n# Create components directory with examples\ncat > oam/components/README.md << EOF\n# OAM Components\n\nThis directory contains generated OAM Component definitions created by ApplicationClaims.\n\n## Generated Components\n\nWhen you add components to `oam/applications/application.yaml`, the system automatically:\n\n1. Creates ApplicationClaims in the vCluster\n2. Generates OAM Component definitions here\n3. Creates Kubernetes manifests in `../manifests/`\n4. Updates ArgoCD applications for deployment\n\n## Component Types\n\n- **microservice-with-db**: Full-featured microservice with database and cache\n- **react-frontend**: React TypeScript frontend with Material-UI\n- **static-site**: Static website hosting\n- **kafka-service**: Event streaming service\n- **data-pipeline**: ETL and data processing workflows\n\n## Example Generated Component\n\n\\`\\`\\`yaml\napiVersion: core.oam.dev/v1beta1\nkind: Component\nmetadata:\n  name: user-service\n  namespace: $APP_NAME\nspec:\n  workload:\n    apiVersion: serving.knative.dev/v1\n    kind: Service\n    metadata:\n      name: user-service\n    spec:\n      template:\n        spec:\n          containers:\n          - name: user-service\n            image: docker.io/socrates12345/user-service:latest\n  parameters:\n  - name: image\n    fieldPaths: [\"spec.template.spec.containers[0].image\"]\n\\`\\`\\`\nEOF\n\n# Create OAM Application ArgoCD Application\ncat > apps/oam-application.yaml << EOF\napiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: $APP_NAME-oam-app\n  namespace: argocd\n  finalizers:\n    - resources-finalizer.argocd.argoproj.io\n  annotations:\n    argocd.argoproj.io/sync-wave: \"1\"\n    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: \"deployments\"\nspec:\n  project: default\n  source:\n    repoURL: $GITOPS_CLONE_URL\n    targetRevision: HEAD\n    path: oam/applications\n  destination:\n    server: https://kubernetes.default.svc\n    namespace: $APP_NAME\n  syncPolicy:\n    automated:\n      prune: true\n      selfHeal: true\n    syncOptions:\n      - CreateNamespace=true\n      - RespectIgnoreDifferences=true\n    retry:\n      limit: 5\n      backoff:\n        duration: 5s\n        factor: 2\n        maxDuration: 3m\n  # Watch for changes in OAM Application\n  info:\n  - name: Description\n    value: OAM Application that drives Crossplane ApplicationClaim creation\n  - name: Workflow\n    value: Automatically creates ApplicationClaims when OAM components are added\nEOF\n\n# Create ArgoCD Application for OAM Applications\ncat > apps/oam-application.yaml << EOF\napiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: $APP_NAME-oam-application\n  namespace: argocd\n  annotations:\n    argocd.argoproj.io/sync-wave: \"2\"\nspec:\n  project: default\n  source:\n    repoURL: $GITOPS_CLONE_URL\n    targetRevision: HEAD\n    path: oam/applications\n  destination:\n    server: https://kubernetes.default.svc\n    namespace: vela-system\n  syncPolicy:\n    automated:\n      prune: true\n      selfHeal: true\n    syncOptions:\n      - CreateNamespace=true\n      - ServerSideApply=true\nEOF\n\n# Create App of Apps ArgoCD Application\n# S-CP-006: app-of-apps manages other Application resources, which live in\n# the argocd namespace \u2014 destination MUST be argocd, NOT $APP_NAME. Previous\n# value caused permanent OutOfSync drift (parent app tries to create child\n# Applications in service ns, but they actually live in argocd ns).\ncat > apps/app-of-apps.yaml << EOF\napiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: $APP_NAME-app-of-apps\n  namespace: argocd\n  finalizers:\n    - resources-finalizer.argocd.argoproj.io\nspec:\n  project: default\n  source:\n    repoURL: $GITOPS_CLONE_URL\n    targetRevision: HEAD\n    path: apps\n  destination:\n    server: https://kubernetes.default.svc\n    namespace: argocd\n  syncPolicy:\n    automated:\n      prune: true\n      selfHeal: true\n    syncOptions:\n      - CreateNamespace=true\nEOF\n\n# Create ApplicationSet for microservices\n\n# Create OAM trigger workflow for GitOps changes\ncat > .github/workflows/oam-sync-trigger.yml << 'EOF'\nname: OAM Sync Trigger\n\non:\n  push:\n    branches: [ main ]\n    paths:\n      - 'oam/applications/**'\n      - 'oam/components/**'\n  workflow_dispatch:\n\njobs:\n  trigger-argocd-sync:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Checkout code\n        uses: actions/checkout@v4\n      \n      - name: Trigger ArgoCD Sync\n        run: |\n          echo \"\U0001F504 OAM files changed, triggering ArgoCD sync...\"\n          # ArgoCD will automatically sync due to automated sync policy\n          # This workflow ensures the change is tracked and logged\n          \n      - name: Log OAM Changes\n        run: |\n          echo \"\U0001F4DD OAM Application changes detected:\"\n          git diff HEAD~1 HEAD -- oam/applications/ oam/components/ || true\n          echo \"\u2705 Changes will be synced to cluster via ArgoCD\"\nEOF\n\n# Create GitOps update workflow from template\ncat > .github/workflows/deployment-update.yml << 'EOF'\nname: GitOps Deployment\
+                          \ Update\n\non:\n  repository_dispatch:\n    types: [update-deployments, simple-update]\n\npermissions:\n  contents: write\n\njobs:\n  update-manifests:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Checkout GitOps repository\n        uses: actions/checkout@v4\n        with:\n          token: ${{ secrets.GITHUB_TOKEN }}\n\n      - name: Update deployment manifests\n        run: |\n          echo \"\U0001F680 Processing GitOps deployment update...\"\n          \n          # Extract dispatch payload\n          SERVICES=\"${{ github.event.client_payload.services }}\"\n          VERSION_INFO=\"${{ github.event.client_payload.version_info }}\"\n          SOURCE_COMMIT=\"${{ github.event.client_payload.source_commit }}\"\n          REGISTRY=\"${{ github.event.client_payload.registry }}\"\n          WORKFLOW_RUN=\"${{ github.event.client_payload.workflow_run }}\"\n          \n          echo \"Services to update: $SERVICES\"\n          echo \"Version info: $VERSION_INFO\" \n          echo \"Source commit: $SOURCE_COMMIT\"\n          echo \"Registry: $REGISTRY\"\n          \n          # Handle different event types\n          if [ \"${{ github.event.action }}\" = \"simple-update\" ]; then\n            echo \"\U0001F4CB Processing simple-update event\"\n            COMMIT_SHA=\"${{ github.event.client_payload.commit_sha }}\"\n          else\n            echo \"\U0001F4CB Processing update-deployments event\"\n            # Parse deployments from payload\n            DEPLOYMENTS='${{ toJson(github.event.client_payload.deployments) }}'\n            echo \"Deployments: $DEPLOYMENTS\"\n          fi\n          \n          # Update each service's manifest\n          IFS=',' read -ra SERVICE_ARRAY <<< \"$SERVICES\"\n          \n          for service in \"${SERVICE_ARRAY[@]}\"; do\n            echo \"\U0001F504 Updating $service manifest...\"\n            \n            if [ \"${{ github.event.action }}\" = \"simple-update\" ]; then\n              # Simple update: construct image from registry and commit\n              NEW_IMAGE=\"${REGISTRY}/$service:$COMMIT_SHA\"\n            else\n              # Complex update: extract from deployments JSON\n              echo \"\U0001F50D Parsing deployments JSON for service: $service\"\n              echo \"Raw deployments: $DEPLOYMENTS\"\n              \n              # Parse the JSON string (it comes as a string, not object)\n              DEPLOYMENTS_PARSED=$(echo \"$DEPLOYMENTS\" | jq -r '. // empty')\n              if [ \"$DEPLOYMENTS_PARSED\" = \"null\" ] || [ -z \"$DEPLOYMENTS_PARSED\" ]; then\n                # Try parsing as raw string\n                DEPLOYMENTS_PARSED=\"$DEPLOYMENTS\"\n              fi\n              \n              NEW_IMAGE=$(echo \"$DEPLOYMENTS_PARSED\" | jq -r \".\\\"$service\\\".image // empty\")\n              COMMIT_SHA=$(echo \"$DEPLOYMENTS_PARSED\" | jq -r \".\\\"$service\\\".commit // empty\")\n              \n              echo \"Extracted - Image: $NEW_IMAGE, Commit: $COMMIT_SHA\"\n              \n              if [ -z \"$NEW_IMAGE\" ] || [ \"$NEW_IMAGE\" = \"null\" ]; then\n                echo \"\u26A0\uFE0F No image found for service $service in deployments payload\"\n                echo \"Available keys in deployments:\"\n                echo \"$DEPLOYMENTS_PARSED\" | jq -r 'keys[]?' 2>/dev/null || echo \"Failed to parse keys\"\n                continue\n              fi\n            fi\n            \n            echo \"\U0001F4DD Updating $service to image: $NEW_IMAGE\"\n            \n            # Update multiple OAM file locations\n            # 1. Main OAM application file\n            MAIN_OAM=\"oam/applications/application.yaml\"\n            \n            # 2. Service-specific OAM files in vcluster directories\n            VCLUSTER_OAM_FILES=$(find . -path \"*/vcluster/*/applications/${service}/oam-application.yaml\" 2>/dev/null)\n            \n            # 3. Look for any OAM file containing the service\n            OTHER_OAM_FILES=$(grep -l \"name: ${service}\" oam/**/*.yaml 2>/dev/null || true)\n            \n            # Update main OAM file if it exists and contains the service\n            if [ -f \"$MAIN_OAM\" ] && grep -q \"name: ${service}\" \"$MAIN_OAM\"; then\n              echo \"\U0001F4C4 Updating main OAM: $MAIN_OAM\"\n              echo \"Current image line:\"\n              grep \"image:\" \"$MAIN_OAM\" | head -1\n              # Update image - handle both with and without registry prefix\n              sed -i \"s|image: docker.io/socrates12345/${service}:.*|image: $NEW_IMAGE|g\" \"$MAIN_OAM\"\n              sed -i \"s|image: ${service}:.*|image: $NEW_IMAGE|g\" \"$MAIN_OAM\"\n              echo \"Updated image line:\"\n              grep \"image:\" \"$MAIN_OAM\" | head -1\n              echo \"\u2705 Updated main OAM manifest\"\n            fi\n            \n            # Update vCluster-specific OAM files\n            if [ ! -z \"$VCLUSTER_OAM_FILES\" ]; then\n              for oam_file in $VCLUSTER_OAM_FILES; do\n                echo \"\U0001F4C4 Updating vCluster OAM: $oam_file\"\n                sed -i \"s|image: .*/${service}:.*|image: $NEW_IMAGE|g\" \"$oam_file\"\n                \n                # Update version labels if they exist\n                if [ ! -z \"$COMMIT_SHA\" ]; then\n                  sed -i \"s|version: .*|version: $COMMIT_SHA|g\" \"$oam_file\"\n                fi\n                echo \"\u2705 Updated vCluster OAM: $oam_file\"\n              done\n            fi\n            \n            # Update any other OAM files containing the service\n            if [ ! -z \"$OTHER_OAM_FILES\" ]; then\n              for oam_file in $OTHER_OAM_FILES; do\n                if [ \"$oam_file\" != \"$MAIN_OAM\" ]; then\n                  echo \"\U0001F4C4 Updating additional OAM: $oam_file\"\n                  sed -i \"s|image: .*/${service}:.*|image: $NEW_IMAGE|g\" \"$oam_file\"\n                  echo \"\u2705 Updated: $oam_file\"\n                fi\n              done\n            fi\n            \n            # Report if no files were found\n            if [ ! -f \"$MAIN_OAM\" ] && [ -z \"$VCLUSTER_OAM_FILES\" ] && [ -z \"$OTHER_OAM_FILES\" ]; then\n              echo \"\u26A0\uFE0F Warning: Could not find any OAM files for $service\"\n              echo \"Available OAM files:\"\n              find . -name \"*.yaml\" -path \"*/oam/*\" -o -path \"*/vcluster/*\" | head -20\n            fi\n          done\n\n      - name: Commit and push changes\n        run: |\n          # Configure git\n          git config user.name \"GitOps Bot\"\n          git config user.email \"gitops-bot@github.com\"\n          \n          # Check if there are changes\n          if git diff --quiet; then\n            echo \"\u2139\uFE0F No changes detected in GitOps manifests\"\n          else\n            echo \"\U0001F4CB Changes detected:\"\n            git diff --name-only\n            \n            # Show what changed\n            echo \"\U0001F4DD Detailed changes:\"\n            git diff\n            \n            # Commit changes\n            git add .\n            git commit -m \"chore: update service deployments from source commit ${{ github.event.client_payload.source_commit }}\n\n            Services updated: ${{ github.event.client_payload.services }}\n            Source workflow: ${{ github.event.client_payload.workflow_run }}\n            Triggered by: repository_dispatch\n            \n            Updated images:\n            $(echo '${{ toJson(github.event.client_payload.deployments) }}' | jq -r 'to_entries[] | \"- \\(.key): \\(.value.image)\"' 2>/dev/null || echo \"- Services: ${{ github.event.client_payload.services }}\")\"\n            \n            git push\n            \n            echo \"\u2705 GitOps manifests updated and pushed successfully!\"\n            echo \"\U0001F504 ArgoCD will now detect and deploy the changes\"\n          fi\n\n      - name: Summary\n        run: |\n          echo \"## \U0001F3AF GitOps Deployment Update Complete\" >> $GITHUB_STEP_SUMMARY\n          echo \"\" >> $GITHUB_STEP_SUMMARY\n          echo \"**Services Updated:** ${{ github.event.client_payload.services }}\" >> $GITHUB_STEP_SUMMARY\n          echo \"**Source Commit:** \\`${{ github.event.client_payload.source_commit }}\\`\" >> $GITHUB_STEP_SUMMARY\n          echo \"**Registry:** ${{ github.event.client_payload.registry }}\" >> $GITHUB_STEP_SUMMARY\n          echo \"\" >> $GITHUB_STEP_SUMMARY\n          echo \"\U0001F680 **Next Steps:** ArgoCD will detect manifest changes and deploy to cluster\" >> $GITHUB_STEP_SUMMARY\nEOF\n\n# Create README\ncat > README.md << EOF\n# $APP_NAME GitOps Repository\n\nThis repository contains the GitOps deployment manifests for the $APP_NAME application container.\n\n## Structure\n\n\\`\\`\\`\n$APP_NAME-gitops/\n\u251C\u2500\u2500 apps/                    # ArgoCD Applications\n\u2502   \u251C\u2500\u2500 app-of-apps.yaml    # Main App of Apps\n\u2502   \u2514\u2500\u2500 environments/       # Environment-specific configs\n\u251C\u2500\u2500 oam/                     # OAM Applications and Components\n\u2502   \u251C\u2500\u2500 applications/        # OAM Applications (edit here)\n\u2502   \u251C\u2500\u2500 components/          # Generated OAM Components\n\u2502   \u2514\u2500\u2500 workflows/           # Workflow definitions\n\u251C\u2500\u2500 manifests/               # Kubernetes manifests per service\n\u2502   \u251C\u2500\u2500 service-1/          # Each microservice directory\n\u2502   \u2514\u2500\u2500 service-2/\n\u2514\u2500\u2500 .github/workflows/       # GitOps automation\n\\`\\`\\`\n\n## Deployment Flow\n\n1. Source repository CI/CD builds and pushes images\n2. Source CI/CD sends repository_dispatch to this repo\n3. GitOps workflow updates manifest files with new image tags\n4. ArgoCD detects changes and deploys to cluster\n\n## ArgoCD Applications\n\n- **App of Apps**: `$APP_NAME-app-of-apps` - Main application managing all microservices\n- **ApplicationSet**:\
+                          \ Automatically creates ArgoCD apps for each service in `manifests/`\n\n## Adding New Services\n\nWhen ApplicationClaim creates a new microservice, it automatically:\n1. Creates a directory in manifests/[service-name]/\n2. Generates Knative service and OAM component manifests\n3. Updates the ApplicationSet to include the new service\nEOF\n\n# Commit and push\n# Idempotent: skip commit/push if nothing changed (handles Crossplane Object retries)\ngit config user.name \"GitOps Setup\"\ngit config user.email \"gitops@platform.local\"\ngit add .\ngit diff --cached --quiet || git commit -m \"Initialize GitOps repository structure\n\n- Add ArgoCD App of Apps pattern\n- Add ApplicationSet for microservices\n- Add GitOps update automation\n- Add environment structure\n- Add OAM and manifests directories\"\ngit push origin HEAD || true\n\n# Setup GitHub repository secrets for GitOps workflows\necho \"Setting up GitHub repository secrets for GitOps...\"\n\n# Get repository public key for secret encryption\nPUBLIC_KEY_RESPONSE=$(curl -s -H \"Authorization: token ${GITHUB_TOKEN}\" \\\n  \"https://api.github.com/repos/${GITHUB_REPO}-gitops/actions/secrets/public-key\")\n\nPUBLIC_KEY=$(echo \"$PUBLIC_KEY_RESPONSE\" | jq -r '.key')\nKEY_ID=$(echo \"$PUBLIC_KEY_RESPONSE\" | jq -r '.key_id')\n\nif [ -z \"$PUBLIC_KEY\" ] || [ -z \"$KEY_ID\" ]; then\n  echo \"Warning: Could not retrieve public key for repository secrets\"\nelse\n  # Install python for encryption\n  # S-CP-004: Alpine 3.19+ python is PEP 668 externally-managed;\n  # pip3 install needs --break-system-packages or a venv.\n  apk add --no-cache python3 py3-pip\n  pip3 install --break-system-packages pynacl\n  \n  # Create encryption script\n  cat > /tmp/encrypt_secret.py << 'ENCRYPT_EOF'\nimport sys\nimport base64\nfrom nacl import encoding, public\n\ndef encrypt_secret(public_key: str, secret_value: str) -> str:\n    public_key = public.PublicKey(public_key.encode(\"utf-8\"), encoding.Base64Encoder())\n    sealed_box = public.SealedBox(public_key)\n    encrypted = sealed_box.encrypt(secret_value.encode(\"utf-8\"))\n    return base64.b64encode(encrypted).decode(\"utf-8\")\n\nif __name__ == \"__main__\":\n    print(encrypt_secret(sys.argv[1], sys.argv[2]))\nENCRYPT_EOF\n  \n  # Create PERSONAL_ACCESS_TOKEN secret for GitOps operations\n  ENCRYPTED_TOKEN=$(python3 /tmp/encrypt_secret.py \"$PUBLIC_KEY\" \"$GITHUB_TOKEN\")\n  curl -X PUT \\\n    -H \"Authorization: token ${GITHUB_TOKEN}\" \\\n    -H \"Accept: application/vnd.github.v3+json\" \\\n    \"https://api.github.com/repos/${GITHUB_REPO}-gitops/actions/secrets/PERSONAL_ACCESS_TOKEN\" \\\n    -d \"{\\\"encrypted_value\\\":\\\"$ENCRYPTED_TOKEN\\\",\\\"key_id\\\":\\\"$KEY_ID\\\"}\"\n  \n  echo \"\u2705 GitOps repository secrets created successfully\"\nfi\n\necho \"GitOps repository setup completed successfully\"\n"
+                        env:
+                        - name: APP_NAME
+                          value: placeholder
+                        - name: GITOPS_CLONE_URL
+                          value: placeholder
+                        - name: DEFAULT_REGISTRY
+                          value: acr
+                        - name: GITHUB_TOKEN
+                          valueFrom:
+                            secretKeyRef:
+                              name: github-credentials
+                              key: token
+                        - name: GITHUB_REPO
+                          value: placeholder
+            providerConfigRef:
+              name: kubernetes-provider
+        patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.name
+          toFieldPath: spec.forProvider.manifest.metadata.name
+          transforms:
+          - type: string
+            string:
+              fmt: '%s-gitops-setup'
+              type: Format
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.name
+          toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[0].value
+        - type: CombineFromComposite
+          combine:
+            variables:
+            - fromFieldPath: spec.gitHubOrg
+            - fromFieldPath: spec.name
+            strategy: string
+            string:
+              fmt: https://github.com/%s/%s-gitops.git
+          toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[1].value
+          policy:
+            fromFieldPath: Required
+        - type: CombineFromComposite
+          combine:
+            variables:
+            - fromFieldPath: spec.gitHubOrg
+            - fromFieldPath: spec.name
+            strategy: string
+            string:
+              fmt: '%s/%s'
+          toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[4].value
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.name
+          toFieldPath: metadata.name
+          transforms:
+          - type: string
+            string:
+              fmt: '%s-gitops-setup'
+              type: Format
+      - name: repository-secrets-setup
+        base:
+          apiVersion: kubernetes.crossplane.io/v1alpha1
+          kind: Object
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: batch/v1
+                kind: Job
+                metadata:
+                  name: placeholder-secrets-setup
+                  namespace: default
+                spec:
+                  ttlSecondsAfterFinished: 600
+                  backoffLimit: 2
+                  template:
+                    spec:
+                      restartPolicy: Never
+                      containers:
+                      - name: setup
+                        image: python:3.11-slim
+                        command:
+                        - /bin/sh
+                        - -c
+                        - "# Install required packages\napt-get update && apt-get install -y curl jq git\n# S-CP-004: defensive --break-system-packages for newer python images\npip install --break-system-packages pynacl requests 2>/dev/null || pip install pynacl requests\n\necho \"Setting up repository secrets and variables...\"\n\n# Set repository variables for GitHub Actions\necho \"Creating repository variables...\"\ncurl -X PATCH \\\n  -H \"Authorization: token ${GITHUB_TOKEN}\" \\\n  -H \"Accept: application/vnd.github.v3+json\" \\\n  \"https://api.github.com/repos/${GITHUB_REPO}/actions/variables/DOCKER_REGISTRY_USER\" \\\n  -d '{\"name\":\"DOCKER_REGISTRY_USER\",\"value\":\"socrates12345\"}' || \\\ncurl -X POST \\\n  -H \"Authorization: token ${GITHUB_TOKEN}\" \\\n  -H \"Accept: application/vnd.github.v3+json\" \\\n  \"https://api.github.com/repos/${GITHUB_REPO}/actions/variables\" \\\n  -d '{\"name\":\"DOCKER_REGISTRY_USER\",\"value\":\"socrates12345\"}'\n\ncurl -X PATCH \\\n  -H \"Authorization: token ${GITHUB_TOKEN}\" \\\n  -H \"Accept: application/vnd.github.v3+json\" \\\n  \"https://api.github.com/repos/${GITHUB_REPO}/actions/variables/APP_NAME\" \\\n  -d \"{\\\"name\\\":\\\"APP_NAME\\\",\\\"value\\\":\\\"${APP_NAME}\\\"}\" || \\\ncurl -X POST \\\n  -H \"Authorization: token ${GITHUB_TOKEN}\" \\\n  -H \"Accept: application/vnd.github.v3+json\" \\\n  \"https://api.github.com/repos/${GITHUB_REPO}/actions/variables\" \\\n  -d \"{\\\"name\\\":\\\"APP_NAME\\\",\\\"value\\\":\\\"${APP_NAME}\\\"}\"\n\n# Get public key for secret encryption\necho \"Creating repository secrets...\"\nPUBLIC_KEY_DATA=$(curl -s -H \"Authorization: token ${GITHUB_TOKEN}\" \\\n  \"https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/public-key\")\n\nPUBLIC_KEY=$(echo \"$PUBLIC_KEY_DATA\" | jq -r .key)\nKEY_ID=$(echo \"$PUBLIC_KEY_DATA\" | jq -r .key_id)\n\n# Create Python script to properly encrypt secrets\ncat > encrypt_secret.py << 'EOF'\nimport base64\nimport sys\nfrom nacl import encoding, public\n\ndef encrypt_secret(public_key_b64, secret_value):\n    \"\"\"Encrypt a secret using GitHub's public key\"\"\"\n    public_key = public.PublicKey(public_key_b64.encode(\"utf-8\"), encoding.Base64Encoder())\n    sealed_box = public.SealedBox(public_key)\n    encrypted = sealed_box.encrypt(secret_value.encode(\"utf-8\"))\n    return base64.b64encode(encrypted).decode(\"utf-8\")\n\nif __name__ == \"__main__\":\n    public_key = sys.argv[1]\n    secret_value = sys.argv[2]\n    print(encrypt_secret(public_key, secret_value))\nEOF\n\n# Create PERSONAL_ACCESS_TOKEN secret with proper encryption\nENCRYPTED_TOKEN=$(python encrypt_secret.py \"$PUBLIC_KEY\" \"$GITHUB_TOKEN\")\ncurl -X PUT \\\n  -H \"Authorization: token ${GITHUB_TOKEN}\" \\\n  -H \"Accept: application/vnd.github.v3+json\" \\\n  \"https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/PERSONAL_ACCESS_TOKEN\" \\\n  -d \"{\\\"encrypted_value\\\":\\\"$ENCRYPTED_TOKEN\\\",\\\"key_id\\\":\\\"$KEY_ID\\\"}\"\n\n# Create DOCKER_PASSWORD secret with proper encryption\nENCRYPTED_PASSWORD=$(python encrypt_secret.py \"$PUBLIC_KEY\" \"$DOCKER_PASSWORD\")\ncurl -X PUT \\\n  -H \"Authorization: token ${GITHUB_TOKEN}\" \\\n  -H \"Accept: application/vnd.github.v3+json\" \\\n  \"https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/DOCKER_PASSWORD\" \\\n  -d \"{\\\"encrypted_value\\\":\\\"$ENCRYPTED_PASSWORD\\\",\\\"key_id\\\":\\\"$KEY_ID\\\"}\"\n\n# Get Azure credentials from secret if it exists\nAZURE_CREDS=$(kubectl get secret azure-credentials -n default -o jsonpath='{.data.azure-creds\\.json}' 2>/dev/null | base64 -d 2>/dev/null || echo \"\")\n\nif [ -n \"$AZURE_CREDS\" ]; then\n  # Create AZURE_CREDENTIALS secret for GitHub Actions\n  ENCRYPTED_AZURE=$(python encrypt_secret.py \"$PUBLIC_KEY\" \"$AZURE_CREDS\")\n  curl -X PUT \\\n    -H \"Authorization: token ${GITHUB_TOKEN}\" \\\n    -H \"Accept: application/vnd.github.v3+json\" \\\n    \"https://api.github.com/repos/${GITHUB_REPO}/actions/secrets/AZURE_CREDENTIALS\" \\\n    -d \"{\\\"encrypted_value\\\":\\\"$ENCRYPTED_AZURE\\\",\\\"key_id\\\":\\\"$KEY_ID\\\"}\"\n  echo \"\u2705 Azure credentials secret created\"\nelse\n  echo \"\u26A0\uFE0F  Azure credentials not found (optional)\"\nfi\n\necho \"Repository setup completed successfully!\"\n"
+                        env:
+                        - name: GITHUB_TOKEN
+                          valueFrom:
+                            secretKeyRef:
+                              name: github-credentials
+                              key: token
+                        - name: DOCKER_PASSWORD
+                          valueFrom:
+                            secretKeyRef:
+                              name: docker-credentials
+                              key: password
+                        - name: GITHUB_REPO
+                          value: placeholder
+                        - name: APP_NAME
+                          value: placeholder
+            providerConfigRef:
+              name: kubernetes-provider
+        patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.name
+          toFieldPath: spec.forProvider.manifest.metadata.name
+          transforms:
+          - type: string
+            string:
+              fmt: '%s-secrets-setup'
+              type: Format
+        - type: CombineFromComposite
+          combine:
+            variables:
+            - fromFieldPath: spec.gitHubOrg
+            - fromFieldPath: spec.name
+            strategy: string
+            string:
+              fmt: '%s/%s'
+          toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[2].value
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.name
+          toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[3].value
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.name
+          toFieldPath: metadata.name
+          transforms:
+          - type: string
+            string:
+              fmt: '%s-secrets-setup'
+              type: Format

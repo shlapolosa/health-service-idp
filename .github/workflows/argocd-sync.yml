@@ -1,11 +1,9 @@
 name: ArgoCD GitOps Sync
 
+# Drops the push trigger — oam-applications/ + argocd-apps/ live in the
+# sibling gitops repo (shlapolosa/health-service-idp-gitops), not here.
+# workflow_dispatch stays so the sync can still be kicked manually.
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - 'oam-applications/**'
-      - 'argocd-apps/**'
   workflow_dispatch:
     inputs:
       sync_all:

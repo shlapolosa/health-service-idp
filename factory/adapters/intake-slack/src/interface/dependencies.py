@@ -39,7 +39,8 @@ def get_github_client() -> GitHubApiClient:
 def get_argo_client() -> ArgoWorkflowsClient:
     """Get Argo Workflows client singleton."""
     # Argo server is accessible within the cluster
-    argo_server_url = os.getenv("ARGO_SERVER_URL", "http://argo-server.argo:2746")
+    # Argo v4 (U8 upgrade) renamed the workflows service argo-server → argo-workflows-server.
+    argo_server_url = os.getenv("ARGO_SERVER_URL", "http://argo-workflows-server.argo:2746")
     argo_namespace = os.getenv("ARGO_NAMESPACE", "argo")
     argo_token_file = os.getenv("ARGO_TOKEN_FILE", "/var/run/secrets/argo/token")
     
