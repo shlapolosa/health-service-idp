@@ -25,12 +25,14 @@ spec:
           reason?: string
         }
 
+        // Uses CUE built-in regex (=~) instead of strings.HasPrefix to
+        // avoid needing an import (OAM CUE templates don't allow imports).
         validate: ok: true
         for c in context.components {
           if c.type == "webservice-shape" || c.type == "webservice" {
             let img = c.properties.image
             let prefixes = parameter.allowedRegistries
-            let matched = [for p in prefixes if strings.HasPrefix(img, p) {p}]
+            let matched = [for p in prefixes if (img =~ "^" + p) {p}]
             if len(matched) == 0 {
               validate: {
                 ok:     false
