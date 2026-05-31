@@ -4,9 +4,14 @@ on:
   pull_request:
     branches: [ main, develop ]
     paths:
+      # Legacy AI-agent microservices (accountant-*, application-architect-*, etc.)
       - 'microservices/**'
-      - 'oam-applications/**'
-      - 'argocd-apps/**'
+      # Post-refactor adapter + production-line code (slack, capability-mcp-*, etc.)
+      - 'factory/adapters/**'
+      - 'factory/production-lines/**'
+      - 'factory/shared-libs/**'
+      # NOTE: oam-applications/ + argocd-apps/ live in the sibling gitops repo,
+      # not here — dropped from filters 2026-05-31.
 
 jobs:
   validate-changes:
