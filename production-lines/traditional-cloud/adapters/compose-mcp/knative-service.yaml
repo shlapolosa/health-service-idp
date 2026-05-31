@@ -14,7 +14,7 @@ spec:
         autoscaling.knative.dev/minScale: "0"
         autoscaling.knative.dev/maxScale: "5"
     spec:
-      serviceAccountName: capability-mcp-sa
+      serviceAccountName: capability-mcp-server
       volumes:
       - name: argo-token
         secret:
