@@ -1,0 +1,48 @@
+# CEL-based ValidatingAdmissionPolicy enforcing image-source allowlist.
+#
+# Replaces the deleted `image-source` OAM PolicyDefinition + the CUE regex
+# constraint inside the webservice-shape CD. Native k8s 1.33+ admission
+# webhook — runs SERVER-SIDE before any OAM rendering, catches every
+# Knative Service creation including those bypassing OAM.
+#
+# Why CEL instead of CUE-in-CD:
+# - CD constraint only fires when OAM Application is rendered. Direct
+#   `kubectl apply -f ksvc.yaml` bypasses it.
+# - CEL VAP catches the kubectl path too.
+# - One CEL expression beats a per-CD constraint (DRY).
+#
+# Scope: ALL Knative Services in ALL namespaces.
+# Allowlist: healthidpuaeacr.azurecr.io/ + docker.io/socrates12345/
+#   (matches earlier CD-level regex; extend `parameter.allowedPrefixes`
+#    in the binding if more registries are needed).
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: image-source-allowlist
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups:   ["serving.knative.dev"]
+        apiVersions: ["v1"]
+        operations:  ["CREATE", "UPDATE"]
+        resources:   ["services"]
+  variables:
+    - name: allowedPrefixes
+      expression: "['healthidpuaeacr.azurecr.io/', 'docker.io/socrates12345/']"
+  validations:
+    - expression: >-
+        object.spec.template.spec.containers.all(c,
+          variables.allowedPrefixes.exists(p, c.image.startsWith(p)))
+      messageExpression: >-
+        "image must start with one of " + variables.allowedPrefixes.join(', ') +
+        "; saw: " + object.spec.template.spec.containers.map(c, c.image).join(', ')
+      reason: Forbidden
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: image-source-allowlist-binding
+spec:
+  policyName: image-source-allowlist
+  validationActions: ["Deny"]
