@@ -57,9 +57,20 @@ spec:
         default: ""
         description: "Resource capabilities for success notifications (optional)"
 
+    # The curlimages/curl image has no kubectl. Mount the slack-webhook secret
+    # directly so the script can read it as a file (no in-container kubectl needed).
+    volumes:
+    - name: slack-webhook
+      secret:
+        secretName: slack-webhook
+        optional: true
     script:
       image: curlimages/curl:8.5.0
       command: [sh]
+      volumeMounts:
+      - name: slack-webhook
+        mountPath: /etc/slack
+        readOnly: true
       source: |
         echo "📱 Sending standardized Slack notification..."
         
@@ -182,10 +193,10 @@ spec:
         echo "📄 Generated Slack payload:"
         cat /tmp/slack-payload.json
         
-        # Get Slack webhook URL from Kubernetes secret
+        # Read webhook URL from mounted secret (no kubectl in this image).
         SLACK_WEBHOOK_URL=""
-        if kubectl get secret slack-webhook -n argo >/dev/null 2>&1; then
-          SLACK_WEBHOOK_URL=$(kubectl get secret slack-webhook -n argo -o jsonpath='{.data.webhook-url}' | base64 -d)
+        if [ -f /etc/slack/webhook-url ]; then
+          SLACK_WEBHOOK_URL=$(cat /etc/slack/webhook-url)
         fi
         
         if [ ! -z "$SLACK_WEBHOOK_URL" ]; then
