@@ -11,7 +11,11 @@ data:
   config.yaml: |
     lenses:
       license:
-        key: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJldmFsdWF0aW9uIiwiYXVkIjoibGVuc2VzIiwibmJmIjoxNjk5ODI0MDAwLCJpc3MiOiJsZW5zZXMuaW8iLCJleHAiOjE3MzE0NDY0MDAsImlhdCI6MTY5OTgyNDAwMCwianRpIjoiZXZhbHVhdGlvbiIsImZlYXR1cmVzIjpbImFsbCJdfQ.example"
+        # License must come from the `lenses-hq-license` Secret in this namespace
+        # (key: license-key). The deployment mounts it via env LENSES_HQ_LICENSE
+        # and references it here as ${LENSES_HQ_LICENSE}. Trivy flagged the
+        # previous inline evaluation JWT (.example signature, exp 2024-11-12).
+        key: "${LENSES_HQ_LICENSE}"
       
       http:
         port: 9991
