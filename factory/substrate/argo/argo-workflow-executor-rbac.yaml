@@ -1,0 +1,42 @@
+# Argo Workflows v4 RBAC for the in-pod executor.
+#
+# v4 introduced the `workflowtaskresults.argoproj.io` CRD. The executor sidecar
+# in every workflow pod tries to create/patch these resources to report step
+# results back to the controller. Without this Role/Binding, every step fails
+# with exit 64:
+#   "workflowtaskresults.argoproj.io is forbidden:
+#    User \"system:serviceaccount:argo:default\" cannot create resource
+#    \"workflowtaskresults\" in API group \"argoproj.io\" in the namespace \"argo\""
+#
+# Applies to the `default` SA in the `argo` namespace because all
+# WorkflowTemplates in this repo submit child workflows that use it.
+# If you ever introduce per-template SAs, mirror this binding for them too.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argo-workflow-executor
+  namespace: argo
+rules:
+- apiGroups: ["argoproj.io"]
+  resources: ["workflowtaskresults"]
+  verbs: ["create", "patch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "watch", "patch"]
+- apiGroups: [""]
+  resources: ["pods/log"]
+  verbs: ["get", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-workflow-executor
+  namespace: argo
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: argo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: argo-workflow-executor

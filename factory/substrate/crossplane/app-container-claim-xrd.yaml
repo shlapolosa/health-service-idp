@@ -1,11 +1,19 @@
-apiVersion: apiextensions.crossplane.io/v2
+apiVersion: apiextensions.crossplane.io/v1
 kind: CompositeResourceDefinition
 metadata:
-  name: appcontainerclaims.platform.example.org
+  name: xappcontainerclaims.platform.example.org
 spec:
-  scope: Namespaced
+  # REVERTED from v2 scope:Namespaced (2026-05-31). provider-upjet-github v0.18
+  # only ships cluster-scoped CRDs; Crossplane v2 forbids cluster-scoped MRs
+  # under a namespaced XR. v1 + claimNames keeps the legacy XR/XRC duality so
+  # this composition can still emit Repository resources.
+  # Once provider-upjet-github ships .m.crossplane.io variants, can promote
+  # back to v2 scope:Namespaced (see task #102 / #112 history).
   group: platform.example.org
   names:
+    kind: XAppContainerClaim
+    plural: xappcontainerclaims
+  claimNames:
     kind: AppContainerClaim
     plural: appcontainerclaims
   versions:
