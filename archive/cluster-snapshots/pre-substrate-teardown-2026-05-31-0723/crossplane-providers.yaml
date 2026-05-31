@@ -1,0 +1,142 @@
+apiVersion: v1
+items:
+- apiVersion: pkg.crossplane.io/v1
+  kind: Provider
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"pkg.crossplane.io/v1","kind":"Provider","metadata":{"annotations":{},"name":"provider-aws"},"spec":{"package":"xpkg.upbound.io/crossplane-contrib/provider-aws:v0.43.0"}}
+    creationTimestamp: "2025-08-17T06:36:42Z"
+    generation: 1
+    name: provider-aws
+    resourceVersion: "57571107"
+    uid: bb6f4187-d16a-400e-ba2c-9d48e73c758c
+  spec:
+    ignoreCrossplaneConstraints: false
+    package: xpkg.upbound.io/crossplane-contrib/provider-aws:v0.43.0
+    packagePullPolicy: IfNotPresent
+    revisionActivationPolicy: Automatic
+    revisionHistoryLimit: 1
+    runtimeConfigRef:
+      apiVersion: pkg.crossplane.io/v1beta1
+      kind: DeploymentRuntimeConfig
+      name: default
+    skipDependencyResolution: false
+  status:
+    conditions:
+    - lastTransitionTime: "2026-05-27T11:17:22Z"
+      reason: HealthyPackageRevision
+      status: "True"
+      type: Healthy
+    - lastTransitionTime: "2025-08-17T06:36:44Z"
+      reason: ActivePackageRevision
+      status: "True"
+      type: Installed
+    currentIdentifier: xpkg.upbound.io/crossplane-contrib/provider-aws:v0.43.0
+    currentRevision: provider-aws-447dacb385f5
+- apiVersion: pkg.crossplane.io/v1
+  kind: Provider
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"pkg.crossplane.io/v1","kind":"Provider","metadata":{"annotations":{},"name":"provider-helm"},"spec":{"package":"xpkg.upbound.io/crossplane-contrib/provider-helm:v0.16.0"}}
+    creationTimestamp: "2025-08-17T00:38:55Z"
+    generation: 2
+    name: provider-helm
+    resourceVersion: "57590501"
+    uid: 6a4adce2-19c0-4b12-9460-5e5e9fce066a
+  spec:
+    ignoreCrossplaneConstraints: false
+    package: xpkg.upbound.io/crossplane-contrib/provider-helm:v0.16.0
+    packagePullPolicy: IfNotPresent
+    revisionActivationPolicy: Automatic
+    revisionHistoryLimit: 1
+    runtimeConfigRef:
+      apiVersion: pkg.crossplane.io/v1beta1
+      kind: DeploymentRuntimeConfig
+      name: default
+    skipDependencyResolution: false
+  status:
+    conditions:
+    - lastTransitionTime: "2026-05-27T11:41:59Z"
+      reason: HealthyPackageRevision
+      status: "True"
+      type: Healthy
+    - lastTransitionTime: "2025-08-17T00:38:56Z"
+      observedGeneration: 1
+      reason: ActivePackageRevision
+      status: "True"
+      type: Installed
+    currentIdentifier: xpkg.upbound.io/crossplane-contrib/provider-helm:v0.16.0
+    currentRevision: provider-helm-b4cc4c2c8db3
+- apiVersion: pkg.crossplane.io/v1
+  kind: Provider
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"pkg.crossplane.io/v1","kind":"Provider","metadata":{"annotations":{},"name":"provider-kubernetes"},"spec":{"package":"xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v0.14.1"}}
+    creationTimestamp: "2025-08-17T06:49:06Z"
+    generation: 1
+    name: provider-kubernetes
+    resourceVersion: "57590499"
+    uid: 0ff64aa1-17ad-40e9-9415-1613fa7e1812
+  spec:
+    ignoreCrossplaneConstraints: false
+    package: xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v0.14.1
+    packagePullPolicy: IfNotPresent
+    revisionActivationPolicy: Automatic
+    revisionHistoryLimit: 1
+    runtimeConfigRef:
+      apiVersion: pkg.crossplane.io/v1beta1
+      kind: DeploymentRuntimeConfig
+      name: default
+    skipDependencyResolution: false
+  status:
+    conditions:
+    - lastTransitionTime: "2026-05-27T11:41:59Z"
+      reason: HealthyPackageRevision
+      status: "True"
+      type: Healthy
+    - lastTransitionTime: "2025-08-17T06:49:07Z"
+      reason: ActivePackageRevision
+      status: "True"
+      type: Installed
+    currentIdentifier: xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v0.14.1
+    currentRevision: provider-kubernetes-101d5a6d80d3
+- apiVersion: pkg.crossplane.io/v1
+  kind: Provider
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"pkg.crossplane.io/v1","kind":"Provider","metadata":{"annotations":{},"name":"provider-upjet-github"},"spec":{"package":"xpkg.upbound.io/crossplane-contrib/provider-upjet-github:v0.18.0"}}
+    creationTimestamp: "2025-08-17T06:45:03Z"
+    generation: 1
+    name: provider-upjet-github
+    resourceVersion: "57590515"
+    uid: 19ca71a3-15a1-4cb6-b965-d6a28a35cd03
+  spec:
+    ignoreCrossplaneConstraints: false
+    package: xpkg.upbound.io/crossplane-contrib/provider-upjet-github:v0.18.0
+    packagePullPolicy: IfNotPresent
+    revisionActivationPolicy: Automatic
+    revisionHistoryLimit: 1
+    runtimeConfigRef:
+      apiVersion: pkg.crossplane.io/v1beta1
+      kind: DeploymentRuntimeConfig
+      name: default
+    skipDependencyResolution: false
+  status:
+    conditions:
+    - lastTransitionTime: "2026-05-27T11:42:01Z"
+      reason: HealthyPackageRevision
+      status: "True"
+      type: Healthy
+    - lastTransitionTime: "2025-08-17T06:45:04Z"
+      reason: ActivePackageRevision
+      status: "True"
+      type: Installed
+    currentIdentifier: xpkg.upbound.io/crossplane-contrib/provider-upjet-github:v0.18.0
+    currentRevision: provider-upjet-github-42e598a5d0d4
+kind: List
+metadata:
+  resourceVersion: ""

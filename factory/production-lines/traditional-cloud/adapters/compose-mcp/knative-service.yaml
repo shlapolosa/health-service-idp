@@ -1,0 +1,75 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: capability-mcp-mfg-tc
+  namespace: default
+  labels:
+    app: capability-mcp-mfg-tc
+    layer: production-line
+    manufacturer: traditional-cloud
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "5"
+    spec:
+      serviceAccountName: capability-mcp-server
+      volumes:
+      - name: argo-token
+        secret:
+          secretName: argo-token
+      containers:
+      - name: capability-mcp-mfg-tc
+        image: healthidpuaeacr.azurecr.io/capability-mcp-mfg-tc:v0.1
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+        env:
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: ARGO_SERVER_URL
+          value: "http://argo-server.argo:2746"
+        - name: ARGO_TOKEN_FILE
+          value: "/var/run/secrets/argo/token"
+        - name: OAM_NAMESPACE
+          value: "default"
+        - name: CAPABILITY_FACTORY_DIR
+          value: "/capability-factory"
+        - name: GITHUB_OWNER
+          value: "shlapolosa"
+        - name: GITOPS_REPO
+          value: "health-service-idp-gitops"
+        - name: GITOPS_BRANCH
+          value: "main"
+        - name: PERSONAL_ACCESS_TOKEN
+          valueFrom:
+            secretKeyRef: { name: github-credentials, key: personal-access-token }
+        - name: AUTH_DISABLED
+          value: "true"
+        - name: APIM_AUDIENCE
+          value: ""
+        - name: ENTRA_TENANT
+          value: ""
+        - name: ALLOWED_OIDS
+          value: ""
+        - name: ALLOWED_HOSTS
+          value: ""
+        volumeMounts:
+        - name: argo-token
+          mountPath: /var/run/secrets/argo
+          readOnly: true
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        # securityContext minimised 2026-05-31 — Knative `secure-pod-defaults: enabled`
+        # injects allowPrivilegeEscalation/capabilities/runAsNonRoot/seccompProfile.
+        # We only set runAsUser explicitly because the image's USER directive is
+        # `appuser` (name, not numeric), which can't satisfy runAsNonRoot=true.
+        # TODO: bump Dockerfile to `USER 1000` then drop this block too.
+        securityContext:
+          runAsUser: 1000

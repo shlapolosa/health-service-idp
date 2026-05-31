@@ -1,0 +1,41 @@
+# Foundry prompt-based evaluator — verifies the architect's phase order:
+# catalog.search must precede any factory.propose, and unknown caps go through web.search.
+name: phase_order
+version: "1"
+description: >
+  Enforces the architect's tool-call sequence rules:
+  - catalog.search precedes factory.propose
+  - web.search precedes any new-component proposal involving unknown tech
+  - kb.diff is used when asked "is X deployed or just in KB"
+
+inputs:
+  query: str
+  response: str
+  tool_calls: list
+
+prompt: |
+  You are evaluating whether an architect agent observed its phase-order rules.
+
+  RULES:
+  1. `catalog.search` must precede any `factory.propose` call (consider existing before proposing new).
+  2. `web.search` must precede recommending an unfamiliar technology.
+  3. `kb.diff` should be invoked when the user asks whether a capability is deployed vs KB-only.
+
+  ===
+  USER REQUEST:
+  {{query}}
+  ===
+  AGENT RESPONSE:
+  {{response}}
+  ===
+  TOOL CALLS (in order):
+  {{tool_calls}}
+  ===
+
+  PASS if all applicable rules are satisfied. If `factory.propose` does NOT appear, rule 1 is
+  vacuously satisfied (this is consent-gated and usually skipped).
+
+  Output JSON only:
+  {"phase_order": "pass" | "fail", "violated_rule": "<rule number or none>", "score": 0.0-1.0}
+
+pass_threshold: 0.5

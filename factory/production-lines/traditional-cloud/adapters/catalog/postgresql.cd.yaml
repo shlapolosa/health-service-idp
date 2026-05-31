@@ -1,0 +1,119 @@
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: postgresql
+  namespace: default
+  annotations:
+    definition.oam.dev/description: PostgreSQL database via Crossplane Helm provider
+    definition.oam.dev/shape: helm-release
+spec:
+  workload:
+    definition:
+      apiVersion: helm.crossplane.io/v1beta1
+      kind: Release
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "helm.crossplane.io/v1beta1"
+          kind: "Release"
+          metadata: {
+            name: context.name + "-postgresql"
+            namespace: context.namespace
+            // Multi-cluster deployment support
+            if parameter.targetEnvironment != _|_ {
+              annotations: {
+                "app.oam.dev/cluster": parameter.targetEnvironment
+              }
+            }
+          }
+          spec: {
+            forProvider: {
+              chart: {
+                name: "postgresql"
+                repository: "https://charts.bitnami.com/bitnami"
+                version: "13.2.24"
+              }
+              namespace: context.namespace
+              skipCreateNamespace: false
+              values: {
+                auth: {
+                  enablePostgresUser: true
+                  postgresPassword: parameter.auth.postgresPassword
+                  username: parameter.auth.username
+                  password: parameter.auth.password
+                  database: parameter.database
+                }
+                primary: {
+                  persistence: {
+                    enabled: true
+                    size: parameter.storage
+                    storageClass: parameter.storageClass
+                  }
+                  resources: {
+                    requests: {
+                      cpu: parameter.resources.cpu
+                      memory: parameter.resources.memory
+                    }
+                    limits: {
+                      cpu: parameter.resources.cpuLimit
+                      memory: parameter.resources.memoryLimit
+                    }
+                  }
+                  readinessProbe: {
+                    enabled: true
+                    initialDelaySeconds: 30
+                    periodSeconds: 10
+                  }
+                  livenessProbe: {
+                    enabled: true
+                    initialDelaySeconds: 30
+                    periodSeconds: 10
+                  }
+                }
+                metrics: {
+                  enabled: parameter.metrics
+                  serviceMonitor: {
+                    enabled: false
+                  }
+                }
+                backup: {
+                  enabled: false
+                }
+              }
+            }
+            providerConfigRef: {
+              name: "default"
+            }
+          }
+        }
+        
+        parameter: {
+          // Required
+          database: string
+          
+          // Authentication
+          auth: {
+            username: *"appuser" | string
+            password: *"changeme" | string
+            postgresPassword: *"adminpass" | string
+          }
+
+          // Storage
+          storage: *"10Gi" | string
+          storageClass: *"gp2" | string
+
+          // Resources
+          resources: {
+            cpu: *"250m" | string
+            memory: *"256Mi" | string
+            cpuLimit: *"500m" | string
+            memoryLimit: *"512Mi" | string
+          }
+          
+          // Monitoring
+          metrics: *false | bool
+          
+          // Multi-cluster support
+          targetEnvironment?: string  // vCluster deployment target
+        }

@@ -1,0 +1,124 @@
+# ClickHouse ComponentDefinition (Analytics database)
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: clickhouse
+  annotations:
+    definition.oam.dev/description: "ClickHouse columnar database for real-time analytics"
+    definition.oam.dev/shape: statefulset
+spec:
+  workload:
+    definition:
+      apiVersion: apps/v1
+      kind: StatefulSet
+    type: statefulsets.apps
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "apps/v1"
+          kind: "StatefulSet"
+          metadata: {
+            name: context.name
+            namespace: context.namespace
+          }
+          spec: {
+            serviceName: context.name
+            replicas: parameter.replicas
+            selector: {
+              matchLabels: {
+                app: context.name
+              }
+            }
+            template: {
+              metadata: {
+                labels: {
+                  app: context.name
+                }
+              }
+              spec: {
+                containers: [{
+                  name: "clickhouse"
+                  image: "clickhouse/clickhouse-server:" + parameter.version
+                  ports: [{
+                    containerPort: 8123
+                    name: "http"
+                  }, {
+                    containerPort: 9000
+                    name: "native"
+                  }]
+                  volumeMounts: [{
+                    name: "data"
+                    mountPath: "/var/lib/clickhouse"
+                  }]
+                  resources: {
+                    limits: {
+                      cpu: parameter.resources.cpu
+                      memory: parameter.resources.memory
+                    }
+                    requests: {
+                      cpu: "500m"
+                      memory: "1Gi"
+                    }
+                  }
+                  env: [
+                    {
+                      name: "CLICKHOUSE_DB"
+                      value: parameter.database
+                    }
+                  ]
+                }]
+              }
+            }
+            volumeClaimTemplates: [{
+              metadata: {
+                name: "data"
+              }
+              spec: {
+                accessModes: ["ReadWriteOnce"]
+                resources: {
+                  requests: {
+                    storage: parameter.storageSize
+                  }
+                }
+              }
+            }]
+          }
+        }
+        
+        outputs: {
+          "service": {
+            apiVersion: "v1"
+            kind: "Service"
+            metadata: {
+              name: context.name
+              namespace: context.namespace
+            }
+            spec: {
+              type: "ClusterIP"
+              ports: [{
+                port: 8123
+                targetPort: 8123
+                name: "http"
+              }, {
+                port: 9000
+                targetPort: 9000
+                name: "native"
+              }]
+              selector: {
+                app: context.name
+              }
+            }
+          }
+        }
+        
+        parameter: {
+          version: *"24.3" | string
+          replicas: *1 | int
+          database: *"default" | string
+          storageSize: *"100Gi" | string
+          resources: {
+            cpu: *"2" | string
+            memory: *"4Gi" | string
+          }
+        }

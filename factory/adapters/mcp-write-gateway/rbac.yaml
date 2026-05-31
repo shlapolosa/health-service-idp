@@ -1,0 +1,27 @@
+# The factory MCP needs NO Kubernetes API permissions — it only talks to GitHub + Key Vault.
+# The SA exists primarily as the federation subject for Azure Workload Identity (the PEM lives in
+# Key Vault; this SA is bound to the Azure AD identity that has Key Vault Reader on kv-w4x7ibwk4e2is).
+#
+# Workload Identity wiring:
+#   - AKS cluster has OIDC issuer enabled and Workload Identity webhook installed (cluster-level
+#     prereq; see scripts/setup-factory-azure.sh).
+#   - Annotate this SA with azure.workload.identity/client-id=<sp-architect-writer client id>.
+#   - Label the Pod (knative-service.yaml) with azure.workload.identity/use="true".
+#   - Federate the SP via:
+#       az identity federated-credential create \
+#         --identity-name sp-architect-writer --resource-group <rg> \
+#         --issuer $(az aks show ...query oidcIssuerProfile.issuerUrl) \
+#         --subject "system:serviceaccount:default:capability-factory-mcp"
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: capability-factory-mcp
+  namespace: default
+  labels:
+    app: capability-factory-mcp
+    service-type: mcp-server
+    azure.workload.identity/use: "true"
+  annotations:
+    # Set by scripts/setup-factory-azure.sh; mirrors Azure AD identity's clientId.
+    # Replace <SP_ARCHITECT_WRITER_CLIENT_ID> at deploy time (helm/kustomize patch or sed).
+    azure.workload.identity/client-id: "9569ae21-9f23-4b93-8c56-9b92b68cb5c5"

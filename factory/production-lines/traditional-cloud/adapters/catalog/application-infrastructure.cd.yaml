@@ -1,0 +1,63 @@
+# Application Infrastructure ComponentDefinition (Crossplane-based)
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: application-infrastructure
+  annotations:
+    definition.oam.dev/description: "Comprehensive application infrastructure with networking, storage, and compute resources"
+    definition.oam.dev/shape: application-claim
+spec:
+  workload:
+    definition:
+      apiVersion: platform.example.org/v1alpha1
+      kind: ApplicationClaim
+    type: applicationclaims.platform.example.org
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "platform.example.org/v1alpha1"
+          kind: "ApplicationClaim"
+          metadata: {
+            name: context.name
+            namespace: context.namespace
+          }
+          spec: {
+            appName: context.name
+            appType: parameter.appType
+            environment: parameter.environment
+            resources: {
+              compute: {
+                cpu: parameter.compute.cpu
+                memory: parameter.compute.memory
+                replicas: parameter.compute.replicas
+              }
+              storage: {
+                size: parameter.storage.size
+                class: parameter.storage.class
+              }
+              networking: {
+                ingress: parameter.networking.ingress
+                tls: parameter.networking.tls
+              }
+            }
+          }
+        }
+        
+        parameter: {
+          appType: *"microservice" | "microservice" | "monolith" | "batch"
+          environment: *"development" | "development" | "staging" | "production"
+          compute: {
+            cpu: *"500m" | string
+            memory: *"1Gi" | string
+            replicas: *2 | int
+          }
+          storage: {
+            size: *"10Gi" | string
+            class: *"standard" | string
+          }
+          networking: {
+            ingress: *true | bool
+            tls: *false | bool
+          }
+        }

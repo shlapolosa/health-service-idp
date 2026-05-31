@@ -1,0 +1,1098 @@
+apiVersion: v1
+items:
+- apiVersion: serving.knative.dev/v1
+  kind: Service
+  metadata:
+    annotations:
+      cafe-spec.io/port: approve
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"serving.knative.dev/v1","kind":"Service","metadata":{"annotations":{"cafe-spec.io/port":"approve"},"name":"approve-pr","namespace":"default"},"spec":{"template":{"metadata":{"annotations":{"autoscaling.knative.dev/max-scale":"3","autoscaling.knative.dev/min-scale":"1"}},"spec":{"containers":[{"image":"healthidpuaeacr.azurecr.io/approve-pr:0.1.0","livenessProbe":{"httpGet":{"path":"/health","port":8080},"initialDelaySeconds":30,"periodSeconds":30},"name":"approve-pr","ports":[{"containerPort":8080,"name":"http1"}],"readinessProbe":{"httpGet":{"path":"/health","port":8080}},"resources":{"limits":{"cpu":"300m","memory":"256Mi"},"requests":{"cpu":"100m","memory":"128Mi"}}}],"imagePullSecrets":[{"name":"acr-credentials"}],"serviceAccountName":"approve-pr"}}}}
+      serving.knative.dev/creator: masterclient
+      serving.knative.dev/lastModifier: masterclient
+    creationTimestamp: "2026-05-29T08:25:50Z"
+    generation: 1
+    name: approve-pr
+    namespace: default
+    resourceVersion: "59451679"
+    uid: fb6e0d72-59a1-4adf-9a89-fe72e6e223c7
+  spec:
+    template:
+      metadata:
+        annotations:
+          autoscaling.knative.dev/max-scale: "3"
+          autoscaling.knative.dev/min-scale: "1"
+        creationTimestamp: null
+      spec:
+        containerConcurrency: 0
+        containers:
+        - image: healthidpuaeacr.azurecr.io/approve-pr:0.1.0
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          name: approve-pr
+          ports:
+          - containerPort: 8080
+            name: http1
+            protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            successThreshold: 1
+          resources:
+            limits:
+              cpu: 300m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+        enableServiceLinks: false
+        imagePullSecrets:
+        - name: acr-credentials
+        serviceAccountName: approve-pr
+        timeoutSeconds: 300
+    traffic:
+    - latestRevision: true
+      percent: 100
+  status:
+    address:
+      url: http://approve-pr.default.svc.cluster.local
+    conditions:
+    - lastTransitionTime: "2026-05-29T08:25:54Z"
+      status: "True"
+      type: ConfigurationsReady
+    - lastTransitionTime: "2026-05-29T08:25:54Z"
+      status: "True"
+      type: Ready
+    - lastTransitionTime: "2026-05-29T08:25:54Z"
+      status: "True"
+      type: RoutesReady
+    latestCreatedRevisionName: approve-pr-00001
+    latestReadyRevisionName: approve-pr-00001
+    observedGeneration: 1
+    traffic:
+    - latestRevision: true
+      percent: 100
+      revisionName: approve-pr-00001
+    url: http://approve-pr.default.20.233.105.82.nip.io
+- apiVersion: serving.knative.dev/v1
+  kind: Service
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"serving.knative.dev/v1","kind":"Service","metadata":{"annotations":{},"labels":{"app":"capability-factory-mcp","service-type":"mcp-server"},"name":"capability-factory-mcp","namespace":"default"},"spec":{"template":{"metadata":{"annotations":{"autoscaling.knative.dev/maxScale":"3","autoscaling.knative.dev/minScale":"1"},"labels":{"azure.workload.identity/use":"true"}},"spec":{"containerConcurrency":50,"containers":[{"env":[{"name":"LOG_LEVEL","value":"INFO"},{"name":"GITHUB_OWNER","value":"shlapolosa"},{"name":"FACTORY_ALLOWED_REPOS","value":"health-service-idp,health-service-idp-gitops"},{"name":"GITHUB_APP_ID","valueFrom":{"secretKeyRef":{"key":"app-id","name":"github-app-factorybot"}}},{"name":"GITHUB_APP_INSTALLATION_ID","valueFrom":{"secretKeyRef":{"key":"installation-id","name":"github-app-factorybot"}}},{"name":"GITHUB_APP_AUTH_MODE","value":"key_vault"},{"name":"AZURE_KEY_VAULT_URL","value":"https://kv-socrates-6706.vault.azure.net/"},{"name":"GITHUB_APP_PEM_SECRET_NAME","value":"github-app-factorybot-pem"},{"name":"AUTH_DISABLED","value":"true"},{"name":"APIM_AUDIENCE","value":"api://fe225ae2-c6eb-4e4e-b4c2-79b45b2dce69"},{"name":"ENTRA_TENANT","value":"df03bef9-a306-41fe-9933-493e3e70d1c6"},{"name":"ALLOWED_OIDS","value":"795d208a-f43a-4afe-8d7f-40f7b57d1b02"},{"name":"ALLOWED_HOSTS","value":"capability-factory-mcp.default.20.233.105.82.nip.io,capability-factory-mcp.default,capability-factory-mcp.default.svc,capability-factory-mcp.default.svc.cluster.local,localhost"}],"image":"healthidpuaeacr.azurecr.io/capability-factory-mcp:v0.1","imagePullPolicy":"Always","livenessProbe":{"httpGet":{"path":"/healthz","port":8080},"initialDelaySeconds":30,"periodSeconds":10},"name":"capability-factory-mcp","ports":[{"containerPort":8080}],"readinessProbe":{"httpGet":{"path":"/healthz","port":8080},"initialDelaySeconds":10,"periodSeconds":5},"resources":{"limits":{"cpu":"500m","memory":"384Mi"},"requests":{"cpu":"100m","memory":"192Mi"}},"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"runAsNonRoot":true,"runAsUser":1000}}],"imagePullSecrets":[{"name":"acr-credentials"}],"serviceAccountName":"capability-factory-mcp","timeoutSeconds":300}},"traffic":[{"latestRevision":true,"percent":100}]}}
+      serving.knative.dev/creator: masterclient
+      serving.knative.dev/lastModifier: masterclient
+    creationTimestamp: "2026-05-28T10:34:43Z"
+    generation: 2
+    labels:
+      app: capability-factory-mcp
+      service-type: mcp-server
+    name: capability-factory-mcp
+    namespace: default
+    resourceVersion: "58604279"
+    uid: 95014f78-4fb2-4255-9611-9fada97611f5
+  spec:
+    template:
+      metadata:
+        annotations:
+          autoscaling.knative.dev/maxScale: "3"
+          autoscaling.knative.dev/minScale: "1"
+        creationTimestamp: null
+        labels:
+          azure.workload.identity/use: "true"
+      spec:
+        containerConcurrency: 50
+        containers:
+        - env:
+          - name: LOG_LEVEL
+            value: INFO
+          - name: GITHUB_OWNER
+            value: shlapolosa
+          - name: FACTORY_ALLOWED_REPOS
+            value: health-service-idp,health-service-idp-gitops
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                key: app-id
+                name: github-app-factorybot
+          - name: GITHUB_APP_INSTALLATION_ID
+            valueFrom:
+              secretKeyRef:
+                key: installation-id
+                name: github-app-factorybot
+          - name: GITHUB_APP_AUTH_MODE
+            value: key_vault
+          - name: AZURE_KEY_VAULT_URL
+            value: https://kv-socrates-6706.vault.azure.net/
+          - name: GITHUB_APP_PEM_SECRET_NAME
+            value: github-app-factorybot-pem
+          - name: AUTH_DISABLED
+            value: "true"
+          - name: APIM_AUDIENCE
+            value: api://fe225ae2-c6eb-4e4e-b4c2-79b45b2dce69
+          - name: ENTRA_TENANT
+            value: df03bef9-a306-41fe-9933-493e3e70d1c6
+          - name: ALLOWED_OIDS
+            value: 795d208a-f43a-4afe-8d7f-40f7b57d1b02
+          - name: ALLOWED_HOSTS
+            value: capability-factory-mcp.default.20.233.105.82.nip.io,capability-factory-mcp.default,capability-factory-mcp.default.svc,capability-factory-mcp.default.svc.cluster.local,localhost
+          image: healthidpuaeacr.azurecr.io/capability-factory-mcp:v0.1
+          imagePullPolicy: Always
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          name: capability-factory-mcp
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: 500m
+              memory: 384Mi
+            requests:
+              cpu: 100m
+              memory: 192Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            runAsNonRoot: true
+            runAsUser: 1000
+        enableServiceLinks: false
+        imagePullSecrets:
+        - name: acr-credentials
+        serviceAccountName: capability-factory-mcp
+        timeoutSeconds: 300
+    traffic:
+    - latestRevision: true
+      percent: 100
+  status:
+    address:
+      url: http://capability-factory-mcp.default.svc.cluster.local
+    conditions:
+    - lastTransitionTime: "2026-05-28T10:38:12Z"
+      status: "True"
+      type: ConfigurationsReady
+    - lastTransitionTime: "2026-05-28T10:38:13Z"
+      status: "True"
+      type: Ready
+    - lastTransitionTime: "2026-05-28T10:38:13Z"
+      status: "True"
+      type: RoutesReady
+    latestCreatedRevisionName: capability-factory-mcp-00002
+    latestReadyRevisionName: capability-factory-mcp-00002
+    observedGeneration: 2
+    traffic:
+    - latestRevision: true
+      percent: 100
+      revisionName: capability-factory-mcp-00002
+    url: http://capability-factory-mcp.default.20.233.105.82.nip.io
+- apiVersion: serving.knative.dev/v1
+  kind: Service
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"serving.knative.dev/v1","kind":"Service","metadata":{"annotations":{},"labels":{"app":"capability-mcp-server","service-type":"mcp-server"},"name":"capability-mcp-server","namespace":"default"},"spec":{"template":{"metadata":{"annotations":{"autoscaling.knative.dev/maxScale":"5","autoscaling.knative.dev/minScale":"1"}},"spec":{"containerConcurrency":100,"containers":[{"env":[{"name":"LOG_LEVEL","value":"INFO"},{"name":"ARGO_SERVER_URL","value":"http://argo-server.argo:2746"},{"name":"ARGO_TOKEN_FILE","value":"/var/run/secrets/argo/token"},{"name":"OAM_NAMESPACE","value":"default"},{"name":"CAPABILITY_FACTORY_DIR","value":"/capability-factory"},{"name":"GITHUB_OWNER","value":"shlapolosa"},{"name":"GITOPS_REPO","value":"health-service-idp-gitops"},{"name":"GITOPS_BRANCH","value":"main"},{"name":"PERSONAL_ACCESS_TOKEN","valueFrom":{"secretKeyRef":{"key":"personal-access-token","name":"github-credentials"}}},{"name":"AUTH_DISABLED","value":"true"},{"name":"APIM_AUDIENCE","value":""},{"name":"ENTRA_TENANT","value":""},{"name":"ALLOWED_OIDS","value":""},{"name":"ALLOWED_HOSTS","value":"capability-mcp-server.default.20.233.105.82.nip.io,capability-mcp-server.default,capability-mcp-server.default.svc,capability-mcp-server.default.svc.cluster.local,localhost"}],"image":"healthidpuaeacr.azurecr.io/capability-mcp-server:v0.10","imagePullPolicy":"Always","livenessProbe":{"httpGet":{"path":"/healthz","port":8080},"initialDelaySeconds":30,"periodSeconds":10},"name":"capability-mcp-server","ports":[{"containerPort":8080}],"readinessProbe":{"httpGet":{"path":"/healthz","port":8080},"initialDelaySeconds":10,"periodSeconds":5},"resources":{"limits":{"cpu":"1","memory":"512Mi"},"requests":{"cpu":"250m","memory":"256Mi"}},"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"runAsNonRoot":true,"runAsUser":1000},"volumeMounts":[{"mountPath":"/var/run/secrets/argo","name":"argo-token","readOnly":true}]}],"imagePullSecrets":[{"name":"acr-credentials"}],"serviceAccountName":"capability-mcp-server","timeoutSeconds":600,"volumes":[{"name":"argo-token","secret":{"secretName":"argo-token"}}]}},"traffic":[{"latestRevision":true,"percent":100}]}}
+      kubectl.kubernetes.io/restartedAt: "1780138913"
+      serving.knative.dev/creator: masterclient
+      serving.knative.dev/lastModifier: masterclient
+    creationTimestamp: "2026-05-28T05:52:40Z"
+    generation: 14
+    labels:
+      app: capability-mcp-server
+      service-type: mcp-server
+    name: capability-mcp-server
+    namespace: default
+    resourceVersion: "61194954"
+    uid: 5af12fe7-52e1-4274-8f0a-908f91667916
+  spec:
+    template:
+      metadata:
+        annotations:
+          autoscaling.knative.dev/maxScale: "5"
+          autoscaling.knative.dev/minScale: "1"
+          deploy.bump: "1779980148"
+          deploy.timestamp: "1779979959"
+          timestamp: "1780138913"
+        creationTimestamp: null
+      spec:
+        containerConcurrency: 100
+        containers:
+        - env:
+          - name: LOG_LEVEL
+            value: INFO
+          - name: ARGO_SERVER_URL
+            value: http://argo-server.argo:2746
+          - name: ARGO_TOKEN_FILE
+            value: /var/run/secrets/argo/token
+          - name: OAM_NAMESPACE
+            value: default
+          - name: CAPABILITY_FACTORY_DIR
+            value: /capability-factory
+          - name: GITHUB_OWNER
+            value: shlapolosa
+          - name: GITOPS_REPO
+            value: health-service-idp-gitops
+          - name: GITOPS_BRANCH
+            value: main
+          - name: PERSONAL_ACCESS_TOKEN
+            valueFrom:
+              secretKeyRef:
+                key: personal-access-token
+                name: github-credentials
+          - name: AUTH_DISABLED
+            value: "true"
+          - name: APIM_AUDIENCE
+          - name: ENTRA_TENANT
+          - name: ALLOWED_OIDS
+          - name: ALLOWED_HOSTS
+            value: capability-mcp-server.default.20.233.105.82.nip.io,capability-mcp-server.default,capability-mcp-server.default.svc,capability-mcp-server.default.svc.cluster.local,localhost
+          image: healthidpuaeacr.azurecr.io/capability-mcp-server:v0.10
+          imagePullPolicy: Always
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          name: capability-mcp-server
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+            requests:
+              cpu: 250m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            runAsNonRoot: true
+            runAsUser: 1000
+          volumeMounts:
+          - mountPath: /var/run/secrets/argo
+            name: argo-token
+            readOnly: true
+        enableServiceLinks: false
+        imagePullSecrets:
+        - name: acr-credentials
+        responseStartTimeoutSeconds: 300
+        serviceAccountName: capability-mcp-server
+        timeoutSeconds: 600
+        volumes:
+        - name: argo-token
+          secret:
+            secretName: argo-token
+    traffic:
+    - latestRevision: true
+      percent: 100
+  status:
+    address:
+      url: http://capability-mcp-server.default.svc.cluster.local
+    conditions:
+    - lastTransitionTime: "2026-05-30T12:41:00Z"
+      status: "True"
+      type: ConfigurationsReady
+    - lastTransitionTime: "2026-05-30T12:41:00Z"
+      status: "True"
+      type: Ready
+    - lastTransitionTime: "2026-05-30T12:41:00Z"
+      status: "True"
+      type: RoutesReady
+    latestCreatedRevisionName: capability-mcp-server-00014
+    latestReadyRevisionName: capability-mcp-server-00014
+    observedGeneration: 14
+    traffic:
+    - latestRevision: true
+      percent: 100
+      revisionName: capability-mcp-server-00014
+    url: http://capability-mcp-server.default.20.233.105.82.nip.io
+- apiVersion: serving.knative.dev/v1
+  kind: Service
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"serving.knative.dev/v1","kind":"Service","metadata":{"annotations":{},"labels":{"app":"capability-web-mcp","service-type":"mcp-server"},"name":"capability-web-mcp","namespace":"default"},"spec":{"template":{"metadata":{"annotations":{"autoscaling.knative.dev/maxScale":"3","autoscaling.knative.dev/minScale":"0"}},"spec":{"containerConcurrency":50,"containers":[{"env":[{"name":"LOG_LEVEL","value":"INFO"},{"name":"SEARXNG_URL","value":"http://searxng.search.svc.cluster.local:8080"},{"name":"FETCH_MAX_BYTES","value":"200000"},{"name":"MAX_QUERY_LEN","value":"300"},{"name":"AUTH_DISABLED","value":"true"},{"name":"ALLOWED_HOSTS","value":"capability-web-mcp.default.20.233.105.82.nip.io,capability-web-mcp.default,capability-web-mcp.default.svc,capability-web-mcp.default.svc.cluster.local,localhost"}],"image":"healthidpuaeacr.azurecr.io/capability-web-mcp:v0.1","imagePullPolicy":"Always","livenessProbe":{"httpGet":{"path":"/healthz","port":8080},"initialDelaySeconds":30,"periodSeconds":10},"name":"capability-web-mcp","ports":[{"containerPort":8080}],"readinessProbe":{"httpGet":{"path":"/healthz","port":8080},"initialDelaySeconds":5,"periodSeconds":5},"resources":{"limits":{"cpu":"500m","memory":"384Mi"},"requests":{"cpu":"100m","memory":"192Mi"}},"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"runAsNonRoot":true,"runAsUser":1000}}],"imagePullSecrets":[{"name":"acr-credentials"}],"serviceAccountName":"capability-web-mcp","timeoutSeconds":60}},"traffic":[{"latestRevision":true,"percent":100}]}}
+      serving.knative.dev/creator: masterclient
+      serving.knative.dev/lastModifier: masterclient
+    creationTimestamp: "2026-05-28T12:37:27Z"
+    generation: 1
+    labels:
+      app: capability-web-mcp
+      service-type: mcp-server
+    name: capability-web-mcp
+    namespace: default
+    resourceVersion: "58681689"
+    uid: 1cc1b3f4-a1af-4d65-8c10-5ddcc0bc083a
+  spec:
+    template:
+      metadata:
+        annotations:
+          autoscaling.knative.dev/maxScale: "3"
+          autoscaling.knative.dev/minScale: "0"
+        creationTimestamp: null
+      spec:
+        containerConcurrency: 50
+        containers:
+        - env:
+          - name: LOG_LEVEL
+            value: INFO
+          - name: SEARXNG_URL
+            value: http://searxng.search.svc.cluster.local:8080
+          - name: FETCH_MAX_BYTES
+            value: "200000"
+          - name: MAX_QUERY_LEN
+            value: "300"
+          - name: AUTH_DISABLED
+            value: "true"
+          - name: ALLOWED_HOSTS
+            value: capability-web-mcp.default.20.233.105.82.nip.io,capability-web-mcp.default,capability-web-mcp.default.svc,capability-web-mcp.default.svc.cluster.local,localhost
+          image: healthidpuaeacr.azurecr.io/capability-web-mcp:v0.1
+          imagePullPolicy: Always
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          name: capability-web-mcp
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: 500m
+              memory: 384Mi
+            requests:
+              cpu: 100m
+              memory: 192Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            runAsNonRoot: true
+            runAsUser: 1000
+        enableServiceLinks: false
+        imagePullSecrets:
+        - name: acr-credentials
+        serviceAccountName: capability-web-mcp
+        timeoutSeconds: 60
+    traffic:
+    - latestRevision: true
+      percent: 100
+  status:
+    address:
+      url: http://capability-web-mcp.default.svc.cluster.local
+    conditions:
+    - lastTransitionTime: "2026-05-28T12:37:38Z"
+      status: "True"
+      type: ConfigurationsReady
+    - lastTransitionTime: "2026-05-28T12:37:39Z"
+      status: "True"
+      type: Ready
+    - lastTransitionTime: "2026-05-28T12:37:39Z"
+      status: "True"
+      type: RoutesReady
+    latestCreatedRevisionName: capability-web-mcp-00001
+    latestReadyRevisionName: capability-web-mcp-00001
+    observedGeneration: 1
+    traffic:
+    - latestRevision: true
+      percent: 100
+      revisionName: capability-web-mcp-00001
+    url: http://capability-web-mcp.default.20.233.105.82.nip.io
+- apiVersion: serving.knative.dev/v1
+  kind: Service
+  metadata:
+    annotations:
+      cafe-spec.io/port: classify
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"serving.knative.dev/v1","kind":"Service","metadata":{"annotations":{"cafe-spec.io/port":"classify"},"name":"classify-router","namespace":"default"},"spec":{"template":{"metadata":{"annotations":{"autoscaling.knative.dev/max-scale":"5","autoscaling.knative.dev/min-scale":"0"}},"spec":{"containers":[{"image":"healthidpuaeacr.azurecr.io/classify-router:0.1.0","livenessProbe":{"httpGet":{"path":"/health","port":8080},"initialDelaySeconds":30,"periodSeconds":30},"name":"classify-router","ports":[{"containerPort":8080,"name":"http1"}],"readinessProbe":{"httpGet":{"path":"/health","port":8080}},"resources":{"limits":{"cpu":"300m","memory":"256Mi"},"requests":{"cpu":"100m","memory":"128Mi"}}}],"imagePullSecrets":[{"name":"acr-credentials"}],"serviceAccountName":"classify-router"}}}}
+      serving.knative.dev/creator: masterclient
+      serving.knative.dev/lastModifier: masterclient
+    creationTimestamp: "2026-05-29T08:25:50Z"
+    generation: 1
+    name: classify-router
+    namespace: default
+    resourceVersion: "59451829"
+    uid: b566b42b-dbc7-494e-af28-182caf7085ca
+  spec:
+    template:
+      metadata:
+        annotations:
+          autoscaling.knative.dev/max-scale: "5"
+          autoscaling.knative.dev/min-scale: "0"
+        creationTimestamp: null
+      spec:
+        containerConcurrency: 0
+        containers:
+        - image: healthidpuaeacr.azurecr.io/classify-router:0.1.0
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          name: classify-router
+          ports:
+          - containerPort: 8080
+            name: http1
+            protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            successThreshold: 1
+          resources:
+            limits:
+              cpu: 300m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+        enableServiceLinks: false
+        imagePullSecrets:
+        - name: acr-credentials
+        serviceAccountName: classify-router
+        timeoutSeconds: 300
+    traffic:
+    - latestRevision: true
+      percent: 100
+  status:
+    address:
+      url: http://classify-router.default.svc.cluster.local
+    conditions:
+    - lastTransitionTime: "2026-05-29T08:26:01Z"
+      status: "True"
+      type: ConfigurationsReady
+    - lastTransitionTime: "2026-05-29T08:26:01Z"
+      status: "True"
+      type: Ready
+    - lastTransitionTime: "2026-05-29T08:26:01Z"
+      status: "True"
+      type: RoutesReady
+    latestCreatedRevisionName: classify-router-00001
+    latestReadyRevisionName: classify-router-00001
+    observedGeneration: 1
+    traffic:
+    - latestRevision: true
+      percent: 100
+      revisionName: classify-router-00001
+    url: http://classify-router.default.20.233.105.82.nip.io
+- apiVersion: serving.knative.dev/v1
+  kind: Service
+  metadata:
+    annotations:
+      cafe-spec.io/manufacturer: traditional-cloud
+      cafe-spec.io/port: compose
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"serving.knative.dev/v1","kind":"Service","metadata":{"annotations":{"cafe-spec.io/manufacturer":"traditional-cloud","cafe-spec.io/port":"compose"},"name":"compose-canonical","namespace":"default"},"spec":{"template":{"metadata":{"annotations":{"autoscaling.knative.dev/max-scale":"5","autoscaling.knative.dev/min-scale":"0"}},"spec":{"containers":[{"image":"healthidpuaeacr.azurecr.io/compose-canonical:0.1.0","livenessProbe":{"httpGet":{"path":"/health","port":8080},"initialDelaySeconds":30,"periodSeconds":30},"name":"compose-canonical","ports":[{"containerPort":8080,"name":"http1"}],"readinessProbe":{"httpGet":{"path":"/health","port":8080}},"resources":{"limits":{"cpu":"500m","memory":"256Mi"},"requests":{"cpu":"100m","memory":"128Mi"}}}],"imagePullSecrets":[{"name":"acr-credentials"}],"serviceAccountName":"compose-canonical"}}}}
+      serving.knative.dev/creator: masterclient
+      serving.knative.dev/lastModifier: masterclient
+    creationTimestamp: "2026-05-29T08:25:49Z"
+    generation: 3
+    name: compose-canonical
+    namespace: default
+    resourceVersion: "59457891"
+    uid: 034a3157-21a0-4680-8007-e454cfe461c3
+  spec:
+    template:
+      metadata:
+        annotations:
+          deploy.bump: "1780043669"
+        creationTimestamp: null
+      spec:
+        containerConcurrency: 0
+        containers:
+        - image: healthidpuaeacr.azurecr.io/compose-canonical:0.1.2
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          name: compose-canonical
+          ports:
+          - containerPort: 8080
+            name: http1
+            protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            successThreshold: 1
+          resources:
+            limits:
+              cpu: 500m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+        enableServiceLinks: false
+        imagePullSecrets:
+        - name: acr-credentials
+        serviceAccountName: compose-canonical
+        timeoutSeconds: 300
+    traffic:
+    - latestRevision: true
+      percent: 100
+  status:
+    address:
+      url: http://compose-canonical.default.svc.cluster.local
+    conditions:
+    - lastTransitionTime: "2026-05-29T08:34:34Z"
+      status: "True"
+      type: ConfigurationsReady
+    - lastTransitionTime: "2026-05-29T08:34:35Z"
+      status: "True"
+      type: Ready
+    - lastTransitionTime: "2026-05-29T08:34:35Z"
+      status: "True"
+      type: RoutesReady
+    latestCreatedRevisionName: compose-canonical-00003
+    latestReadyRevisionName: compose-canonical-00003
+    observedGeneration: 3
+    traffic:
+    - latestRevision: true
+      percent: 100
+      revisionName: compose-canonical-00003
+    url: http://compose-canonical.default.20.233.105.82.nip.io
+- apiVersion: serving.knative.dev/v1
+  kind: Service
+  metadata:
+    annotations:
+      cafe-spec.io/adapter-id: opa-reference
+      cafe-spec.io/port: govern
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"serving.knative.dev/v1","kind":"Service","metadata":{"annotations":{"cafe-spec.io/adapter-id":"opa-reference","cafe-spec.io/port":"govern"},"name":"govern-opa","namespace":"default"},"spec":{"template":{"metadata":{"annotations":{"autoscaling.knative.dev/max-scale":"5","autoscaling.knative.dev/min-scale":"1"}},"spec":{"containers":[{"env":[{"name":"CAFE_SPEC_ROOT","value":"/cafe-spec"},{"name":"M3_BUNDLES_DIR","value":"/cafe-spec/cafe-spec/m3-invariants"},{"name":"DOMAIN_DEFS_PATH","value":"/cafe-spec/cafe-spec/domain-definitions.json"}],"image":"healthidpuaeacr.azurecr.io/govern-opa:0.1.0","livenessProbe":{"httpGet":{"path":"/health","port":8080},"initialDelaySeconds":30,"periodSeconds":30},"name":"govern-opa","ports":[{"containerPort":8080,"name":"http1"}],"readinessProbe":{"httpGet":{"path":"/health","port":8080},"initialDelaySeconds":5,"periodSeconds":10},"resources":{"limits":{"cpu":"1","memory":"512Mi"},"requests":{"cpu":"200m","memory":"256Mi"}}}],"imagePullSecrets":[{"name":"acr-credentials"}],"serviceAccountName":"govern-opa"}}}}
+      serving.knative.dev/creator: masterclient
+      serving.knative.dev/lastModifier: masterclient
+    creationTimestamp: "2026-05-29T08:10:31Z"
+    generation: 3
+    name: govern-opa
+    namespace: default
+    resourceVersion: "59682213"
+    uid: 2c98b54b-89f6-45bd-bc46-024e6dff7a23
+  spec:
+    template:
+      metadata:
+        annotations:
+          deploy.bump: "1780061485"
+        creationTimestamp: null
+      spec:
+        containerConcurrency: 0
+        containers:
+        - env:
+          - name: CAFE_SPEC_ROOT
+            value: /cafe-spec
+          - name: M3_BUNDLES_DIR
+            value: /cafe-spec/cafe-spec/m3-invariants
+          - name: DOMAIN_DEFS_PATH
+            value: /cafe-spec/cafe-spec/domain-definitions.json
+          image: healthidpuaeacr.azurecr.io/govern-opa:0.1.1
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          name: govern-opa
+          ports:
+          - containerPort: 8080
+            name: http1
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+            requests:
+              cpu: 200m
+              memory: 256Mi
+        enableServiceLinks: false
+        imagePullSecrets:
+        - name: acr-credentials
+        serviceAccountName: govern-opa
+        timeoutSeconds: 300
+    traffic:
+    - latestRevision: true
+      percent: 100
+  status:
+    address:
+      url: http://govern-opa.default.svc.cluster.local
+    conditions:
+    - lastTransitionTime: "2026-05-29T13:31:26Z"
+      message: 'Revision "govern-opa-00003" failed with message: Unable to fetch image
+        "healthidpuaeacr.azurecr.io/govern-opa:0.1.1": failed to resolve image to
+        digest: HEAD https://healthidpuaeacr.azurecr.io/v2/govern-opa/manifests/0.1.1:
+        unexpected status code 404 Not Found (HEAD responses have no body, use GET
+        for details).'
+      reason: RevisionFailed
+      status: "False"
+      type: ConfigurationsReady
+    - lastTransitionTime: "2026-05-29T13:31:26Z"
+      message: 'Revision "govern-opa-00003" failed with message: Unable to fetch image
+        "healthidpuaeacr.azurecr.io/govern-opa:0.1.1": failed to resolve image to
+        digest: HEAD https://healthidpuaeacr.azurecr.io/v2/govern-opa/manifests/0.1.1:
+        unexpected status code 404 Not Found (HEAD responses have no body, use GET
+        for details).'
+      reason: RevisionFailed
+      status: "False"
+      type: Ready
+    - lastTransitionTime: "2026-05-29T08:14:21Z"
+      status: "True"
+      type: RoutesReady
+    latestCreatedRevisionName: govern-opa-00003
+    latestReadyRevisionName: govern-opa-00002
+    observedGeneration: 3
+    traffic:
+    - latestRevision: true
+      percent: 100
+      revisionName: govern-opa-00002
+    url: http://govern-opa.default.20.233.105.82.nip.io
+- apiVersion: serving.knative.dev/v1
+  kind: Service
+  metadata:
+    annotations:
+      cafe-spec.io/port: orchestrator
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"serving.knative.dev/v1","kind":"Service","metadata":{"annotations":{"cafe-spec.io/port":"orchestrator"},"name":"lifecycle-orchestrator","namespace":"default"},"spec":{"template":{"metadata":{"annotations":{"autoscaling.knative.dev/max-scale":"5","autoscaling.knative.dev/min-scale":"1"}},"spec":{"containers":[{"env":[{"name":"URL_CLASSIFY_ROUTER","value":"http://classify-router.default.svc.cluster.local"},{"name":"URL_COMPOSE_CANONICAL","value":"http://compose-canonical.default.svc.cluster.local"},{"name":"URL_GOVERN_OPA","value":"http://govern-opa.default.svc.cluster.local"},{"name":"URL_APPROVE_PR","value":"http://approve-pr.default.svc.cluster.local"},{"name":"URL_OBSERVE_AUDIT_SINK","value":"http://observe-audit-sink.default.svc.cluster.local"},{"name":"URL_UI_CLI","value":"http://ui-cli.default.svc.cluster.local"},{"name":"URL_CAPABILITY_MCP_SERVER","value":"http://capability-mcp-server.default.svc.cluster.local"}],"image":"healthidpuaeacr.azurecr.io/lifecycle-orchestrator:0.1.0","livenessProbe":{"httpGet":{"path":"/health","port":8080},"initialDelaySeconds":30,"periodSeconds":30},"name":"lifecycle-orchestrator","ports":[{"containerPort":8080,"name":"http1"}],"readinessProbe":{"httpGet":{"path":"/health","port":8080}},"resources":{"limits":{"cpu":"500m","memory":"384Mi"},"requests":{"cpu":"150m","memory":"192Mi"}}}],"imagePullSecrets":[{"name":"acr-credentials"}],"serviceAccountName":"lifecycle-orchestrator"}}}}
+      serving.knative.dev/creator: masterclient
+      serving.knative.dev/lastModifier: masterclient
+    creationTimestamp: "2026-05-29T08:39:19Z"
+    generation: 2
+    name: lifecycle-orchestrator
+    namespace: default
+    resourceVersion: "59462789"
+    uid: 3c48c1fa-2f3b-4739-93cb-ce9237d588cf
+  spec:
+    template:
+      metadata:
+        annotations:
+          deploy.bump: "1780044101"
+        creationTimestamp: null
+      spec:
+        containerConcurrency: 0
+        containers:
+        - env:
+          - name: URL_CLASSIFY_ROUTER
+            value: http://classify-router.default.svc.cluster.local
+          - name: URL_COMPOSE_CANONICAL
+            value: http://compose-canonical.default.svc.cluster.local
+          - name: URL_GOVERN_OPA
+            value: http://govern-opa.default.svc.cluster.local
+          - name: URL_APPROVE_PR
+            value: http://approve-pr.default.svc.cluster.local
+          - name: URL_OBSERVE_AUDIT_SINK
+            value: http://observe-audit-sink.default.svc.cluster.local
+          - name: URL_UI_CLI
+            value: http://ui-cli.default.svc.cluster.local
+          - name: URL_CAPABILITY_MCP_SERVER
+            value: http://capability-mcp-server.default.svc.cluster.local
+          image: healthidpuaeacr.azurecr.io/lifecycle-orchestrator:0.1.1
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          name: lifecycle-orchestrator
+          ports:
+          - containerPort: 8080
+            name: http1
+            protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            successThreshold: 1
+          resources:
+            limits:
+              cpu: 500m
+              memory: 384Mi
+            requests:
+              cpu: 150m
+              memory: 192Mi
+        enableServiceLinks: false
+        imagePullSecrets:
+        - name: acr-credentials
+        serviceAccountName: lifecycle-orchestrator
+        timeoutSeconds: 300
+    traffic:
+    - latestRevision: true
+      percent: 100
+  status:
+    address:
+      url: http://lifecycle-orchestrator.default.svc.cluster.local
+    conditions:
+    - lastTransitionTime: "2026-05-29T08:41:46Z"
+      status: "True"
+      type: ConfigurationsReady
+    - lastTransitionTime: "2026-05-29T08:41:47Z"
+      status: "True"
+      type: Ready
+    - lastTransitionTime: "2026-05-29T08:41:47Z"
+      status: "True"
+      type: RoutesReady
+    latestCreatedRevisionName: lifecycle-orchestrator-00002
+    latestReadyRevisionName: lifecycle-orchestrator-00002
+    observedGeneration: 2
+    traffic:
+    - latestRevision: true
+      percent: 100
+      revisionName: lifecycle-orchestrator-00002
+    url: http://lifecycle-orchestrator.default.20.233.105.82.nip.io
+- apiVersion: serving.knative.dev/v1
+  kind: Service
+  metadata:
+    annotations:
+      cafe-spec.io/port: observe
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"serving.knative.dev/v1","kind":"Service","metadata":{"annotations":{"cafe-spec.io/port":"observe"},"name":"observe-audit-sink","namespace":"default"},"spec":{"template":{"metadata":{"annotations":{"autoscaling.knative.dev/max-scale":"3","autoscaling.knative.dev/min-scale":"1"}},"spec":{"containers":[{"image":"healthidpuaeacr.azurecr.io/observe-audit-sink:0.1.0","livenessProbe":{"httpGet":{"path":"/health","port":8080},"initialDelaySeconds":30,"periodSeconds":30},"name":"observe-audit-sink","ports":[{"containerPort":8080,"name":"http1"}],"readinessProbe":{"httpGet":{"path":"/health","port":8080}},"resources":{"limits":{"cpu":"300m","memory":"256Mi"},"requests":{"cpu":"100m","memory":"128Mi"}}}],"imagePullSecrets":[{"name":"acr-credentials"}],"serviceAccountName":"observe-audit-sink"}}}}
+      serving.knative.dev/creator: masterclient
+      serving.knative.dev/lastModifier: masterclient
+    creationTimestamp: "2026-05-29T08:25:51Z"
+    generation: 1
+    name: observe-audit-sink
+    namespace: default
+    resourceVersion: "59451722"
+    uid: ad2683cc-8922-418c-9cd9-ce1258423cd7
+  spec:
+    template:
+      metadata:
+        annotations:
+          autoscaling.knative.dev/max-scale: "3"
+          autoscaling.knative.dev/min-scale: "1"
+        creationTimestamp: null
+      spec:
+        containerConcurrency: 0
+        containers:
+        - image: healthidpuaeacr.azurecr.io/observe-audit-sink:0.1.0
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          name: observe-audit-sink
+          ports:
+          - containerPort: 8080
+            name: http1
+            protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            successThreshold: 1
+          resources:
+            limits:
+              cpu: 300m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+        enableServiceLinks: false
+        imagePullSecrets:
+        - name: acr-credentials
+        serviceAccountName: observe-audit-sink
+        timeoutSeconds: 300
+    traffic:
+    - latestRevision: true
+      percent: 100
+  status:
+    address:
+      url: http://observe-audit-sink.default.svc.cluster.local
+    conditions:
+    - lastTransitionTime: "2026-05-29T08:25:55Z"
+      status: "True"
+      type: ConfigurationsReady
+    - lastTransitionTime: "2026-05-29T08:25:56Z"
+      status: "True"
+      type: Ready
+    - lastTransitionTime: "2026-05-29T08:25:56Z"
+      status: "True"
+      type: RoutesReady
+    latestCreatedRevisionName: observe-audit-sink-00001
+    latestReadyRevisionName: observe-audit-sink-00001
+    observedGeneration: 1
+    traffic:
+    - latestRevision: true
+      percent: 100
+      revisionName: observe-audit-sink-00001
+    url: http://observe-audit-sink.default.20.233.105.82.nip.io
+- apiVersion: serving.knative.dev/v1
+  kind: Service
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: slack-api-server:serving.knative.dev/Service:default/slack-api-server
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"serving.knative.dev/v1","kind":"Service","metadata":{"annotations":{"argocd.argoproj.io/tracking-id":"slack-api-server:serving.knative.dev/Service:default/slack-api-server"},"labels":{"app":"slack-api-server","component":"slack-integration","service-type":"api-server"},"name":"slack-api-server","namespace":"default"},"spec":{"template":{"metadata":{"annotations":{"autoscaling.knative.dev/maxScale":"5","autoscaling.knative.dev/minScale":"1","autoscaling.knative.dev/scaleDownDelay":"30s","autoscaling.knative.dev/scaleToZeroGracePeriod":"60s","autoscaling.knative.dev/target":"10"},"labels":{"app":"slack-api-server","component":"slack-integration","service-type":"api-server"}},"spec":{"containers":[{"env":[{"name":"LOG_LEVEL","value":"INFO"},{"name":"ENVIRONMENT","value":"production"},{"name":"GITHUB_REPOSITORY","value":"shlapolosa/health-service-idp"},{"name":"LIFECYCLE_MODE","value":"events_only"},{"name":"LIFECYCLE_ORCHESTRATOR_URL","value":"http://lifecycle-orchestrator.default.svc.cluster.local"},{"name":"OBSERVE_AUDIT_SINK_URL","value":"http://observe-audit-sink.default.svc.cluster.local"},{"name":"REGISTRY_TYPE","valueFrom":{"configMapKeyRef":{"key":"ACTIVE_REGISTRY","name":"registry-config","optional":true}}},{"name":"ARGO_TOKEN_FILE","value":"/var/run/secrets/argo/token"},{"name":"SLACK_SIGNING_SECRET","valueFrom":{"secretKeyRef":{"key":"signing-secret","name":"slack-credentials"}}},{"name":"PERSONAL_ACCESS_TOKEN","valueFrom":{"secretKeyRef":{"key":"personal-access-token","name":"github-credentials"}}},{"name":"GITHUB_TOKEN","valueFrom":{"secretKeyRef":{"key":"personal-access-token","name":"github-credentials"}}}],"image":"healthidpuaeacr.azurecr.io/slack-api-server:oam-driven-v1","imagePullPolicy":"Always","livenessProbe":{"httpGet":{"path":"/health","port":8080},"initialDelaySeconds":30,"periodSeconds":10},"name":"slack-api-server","ports":[{"containerPort":8080,"protocol":"TCP"}],"readinessProbe":{"httpGet":{"path":"/health","port":8080},"initialDelaySeconds":10,"periodSeconds":5},"resources":{"limits":{"cpu":"1","memory":"512Mi"},"requests":{"cpu":"250m","memory":"256Mi"}},"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":false,"runAsNonRoot":true,"runAsUser":1000},"volumeMounts":[{"mountPath":"/var/run/secrets/argo","name":"argo-token","readOnly":true}]}],"imagePullSecrets":[{"name":"acr-credentials"}],"serviceAccountName":"slack-api-server","volumes":[{"name":"argo-token","secret":{"secretName":"argo-token"}}]}},"traffic":[{"latestRevision":true,"percent":100}]}}
+      serving.knative.dev/creator: masterclient
+      serving.knative.dev/lastModifier: masterclient
+    creationTimestamp: "2025-08-17T05:38:55Z"
+    generation: 20
+    labels:
+      app: slack-api-server
+      component: slack-integration
+      service-type: api-server
+    name: slack-api-server
+    namespace: default
+    resourceVersion: "61310767"
+    uid: eb9b2e67-5ff6-41f6-b2e7-c5b2a8a41835
+  spec:
+    template:
+      metadata:
+        annotations:
+          autoscaling.knative.dev/maxScale: "5"
+          autoscaling.knative.dev/minScale: "1"
+          autoscaling.knative.dev/scaleDownDelay: 30s
+          autoscaling.knative.dev/scaleToZeroGracePeriod: 60s
+          autoscaling.knative.dev/target: "10"
+          deploy.bump: "1780044296"
+          redeploy-ts: "1780150643"
+        creationTimestamp: null
+        labels:
+          app: slack-api-server
+          component: slack-integration
+          service-type: api-server
+      spec:
+        containerConcurrency: 0
+        containers:
+        - env:
+          - name: LOG_LEVEL
+            value: INFO
+          - name: ENVIRONMENT
+            value: production
+          - name: GITHUB_REPOSITORY
+            value: shlapolosa/health-service-idp
+          - name: LIFECYCLE_MODE
+            value: events_only
+          - name: LIFECYCLE_ORCHESTRATOR_URL
+            value: http://lifecycle-orchestrator.default.svc.cluster.local
+          - name: OBSERVE_AUDIT_SINK_URL
+            value: http://observe-audit-sink.default.svc.cluster.local
+          - name: REGISTRY_TYPE
+            valueFrom:
+              configMapKeyRef:
+                key: ACTIVE_REGISTRY
+                name: registry-config
+                optional: true
+          - name: ARGO_TOKEN_FILE
+            value: /var/run/secrets/argo/token
+          - name: SLACK_SIGNING_SECRET
+            valueFrom:
+              secretKeyRef:
+                key: signing-secret
+                name: slack-credentials
+          - name: PERSONAL_ACCESS_TOKEN
+            valueFrom:
+              secretKeyRef:
+                key: personal-access-token
+                name: github-credentials
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                key: personal-access-token
+                name: github-credentials
+          image: healthidpuaeacr.azurecr.io/slack-api-server:oam-driven-v1
+          imagePullPolicy: Always
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          name: slack-api-server
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+            requests:
+              cpu: 250m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 1000
+          volumeMounts:
+          - mountPath: /var/run/secrets/argo
+            name: argo-token
+            readOnly: true
+        enableServiceLinks: false
+        imagePullSecrets:
+        - name: acr-credentials
+        serviceAccountName: slack-api-server
+        timeoutSeconds: 300
+        volumes:
+        - name: argo-token
+          secret:
+            secretName: argo-token
+    traffic:
+    - latestRevision: true
+      percent: 100
+  status:
+    address:
+      url: http://slack-api-server.default.svc.cluster.local
+    conditions:
+    - lastTransitionTime: "2026-05-30T14:17:40Z"
+      status: "True"
+      type: ConfigurationsReady
+    - lastTransitionTime: "2026-05-30T14:17:40Z"
+      status: "True"
+      type: Ready
+    - lastTransitionTime: "2026-05-30T14:17:40Z"
+      status: "True"
+      type: RoutesReady
+    latestCreatedRevisionName: slack-api-server-00018
+    latestReadyRevisionName: slack-api-server-00018
+    observedGeneration: 20
+    traffic:
+    - latestRevision: true
+      percent: 100
+      revisionName: slack-api-server-00018
+    url: http://slack-api-server.default.20.233.105.82.nip.io
+- apiVersion: serving.knative.dev/v1
+  kind: Service
+  metadata:
+    annotations:
+      cafe-spec.io/port: ui
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"serving.knative.dev/v1","kind":"Service","metadata":{"annotations":{"cafe-spec.io/port":"ui"},"name":"ui-cli","namespace":"default"},"spec":{"template":{"metadata":{"annotations":{"autoscaling.knative.dev/max-scale":"3","autoscaling.knative.dev/min-scale":"0"}},"spec":{"containers":[{"image":"healthidpuaeacr.azurecr.io/ui-cli:0.1.0","livenessProbe":{"httpGet":{"path":"/health","port":8080},"initialDelaySeconds":30,"periodSeconds":30},"name":"ui-cli","ports":[{"containerPort":8080,"name":"http1"}],"readinessProbe":{"httpGet":{"path":"/health","port":8080}},"resources":{"limits":{"cpu":"200m","memory":"128Mi"},"requests":{"cpu":"50m","memory":"64Mi"}}}],"imagePullSecrets":[{"name":"acr-credentials"}],"serviceAccountName":"ui-cli"}}}}
+      serving.knative.dev/creator: masterclient
+      serving.knative.dev/lastModifier: masterclient
+    creationTimestamp: "2026-05-29T08:25:51Z"
+    generation: 1
+    name: ui-cli
+    namespace: default
+    resourceVersion: "59451894"
+    uid: df2fa3f0-cd93-4094-9bd8-2ebbd6dee09d
+  spec:
+    template:
+      metadata:
+        annotations:
+          autoscaling.knative.dev/max-scale: "3"
+          autoscaling.knative.dev/min-scale: "0"
+        creationTimestamp: null
+      spec:
+        containerConcurrency: 0
+        containers:
+        - image: healthidpuaeacr.azurecr.io/ui-cli:0.1.0
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          name: ui-cli
+          ports:
+          - containerPort: 8080
+            name: http1
+            protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            successThreshold: 1
+          resources:
+            limits:
+              cpu: 200m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+        enableServiceLinks: false
+        imagePullSecrets:
+        - name: acr-credentials
+        serviceAccountName: ui-cli
+        timeoutSeconds: 300
+    traffic:
+    - latestRevision: true
+      percent: 100
+  status:
+    address:
+      url: http://ui-cli.default.svc.cluster.local
+    conditions:
+    - lastTransitionTime: "2026-05-29T08:26:04Z"
+      status: "True"
+      type: ConfigurationsReady
+    - lastTransitionTime: "2026-05-29T08:26:05Z"
+      status: "True"
+      type: Ready
+    - lastTransitionTime: "2026-05-29T08:26:05Z"
+      status: "True"
+      type: RoutesReady
+    latestCreatedRevisionName: ui-cli-00001
+    latestReadyRevisionName: ui-cli-00001
+    observedGeneration: 1
+    traffic:
+    - latestRevision: true
+      percent: 100
+      revisionName: ui-cli-00001
+    url: http://ui-cli.default.20.233.105.82.nip.io
+kind: List
+metadata:
+  resourceVersion: ""

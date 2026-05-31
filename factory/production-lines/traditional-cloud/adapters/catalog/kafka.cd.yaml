@@ -1,0 +1,59 @@
+# Native Kafka ComponentDefinition (Crossplane-managed via Helm)
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: kafka
+  annotations:
+    definition.oam.dev/description: "Native Kafka deployment via Helm (Strimzi) with Crossplane-managed lifecycle"
+    definition.oam.dev/shape: helm-release
+spec:
+  workload:
+    definition:
+      apiVersion: helm.crossplane.io/v1beta1
+      kind: Release
+    type: releases.helm.crossplane.io
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "helm.crossplane.io/v1beta1"
+          kind: "Release"
+          metadata: {
+            name: context.name
+            namespace: "crossplane-system"
+          }
+          spec: {
+            forProvider: {
+              chart: {
+                name: "strimzi-kafka-operator"
+                repository: "https://strimzi.io/charts/"
+                version: "0.35.0"
+              }
+              namespace: context.namespace
+              values: {
+                kafka: {
+                  replicas: parameter.replicas
+                  storage: {
+                    size: parameter.storageSize
+                  }
+                  config: {
+                    "offsets.topic.replication.factor": parameter.replicas
+                    "transaction.state.log.replication.factor": parameter.replicas
+                    "transaction.state.log.min.isr": 2
+                  }
+                }
+                zookeeper: {
+                  replicas: 3
+                  storage: {
+                    size: "10Gi"
+                  }
+                }
+              }
+            }
+          }
+        }
+        
+        parameter: {
+          replicas: *3 | int
+          storageSize: *"100Gi" | string
+        }

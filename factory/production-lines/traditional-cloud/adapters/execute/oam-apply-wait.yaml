@@ -1,0 +1,102 @@
+# oam-apply-wait WorkflowTemplate — deferred OAM provisioning for consumers whose OAM references
+# ComponentDefinitions that don't exist yet.
+#
+# Sibling to oam-apply. Same parameter shape, same SA, same downstream behavior. The only difference:
+# this workflow polls `vela dry-run` in a retry loop BEFORE invoking the per-app ArgoCD Application
+# creation step. While the loop is running:
+#   - The OAM file IS committed to gitops (by capability-mcp app.submit_wait).
+#   - But no ArgoCD Application points at it yet → ArgoCD does nothing → no premature reconcile.
+# Once `vela dry-run` passes (because the missing CDs have landed), step 3 creates the ArgoCD
+# Application by reusing oam-apply's `create-argocd-application` template via templateRef. That
+# Application is the trigger; ArgoCD then syncs and KubeVela deploys.
+#
+# Exception handling, reject-path detection, notifications, and `app.status` are explicitly out
+# of scope for this iteration (per user direction).
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: oam-apply-wait
+  namespace: argo
+  labels:
+    parameter-contract-version: "v1.0"
+    resource-type: "oam-application"
+    template-category: "consumer-wait"
+  annotations:
+    description: "Deferred OAM-first provisioning: poll vela dry-run until ready, then create ArgoCD Application"
+    maintainer: "platform-team"
+spec:
+  serviceAccountName: slack-api-argo-access
+  entrypoint: main
+  activeDeadlineSeconds: 259200            # 72h hard cap on the whole workflow
+  arguments:
+    parameters:
+    # Identical to oam-apply's parameter set
+    - { name: oam-application }                                  # base64-encoded OAM Application YAML
+    - { name: app-name }
+    - { name: namespace,       value: "default" }
+    - { name: target-vcluster, value: "host" }
+    - { name: gitops-path,     value: "oam/applications" }
+    - { name: github-org,      value: "shlapolosa" }
+    - { name: gitops-repo,     value: "health-service-idp-gitops" }
+    - { name: user,            value: "capability-mcp" }
+
+  templates:
+
+  - name: main
+    steps:
+    # ─── 1. cluster prereqs (vCluster + ClusterGateway). REUSE existing template. ───
+    # These are about cluster topology, not ComponentDefinitions — safe to do upfront.
+    # Skip for host-tier (no vCluster needed), matching oam-apply line 89 behaviour.
+    - - name: prep-cluster
+        templateRef:
+          name: oam-apply
+          template: wait-for-clustergateway
+        arguments:
+          parameters:
+          - { name: target-vcluster, value: "{{workflow.parameters.target-vcluster}}" }
+        when: "'{{workflow.parameters.target-vcluster}}' != 'host'"
+
+    # ─── 2. poll vela dry-run until prerequisites are satisfied ───
+    - - name: poll-dryrun
+        template: poll-dryrun
+        arguments:
+          parameters:
+          - { name: oam-application, value: "{{workflow.parameters.oam-application}}" }
+
+    # ─── 3. create the ArgoCD Application (the trigger). REUSE existing template. ───
+    - - name: create-argocd-application
+        templateRef:
+          name: oam-apply
+          template: create-argocd-application
+        arguments:
+          parameters:
+          - { name: app-name,        value: "{{workflow.parameters.app-name}}" }
+          - { name: namespace,       value: "{{workflow.parameters.namespace}}" }
+          - { name: target-vcluster, value: "{{workflow.parameters.target-vcluster}}" }
+          - { name: gitops-path,     value: "{{workflow.parameters.gitops-path}}" }
+          - { name: github-org,      value: "{{workflow.parameters.github-org}}" }
+          - { name: gitops-repo,     value: "{{workflow.parameters.gitops-repo}}" }
+
+  # poll-and-retry wrapper around `vela dry-run`. Same image + decoding as oam-apply's validate-oam.
+  - name: poll-dryrun
+    inputs:
+      parameters:
+      - { name: oam-application }
+    container:
+      image: oamdev/vela-cli:v1.10.8
+      command: [sh, -c]
+      args:
+      - |
+        set -u
+        echo "{{inputs.parameters.oam-application}}" | base64 -d > /tmp/oam.yaml
+        echo "--- waiting for OAM dry-run to pass ---"
+        cat /tmp/oam.yaml
+        until vela dry-run -f /tmp/oam.yaml >/tmp/diag 2>&1; do
+          echo "dry-run failed; sleeping 60s. Last diagnostic:"
+          tail -n 20 /tmp/diag
+          sleep 60
+        done
+        echo "dry-run passed. Proceeding to create-argocd-application."
+      resources:
+        requests: { cpu: "100m", memory: "128Mi" }
+        limits:   { cpu: "500m", memory: "256Mi" }

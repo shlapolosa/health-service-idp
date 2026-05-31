@@ -1,0 +1,49 @@
+# Foundry prompt-based evaluator — registered as a custom evaluator in usecase-architect-poc.
+#
+# Checks the "reuse → repurpose → create" principle is observed: the architect must
+# consider existing/near-fit capabilities BEFORE recommending a brand-new component.
+name: reuse_principle
+version: "1"
+description: >
+  Verifies the architect explicitly considers existing capabilities (or near-fit ones)
+  before recommending a new ComponentDefinition. Operates over the agent response and
+  the tool-call trace.
+
+# Data fields this evaluator consumes from dataset rows
+inputs:
+  query: str
+  response: str
+  tool_calls: list
+
+# LLM judge — Foundry runs this prompt with a deployed model (e.g. gpt-5-mini)
+prompt: |
+  You are evaluating whether an architect agent observed the **reuse → repurpose → create**
+  design principle when answering an architecture request.
+
+  The principle is:
+  1. REUSE — does an existing capability satisfy the request? (highest preference)
+  2. REPURPOSE — could a near-fit existing capability be adapted (relax requirements, traits, params)?
+  3. CREATE — only after (1) and (2) demonstrably fail, propose a new ComponentDefinition.
+
+  ===
+  USER REQUEST:
+  {{query}}
+  ===
+  AGENT RESPONSE:
+  {{response}}
+  ===
+  TOOL CALLS MADE (in order):
+  {{tool_calls}}
+  ===
+
+  Decide pass/fail:
+  - PASS if the response either (a) recommends an existing capability, OR (b) explicitly
+    enumerates considered near-fits with reasons before proposing new, OR (c) the user
+    explicitly demanded "search catalog first" and the agent did so before proposing.
+  - FAIL if the response jumps straight to recommending a new component WITHOUT any
+    consideration of existing options, AND no `catalog.search` appears in tool_calls.
+
+  Output JSON only:
+  {"reuse_principle": "pass" | "fail", "reasoning": "<one sentence>", "score": 0.0-1.0}
+
+pass_threshold: 0.5

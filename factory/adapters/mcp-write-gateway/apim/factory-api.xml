@@ -1,0 +1,57 @@
+<!--
+  APIM policy for the Capability Factory MCP (write surface).
+
+  Backend (serviceUrl on the API resource, NOT in this policy):
+    http://<aks-ingress-fqdn>/factory-mcp
+  (or the in-cluster Istio gateway address through PrivateLink / Application Gateway integration)
+
+  Auth model:
+    * Caller presents a JWT for the factory APIM app audience (api://<factoryAppId>).
+    * REQUIRED claim: app role `factory-proposer`. Only sp-architect-writer holds this role.
+    * Both v1 and v2 issuers accepted (Entra returns v1 by default for client_credentials with the
+      app's accessTokenAcceptedVersion=null; see apim-openai-serviceurl-fix memory).
+    * NO MI swap on this API: the factory MCP authenticates to GitHub itself via the App PEM
+      (loaded from Key Vault via Workload Identity). The Bearer token is preserved end-to-end so
+      the MCP middleware can validate caller OID against ALLOWED_OIDS.
+    * Rate-limit: 30 calls/min/caller. PRs are expensive; this caps runaway agents.
+
+  Apply with az rest PATCH against /apis/factory/policies/policy (api-version=2022-08-01),
+  sending JSON body {properties:{format:"rawxml",value:"<this file>"}}.
+-->
+<policies>
+  <inbound>
+    <base />
+    <validate-jwt header-name="Authorization" failed-validation-httpcode="401"
+                  require-scheme="Bearer" output-token-variable-name="jwt">
+      <openid-config url="https://login.microsoftonline.com/df03bef9-a306-41fe-9933-493e3e70d1c6/.well-known/openid-configuration" />
+      <audiences>
+        <!-- Replace with the factory APIM app's audience after scripts/setup-factory-azure.sh creates it. -->
+        <audience>api://fe225ae2-c6eb-4e4e-b4c2-79b45b2dce69</audience>
+        <audience>fe225ae2-c6eb-4e4e-b4c2-79b45b2dce69</audience>
+      </audiences>
+      <issuers>
+        <issuer>https://sts.windows.net/df03bef9-a306-41fe-9933-493e3e70d1c6/</issuer>
+        <issuer>https://login.microsoftonline.com/df03bef9-a306-41fe-9933-493e3e70d1c6/v2.0</issuer>
+      </issuers>
+      <required-claims>
+        <claim name="roles" match="any">
+          <value>factory-proposer</value>
+        </claim>
+      </required-claims>
+    </validate-jwt>
+    <set-variable name="callerOid"
+                  value="@(((Jwt)context.Variables[&quot;jwt&quot;]).Claims.GetValueOrDefault(&quot;oid&quot;, &quot;unknown&quot;))" />
+    <rate-limit-by-key calls="30" renewal-period="60"
+                       counter-key="@((string)context.Variables[&quot;callerOid&quot;])" />
+    <!-- Pass the caller's JWT through to the backend MCP unchanged (it validates again). -->
+  </inbound>
+  <backend>
+    <forward-request />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>

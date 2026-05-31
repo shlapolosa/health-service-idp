@@ -1,0 +1,48 @@
+name: architect-v1-evals
+
+# Scheduled Foundry evaluation run for architect-v1.
+# Runs nightly + on-demand. Pushes results to the usecase-architect-poc Evaluations tab.
+
+on:
+  schedule:
+    - cron: "0 3 * * *"          # 03:00 UTC daily
+  workflow_dispatch: {}
+  push:
+    paths:
+      - "agents/architect-v1/system-prompt.md"
+      - "tests/agent-evals/**"
+
+permissions:
+  id-token: write              # azure/login OIDC
+  contents: read
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      AZURE_AI_PROJECT_ENDPOINT: https://aifoundry-socrates.services.ai.azure.com/api/projects/usecase-architect-poc
+      AZURE_AI_MODEL_DEPLOYMENT_NAME: gpt-5.4-mini
+      ARCHITECT_AGENT_ID: architect-v1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install "azure-ai-projects>=2.0.0" azure-identity
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Run Foundry cloud evaluation
+        working-directory: tests/agent-evals
+        env:
+          EVAL_NAME: architect-v1-suite
+          RUN_NAME: ci-${{ github.run_id }}
+        run: python run_evals.py

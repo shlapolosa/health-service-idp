@@ -4,24 +4,24 @@ on:
   push:
     branches: [ main, develop, 'feature/*', 'hotfix/*', 'release/*' ]
     paths:
-      - 'slack-api-server/src/**'
-      - 'slack-api-server/tests/**'
-      - 'slack-api-server/main.py'
-      - 'slack-api-server/Dockerfile'
-      - 'slack-api-server/pyproject.toml'
-      - 'slack-api-server/requirements.txt'
-      - 'slack-api-server/deployment.yaml'
+      - 'factory/adapters/intake-slack/src/**'
+      - 'factory/adapters/intake-slack/tests/**'
+      - 'factory/adapters/intake-slack/main.py'
+      - 'factory/adapters/intake-slack/Dockerfile'
+      - 'factory/adapters/intake-slack/pyproject.toml'
+      - 'factory/adapters/intake-slack/requirements.txt'
+      - 'factory/adapters/intake-slack/deployment.yaml'
       - '.github/workflows/slack-api-server-ci.yml'
   pull_request:
     branches: [ main ]
     paths:
-      - 'slack-api-server/src/**'
-      - 'slack-api-server/tests/**'
-      - 'slack-api-server/main.py'
-      - 'slack-api-server/Dockerfile'
-      - 'slack-api-server/pyproject.toml'
-      - 'slack-api-server/requirements.txt'
-      - 'slack-api-server/deployment.yaml'
+      - 'factory/adapters/intake-slack/src/**'
+      - 'factory/adapters/intake-slack/tests/**'
+      - 'factory/adapters/intake-slack/main.py'
+      - 'factory/adapters/intake-slack/Dockerfile'
+      - 'factory/adapters/intake-slack/pyproject.toml'
+      - 'factory/adapters/intake-slack/requirements.txt'
+      - 'factory/adapters/intake-slack/deployment.yaml'
       - '.github/workflows/slack-api-server-ci.yml'
   repository_dispatch:
     types: [slack_create_vcluster]
@@ -74,7 +74,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
-        working-directory: slack-api-server
+        working-directory: factory/adapters/intake-slack
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
@@ -87,12 +87,12 @@ jobs:
           pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
 
       - name: Run unit tests
-        working-directory: slack-api-server
+        working-directory: factory/adapters/intake-slack
         run: |
           python -m pytest tests/unit/ -v --tb=short
 
       - name: Run integration tests
-        working-directory: slack-api-server
+        working-directory: factory/adapters/intake-slack
         run: |
           python -m pytest tests/integration/ -v --tb=short
         env:
@@ -134,7 +134,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: slack-api-server
+          context: factory/adapters/intake-slack
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/${{ env.SERVICE_NAME }}:latest

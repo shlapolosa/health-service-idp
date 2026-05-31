@@ -1,0 +1,80 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: capability-factory-mcp
+  namespace: default
+  labels: { app: capability-factory-mcp, service-type: mcp-server }
+spec:
+  template:
+    metadata:
+      labels:
+        # Workload Identity webhook injects AZURE_CLIENT_ID/AZURE_TENANT_ID/AZURE_FEDERATED_TOKEN_FILE
+        # into pods carrying this label. The SA must also carry it (see rbac.yaml).
+        azure.workload.identity/use: "true"
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "3"
+    spec:
+      serviceAccountName: capability-factory-mcp
+      containerConcurrency: 50
+      timeoutSeconds: 300
+      imagePullSecrets:
+      - name: acr-credentials
+      containers:
+      - name: capability-factory-mcp
+        image: healthidpuaeacr.azurecr.io/capability-factory-mcp:v0.1
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+        env:
+        - name: LOG_LEVEL
+          value: "INFO"
+        # ---- GitHub App ----
+        - name: GITHUB_OWNER
+          value: "shlapolosa"
+        - name: FACTORY_ALLOWED_REPOS
+          value: "health-service-idp,health-service-idp-gitops"
+        - name: GITHUB_APP_ID
+          valueFrom: { secretKeyRef: { name: github-app-factorybot, key: app-id } }
+        - name: GITHUB_APP_INSTALLATION_ID
+          valueFrom: { secretKeyRef: { name: github-app-factorybot, key: installation-id } }
+        # ---- PEM source: Key Vault (Workload Identity) in prod ----
+        - name: GITHUB_APP_AUTH_MODE
+          value: "key_vault"
+        - name: AZURE_KEY_VAULT_URL
+          value: "https://kv-socrates-6706.vault.azure.net/"
+        - name: GITHUB_APP_PEM_SECRET_NAME
+          value: "github-app-factorybot-pem"
+        # ---- Entra JWT validation on caller (the agent) ----
+        - name: AUTH_DISABLED
+          value: "true"          # APIM is the trust boundary; relax MCP-side for now (parity with catalog MCP)
+        - name: APIM_AUDIENCE
+          value: "api://fe225ae2-c6eb-4e4e-b4c2-79b45b2dce69"
+        - name: ENTRA_TENANT
+          value: "df03bef9-a306-41fe-9933-493e3e70d1c6"
+        - name: ALLOWED_OIDS
+          value: "795d208a-f43a-4afe-8d7f-40f7b57d1b02"   # sp-architect-writer object id (defence-in-depth)
+        # ---- FastMCP DNS-rebinding allow-list (parity with catalog MCP v0.7+) ----
+        - name: ALLOWED_HOSTS
+          value: "capability-factory-mcp.default.20.233.105.82.nip.io,capability-factory-mcp.default,capability-factory-mcp.default.svc,capability-factory-mcp.default.svc.cluster.local,localhost"
+        resources:
+          requests: { cpu: "100m", memory: "192Mi" }
+          limits:   { cpu: "500m", memory: "384Mi" }
+        readinessProbe:
+          httpGet: { path: /healthz, port: 8080 }
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet: { path: /healthz, port: 8080 }
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        # securityContext minimised 2026-05-31 — Knative `secure-pod-defaults: enabled`
+        # injects allowPrivilegeEscalation/capabilities/runAsNonRoot/seccompProfile.
+        # We only set runAsUser explicitly because the image's USER directive is
+        # `appuser` (name, not numeric), which can't satisfy runAsNonRoot=true.
+        # TODO: bump Dockerfile to `USER 1000` then drop this block too.
+        securityContext:
+          runAsUser: 1000
+  traffic:
+  - latestRevision: true
+    percent: 100

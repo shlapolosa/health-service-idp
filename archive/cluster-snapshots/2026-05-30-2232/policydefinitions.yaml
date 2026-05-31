@@ -1,0 +1,623 @@
+apiVersion: v1
+items:
+- apiVersion: core.oam.dev/v1beta1
+  kind: PolicyDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Health checking policy for applications
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"core.oam.dev/v1beta1","kind":"PolicyDefinition","metadata":{"annotations":{"definition.oam.dev/description":"Health checking policy for applications"},"name":"health","namespace":"default"},"spec":{"schematic":{"cue":{"template":"output: {\n  apiVersion: \"standard.oam.dev/v1alpha1\"\n  kind: \"HealthScope\"\n  metadata: {\n    name: context.appName + \"-health\"\n    namespace: context.namespace\n  }\n  spec: {\n    probeInterval: parameter.probeInterval\n    probeTimeout: parameter.probeTimeout\n    workloadRefs: [\n      for comp in context.components {\n        {\n          apiVersion: comp.apiVersion\n          kind: comp.kind\n          name: comp.name\n        }\n      }\n    ]\n  }\n}\n\nparameter: {\n  // Optional\n  probeInterval: *30 | int\n  probeTimeout: *10 | int\n}\n"}}}}
+    creationTimestamp: "2025-08-17T00:43:14Z"
+    generation: 1
+    name: health
+    namespace: default
+    resourceVersion: "57463015"
+    uid: 08083282-288f-48b0-984c-ed9bc07cf5e1
+  spec:
+    schematic:
+      cue:
+        template: |
+          output: {
+            apiVersion: "standard.oam.dev/v1alpha1"
+            kind: "HealthScope"
+            metadata: {
+              name: context.appName + "-health"
+              namespace: context.namespace
+            }
+            spec: {
+              probeInterval: parameter.probeInterval
+              probeTimeout: parameter.probeTimeout
+              workloadRefs: [
+                for comp in context.components {
+                  {
+                    apiVersion: comp.apiVersion
+                    kind: comp.kind
+                    name: comp.name
+                  }
+                }
+              ]
+            }
+          }
+
+          parameter: {
+            // Optional
+            probeInterval: *30 | int
+            probeTimeout: *10 | int
+          }
+  status:
+    conditions:
+    - lastTransitionTime: "2026-05-27T09:08:06Z"
+      message: 'cannot store capability health in ConfigMap: cannot create or update
+        capability health-v1 in ConfigMap: the server is currently unable to handle
+        the request (put configmaps policy-schema-health-v1)'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: policy-schema-health
+    latestRevision:
+      name: health-v1
+      revision: 1
+      revisionHash: b248a27226375073
+- apiVersion: core.oam.dev/v1beta1
+  kind: PolicyDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Override component configurations selectively
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"core.oam.dev/v1beta1","kind":"PolicyDefinition","metadata":{"annotations":{"definition.oam.dev/description":"Override component configurations selectively"},"name":"override","namespace":"default"},"spec":{"schematic":{"cue":{"template":"output: {\n  apiVersion: \"standard.oam.dev/v1alpha1\"\n  kind: \"Override\"\n  metadata: {\n    name: context.appName + \"-overrides\"\n    namespace: context.namespace\n  }\n  spec: {\n    components: [\n      for comp in parameter.components {\n        {\n          name: comp.name\n          if comp.properties != _|_ {\n            properties: comp.properties\n          }\n          if comp.traits != _|_ {\n            traits: comp.traits\n          }\n        }\n      }\n    ]\n  }\n}\n\nparameter: {\n  // Required\n  components: [...{\n    name: string\n    properties?: {...}\n    traits?: [...]\n  }]\n}\n"}}}}
+    creationTimestamp: "2025-08-17T00:43:15Z"
+    generation: 1
+    name: override
+    namespace: default
+    resourceVersion: "57470741"
+    uid: 22f6ab60-2e97-445c-a1be-a0ca6be52df1
+  spec:
+    schematic:
+      cue:
+        template: |
+          output: {
+            apiVersion: "standard.oam.dev/v1alpha1"
+            kind: "Override"
+            metadata: {
+              name: context.appName + "-overrides"
+              namespace: context.namespace
+            }
+            spec: {
+              components: [
+                for comp in parameter.components {
+                  {
+                    name: comp.name
+                    if comp.properties != _|_ {
+                      properties: comp.properties
+                    }
+                    if comp.traits != _|_ {
+                      traits: comp.traits
+                    }
+                  }
+                }
+              ]
+            }
+          }
+
+          parameter: {
+            // Required
+            components: [...{
+              name: string
+              properties?: {...}
+              traits?: [...]
+            }]
+          }
+  status:
+    conditions:
+    - lastTransitionTime: "2026-05-27T09:13:34Z"
+      message: 'cannot store capability override in ConfigMap: cannot create or update
+        capability override-v1 in ConfigMap: configmaps "policy-schema-override-v1"
+        is forbidden: User "system:serviceaccount:vela-system:kubevela-vela-core"
+        cannot update resource "configmaps" in API group "" in the namespace "default"'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: policy-schema-override
+    latestRevision:
+      name: override-v1
+      revision: 1
+      revisionHash: dbd80c95e7406861
+- apiVersion: core.oam.dev/v1beta1
+  kind: PolicyDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Security policies for application access control
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"core.oam.dev/v1beta1","kind":"PolicyDefinition","metadata":{"annotations":{"definition.oam.dev/description":"Security policies for application access control"},"name":"security-policy","namespace":"default"},"spec":{"schematic":{"cue":{"template":"outputs: {\n  networkPolicy: {\n    apiVersion: \"networking.k8s.io/v1\"\n    kind: \"NetworkPolicy\"\n    metadata: {\n      name: context.appName + \"-security\"\n      namespace: context.namespace\n    }\n    spec: {\n      podSelector: {\n        matchLabels: {\n          \"app.oam.dev/name\": context.appName\n        }\n      }\n      policyTypes: [\"Ingress\", \"Egress\"]\n      ingress: [\n        {\n          from: [\n            if parameter.allowedOrigins != _|_ {\n              for origin in parameter.allowedOrigins {\n                {\n                  namespaceSelector: {\n                    matchLabels: {\n                      \"kubernetes.io/metadata.name\": origin\n                    }\n                  }\n                }\n              }\n            },\n            {\n              namespaceSelector: {\n                matchLabels: {\n                  \"name\": \"istio-system\"\n                }\n              }\n            }\n          ]\n          ports: [{\n            protocol: \"TCP\"\n            port: 8080\n          }]\n        }\n      ]\n      egress: [\n        {\n          to: []\n          ports: [\n            {\n              protocol: \"TCP\"\n              port: 53\n            },\n            {\n              protocol: \"UDP\" \n              port: 53\n            },\n            {\n              protocol: \"TCP\"\n              port: 443\n            },\n            {\n              protocol: \"TCP\"\n              port: 80\n            }\n          ]\n        }\n      ]\n    }\n  }\n}\n\nparameter: {\n  // Optional\n  allowedOrigins?: [...string]\n}\n"}}}}
+    creationTimestamp: "2025-08-17T00:43:15Z"
+    generation: 1
+    name: security-policy
+    namespace: default
+    resourceVersion: "57470740"
+    uid: 513d130c-4b64-4072-bb2a-5940b5d0cbe3
+  spec:
+    schematic:
+      cue:
+        template: "outputs: {\n  networkPolicy: {\n    apiVersion: \"networking.k8s.io/v1\"\n
+          \   kind: \"NetworkPolicy\"\n    metadata: {\n      name: context.appName
+          + \"-security\"\n      namespace: context.namespace\n    }\n    spec: {\n
+          \     podSelector: {\n        matchLabels: {\n          \"app.oam.dev/name\":
+          context.appName\n        }\n      }\n      policyTypes: [\"Ingress\", \"Egress\"]\n
+          \     ingress: [\n        {\n          from: [\n            if parameter.allowedOrigins
+          != _|_ {\n              for origin in parameter.allowedOrigins {\n                {\n
+          \                 namespaceSelector: {\n                    matchLabels:
+          {\n                      \"kubernetes.io/metadata.name\": origin\n                    }\n
+          \                 }\n                }\n              }\n            },\n
+          \           {\n              namespaceSelector: {\n                matchLabels:
+          {\n                  \"name\": \"istio-system\"\n                }\n              }\n
+          \           }\n          ]\n          ports: [{\n            protocol: \"TCP\"\n
+          \           port: 8080\n          }]\n        }\n      ]\n      egress:
+          [\n        {\n          to: []\n          ports: [\n            {\n              protocol:
+          \"TCP\"\n              port: 53\n            },\n            {\n              protocol:
+          \"UDP\" \n              port: 53\n            },\n            {\n              protocol:
+          \"TCP\"\n              port: 443\n            },\n            {\n              protocol:
+          \"TCP\"\n              port: 80\n            }\n          ]\n        }\n
+          \     ]\n    }\n  }\n}\n\nparameter: {\n  // Optional\n  allowedOrigins?:
+          [...string]\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-05-27T09:13:34Z"
+      message: 'cannot store capability security-policy in ConfigMap: cannot create
+        or update capability security-policy in ConfigMap: resource name may not be
+        empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: policy-schema-security-policy
+    latestRevision:
+      name: security-policy-v1
+      revision: 1
+      revisionHash: 5ad9b2abceb14365
+- apiVersion: core.oam.dev/v1beta1
+  kind: PolicyDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Allow configuration drift for applied resources,
+        delivery the resource without continuously reconciliation.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: apply-once
+    namespace: vela-system
+    resourceVersion: "57338242"
+    uid: 8214cae8-3681-4e38-af3e-a0dd04e252cd
+  spec:
+    schematic:
+      cue:
+        template: "#ApplyOnceStrategy: {\n\t// +usage=When the strategy takes effect,e.g.
+          onUpdate、onStateKeep\n\taffect?: string\n\t// +usage=Specify the path of
+          the resource that allow configuration drift\n\tpath: [...string]\n}\n\n#ApplyOncePolicyRule:
+          {\n\t// +usage=Specify how to select the targets of the rule\n\tselector?:
+          #ResourcePolicyRuleSelector\n\t// +usage=Specify the strategy for configuring
+          the resource level configuration drift behaviour\n\tstrategy: #ApplyOnceStrategy\n}\n\n#ResourcePolicyRuleSelector:
+          {\n\t// +usage=Select resources by component names\n\tcomponentNames?: [...string]\n\t//
+          +usage=Select resources by component types\n\tcomponentTypes?: [...string]\n\t//
+          +usage=Select resources by oamTypes (COMPONENT or TRAIT)\n\toamTypes?: [...string]\n\t//
+          +usage=Select resources by trait types\n\ttraitTypes?: [...string]\n\t//
+          +usage=Select resources by resource types (like Deployment)\n\tresourceTypes?:
+          [...string]\n\t// +usage=Select resources by their names\n\tresourceNames?:
+          [...string]\n}\n\nparameter: {\n\t// +usage=Whether to enable apply-once
+          for the whole application\n\tenable: *false | bool\n\t// +usage=Specify
+          the rules for configuring apply-once policy in resource level\n\trules?:
+          [...#ApplyOncePolicyRule]\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-01-02T15:31:38Z"
+      message: 'cannot store capability apply-once in ConfigMap: cannot create or
+        update capability apply-once in ConfigMap: resource name may not be empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: policy-schema-apply-once
+    latestRevision:
+      name: apply-once-v1
+      revision: 1
+      revisionHash: 8cb80cd09c409855
+- apiVersion: core.oam.dev/v1beta1
+  kind: PolicyDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Determining the destination where components
+        should be deployed to, and support override configuration
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+      custom.definition.oam.dev/deprecated: "true"
+    name: envbinding
+    namespace: vela-system
+    resourceVersion: "57357093"
+    uid: c13cbc8c-6d56-4702-adb6-82939100988d
+  spec:
+    schematic:
+      cue:
+        template: "#PatchParams: {\n\t// +usage=Specify the name of the patch component,
+          if empty, all components will be merged\n\tname?: string\n\t// +usage=Specify
+          the type of the patch component.\n\ttype?: string\n\tproperties?: {...}\n\ttraits?:
+          [...{\n\t\ttype: string\n\t\tproperties?: {...}\n\t\t// +usage=Specify if
+          the trait should be remove, default false\n\t\tdisable: *false | bool\n\t}]\n}\n\nparameter:
+          envs: [...{\n\tname: string\n\tplacement?: {\n\t\tclusterSelector?: {\n\t\t\t//
+          +usage=Specify cluster name, defualt local\n\t\t\tname: *\"local\" | string\n\t\t\tlabels?:
+          [string]: string\n\t\t}\n\t\tnamespaceSelector?: {\n\t\t\t// +usage=Specify
+          namespace name.\n\t\t\tname?: string\n\t\t\tlabels?: [string]: string\n\t\t}\n\t}\n\tselector?:
+          components: [...string]\n\tpatch?: components: [...#PatchParams]\n}]\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-01-02T16:17:14Z"
+      message: 'cannot store capability envbinding in ConfigMap: cannot create or
+        update capability envbinding in ConfigMap: the server is currently unable
+        to handle the request (put configmaps policy-schema-envbinding)'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: policy-schema-envbinding
+    latestRevision:
+      name: envbinding-v1
+      revision: 1
+      revisionHash: c38bb19ef852cda2
+- apiVersion: core.oam.dev/v1beta1
+  kind: PolicyDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Configure the garbage collect behaviour for
+        the application.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: garbage-collect
+    namespace: vela-system
+    resourceVersion: "57354681"
+    uid: 2a0ef940-fe5a-4368-9764-8826576e419c
+  spec:
+    schematic:
+      cue:
+        template: "#GarbageCollectPolicyRule: {\n\t// +usage=Specify how to select
+          the targets of the rule\n\tselector: #ResourcePolicyRuleSelector\n\t// +usage=Specify
+          the strategy for target resource to recycle\n\tstrategy: *\"onAppUpdate\"
+          | \"onAppDelete\" | \"never\"\n\t// +usage=Specify the deletion propagation
+          strategy for target resource to delete\n\tpropagation?: \"orphan\" | \"cascading\"\n}\n\n#ResourcePolicyRuleSelector:
+          {\n\t// +usage=Select resources by component names\n\tcomponentNames?: [...string]\n\t//
+          +usage=Select resources by component types\n\tcomponentTypes?: [...string]\n\t//
+          +usage=Select resources by oamTypes (COMPONENT or TRAIT)\n\toamTypes?: [...string]\n\t//
+          +usage=Select resources by trait types\n\ttraitTypes?: [...string]\n\t//
+          +usage=Select resources by resource types (like Deployment)\n\tresourceTypes?:
+          [...string]\n\t// +usage=Select resources by their names\n\tresourceNames?:
+          [...string]\n}\n\nparameter: {\n\t// +usage=If set, it will override the
+          default revision limit number and customize this number for the current
+          application\n\tapplicationRevisionLimit?: int\n\t// +usage=If is set, outdated
+          versioned resourcetracker will not be recycled automatically, outdated resources
+          will be kept until resourcetracker be deleted manually\n\tkeepLegacyResource:
+          *false | bool\n\t// +usage=If is set, continue to execute gc when the workflow
+          fails, by default gc will be executed only after the workflow succeeds\n\tcontinueOnFailure:
+          *false | bool\n\t// +usage=Specify the list of rules to control gc strategy
+          at resource level, if one resource is controlled by multiple rules, first
+          rule will be used\n\trules?: [...#GarbageCollectPolicyRule]\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-01-02T16:10:01Z"
+      message: 'cannot store capability garbage-collect in ConfigMap: cannot create
+        or update capability garbage-collect in ConfigMap: resource name may not be
+        empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: policy-schema-garbage-collect
+    latestRevision:
+      name: garbage-collect-v1
+      revision: 1
+      revisionHash: e7324cdb4e9418d2
+- apiVersion: core.oam.dev/v1beta1
+  kind: PolicyDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Describe the configuration to override when
+        deploying resources, it only works with specified `deploy` step in workflow.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: override
+    namespace: vela-system
+    resourceVersion: "57354707"
+    uid: ad4b29ec-41fa-403d-a281-c76113b14b46
+  spec:
+    schematic:
+      cue:
+        template: "#PatchParams: {\n\t// +usage=Specify the name of the patch component,
+          if empty, all components will be merged\n\tname?: string\n\t// +usage=Specify
+          the type of the patch component.\n\ttype?: string\n\t// +usage=Specify the
+          properties to override.\n\tproperties?: {...}\n\t// +usage=Specify the traits
+          to override.\n\ttraits?: [...{\n\t\t// +usage=Specify the type of the trait
+          to be patched.\n\t\ttype: string\n\t\t// +usage=Specify the properties to
+          override.\n\t\tproperties?: {...}\n\t\t// +usage=Specify if the trait should
+          be remove, default false\n\t\tdisable: *false | bool\n\t}]\n}\n\nparameter:
+          {\n\t// +usage=Specify the overridden component configuration.\n\tcomponents:
+          [...#PatchParams]\n\t// +usage=Specify a list of component names to use,
+          if empty, all components will be selected.\n\tselector?: [...string]\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-01-02T16:10:01Z"
+      message: 'cannot store capability override in ConfigMap: cannot create or update
+        capability override in ConfigMap: the server is currently unable to handle
+        the request (put configmaps policy-schema-override)'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: policy-schema-override
+    latestRevision:
+      name: override-v1
+      revision: 1
+      revisionHash: 85a95f1bdb13fff2
+- apiVersion: core.oam.dev/v1beta1
+  kind: PolicyDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Configure the resources to be read-only in the
+        application (no update / state-keep).
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: read-only
+    namespace: vela-system
+    resourceVersion: "57338247"
+    uid: 33ae9092-1547-4066-bc6d-7dd8b2684a15
+  spec:
+    schematic:
+      cue:
+        template: "#PolicyRule: {\n\t// +usage=Specify how to select the targets of
+          the rule\n\tselector: #RuleSelector\n}\n\n#RuleSelector: {\n\t// +usage=Select
+          resources by component names\n\tcomponentNames?: [...string]\n\t// +usage=Select
+          resources by component types\n\tcomponentTypes?: [...string]\n\t// +usage=Select
+          resources by oamTypes (COMPONENT or TRAIT)\n\toamTypes?: [...string]\n\t//
+          +usage=Select resources by trait types\n\ttraitTypes?: [...string]\n\t//
+          +usage=Select resources by resource types (like Deployment)\n\tresourceTypes?:
+          [...string]\n\t// +usage=Select resources by their names\n\tresourceNames?:
+          [...string]\n}\n\nparameter: {\n\t// +usage=Specify the list of rules to
+          control read only strategy at resource level.\n\t// The selected resource
+          will be read-only to the current application. If the target resource does\n\t//
+          not exist, error will be raised.\n\trules?: [...#PolicyRule]\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-01-02T15:31:38Z"
+      message: 'cannot store capability read-only in ConfigMap: cannot create or update
+        capability read-only in ConfigMap: resource name may not be empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: policy-schema-read-only
+    latestRevision:
+      name: read-only-v1
+      revision: 1
+      revisionHash: 75f0e88a041f8f48
+- apiVersion: core.oam.dev/v1beta1
+  kind: PolicyDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Describe the configuration to replicate components
+        when deploying resources, it only works with specified `deploy` step in workflow.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: replication
+    namespace: vela-system
+    resourceVersion: "57463084"
+    uid: dfa8245e-f27f-450c-abd4-31aa8866f90e
+  spec:
+    schematic:
+      cue:
+        template: "parameter: {\n\t// +usage=Spicify the keys of replication. Every
+          key coresponds to a replication components\n\tkeys: [...string]\n\t// +usage=Specify
+          the components which will be replicated.\n\tselector?: [...string]\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-05-27T09:08:08Z"
+      message: 'cannot store capability replication in ConfigMap: cannot create or
+        update capability replication in ConfigMap: the server is currently unable
+        to handle the request (put configmaps policy-schema-replication)'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: policy-schema-replication
+    latestRevision:
+      name: replication-v1
+      revision: 1
+      revisionHash: 5a1ae0966f5ba5dd
+- apiVersion: core.oam.dev/v1beta1
+  kind: PolicyDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Configure the update strategy for selected resources.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: resource-update
+    namespace: vela-system
+    resourceVersion: "57354720"
+    uid: 07bc41ea-d249-4e14-905b-a06bd9340760
+  spec:
+    schematic:
+      cue:
+        template: "#PolicyRule: {\n\t// +usage=Specify how to select the targets of
+          the rule\n\tselector: #RuleSelector\n\t// +usage=The update strategy for
+          the target resources\n\tstrategy: #Strategy\n}\n\n#Strategy: {\n\t// +usage=Specify
+          the op for updating target resources\n\top: *\"patch\" | \"replace\"\n\t//
+          +usage=Specify which fields would trigger recreation when updated\n\trecreateFields?:
+          [...string]\n}\n\n#RuleSelector: {\n\t// +usage=Select resources by component
+          names\n\tcomponentNames?: [...string]\n\t// +usage=Select resources by component
+          types\n\tcomponentTypes?: [...string]\n\t// +usage=Select resources by oamTypes
+          (COMPONENT or TRAIT)\n\toamTypes?: [...string]\n\t// +usage=Select resources
+          by trait types\n\ttraitTypes?: [...string]\n\t// +usage=Select resources
+          by resource types (like Deployment)\n\tresourceTypes?: [...string]\n\t//
+          +usage=Select resources by their names\n\tresourceNames?: [...string]\n}\n\nparameter:
+          {\n\t// +usage=Specify the list of rules to control resource update strategy
+          at resource level.\n\trules?: [...#PolicyRule]\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-01-02T16:10:02Z"
+      message: 'cannot store capability resource-update in ConfigMap: cannot create
+        or update capability resource-update in ConfigMap: resource name may not be
+        empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: policy-schema-resource-update
+    latestRevision:
+      name: resource-update-v1
+      revision: 1
+      revisionHash: adce73d0255d1c69
+- apiVersion: core.oam.dev/v1beta1
+  kind: PolicyDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Configure the resources to be sharable across
+        applications.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: shared-resource
+    namespace: vela-system
+    resourceVersion: "57287302"
+    uid: 35a1740e-619a-431a-914e-9483be64e66c
+  spec:
+    schematic:
+      cue:
+        template: "#SharedResourcePolicyRule: {\n\t// +usage=Specify how to select
+          the targets of the rule\n\tselector: #ResourcePolicyRuleSelector\n}\n\n#ResourcePolicyRuleSelector:
+          {\n\t// +usage=Select resources by component names\n\tcomponentNames?: [...string]\n\t//
+          +usage=Select resources by component types\n\tcomponentTypes?: [...string]\n\t//
+          +usage=Select resources by oamTypes (COMPONENT or TRAIT)\n\toamTypes?: [...string]\n\t//
+          +usage=Select resources by trait types\n\ttraitTypes?: [...string]\n\t//
+          +usage=Select resources by resource types (like Deployment)\n\tresourceTypes?:
+          [...string]\n\t// +usage=Select resources by their names\n\tresourceNames?:
+          [...string]\n}\n\nparameter: {\n\t// +usage=Specify the list of rules to
+          control shared-resource strategy at resource level.\n\t// The selected resource
+          will be sharable across applications. (That means multiple applications\n\t//
+          can all read it without conflict, but only the first one can write it)\n\trules?:
+          [...#SharedResourcePolicyRule]\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-01-02T14:29:12Z"
+      message: 'cannot store capability shared-resource in ConfigMap: cannot create
+        or update capability shared-resource in ConfigMap: the server is currently
+        unable to handle the request (put configmaps policy-schema-shared-resource)'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: policy-schema-shared-resource
+    latestRevision:
+      name: shared-resource-v1
+      revision: 1
+      revisionHash: 766f96c04f5638a1
+- apiVersion: core.oam.dev/v1beta1
+  kind: PolicyDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Configure the resources to be able to take over
+        when it belongs to no application.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: take-over
+    namespace: vela-system
+    resourceVersion: "57287296"
+    uid: 59a3fd36-984c-4983-abd7-c30a24785d3f
+  spec:
+    schematic:
+      cue:
+        template: "#PolicyRule: {\n\t// +usage=Specify how to select the targets of
+          the rule\n\tselector: #RuleSelector\n}\n\n#RuleSelector: {\n\t// +usage=Select
+          resources by component names\n\tcomponentNames?: [...string]\n\t// +usage=Select
+          resources by component types\n\tcomponentTypes?: [...string]\n\t// +usage=Select
+          resources by oamTypes (COMPONENT or TRAIT)\n\toamTypes?: [...string]\n\t//
+          +usage=Select resources by trait types\n\ttraitTypes?: [...string]\n\t//
+          +usage=Select resources by resource types (like Deployment)\n\tresourceTypes?:
+          [...string]\n\t// +usage=Select resources by their names\n\tresourceNames?:
+          [...string]\n}\n\nparameter: {\n\t// +usage=Specify the list of rules to
+          control take over strategy at resource level.\n\t// The selected resource
+          will be able to be taken over by the current application when the resource
+          belongs to no\n\t// one.\n\trules?: [...#PolicyRule]\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2026-01-02T14:29:12Z"
+      message: 'cannot store capability take-over in ConfigMap: cannot create or update
+        capability take-over in ConfigMap: resource name may not be empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: policy-schema-take-over
+    latestRevision:
+      name: take-over-v1
+      revision: 1
+      revisionHash: bd664e2bd397b303
+- apiVersion: core.oam.dev/v1beta1
+  kind: PolicyDefinition
+  metadata:
+    annotations:
+      definition.oam.dev/description: Describe the destination where components should
+        be deployed to.
+      meta.helm.sh/release-name: kubevela
+      meta.helm.sh/release-namespace: vela-system
+    creationTimestamp: "2025-08-17T00:36:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: topology
+    namespace: vela-system
+    resourceVersion: "53730774"
+    uid: 82062ef2-09be-4773-bb4a-2f0d13f6515a
+  spec:
+    schematic:
+      cue:
+        template: "parameter: {\n\t// +usage=Specify the names of the clusters to
+          select.\n\tclusters?: [...string]\n\t// +usage=Specify the label selector
+          for clusters\n\tclusterLabelSelector?: [string]: string\n\t// +usage=Ignore
+          empty cluster error\n\tallowEmpty?: bool\n\t// +usage=Deprecated: Use clusterLabelSelector
+          instead.\n\tclusterSelector?: [string]: string\n\t// +usage=Specify the
+          target namespace to deploy in the selected clusters, default inherit the
+          original namespace.\n\tnamespace?: string\n}\n"
+  status:
+    conditions:
+    - lastTransitionTime: "2025-12-03T12:18:13Z"
+      message: 'cannot store capability topology in ConfigMap: cannot create or update
+        capability topology in ConfigMap: resource name may not be empty'
+      reason: ReconcileError
+      status: "False"
+      type: Synced
+    configMapRef: policy-schema-topology
+    latestRevision:
+      name: topology-v1
+      revision: 1
+      revisionHash: d163a6cc1e225fcb
+kind: List
+metadata:
+  resourceVersion: ""

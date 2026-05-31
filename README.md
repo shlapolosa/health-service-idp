@@ -1,6 +1,136 @@
 # health-service-idp
 
-CLAUDE.md-compliant microservice application container with GitOps-enabled multi-cluster OAM platform.
+This repository hosts the **Traditional Cloud production line** of the CAFE
+factory, plus the **factory's cross-line adapters** (Intake, Operator,
+factory-level MCP gateways) and the **substrate** they run on.
+
+> CAFE = Composable AI Framework for Enterprise. CAM = Composable Application
+> Manufacturing. The factory abstractions and port contracts live in the
+> sibling [`cafe-spec`](https://github.com/shlapolosa/cafe-spec) repository.
+
+## Repository structure
+
+```
+health-service-idp/
+├── factory/                                # the factory: contains production lines, sits on substrate, owns shared tooling
+│   ├── adapters/                           # cross-manufacturer adapters
+│   │   ├── intake-slack/                   # Intake port adapter (Slack)
+│   │   ├── operator/                       # Operator agent (factory steward)
+│   │   ├── mcp-read-gateway/               # factory MCP read gateway
+│   │   ├── mcp-write-gateway/              # factory MCP write gateway (PR opener)
+│   │   └── mcp-web-gateway/                # factory MCP discover gateway
+│   ├── core/
+│   │   └── knowledge-base/                 # KB, recipes, schemas, weightings
+│   ├── ports/                              # pointers to canonical port specs
+│   │
+│   ├── production-lines/
+│   │   └── traditional-cloud/              # MFG-TC production line
+│   │       ├── adapters/
+│   │       │   ├── compose/                # architect-v1 Foundry prompt
+│   │       │   ├── compose-mcp/            # per-line MCP (Catalog port)
+│   │       │   ├── catalog/                # OAM ComponentDefinitions / Traits / Policies
+│   │       │   ├── composition/            # Crossplane Composition
+│   │       │   └── execute/                # Argo workflow templates (Execute port)
+│   │       ├── core/                       # pointer to sibling cafe-spec specs
+│   │       ├── ports/                      # MFG-TC port refinements
+│   │       ├── evals/                      # architect-v1 eval suite
+│   │       └── examples/                   # sample OAM apps
+│   │
+│   ├── substrate/                          # platform that hosts the factory
+│   │   ├── argo/                           # Argo Workflows server config + RBAC
+│   │   ├── argocd/                         # ArgoCD app templates
+│   │   ├── argo-events/                    # OAM webhook + watcher sensors
+│   │   ├── crossplane/                     # XRDs, Compositions, providers, RBAC
+│   │   └── knative/                        # Knative install + autoscaler config
+│   │
+│   └── shared-libs/
+│       ├── capability-mcp-core/            # extracted MCP business logic library
+│       └── common/                         # existing shared utilities
+│
+│   └── utilities/                          # human-operated scripts (health checks, secrets, etc.)
+├── microservices/                          # sample products the factory makes (out of refactor scope)
+├── docs/                                   # architecture docs
+└── archive/                                # deprecated historical artifacts
+```
+
+## Ports-and-adapters at a glance
+
+Every action in the system crosses a **port**. The canonical port set lives
+in `cafe-spec/cafe-spec/ports/`. Adapters in this repo implement those ports
+for either the whole factory (cross-mfg) or for a specific production line.
+
+| Port | Scope | Adapter in this repo |
+|---|---|---|
+| Intake | cross-mfg | `factory/adapters/intake-slack/` |
+| Classify | cross-mfg | (sibling `cafe-spec/adapters/classify-router/`) |
+| Compose | per-mfg | `factory/production-lines/traditional-cloud/adapters/compose/` |
+| Catalog | per-mfg | `factory/production-lines/traditional-cloud/adapters/compose-mcp/` + `…/catalog/` (the data) |
+| Govern | cross-mfg | (sibling `cafe-spec/adapters/govern-opa/`) |
+| Approve | cross-mfg | (sibling `cafe-spec/adapters/approve-pr/`) |
+| Execute | per-mfg | `factory/production-lines/traditional-cloud/adapters/execute/` + `…/composition/` |
+| Observe | cross-mfg | (sibling `cafe-spec/adapters/observe-audit-sink/`) |
+| Factory routing | cross-mfg | `factory/adapters/mcp-read-gateway/` (factory.route, lifecycle.state) |
+
+## Bringing the factory up (one command)
+
+```bash
+make up                    # full bring-up: substrate → factory → production-line → verify
+make up-fast               # same, skip image rebuild
+```
+
+Or via the underlying bootstrap script with phase control:
+
+```bash
+./factory/utilities/bootstrap.sh up                                   # everything
+./factory/utilities/bootstrap.sh phase substrate                      # substrate only
+./factory/utilities/bootstrap.sh phase production-line:traditional-cloud
+./factory/utilities/bootstrap.sh status                               # health check
+./factory/utilities/bootstrap.sh down --keep-data                     # tear down, preserve volumes
+```
+
+Phase order — each is idempotent and re-runnable:
+
+| # | Phase | What it does |
+|---|---|---|
+| 1 | `secrets` | k8s secrets from `.env` + ACR pull secret |
+| 2 | `substrate` | Crossplane providers + XRDs + Compositions + Argo Workflows + Argo Events + ArgoCD + Knative |
+| 3 | `images` | `docker build` + `docker push` for all factory + per-line services |
+| 4 | `factory` | Deploy cross-line adapter Knative services (intake-slack, mcp gateways) |
+| 5 | `production-line:<id>` | Apply per-line catalog + composition + execute + compose-mcp |
+| 6 | `verify` | Health checks across all phases + parity audit + Knative Ready checks |
+
+Make targets:
+
+```
+make help        # list all targets
+make up          # full bring-up
+make substrate   # just substrate
+make factory     # just cross-mfg adapters
+make tc          # just production-line:traditional-cloud
+make images      # build + push everything
+make test        # run unit tests
+make parity      # MFG-TC catalog parity audit
+make status      # health checks
+make down        # tear down (keep data)
+```
+
+The bootstrap orchestrator lives at `factory/utilities/bootstrap.sh` with phase
+scripts in `factory/utilities/bootstrap/`. Each phase script is independently
+runnable for diagnostics or partial recovery.
+
+## Extending the Traditional Cloud production line
+
+Adding a new capability to MFG-TC is **definition-only**. See
+[factory/production-lines/traditional-cloud/](factory/production-lines/traditional-cloud/README.md)
+and the sibling [`cafe-spec/manufacturers/traditional-cloud/EXTENDING.md`](https://github.com/shlapolosa/cafe-spec/blob/main/manufacturers/traditional-cloud/EXTENDING.md)
+for the 5-file checklist (1 in this repo, 2 in sibling, 2 optional).
+
+The audit script verifies parity between the runtime catalog and the
+spec-side wire-shape schemas:
+
+```bash
+./factory/utilities/check-mfg-tc-parity.sh
+```
 
 ## Architecture Overview
 

@@ -1,0 +1,119 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: slack-api-server
+  namespace: default
+  labels:
+    app: slack-api-server
+    service-type: api-server
+    component: slack-integration
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "5"
+        autoscaling.knative.dev/target: "10"
+        autoscaling.knative.dev/scaleDownDelay: "30s"
+        autoscaling.knative.dev/scaleToZeroGracePeriod: "60s"
+      labels:
+        app: slack-api-server
+        service-type: api-server
+        component: slack-integration
+    spec:
+      serviceAccountName: slack-api-server
+      # Image pull secrets for ACR
+      imagePullSecrets:
+      - name: acr-credentials
+      
+      volumes:
+      - name: argo-token
+        secret:
+          secretName: argo-token
+          
+      containers:
+      - name: slack-api-server
+        # lifecycle-v1: adds non-breaking CAFE lifecycle wiring — emits observe events
+        # per slack command and optionally drives lifecycle-orchestrator /run on deploy-intent.
+        # LIFECYCLE_MODE controls behavior: events_only (default) | full | off.
+        image: healthidpuaeacr.azurecr.io/slack-api-server:lifecycle-v1
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        env:
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: ENVIRONMENT
+          value: "production"
+        - name: GITHUB_REPOSITORY
+          value: "shlapolosa/health-service-idp"
+        # CAFE lifecycle wiring — additive, non-breaking
+        - name: LIFECYCLE_MODE
+          value: "events_only"
+        - name: LIFECYCLE_ORCHESTRATOR_URL
+          value: "http://lifecycle-orchestrator.default.svc.cluster.local"
+        - name: OBSERVE_AUDIT_SINK_URL
+          value: "http://observe-audit-sink.default.svc.cluster.local"
+        # Registry type from ConfigMap
+        - name: REGISTRY_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: registry-config
+              key: ACTIVE_REGISTRY
+              optional: true
+        - name: ARGO_TOKEN_FILE
+          value: "/var/run/secrets/argo/token"
+        # Slack signature verification (must match the installed Slack app's signing secret)
+        - name: SLACK_SIGNING_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: slack-credentials
+              key: signing-secret
+        # GitHub PAT for repository_dispatch / Crossplane provider
+        - name: PERSONAL_ACCESS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: github-credentials
+              key: personal-access-token
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: github-credentials
+              key: personal-access-token
+        volumeMounts:
+        - name: argo-token
+          mountPath: /var/run/secrets/argo
+          readOnly: true
+        resources:
+          limits:
+            cpu: "1"
+            memory: "512Mi"
+          requests:
+            cpu: "250m"
+            memory: "256Mi"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        # securityContext minimised 2026-05-31 — Knative `secure-pod-defaults: enabled`
+        # injects allowPrivilegeEscalation/capabilities/runAsNonRoot/seccompProfile.
+        # We only set runAsUser explicitly because the image's USER directive is
+        # `appuser` (name, not numeric), which can't satisfy runAsNonRoot=true.
+        # readOnlyRootFilesystem stays false — slack-api-server writes to /tmp.
+        # TODO: bump Dockerfile to `USER 1000` then drop runAsUser too.
+        securityContext:
+          runAsUser: 1000
+          readOnlyRootFilesystem: false
+  # Always route 100% to the latest revision (avoids stale pinned-revision RevisionMissing)
+  traffic:
+  - latestRevision: true
+    percent: 100

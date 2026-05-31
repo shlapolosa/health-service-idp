@@ -1,0 +1,66 @@
+# Native MongoDB ComponentDefinition (Crossplane-managed via Helm)
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: mongodb
+  annotations:
+    definition.oam.dev/description: "Native MongoDB deployment via Helm with Crossplane-managed lifecycle"
+    definition.oam.dev/shape: helm-release
+spec:
+  workload:
+    definition:
+      apiVersion: helm.crossplane.io/v1beta1
+      kind: Release
+    type: releases.helm.crossplane.io
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "helm.crossplane.io/v1beta1"
+          kind: "Release"
+          metadata: {
+            name: context.name
+            namespace: "crossplane-system"
+          }
+          spec: {
+            forProvider: {
+              chart: {
+                name: "mongodb"
+                repository: "https://charts.bitnami.com/bitnami"
+                version: "13.15.1"
+              }
+              namespace: context.namespace
+              values: {
+                auth: {
+                  enabled: parameter.authEnabled
+                  rootPassword: parameter.rootPassword
+                  database: parameter.database
+                  username: parameter.username
+                  password: parameter.password
+                }
+                architecture: parameter.architecture
+                replicaCount: parameter.replicaCount
+                persistence: {
+                  enabled: parameter.persistenceEnabled
+                  size: parameter.storageSize
+                }
+                metrics: {
+                  enabled: parameter.metricsEnabled
+                }
+              }
+            }
+          }
+        }
+        
+        parameter: {
+          authEnabled: *true | bool
+          rootPassword: *"mongodb-root" | string
+          database: *"mydb" | string
+          username: *"user" | string
+          password: *"password" | string
+          architecture: *"replicaset" | "standalone" | "replicaset"
+          replicaCount: *3 | int
+          persistenceEnabled: *true | bool
+          storageSize: *"20Gi" | string
+          metricsEnabled: *true | bool
+        }

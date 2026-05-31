@@ -1,0 +1,27 @@
+NAMESPACE     NAME                         WORKLOAD-KIND      DESCRIPTION
+default       application-infrastructure   ApplicationClaim   Comprehensive application infrastructure with networking, storage, and compute resources
+default       auth0-idp                    ExternalSecret     Auth0 identity provider integration via External Secrets
+default       camunda-orchestrator         Service            Camunda 8 orchestrator with full UI stack for process design, monitoring, and human task management
+default       clickhouse                   StatefulSet        ClickHouse columnar database for real-time analytics
+default       graphql-gateway              Service            Auto-generating GraphQL API gateway that discovers and federates Knative services
+default       identity-service             Workflow           Domain-specific identity and access management service generator using Spring Boot templates
+default       kafka                        Release            Native Kafka deployment via Helm (Strimzi) with Crossplane-managed lifecycle
+default       mongodb                      Release            Native MongoDB deployment via Helm with Crossplane-managed lifecycle
+default       nats-jetstream               Release            Native NATS JetStream deployment via Helm with Crossplane-managed lifecycle
+default       neon-postgres                Secret             Neon serverless PostgreSQL database with automatic scaling and branching
+default       postgresql                   Release            PostgreSQL database via Crossplane Helm provider
+default       rasa-chatbot                 Service            Complete Rasa chatbot with dual-container pattern (Rasa server + Actions server) and automatic service discovery
+default       realtime-platform            Service            Complete real-time streaming platform with IoT, analytics, and stream processing
+default       redis                        Release            Native Redis deployment via Helm with Crossplane-managed lifecycle
+default       vcluster                     Release            Virtual Kubernetes cluster for multi-tenancy and isolation
+default       webservice                   Service            Enhanced webservice with automatic infrastructure bootstrap via embedded workflows
+default       webservice-shape             Service            Shape-only ComponentDefinition for a webservice — renders a Knative Service from image + port + healthPath + resources + environment. No bootstrap, no language inference, no GraphQL/realtime knobs. Bootstrap concerns belong to the auto-scaffold-bootstrap TraitDefinition. Image-source / language-enum constraints belong to the corresponding PolicyDefinitions....
+vela-system   cron-task                                       Describes cron jobs that run code or a script to completion.
+vela-system   daemon                       DaemonSet          Describes daemonset services in Kubernetes.
+vela-system   k8s-objects                                     K8s-objects allow users to specify raw K8s objects in properties
+vela-system   raw                                             Raw allow users to specify raw K8s object in properties. This definition is DEPRECATED, please use 'k8s-objects' instead.
+vela-system   ref-objects                                     Ref-objects allow users to specify ref objects to use. Notice that this component type have special handle logic.
+vela-system   statefulset                  StatefulSet        Describes long-running, scalable, containerized services used to manage stateful application, like database.
+vela-system   task                         Job                Describes jobs that run code or a script to completion.
+vela-system   webservice                   Deployment         Describes long-running, scalable, containerized services that have a stable network endpoint to receive external network traffic from customers.
+vela-system   worker                       Deployment         Describes long-running, scalable, containerized services that running at backend. They do NOT have network endpoint to receive external network traffic.

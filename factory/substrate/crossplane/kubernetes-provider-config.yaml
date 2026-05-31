@@ -1,0 +1,25 @@
+# Crossplane v2 + provider-kubernetes v1.x dual ProviderConfig.
+#
+# Two manifests for two API surfaces:
+#   - Legacy `kubernetes.crossplane.io/v1alpha1 ProviderConfig` for cluster-scoped
+#     `Object.kubernetes.crossplane.io/v1alpha2` resources (existing flows).
+#   - New `kubernetes.m.crossplane.io/v1alpha1 ClusterProviderConfig` for
+#     namespaced `Object.kubernetes.m.crossplane.io/v1alpha1` resources used
+#     under v2 Namespaced XRDs (PR3.2+3.3).
+#
+# Both use InjectedIdentity (the provider pod's SA).
+apiVersion: kubernetes.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: kubernetes-provider
+spec:
+  credentials:
+    source: InjectedIdentity
+---
+apiVersion: kubernetes.m.crossplane.io/v1alpha1
+kind: ClusterProviderConfig
+metadata:
+  name: kubernetes-provider
+spec:
+  credentials:
+    source: InjectedIdentity
