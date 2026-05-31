@@ -47,7 +47,7 @@ COPY factory/production-lines/traditional-cloud/adapters/composition/application
 COPY factory/adapters/mcp-read-gateway/cafe-spec-staging/ /cafe-spec/
 
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app /capability-factory /repo /cafe-spec
-USER appuser
+USER 1000
 
 ENV PYTHONPATH=/app PORT=8080 \
     CAPABILITY_FACTORY_DIR=/capability-factory \

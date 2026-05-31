@@ -13,7 +13,7 @@ COPY capability-factory-mcp/src/ /app/src/
 COPY capability-factory-mcp/main.py /app/main.py
 
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
-USER appuser
+USER 1000
 
 ENV PYTHONPATH=/app PORT=8080
 EXPOSE 8080

@@ -23,7 +23,7 @@ COPY main.py ./
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
-USER appuser
+USER 1000
 
 # Set environment variables
 ENV PYTHONPATH=/app
