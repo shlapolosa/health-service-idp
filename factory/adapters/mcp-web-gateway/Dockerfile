@@ -1,15 +1,15 @@
 # Build context = repo root.
-#   docker build -f capability-web-mcp/Dockerfile -t healthidpuaeacr.azurecr.io/capability-web-mcp:<tag> .
+#   docker build -f factory/adapters/mcp-web-gateway/Dockerfile -t healthidpuaeacr.azurecr.io/capability-web-mcp:<tag> .
 FROM python:3.11-slim
 
 WORKDIR /app
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 
-COPY capability-web-mcp/requirements.txt /app/requirements.txt
+COPY factory/adapters/mcp-web-gateway/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY capability-web-mcp/src/ /app/src/
-COPY capability-web-mcp/main.py /app/main.py
+COPY factory/adapters/mcp-web-gateway/src/ /app/src/
+COPY factory/adapters/mcp-web-gateway/main.py /app/main.py
 
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER 1000
