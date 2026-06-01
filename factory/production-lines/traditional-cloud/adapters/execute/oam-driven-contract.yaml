@@ -478,23 +478,23 @@ spec:
         
         # Validate Tier 3 - Microservice-specific Parameters
         case "{{inputs.parameters.microservice-language}}" in
-          python|java|go|nodejs|rust|rasa)
+          python|java)
             echo "✅ Valid microservice-language: {{inputs.parameters.microservice-language}}"
             ;;
           *)
             echo "❌ Invalid microservice-language: {{inputs.parameters.microservice-language}}"
-            echo "Must be one of: python, java, go, nodejs, rust, rasa"
+            echo "Must be one of: python, java"
             exit 1
             ;;
         esac
         
         case "{{inputs.parameters.microservice-framework}}" in
-          fastapi|springboot|gin|express|axum|auto|chatbot|graphql-gateway)
+          fastapi|springboot)
             echo "✅ Valid microservice-framework: {{inputs.parameters.microservice-framework}}"
             ;;
           *)
             echo "❌ Invalid microservice-framework: {{inputs.parameters.microservice-framework}}"
-            echo "Must be one of: fastapi, springboot, gin, express, axum, auto, chatbot, graphql-gateway"
+            echo "Must be one of: fastapi, springboot"
             exit 1
             ;;
         esac
