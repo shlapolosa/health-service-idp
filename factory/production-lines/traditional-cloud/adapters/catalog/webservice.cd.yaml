@@ -39,7 +39,11 @@ spec:
               if parameter.language != _|_ {
                 "webservice.oam.dev/bootstrap": "true"
                 "webservice.oam.dev/language": parameter.language
-                "webservice.oam.dev/framework": parameter.framework
+                // framework is optional; only label when explicitly set
+                // (regression-fix 2026-06-01: was unconditional, broke language-only path)
+                if parameter.framework != _|_ {
+                  "webservice.oam.dev/framework": parameter.framework
+                }
                 if parameter.source != _|_ {
                   "webservice.oam.dev/source": parameter.source
                 }
@@ -270,7 +274,7 @@ spec:
                         "          {\"name\": \"auto-create-dependencies\", \"value\": \"true\"},\n" +
                         "          {\"name\": \"resource-size\", \"value\": \"medium\"},\n" +
                         "          {\"name\": \"microservice-language\", \"value\": \"" + parameter.language + "\"},\n" +
-                        "          {\"name\": \"microservice-framework\", \"value\": \"" + parameter.framework + "\"},\n" +
+                        "          {\"name\": \"microservice-framework\", \"value\": \"" + (*parameter.framework | "auto") + "\"},\n" +
                         "          {\"name\": \"microservice-database\", \"value\": \"" + (*parameter.database | "none") + "\"},\n" +
                         "          {\"name\": \"microservice-cache\", \"value\": \"" + (*parameter.cache | "none") + "\"},\n" +
                         "          {\"name\": \"microservice-realtime\", \"value\": \"" + (*parameter.realtime | "") + "\"},\n" +
@@ -309,8 +313,11 @@ spec:
         }
         
         parameter: {
-          // Required Parameters
-          image: string  // Full image path
+          // image defaults to ACR placeholder built by the auto-scaffold workflow
+          // when `language:` is set. Consumers can override to BYO image.
+          // (Regression-fix 2026-06-01: CUE-R5 removed this default and broke
+          //  the architect-v1 A5(a) language-only auto-scaffold path.)
+          image: *"healthidpuaeacr.azurecr.io/\(context.name):latest" | string
 
           port: *8080 | int
           healthPath: *"/health" | string
