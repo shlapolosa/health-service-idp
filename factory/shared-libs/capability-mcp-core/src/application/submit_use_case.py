@@ -180,13 +180,21 @@ class SubmitUseCase:
             if not raw:
                 return default
             return comp_types.get(raw, raw)
+        # Derive framework from language when unset / "auto". PR #23 narrowed
+        # the WFT enum to fastapi|springboot only, so "auto" no longer passes
+        # validate-parameters. Keep the consumer-facing OAM lenient (framework
+        # optional) but always forward a concrete value to the workflow.
+        _lang = props.get("language", "python")
+        _fw = props.get("framework")
+        if not _fw or _fw == "auto":
+            _fw = {"python": "fastapi", "java": "springboot"}.get(_lang, "fastapi")
         params = {
             "resource-name": scaffold_comp["name"],
             "namespace": namespace,
             "user": "capability-mcp",
             "description": f"OAM-driven via app.submit ({app_name})",
-            "microservice-language": props.get("language", "python"),
-            "microservice-framework": props.get("framework", "auto"),
+            "microservice-language": _lang,
+            "microservice-framework": _fw,
             "microservice-database": _resolve_dep("database", "none"),
             "microservice-cache": _resolve_dep("cache", "none"),
             "target-vcluster": target_vcluster or "host",
