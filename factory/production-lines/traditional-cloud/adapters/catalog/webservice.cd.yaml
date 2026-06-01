@@ -86,6 +86,16 @@ spec:
                 containers: [{
                   // Use the image parameter directly (always provided)
                   image: parameter.image
+                  // Inject numeric runAsUser so Knative's runAsNonRoot enforcement
+                  // can verify non-root even when the image uses a named USER
+                  // (e.g. `USER app` from auto-scaffolded Dockerfiles).
+                  // Without this, kubelet errors:
+                  //   "container has runAsNonRoot and image has non-numeric user, cannot verify"
+                  securityContext: {
+                    runAsUser: 1000
+                    runAsNonRoot: true
+                    allowPrivilegeEscalation: false
+                  }
                   ports: [{
                     containerPort: parameter.port
                     name: "http1"

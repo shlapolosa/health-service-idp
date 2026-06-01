@@ -488,13 +488,17 @@ spec:
             ;;
         esac
         
+        # Accept "auto" (Slack default when user omits framework). Downstream
+        # microservice-creator resolves auto → fastapi (python) / springboot (java).
+        # Without this, slack-api-server triggers fail-fast here because it
+        # bypasses the submit_use_case derive logic that the MCP path uses.
         case "{{inputs.parameters.microservice-framework}}" in
-          fastapi|springboot)
+          fastapi|springboot|auto)
             echo "✅ Valid microservice-framework: {{inputs.parameters.microservice-framework}}"
             ;;
           *)
             echo "❌ Invalid microservice-framework: {{inputs.parameters.microservice-framework}}"
-            echo "Must be one of: fastapi, springboot"
+            echo "Must be one of: fastapi, springboot, auto"
             exit 1
             ;;
         esac
