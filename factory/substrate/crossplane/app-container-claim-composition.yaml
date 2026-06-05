@@ -26,6 +26,9 @@ spec:
           apiVersion: repo.github.upbound.io/v1alpha1
           kind: Repository
           spec:
+            # Orphan: deleting the claim must NEVER delete the GitHub repo
+            # (consumer source code lives there). W1 of declarative-spine plan.
+            deletionPolicy: Orphan
             forProvider:
               name: placeholder
               description: CLAUDE.md-compliant microservices container
@@ -75,6 +78,9 @@ spec:
           apiVersion: repo.github.upbound.io/v1alpha1
           kind: Repository
           spec:
+            # Orphan: deleting the claim must NEVER delete the GitHub repo
+            # (it is the tenancy unit / reconciled truth). W1 of declarative-spine plan.
+            deletionPolicy: Orphan
             forProvider:
               name: placeholder
               description: GitOps repository for app container deployment manifests
