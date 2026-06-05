@@ -102,6 +102,12 @@ def get_claims() -> "K8sClaimClient":
 
 
 @lru_cache
+def get_status():
+    from ..application.status_use_case import StatusUseCase
+    return StatusUseCase(get_claims())
+
+
+@lru_cache
 def get_submit() -> SubmitUseCase:
     return SubmitUseCase(get_vela(), get_github(), get_argo(),
                          gitops_branch=os.getenv("GITOPS_BRANCH", "main"),

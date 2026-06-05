@@ -158,6 +158,14 @@ def app_submit(oam_yaml: str) -> dict[str, Any]:
     }
 
 
+@mcp.tool(name="app.status",
+          description="Status of a submitted service: AppContainerClaim scaffold progress + "
+                      "ArgoCD Application sync/health (aggregated from host or vcluster). "
+                      "Phases: scaffolding -> scaffolded -> reconciling -> ready.")
+def app_status(name: str) -> dict[str, Any]:
+    return deps.get_status().status_of(name)
+
+
 @mcp.tool(name="app.submit_wait",
           description="Deferred OAM provisioning for MFG-TC consumers whose OAM references CDs "
                       "not yet present. Commits to gitops + fires oam-apply-wait. "

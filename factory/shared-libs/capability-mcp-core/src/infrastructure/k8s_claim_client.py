@@ -95,12 +95,33 @@ class K8sClaimClient:
             return False, f"AppContainerClaim create failed: {e}"
 
     def get_claim_status(self, name: str) -> Optional[dict[str, Any]]:
-        """Return the claim's .status (or None). Used by lifecycle.state (W5)."""
+        """Return the claim's .status (or None). Used by app.status (W5)."""
         try:
             obj = self._custom_api().get_namespaced_custom_object(
                 group=_GROUP, version=_VERSION, namespace=self.namespace,
                 plural=_PLURAL, name=name,
             )
             return obj.get("status")
+        except Exception:  # noqa: BLE001
+            return None
+
+    def get_argocd_app_status(self, name: str, argocd_namespace: str = "argocd") -> Optional[dict[str, Any]]:
+        """Return {sync, health, revision} for the ArgoCD Application `name` (or None).
+
+        W5: ArgoCD aggregates health from the destination cluster (host OR vcluster),
+        so this is the one status surface that works across tenancy targets.
+        """
+        try:
+            obj = self._custom_api().get_namespaced_custom_object(
+                group="argoproj.io", version="v1alpha1", namespace=argocd_namespace,
+                plural="applications", name=name,
+            )
+            st = obj.get("status") or {}
+            return {
+                "sync": (st.get("sync") or {}).get("status"),
+                "health": (st.get("health") or {}).get("status"),
+                "revision": (st.get("sync") or {}).get("revision"),
+                "operation_phase": ((st.get("operationState") or {}).get("phase")),
+            }
         except Exception:  # noqa: BLE001
             return None

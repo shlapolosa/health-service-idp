@@ -1,0 +1,91 @@
+---
+# Declarative-spine W5: notification path for the claim-driven delivery flow.
+# The legacy oam-driven-contract chain notified Slack via in-workflow steps
+# (fragile - see #119 silent-notify). The declarative path has no workflow, so
+# notifications come from watching the ArgoCD Applications the
+# app-container-claim composition creates (label managed-by=capability-mcp):
+# health/sync transitions -> slack-api-server -> Slack.
+#
+# EventSource: watch ArgoCD Applications in the argocd namespace.
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: argocd-application-watcher
+  namespace: argo-events
+spec:
+  template:
+    serviceAccountName: oam-event-sa
+  resource:
+    argocd-applications:
+      namespace: argocd
+      group: argoproj.io
+      version: v1alpha1
+      resource: applications
+      eventTypes:
+        - ADD
+        - UPDATE
+      filter:
+        labels:
+          - key: managed-by
+            operation: "=="
+            value: "capability-mcp"
+---
+# Sensor: forward transitions to slack-api-server (same consumer endpoint the
+# oam-to-slack-api sensor uses; the server owns formatting + channel routing).
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: argocd-health-to-slack
+  namespace: argo-events
+spec:
+  template:
+    serviceAccountName: oam-event-sa
+  dependencies:
+    - name: argocd-app-change
+      eventSourceName: argocd-application-watcher
+      eventName: argocd-applications
+  triggers:
+    - template:
+        name: slack-api-argocd-trigger
+        http:
+          url: http://slack-api-server.default.svc.cluster.local/oam/webhook
+          method: POST
+          headers:
+            Content-Type: application/json
+          payload:
+            - src:
+                dependencyName: argocd-app-change
+                dataKey: body
+              dest: body
+            - src:
+                dependencyName: argocd-app-change
+                dataKey: type
+              dest: operation
+          retryStrategy:
+            steps: 3
+            duration: "3s"
+            factor: 2
+---
+# RBAC addition: oam-event-sa (argo-events) must read ArgoCD Applications.
+# The existing oam-event-role covers core.oam.dev only; this is additive.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argocd-application-event-role
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["applications"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argocd-application-event-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argocd-application-event-role
+subjects:
+  - kind: ServiceAccount
+    name: oam-event-sa
+    namespace: argo-events
