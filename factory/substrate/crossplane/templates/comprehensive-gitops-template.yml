@@ -391,10 +391,19 @@ jobs:
           
           # Create payload for each service
           IFS=',' read -ra SERVICE_ARRAY <<< "$SERVICES"
-          
+
+          # Declarative-spine (W3): image base must match where the build job
+          # actually pushed. Previously hardcoded docker.io/socrates12345 even
+          # when DEFAULT_REGISTRY=acr, so the gitops OAM never got the real ref.
+          if [[ "${{ env.DEFAULT_REGISTRY }}" == "acr" || "${{ env.DEFAULT_REGISTRY }}" == "both" ]]; then
+            IMAGE_BASE="${{ env.ACR_REGISTRY }}"
+          else
+            IMAGE_BASE="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}"
+          fi
+
           DEPLOYMENTS=""
           for service in "${SERVICE_ARRAY[@]}"; do
-            NEW_IMAGE="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/$service:$COMMIT_SHA"
+            NEW_IMAGE="${IMAGE_BASE}/$service:$COMMIT_SHA"
             
             if [ -z "$DEPLOYMENTS" ]; then
               DEPLOYMENTS="\"$service\": {\"image\": \"$NEW_IMAGE\", \"commit\": \"$COMMIT_SHA\"}"
@@ -417,7 +426,7 @@ jobs:
             --field client_payload[services]="$SERVICES" \
             --field client_payload[version_info]="$VERSION_INFO" \
             --field client_payload[source_commit]="$SOURCE_COMMIT" \
-            --field client_payload[registry]="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}" \
+            --field client_payload[registry]="${IMAGE_BASE}" \
             --field client_payload[branch]="${{ github.ref_name }}" \
             --field client_payload[workflow_run]="${{ github.run_id }}" \
             --raw-field client_payload[deployments]="{$DEPLOYMENTS}"; then
@@ -434,7 +443,7 @@ jobs:
               --field client_payload[services]="$SERVICES" \
               --field client_payload[source_commit]="$SOURCE_COMMIT" \
               --field client_payload[commit_sha]="${COMMIT_SHA}" \
-              --field client_payload[registry]="${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}"; then
+              --field client_payload[registry]="${IMAGE_BASE}"; then
               echo "✅ Simplified dispatch sent successfully!"
             else
               echo "❌ All dispatch methods failed"
