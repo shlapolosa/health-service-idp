@@ -1,23 +1,30 @@
 """Submit use-case — the gated action surface (`app.submit`).
 
-OAM-first: validate (vela dry-run) → commit the OAM to the gitops repo (THE GATE) → trigger the
-deployment workflow.
+OAM-first: validate (vela dry-run) → commit the OAM to the central gitops repo (intake
+ledger / audit record) → route.
 
-Routing (2026-05-30, Stage 3 of oam-apply consolidation plan):
-  - If the OAM has a webservice component with `language:` set → fire `oam-driven-contract`
-    (the proven /microservice chain forked + extended to accept consumer OAM). This builds the
-    source repo, scaffolds boilerplate code, builds + pushes the image to ACR, AND overlays the
-    consumer's OAM as the deployed state (overwriting the chain's boilerplate OAM at
-    apps/oam-application.yaml in the per-service gitops repo).
-  - Otherwise (no webservice with language, or OAM is purely backing services / pre-built
-    image webservice) → fall back to `oam-apply` (legacy: validate → ArgoCD app → ArgoCD syncs
-    the file the MCP just committed). This path doesn't build images; consumer must bring their
-    own ACR image.
+Routing (declarative-spine W4, 2026-06-05):
+  - Scaffold needed (webservice with `language:` and default/absent image):
+      * per-service gitops repo EXISTS  → UPDATE path: commit the OAM directly to
+        <svc>-gitops/oam/applications/application.yaml. ArgoCD syncs; no workflow.
+      * repo does NOT exist             → DAY-0 path: create an AppContainerClaim
+        (in-cluster, no Argo REST call). Its composition creates source + gitops
+        repos, seeds the consumer OAM, and an ArgoCD Application pointing at the
+        per-service repo. CI builds → pins the image sha back into the repo.
+      * env SUBMIT_USE_WFT=true         → legacy rollback hatch: fire the
+        oam-driven-contract Argo workflow chain as before.
+  - Otherwise (no webservice with language, or bring-your-own-image) → `oam-apply`
+    (legacy: validate → ArgoCD app → ArgoCD syncs the file the MCP just committed).
+    This path doesn't build images; retained until W7.
+
+The central-ledger copy at oam/applications/<app>.yaml is the consumer's pristine
+submission — it is never mutated by CI and is NOT reconciled by ArgoCD.
 """
 from __future__ import annotations
 
 import base64
 import logging
+import os
 from typing import Any
 
 import yaml
@@ -25,21 +32,26 @@ import yaml
 from ..domain.models import SubmitResult
 from ..infrastructure.argo_client import ArgoWorkflowsClient
 from ..infrastructure.github_client import GitHubClient
+from ..infrastructure.k8s_claim_client import K8sClaimClient
 from ..infrastructure.vela_client import VelaClient
 
 logger = logging.getLogger(__name__)
 _OAM_TEMPLATE = "oam-apply"                       # legacy fallback for non-scaffold paths
 _OAM_WAIT_TEMPLATE = "oam-apply-wait"             # deferred poll for missing-CD case
-_OAM_DRIVEN_TEMPLATE = "oam-driven-contract"      # forked /microservice chain (Stage 3+)
+_OAM_DRIVEN_TEMPLATE = "oam-driven-contract"      # legacy /microservice chain (rollback hatch)
+_SVC_OAM_PATH = "oam/applications/application.yaml"  # single reconciled truth per service repo
 
 
 class SubmitUseCase:
     def __init__(self, vela: VelaClient, github: GitHubClient, argo: ArgoWorkflowsClient,
-                 gitops_branch: str = "main"):
+                 gitops_branch: str = "main", claims: K8sClaimClient | None = None):
         self.vela = vela
         self.github = github
         self.argo = argo
         self.gitops_branch = gitops_branch
+        # Optional so existing tests/callers keep working; dependencies.py wires it.
+        # When absent, day-0 scaffolds fall back to the legacy WFT path.
+        self.claims = claims
 
     # ----------------------------------------------------------------------
     # Public surface (MCP tools wrap these)
@@ -72,12 +84,18 @@ class SubmitUseCase:
         if not committed:
             return SubmitResult(ok=False, message="gitops commit failed")
 
-        # 4. ROUTE: scaffold-needed → oam-driven-contract; otherwise → oam-apply
+        # 4. ROUTE (declarative-spine W4)
         scaffold = self._needs_scaffold(app)
-        if scaffold is not None:
+        if scaffold is None:
+            # No scaffolding (backing services / bring-your-own-image) → legacy oam-apply.
+            return self._fire_oam_apply(app_name, namespace, target_vcluster, oam_yaml, sha, path)
+
+        if os.environ.get("SUBMIT_USE_WFT", "").lower() == "true" or self.claims is None:
+            # Rollback hatch (or claim client not wired): legacy imperative chain.
             return self._fire_oam_driven_contract(app, app_name, namespace, scaffold,
                                                   target_vcluster, oam_yaml, sha)
-        return self._fire_oam_apply(app_name, namespace, target_vcluster, oam_yaml, sha, path)
+
+        return self._declarative_scaffold(app_name, scaffold, target_vcluster, oam_yaml, sha)
 
     def submit_wait(self, oam_yaml: str) -> SubmitResult:
         """Deferred sibling of submit() — for OAMs whose ComponentDefinitions don't exist yet.
@@ -159,6 +177,56 @@ class SubmitUseCase:
                 continue
             return comp
         return None
+
+    def _declarative_scaffold(self, app_name: str, scaffold_comp: dict[str, Any],
+                              target_vcluster: str | None, oam_yaml: str,
+                              sha: str) -> SubmitResult:
+        """Declarative-spine path: update via direct repo commit, day-0 via claim.
+
+        No Argo REST call anywhere — the claim's composition owns repo creation,
+        OAM seeding and the ArgoCD Application; CI closes the image loop.
+        """
+        comp_name = scaffold_comp["name"]
+        svc_repo = f"{comp_name}-gitops"
+
+        # UPDATE path: per-service repo already exists → the OAM file there is the
+        # single reconciled truth; commit straight to it. ArgoCD picks it up.
+        if self.github.repo_exists(svc_repo):
+            ok, svc_sha = self.github.commit_file(
+                _SVC_OAM_PATH, oam_yaml,
+                message=f"oam: update {app_name} (capability-mcp app.submit)",
+                branch=self.gitops_branch, repo=svc_repo,
+            )
+            if not ok:
+                return SubmitResult(ok=False, commit_sha=sha,
+                                    message=f"ledger committed {sha} but per-service "
+                                            f"commit to {svc_repo} failed")
+            return SubmitResult(ok=True, commit_sha=svc_sha,
+                                message=(f"updated {app_name}; committed {svc_sha} to "
+                                         f"{svc_repo}/{_SVC_OAM_PATH}; ArgoCD will reconcile "
+                                         f"(ledger {sha})"))
+
+        # DAY-0 path: create the AppContainerClaim. Composition does the rest.
+        props = scaffold_comp.get("properties") or {}
+        _lang = props.get("language", "python")
+        _fw = props.get("framework")
+        if not _fw or _fw == "auto":
+            _fw = {"python": "fastapi", "java": "springboot"}.get(_lang, "fastapi")
+        ok, msg = self.claims.create_app_container_claim(
+            name=comp_name,
+            oam_application_b64=base64.b64encode(oam_yaml.encode()).decode(),
+            language=_lang,
+            framework=_fw,
+            delivery_target=target_vcluster or "host",
+            description=f"OAM-driven via app.submit ({app_name})",
+        )
+        if not ok:
+            return SubmitResult(ok=False, commit_sha=sha,
+                                message=f"committed {sha} but claim creation failed: {msg}")
+        return SubmitResult(ok=True, commit_sha=sha, workflow_name=comp_name,
+                            message=(f"submitted {app_name}; committed {sha}; {msg}; "
+                                     f"composition will create {svc_repo} + seed OAM + "
+                                     f"ArgoCD app (target={target_vcluster or 'host'})"))
 
     def _fire_oam_driven_contract(self, app: dict[str, Any], app_name: str, namespace: str,
                                   scaffold_comp: dict[str, Any], target_vcluster: str | None,

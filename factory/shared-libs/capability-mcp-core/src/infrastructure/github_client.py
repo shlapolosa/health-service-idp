@@ -30,11 +30,26 @@ class GitHubClient:
             "User-Agent": "capability-mcp",
         }
 
+    def repo_exists(self, repo: str) -> bool:
+        """True when `repo` exists under self.owner. Used by app.submit routing:
+        per-service gitops repo present => update path (direct commit), absent => day-0
+        (create AppContainerClaim)."""
+        try:
+            r = requests.get(f"{_API}/repos/{self.owner}/{repo}",
+                             headers=self._headers(), timeout=self.timeout)
+            return r.status_code == 200
+        except requests.RequestException as e:  # noqa: BLE001
+            logger.error("repo_exists transport error for %s: %s", repo, e)
+            return False
+
     def commit_file(self, path: str, content: str, message: str,
-                    branch: str = "main") -> Tuple[bool, Optional[str]]:
-        """Create or update `path` in the gitops repo on `branch`. Returns (ok, commit_sha).
+                    branch: str = "main", repo: Optional[str] = None) -> Tuple[bool, Optional[str]]:
+        """Create or update `path` on `branch`. Returns (ok, commit_sha).
+        Targets the central gitops repo unless `repo` overrides it (declarative-spine W4:
+        updates to already-scaffolded apps commit straight to the per-service gitops repo).
         Idempotent: fetches the existing blob sha first so re-submits update rather than 409."""
-        url = f"{_API}/repos/{self.owner}/{self.gitops_repo}/contents/{path}"
+        target_repo = repo or self.gitops_repo
+        url = f"{_API}/repos/{self.owner}/{target_repo}/contents/{path}"
         existing_sha = self._existing_sha(url, branch)
         body = {
             "message": message,
@@ -47,7 +62,7 @@ class GitHubClient:
             resp = requests.put(url, headers=self._headers(), json=body, timeout=self.timeout)
             if resp.status_code in (200, 201):
                 sha = resp.json().get("commit", {}).get("sha")
-                logger.info("✅ committed %s -> %s@%s (%s)", path, self.gitops_repo, branch, sha)
+                logger.info("✅ committed %s -> %s@%s (%s)", path, target_repo, branch, sha)
                 return True, sha
             logger.error("commit_file failed %s: %s", resp.status_code, resp.text[:200])
             return False, None
