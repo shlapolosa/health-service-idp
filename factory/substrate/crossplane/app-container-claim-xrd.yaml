@@ -63,13 +63,18 @@ spec:
                   directly to the repo via app.submit, never through this field).
               language:
                 type: string
-                description: Scaffold language for the boilerplate OAM template (used only when oamApplication is not provided)
-                enum: [python, java]
+                description: >-
+                  Scaffold language, passed to the composed ApplicationClaim which maps it
+                  to a template repo (python->onion-architecture-template,
+                  rasa->chat-template, nodejs->graphql-federation-gateway-template).
+                  Mirrors the ApplicationClaim XRD enum. NOTE: java is advertised for
+                  enum parity but microservice-creator has no springboot template yet.
+                enum: [python, java, rasa, nodejs]
                 default: python
               framework:
                 type: string
-                description: Scaffold framework matching language (used only when oamApplication is not provided)
-                enum: [fastapi, springboot]
+                description: Scaffold framework matching language (fastapi/python, springboot/java, chatbot/rasa, graphql-gateway/nodejs)
+                enum: [fastapi, springboot, chatbot, graphql-gateway]
                 default: fastapi
               database:
                 type: string

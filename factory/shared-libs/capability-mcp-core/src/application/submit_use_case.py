@@ -224,7 +224,8 @@ class SubmitUseCase:
         _lang = props.get("language", "python")
         _fw = props.get("framework")
         if not _fw or _fw == "auto":
-            _fw = {"python": "fastapi", "java": "springboot"}.get(_lang, "fastapi")
+            _fw = {"python": "fastapi", "java": "springboot",
+                   "rasa": "chatbot", "nodejs": "graphql-gateway"}.get(_lang, "fastapi")
         ok, msg = self.claims.create_app_container_claim(
             name=comp_name,
             oam_application_b64=base64.b64encode(oam_yaml.encode()).decode(),
