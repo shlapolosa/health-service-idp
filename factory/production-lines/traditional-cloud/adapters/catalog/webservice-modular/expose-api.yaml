@@ -101,10 +101,15 @@ spec:
                       done
                       test -s /tmp/openapi.json || { echo "spec never became reachable"; exit 1; }
 
+                      # --display-name overrides the spec's info.title: scaffolded
+                      # services may share the template's default title and APIM
+                      # requires unique display names (caught: patient2-api vs
+                      # items-api both titled "template-service").
                       az apim api import \\
                         --resource-group "$APIM_RG" \\
                         --service-name "$APIM_NAME" \\
                         --api-id "$SVC_NAME" \\
+                        --display-name "$SVC_NAME" \\
                         --path "$API_SUFFIX" \\
                         --specification-format OpenApiJson \\
                         --specification-path /tmp/openapi.json \\
