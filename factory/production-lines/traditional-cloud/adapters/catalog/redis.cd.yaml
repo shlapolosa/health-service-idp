@@ -31,6 +31,15 @@ spec:
               }
               namespace: context.namespace
               values: {
+                // bitnamilegacy: see postgresql.cd.yaml - same Docker Hub tag purge.
+                image: {
+                  repository: "bitnamilegacy/redis"
+                }
+                metrics: {
+                  image: {
+                    repository: "bitnamilegacy/redis-exporter"
+                  }
+                }
                 auth: {
                   enabled: parameter.authEnabled
                   password: parameter.password

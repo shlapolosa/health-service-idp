@@ -101,7 +101,8 @@ spec:
                         --specification-format OpenApiJson \\
                         --specification-path /tmp/openapi.json \\
                         --service-url "$PUBLIC_URL" \\
-                        --protocols https http
+                        --protocols https http \\
+                        --subscription-required false
                       echo "published: APIM api-id=$SVC_NAME path=$API_SUFFIX -> $PUBLIC_URL"
 
                       # Identity wiring: when an identity component is bound, lock the

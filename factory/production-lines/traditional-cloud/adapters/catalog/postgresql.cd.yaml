@@ -37,6 +37,12 @@ spec:
               namespace: context.namespace
               skipCreateNamespace: false
               values: {
+                // Bitnami removed old tags from docker.io/bitnami (2025 catalog
+                // migration); pinned chart 13.2.24 references them. bitnamilegacy/
+                // is the official archive mirror.
+                image: {
+                  repository: "bitnamilegacy/postgresql"
+                }
                 auth: {
                   enablePostgresUser: true
                   postgresPassword: parameter.auth.postgresPassword
