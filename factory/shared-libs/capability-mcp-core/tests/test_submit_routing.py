@@ -167,3 +167,46 @@ def test_oam_payload_roundtrips_b64():
     # (FakeClaims signature consumes it positionally via kwargs)
     name, kw = uc.claims.created[0]
     assert name == "my-svc"
+
+
+def _multi_oam(n_identity=1, exposed=True):
+    comps = []
+    for i in range(n_identity):
+        comps.append({"name": f"idp-{i}", "type": "auth0-idp", "properties": {}})
+    for n in ("svc-a", "svc-b"):
+        c = {"name": n, "type": "webservice",
+             "properties": {"name": n, "language": "python",
+                            **({"identity": "idp-0"} if n_identity else {})}}
+        if exposed:
+            c["traits"] = [{"type": "expose-api", "properties": {}}]
+        comps.append(c)
+    return yaml.safe_dump({"apiVersion": "core.oam.dev/v1beta1", "kind": "Application",
+                           "metadata": {"name": "multi", "namespace": "default"},
+                           "spec": {"components": comps}})
+
+
+def test_one_identity_serves_many_exposed_ok():
+    uc, gh = _uc()
+    res = uc.submit(_multi_oam(n_identity=1))
+    assert res.ok, res.message
+
+
+def test_multiple_identity_components_rejected():
+    uc, gh = _uc()
+    res = uc.submit(_multi_oam(n_identity=2))
+    assert not res.ok
+    assert "at most ONE" in res.message
+    assert not gh.commits, "rejected OAM must not reach the gitops gate"
+
+
+def test_exposed_without_identity_rejected():
+    uc, gh = _uc()
+    res = uc.submit(_multi_oam(n_identity=0))
+    assert not res.ok
+    assert "no identity component" in res.message
+
+
+def test_unexposed_needs_no_identity():
+    uc, gh = _uc()
+    res = uc.submit(_multi_oam(n_identity=0, exposed=False))
+    assert res.ok, res.message

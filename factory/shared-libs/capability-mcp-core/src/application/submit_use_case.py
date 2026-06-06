@@ -69,7 +69,14 @@ class SubmitUseCase:
 
         target_vcluster = self._target_vcluster(app)
 
-        # 2. validate (fail-fast gate)
+        # 2a. identity topology rule (platform invariant, 2026-06-06):
+        # an OAM with >=1 externally exposed webservice has EXACTLY ONE
+        # identity component, which auths all of its APIs.
+        topo_err = self._validate_identity_topology(app)
+        if topo_err:
+            return SubmitResult(ok=False, message=f"validation failed:\n{topo_err}")
+
+        # 2b. validate (fail-fast gate)
         ok, diag = self.vela.dry_run(oam_yaml)
         if not ok:
             return SubmitResult(ok=False, message=f"validation failed:\n{diag}")
@@ -146,6 +153,35 @@ class SubmitUseCase:
     # ----------------------------------------------------------------------
     # Routing helpers
     # ----------------------------------------------------------------------
+
+    @staticmethod
+    def _validate_identity_topology(app: dict[str, Any]) -> str | None:
+        """Platform invariant: >=1 exposed webservice => exactly ONE identity
+        component (type auth0-idp) authing all the OAM's APIs. Multiple identity
+        components per OAM are always rejected. Returns an error string or None.
+        """
+        comps = app.get("spec", {}).get("components", []) or []
+        identity_comps = [c.get("name") for c in comps if c.get("type") == "auth0-idp"]
+
+        def _is_exposed(c: dict[str, Any]) -> bool:
+            for t in c.get("traits") or []:
+                if t.get("type") == "expose-api":
+                    return True
+            return bool((c.get("properties") or {}).get("exposeApi"))
+
+        exposed = [c.get("name") for c in comps
+                   if c.get("type") in ("webservice", "webservice-shape") and _is_exposed(c)]
+
+        if len(identity_comps) > 1:
+            return ("identity topology: found %d identity components (%s) - an OAM must "
+                    "have at most ONE; point every webservice's `identity:` ref and every "
+                    "expose-api trait at the same component"
+                    % (len(identity_comps), ", ".join(identity_comps)))
+        if exposed and not identity_comps:
+            return ("identity topology: components %s are externally exposed but the OAM "
+                    "has no identity component - add ONE auth0-idp component and reference "
+                    "it via `identity:` + expose-api(identity=...)" % ", ".join(exposed))
+        return None
 
     def _needs_scaffold(self, app: dict[str, Any]) -> dict[str, Any] | None:
         """Inspect OAM components; return the webservice component dict that needs scaffolding,

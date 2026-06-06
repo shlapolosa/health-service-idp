@@ -91,6 +91,10 @@ spec:
             stringData: {
               REDIS_HOST: _host
               REDIS_PORT: "6379"
+              // Spring services bind spring.cache.type to ${SPRING_CACHE_TYPE:none}:
+              // the act of binding this component switches caching on. Python
+              // services key off REDIS_URL presence instead.
+              SPRING_CACHE_TYPE: "redis"
               if parameter.authEnabled {
                 REDIS_PASSWORD: parameter.password
                 REDIS_URL:      "redis://:" + parameter.password + "@" + _host + ":6379/0"

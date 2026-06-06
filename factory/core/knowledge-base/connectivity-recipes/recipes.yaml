@@ -31,8 +31,11 @@ recipes:
       identity=<auth0-component> — publishes /openapi.json into Azure APIM
       (aigw-apim-dev-w4x7ibwk4e2is, path svc/<name>) AND locks the API behind a
       validate-jwt policy against the same issuer/audience. Tokens minted by the IdP are
-      verified at the gateway AND in the service. Multi-webservice OAMs: one auth0-idp
-      component may serve several webservices; attach the trait per exposed component.
+      verified at the gateway AND in the service. INVARIANT (enforced at app.submit):
+      an OAM has EXACTLY ONE identity component no matter how many webservices it
+      exposes - every webservice's `identity:` ref and every expose-api trait point at
+      that single component, which auths all of the OAM's APIs. Never generate a
+      second auth0-idp in the same OAM.
 
   - id: web-service-needs-db
     triggers:
