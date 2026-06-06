@@ -134,112 +134,63 @@ class TestArgoWorkflowsClient:
         assert params["observability"] == "true"
         assert params["security"] == "false"
 
+    @patch.dict('os.environ', {"CAPABILITY_MCP_URL": "http://capability-mcp.default:8000"})
     @patch('src.infrastructure.argo_client.requests.post')
-    def test_trigger_microservice_creation_success(self, mock_post):
-        """Test successful Microservice creation via Argo Workflows."""
+    def test_trigger_microservice_creation_routes_via_capability_mcp(self, mock_post):
+        """RETIRE-WFT #149: /microservice goes EXCLUSIVELY through capability-mcp
+        app.submit (POST /api/submit). No Argo WorkflowTemplate is fired."""
         mock_response = Mock()
-        mock_response.status_code = 201
-        mock_response.json.return_value = {
-            "metadata": {"name": "microservice-creation-ghi789"},
-            "status": {"phase": "Pending"}
-        }
+        mock_response.status_code = 200
+        mock_response.content = b'{"ok": true, "workflow_name": "user-service"}'
+        mock_response.json.return_value = {"ok": True, "workflow_name": "user-service"}
         mock_post.return_value = mock_response
 
         payload = {
             "microservice-name": "user-service",
             "namespace": "production",
             "language": "java",
-            "database": "postgres",  # Note: should be postgres (mapped from postgresql)
+            "database": "postgres",
             "cache": "redis",
-            "description": "User management service",
-            "github-org": "ecommerce",
-            "docker-registry": "registry.ecommerce.com/services",
-            "security": "true",
-            "observability": "false",
-            "target-vcluster": "prod-cluster",
-            "auto-create-vcluster": "false",
             "user": "bob",
             "slack-channel": "C789",
-            "slack-user-id": "U789"
+            "slack-user-id": "U789",
         }
 
         success, message = self.client.trigger_microservice_creation(payload)
 
         assert success is True
-        assert "Microservice creation workflow started: microservice-creation-ghi789" in message
+        assert "Microservice creation workflow started: user-service" in message
 
-        # Verify the request was made correctly
         mock_post.assert_called_once()
         call_args = mock_post.call_args
-        
-        # Verify workflow spec structure uses oam-driven-contract template (Stage 6 cutover
-        # of microservice-standard-contract → oam-driven-contract; identical behaviour when
-        # `oam-application` is not passed)
-        workflow_spec = call_args[1]["json"]
-        assert workflow_spec["workflow"]["spec"]["workflowTemplateRef"]["name"] == "oam-driven-contract"
-        
-        # Verify 4-tier standardized contract parameters
-        params = {p["name"]: p["value"] for p in workflow_spec["workflow"]["spec"]["arguments"]["parameters"]}
-        
-        # TIER 1: Universal Parameters
-        assert params["resource-name"] == "user-service"
-        assert params["resource-type"] == "microservice"
-        assert params["namespace"] == "production"
-        assert params["user"] == "bob"
-        assert params["description"] == "User management service"
-        assert params["github-org"] == "ecommerce"
-        assert params["docker-registry"] == "registry.ecommerce.com/services"
-        assert params["slack-channel"] == "C789"
-        assert params["slack-user-id"] == "U789"
-        
-        # TIER 2: Platform Parameters
-        assert params["security-enabled"] == "true"
-        assert params["observability-enabled"] == "false"
-        assert params["backup-enabled"] == "false"
-        assert params["environment-tier"] == "development"
-        assert params["auto-create-dependencies"] == "false"
-        assert params["resource-size"] == "medium"
-        
-        # TIER 3: Microservice-Specific Parameters
-        assert params["microservice-language"] == "java"
-        assert params["microservice-framework"] == "auto"
-        assert params["microservice-database"] == "postgres"
-        assert params["microservice-cache"] == "redis"
-        assert params["microservice-expose-api"] == "false"
-        assert params["target-vcluster"] == "prod-cluster"
-        assert params["parent-appcontainer"] == ""
+        # It hit capability-mcp /api/submit, NOT the Argo workflows endpoint.
+        url = call_args[0][0] if call_args[0] else call_args[1].get("url", "")
+        assert url.endswith("/api/submit")
+        # Payload is the OAM submission contract, not a WorkflowTemplate spec.
+        body = call_args[1]["json"]
+        assert "oam_yaml" in body
+        assert "workflowTemplateRef" not in body
 
+    @patch.dict('os.environ', {}, clear=False)
     @patch('src.infrastructure.argo_client.requests.post')
-    def test_trigger_microservice_creation_database_mapping(self, mock_post):
-        """Test that database values are properly mapped in microservice creation."""
-        mock_response = Mock()
-        mock_response.status_code = 201
-        mock_response.json.return_value = {"metadata": {"name": "microservice-creation-test"}}
-        mock_post.return_value = mock_response
+    def test_trigger_microservice_creation_requires_mcp_url(self, mock_post):
+        """RETIRE-WFT #149: with no CAPABILITY_MCP_URL there is NO legacy WFT
+        fallback — the call errors and fires nothing."""
+        import os as _os
+        _os.environ.pop("CAPABILITY_MCP_URL", None)
+        payload = {
+            "microservice-name": "test-service",
+            "database": "postgres",
+            "user": "testuser",
+            "slack-channel": "C123",
+            "slack-user-id": "U123",
+        }
 
-        # Test with different database values
-        test_cases = [
-            {"input": "postgres", "expected": "postgres"},
-            {"input": "none", "expected": "none"},
-        ]
+        success, message = self.client.trigger_microservice_creation(payload)
 
-        for case in test_cases:
-            payload = {
-                "microservice-name": "test-service",
-                "database": case["input"],
-                "user": "testuser",
-                "slack-channel": "C123",
-                "slack-user-id": "U123"
-            }
-
-            self.client.trigger_microservice_creation(payload)
-            
-            # Get the last call arguments
-            call_args = mock_post.call_args
-            workflow_spec = call_args[1]["json"]
-            params = {p["name"]: p["value"] for p in workflow_spec["workflow"]["spec"]["arguments"]["parameters"]}
-            
-            assert params["microservice-database"] == case["expected"]
+        assert success is False
+        assert "CAPABILITY_MCP_URL" in message
+        mock_post.assert_not_called()
 
     @patch('src.infrastructure.argo_client.requests.post')
     def test_trigger_creation_http_error(self, mock_post):
