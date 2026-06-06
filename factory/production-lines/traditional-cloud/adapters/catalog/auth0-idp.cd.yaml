@@ -108,16 +108,29 @@ spec:
                 template: {
                   spec: {
                     restartPolicy: "OnFailure"
+                    volumes: [{
+                      name: "azure-creds"
+                      secret: { secretName: "azure-credentials" }
+                    }]
                     containers: [{
                       name:  "admin-seed"
-                      image: "python:3.11-slim"
+                      // azure-cli: the seed password is fetched from Key Vault at
+                      // runtime (SP auth) and NEVER materialized as a k8s secret -
+                      // it's a bootstrap credential, not a runtime binding.
+                      image: "mcr.microsoft.com/azure-cli:2.64.0"
+                      volumeMounts: [{
+                        name:      "azure-creds"
+                        mountPath: "/azure"
+                        readOnly:  true
+                      }]
                       envFrom: [{
                         secretRef: { name: context.name + "-conn" }
                       }]
                       env: [
-                        { name: "SEED_EMAIL",    value: parameter.seedEmail },
-                        { name: "SEED_PASSWORD", value: parameter.seedPassword },
+                        { name: "SEED_EMAIL",      value: parameter.seedEmail },
                         { name: "SEED_CONNECTION", value: parameter.seedConnection },
+                        { name: "KV_NAME",         value: parameter.kvName },
+                        { name: "KV_PASSWORD_SECRET", value: parameter.kvSecretPrefix + "-admin-password" },
                       ]
                       command: ["python3", "-u", "-c"]
                       args: ["""
@@ -133,6 +146,16 @@ spec:
                                     return r.status, json.loads(r.read() or '{}')
                             except urllib.error.HTTPError as e:
                                 return e.code, json.loads(e.read() or '{}')
+                        import subprocess
+                        cj = json.load(open('/azure/azure-creds.json'))
+                        subprocess.run(['az', 'login', '--service-principal', '-u', cj['clientId'],
+                                        '-p', cj['clientSecret'], '--tenant', cj['tenantId']],
+                                       check=True, capture_output=True)
+                        pw = subprocess.run(['az', 'keyvault', 'secret', 'show',
+                                             '--vault-name', os.environ['KV_NAME'],
+                                             '--name', os.environ['KV_PASSWORD_SECRET'],
+                                             '--query', 'value', '-o', 'tsv'],
+                                            check=True, capture_output=True, text=True).stdout.strip()
                         st, tok = call('POST', '/oauth/token', {
                             'grant_type': 'client_credentials',
                             'client_id': os.environ['AUTH0_CLIENT_ID'],
@@ -141,19 +164,10 @@ spec:
                         assert st == 200, 'mgmt token failed: %s %s' % (st, tok)
                         t = tok['access_token']
                         conn_name = os.environ['SEED_CONNECTION']
-                        st, conns = call('GET', '/api/v2/connections?strategy=auth0', token=t)
-                        assert st == 200, 'list connections failed (check read:connections scope): %s %s' % (st, conns)
-                        conn = next((c for c in conns if c['name'] == conn_name), None)
-                        assert conn, 'connection %s not found' % conn_name
-                        opts = conn.get('options', {})
-                        if opts.get('passwordPolicy') != 'none':
-                            opts['passwordPolicy'] = 'none'
-                            st, r = call('PATCH', '/api/v2/connections/' + conn['id'], {'options': opts}, token=t)
-                            print('password policy ->none:', st)
                         md = {'profiles': ['admin', 'user'], 'active_profile': 'admin'}
                         st, r = call('POST', '/api/v2/users', {
                             'email': os.environ['SEED_EMAIL'], 'username': 'admin',
-                            'password': os.environ['SEED_PASSWORD'], 'connection': conn_name,
+                            'password': pw, 'connection': conn_name,
                             'email_verified': True, 'app_metadata': md}, token=t)
                         if st == 201:
                             print('admin user created:', r.get('user_id'))
@@ -181,8 +195,8 @@ spec:
           // +usage=Create a default admin user (admin/<seedPassword>, profiles [admin,user]) via the Management API. Default true.
           seedAdminUser: *true | bool
 
-          // +usage=Default admin password. CHANGE IN PRODUCTION.
-          seedPassword: *"admin" | string
+          // +usage=Key Vault holding <kvSecretPrefix>-admin-password (the seeded admin's password; vault-only, never a k8s secret).
+          kvName: *"kv-socrates-6706" | string
 
           // +usage=Email for the seeded admin user.
           seedEmail: *"admin@cafe.io" | string
