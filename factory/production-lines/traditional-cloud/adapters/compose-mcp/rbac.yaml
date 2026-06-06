@@ -1,0 +1,33 @@
+# RBAC for capability-mcp-mfg-tc (SA: capability-mcp-server, ns: default).
+# Declarative-spine W4: app.submit creates AppContainerClaims directly
+# (day-0 scaffold) instead of POSTing the Argo REST API. The SA's existing
+# read RBAC (catalog: ComponentDefinitions etc.) was created live on-cluster;
+# this file adds the claim surface and is the durable record for it.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: capability-mcp-claims
+rules:
+- apiGroups: ["platform.example.org"]
+  resources: ["appcontainerclaims"]
+  verbs: ["get", "list", "watch", "create", "patch"]
+- apiGroups: ["platform.example.org"]
+  resources: ["appcontainerclaims/status"]
+  verbs: ["get"]
+# lifecycle.state (W5) reads ArgoCD Application health.
+- apiGroups: ["argoproj.io"]
+  resources: ["applications"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: capability-mcp-claims
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: capability-mcp-claims
+subjects:
+- kind: ServiceAccount
+  name: capability-mcp-server
+  namespace: default

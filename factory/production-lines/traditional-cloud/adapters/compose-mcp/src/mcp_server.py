@@ -158,6 +158,14 @@ def app_submit(oam_yaml: str) -> dict[str, Any]:
     }
 
 
+@mcp.tool(name="app.status",
+          description="Status of a submitted service: AppContainerClaim scaffold progress + "
+                      "ArgoCD Application sync/health (aggregated from host or vcluster). "
+                      "Phases: scaffolding -> scaffolded -> reconciling -> ready.")
+def app_status(name: str) -> dict[str, Any]:
+    return deps.get_status().status_of(name)
+
+
 @mcp.tool(name="app.submit_wait",
           description="Deferred OAM provisioning for MFG-TC consumers whose OAM references CDs "
                       "not yet present. Commits to gitops + fires oam-apply-wait. "
@@ -181,8 +189,35 @@ async def _healthz(_request):
     return JSONResponse({"status": "ok", "service": "capability-mcp-mfg-tc"})
 
 
+# Declarative-spine W6: plain REST mirror of app.submit / app.status for
+# in-cluster intakes (slack-api-server) that don't speak MCP. Same use cases,
+# same gate, same response shape — one contract, two transports.
+async def _api_submit(request):
+    try:
+        body = await request.json()
+        oam_yaml = body.get("oam_yaml", "")
+        if not oam_yaml:
+            return JSONResponse({"ok": False, "message": "oam_yaml required"}, status_code=400)
+    except Exception:  # noqa: BLE001
+        return JSONResponse({"ok": False, "message": "invalid JSON body"}, status_code=400)
+    r = deps.get_submit().submit(oam_yaml)
+    return JSONResponse({
+        "ok": r.ok,
+        "commit_sha": r.commit_sha,
+        "workflow_name": r.workflow_name,
+        "message": r.message,
+    }, status_code=200 if r.ok else 422)
+
+
+async def _api_status(request):
+    name = request.path_params.get("name", "")
+    return JSONResponse(deps.get_status().status_of(name))
+
+
 def build_app():
     app = mcp.streamable_http_app()
     app.add_middleware(EntraJWTMiddleware)
     app.routes.append(Route("/healthz", _healthz, methods=["GET"]))
+    app.routes.append(Route("/api/submit", _api_submit, methods=["POST"]))
+    app.routes.append(Route("/api/status/{name}", _api_status, methods=["GET"]))
     return app

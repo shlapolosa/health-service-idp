@@ -303,10 +303,80 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
             logger.error(error_msg, exc_info=True)
             return False, error_msg
 
+    # ------------------------------------------------------------------
+    # Declarative-spine W6: intake convergence. When CAPABILITY_MCP_URL is
+    # set, /microservice goes through capability-mcp-mfg-tc app.submit
+    # (the one contract: vela dry-run -> gitops commit -> claim) instead of
+    # firing the Argo WFT directly. No Argo token on this path — kills the
+    # recurring 24h 401 class (#134) and the framework=auto divergence.
+    # Unset CAPABILITY_MCP_URL = legacy WFT behavior (rollback hatch).
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _build_oam_from_payload(payload: Dict) -> str:
+        """Construct the minimal consumer OAM the /microservice command implies."""
+        name = payload.get("microservice-name", "unknown")
+        props: Dict = {
+            "name": name,
+            "language": payload.get("language", "python"),
+        }
+        for slack_key, oam_key in (("database", "database"), ("cache", "cache"),
+                                   ("realtime", "realtime")):
+            v = payload.get(slack_key)
+            if v and v != "none":
+                props[oam_key] = v
+        tv = payload.get("target-vcluster")
+        if tv:
+            props["targetEnvironment"] = tv
+        oam = {
+            "apiVersion": "core.oam.dev/v1beta1",
+            "kind": "Application",
+            "metadata": {
+                "name": name,
+                "namespace": payload.get("namespace", "default"),
+                "annotations": {
+                    "intake.cafe.io/source": "slack",
+                    "intake.cafe.io/user": payload.get("user", "unknown"),
+                },
+            },
+            "spec": {"components": [{
+                "name": name,
+                "type": "webservice",
+                "properties": props,
+            }]},
+        }
+        import yaml as _yaml
+        return _yaml.safe_dump(oam, sort_keys=False)
+
+    def _submit_via_capability_mcp(self, payload: Dict, mcp_url: str) -> Tuple[bool, str]:
+        """POST the constructed OAM to capability-mcp-mfg-tc /api/submit."""
+        oam_yaml = self._build_oam_from_payload(payload)
+        try:
+            resp = requests.post(
+                f"{mcp_url.rstrip('/')}/api/submit",
+                json={"oam_yaml": oam_yaml},
+                headers={"Content-Type": "application/json"},
+                timeout=self.timeout,
+            )
+            data = resp.json() if resp.content else {}
+            if resp.status_code == 200 and data.get("ok"):
+                # Keep the message shape consumers already see in Slack.
+                name = data.get("workflow_name") or payload.get("microservice-name", "unknown")
+                return True, f"Microservice creation workflow started: {name}"
+            detail = data.get("message") or str(resp.text)[:200]
+            return False, f"capability-mcp app.submit error: {resp.status_code} - {detail}"
+        except requests.RequestException as e:
+            return False, f"capability-mcp app.submit request failed: {e}"
+
     def trigger_microservice_creation(self, payload: Dict) -> Tuple[bool, str]:
-        """Trigger Microservice creation via Argo Workflows."""
+        """Trigger Microservice creation via app.submit (declarative spine) or legacy WFT."""
         microservice_name = payload.get("microservice-name", "unknown")
-        
+
+        mcp_url = os.getenv("CAPABILITY_MCP_URL", "").strip()
+        if mcp_url:
+            logger.info(f"🚀 Routing microservice creation for {microservice_name} via capability-mcp app.submit")
+            return self._submit_via_capability_mcp(payload, mcp_url)
+
         # Create workflow submission for Microservice
         workflow_spec = {
             "namespace": self.namespace,

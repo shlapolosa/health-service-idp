@@ -96,9 +96,22 @@ def get_catalog() -> CatalogUseCases:
 
 
 @lru_cache
+def get_claims() -> "K8sClaimClient":
+    from ..infrastructure.k8s_claim_client import K8sClaimClient
+    return K8sClaimClient(namespace=os.getenv("CLAIM_NAMESPACE", "default"))
+
+
+@lru_cache
+def get_status():
+    from ..application.status_use_case import StatusUseCase
+    return StatusUseCase(get_claims())
+
+
+@lru_cache
 def get_submit() -> SubmitUseCase:
     return SubmitUseCase(get_vela(), get_github(), get_argo(),
-                         gitops_branch=os.getenv("GITOPS_BRANCH", "main"))
+                         gitops_branch=os.getenv("GITOPS_BRANCH", "main"),
+                         claims=get_claims())
 
 
 # ---- S4 additions: factory.route (classify-router proxy) ----

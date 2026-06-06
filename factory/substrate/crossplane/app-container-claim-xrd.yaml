@@ -53,6 +53,33 @@ spec:
                 type: boolean
                 description: Whether to enable security scanning and policies
                 default: true
+              # --- Declarative-spine fields (W2, 2026-06-05). All optional/additive. ---
+              oamApplication:
+                type: string
+                description: >-
+                  Base64-encoded consumer OAM Application YAML. When set, the
+                  gitops-repo-setup Job seeds it into the per-service gitops repo at
+                  oam/applications/application.yaml (write-once; subsequent updates go
+                  directly to the repo via app.submit, never through this field).
+              language:
+                type: string
+                description: Scaffold language for the boilerplate OAM template (used only when oamApplication is not provided)
+                enum: [python, java]
+                default: python
+              framework:
+                type: string
+                description: Scaffold framework matching language (used only when oamApplication is not provided)
+                enum: [fastapi, springboot]
+                default: fastapi
+              deliveryTarget:
+                type: string
+                description: >-
+                  Where the platform reconciles the seeded OAM. "host" = this cluster
+                  (ArgoCD destination in-cluster); any other value = a vcluster name
+                  (a VClusterEnvironmentClaim is composed and the ArgoCD Application
+                  targets that registered cluster). OMIT for external tenancy - no
+                  ArgoCD Application is created and the per-service gitops repo is the
+                  handover artifact for the consumer's own ArgoCD/vela.
             required:
             - name
           status:

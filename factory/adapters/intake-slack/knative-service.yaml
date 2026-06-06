@@ -53,6 +53,11 @@ spec:
         # is stale; pin via env until that default is bumped + image rebuilt.
         - name: ARGO_SERVER_URL
           value: "http://argo-workflows-server.argo:2746"
+        # Declarative-spine W6: /microservice routes through capability-mcp
+        # app.submit (no Argo token on this path). Remove this env to fall
+        # back to the legacy direct-WFT behavior.
+        - name: CAPABILITY_MCP_URL
+          value: "http://capability-mcp-mfg-tc.default.svc.cluster.local"
         # CAFE lifecycle wiring — additive, non-breaking
         - name: LIFECYCLE_MODE
           value: "events_only"
