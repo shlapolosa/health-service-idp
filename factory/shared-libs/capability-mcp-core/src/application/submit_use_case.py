@@ -3,7 +3,7 @@
 OAM-first: validate (vela dry-run) → commit the OAM to the central gitops repo (intake
 ledger / audit record) → route.
 
-Routing (declarative-spine W4, 2026-06-05):
+Routing (declarative-spine W4; legacy WFT retired in RETIRE-WFT #149, 2026-06-06):
   - Scaffold needed (webservice with `language:` and default/absent image):
       * per-service gitops repo EXISTS  → UPDATE path: commit the OAM directly to
         <svc>-gitops/oam/applications/application.yaml. ArgoCD syncs; no workflow.
@@ -11,8 +11,9 @@ Routing (declarative-spine W4, 2026-06-05):
         (in-cluster, no Argo REST call). Its composition creates source + gitops
         repos, seeds the consumer OAM, and an ArgoCD Application pointing at the
         per-service repo. CI builds → pins the image sha back into the repo.
-      * env SUBMIT_USE_WFT=true         → legacy rollback hatch: fire the
-        oam-driven-contract Argo workflow chain as before.
+    The legacy oam-driven-contract WFT escape hatch (env SUBMIT_USE_WFT) was
+    removed once the claim path was proven E2E (patient2-api, 2026-06-06); the
+    archived template lives under execute/_archive/.
   - Otherwise (no webservice with language, or bring-your-own-image) → `oam-apply`
     (legacy: validate → ArgoCD app → ArgoCD syncs the file the MCP just committed).
     This path doesn't build images; retained until W7.
@@ -24,7 +25,6 @@ from __future__ import annotations
 
 import base64
 import logging
-import os
 from typing import Any
 
 import yaml
@@ -37,8 +37,6 @@ from ..infrastructure.vela_client import VelaClient
 
 logger = logging.getLogger(__name__)
 _OAM_TEMPLATE = "oam-apply"                       # legacy fallback for non-scaffold paths
-_OAM_WAIT_TEMPLATE = "oam-apply-wait"             # deferred poll for missing-CD case
-_OAM_DRIVEN_TEMPLATE = "oam-driven-contract"      # legacy /microservice chain (rollback hatch)
 _SVC_OAM_PATH = "oam/applications/application.yaml"  # single reconciled truth per service repo
 
 
@@ -49,8 +47,9 @@ class SubmitUseCase:
         self.github = github
         self.argo = argo
         self.gitops_branch = gitops_branch
-        # Optional so existing tests/callers keep working; dependencies.py wires it.
-        # When absent, day-0 scaffolds fall back to the legacy WFT path.
+        # dependencies.py wires this. Kept Optional only so existing unit tests can
+        # construct the use-case without a real cluster client; day-0 scaffolds and
+        # submit_wait REQUIRE it (the legacy WFT fallback was retired in #149).
         self.claims = claims
 
     # ----------------------------------------------------------------------
@@ -97,26 +96,37 @@ class SubmitUseCase:
             # No scaffolding (backing services / bring-your-own-image) → legacy oam-apply.
             return self._fire_oam_apply(app_name, namespace, target_vcluster, oam_yaml, sha, path)
 
-        if os.environ.get("SUBMIT_USE_WFT", "").lower() == "true" or self.claims is None:
-            # Rollback hatch (or claim client not wired): legacy imperative chain.
-            return self._fire_oam_driven_contract(app, app_name, namespace, scaffold,
-                                                  target_vcluster, oam_yaml, sha)
+        if self.claims is None:
+            # Claim client not wired (should not happen in prod — dependencies.py
+            # always provides it). No legacy WFT to fall back to since #149.
+            return SubmitResult(ok=False, commit_sha=sha,
+                                message=f"committed {sha} but no claim client is "
+                                        f"configured; cannot scaffold {app_name}")
 
         return self._declarative_scaffold(app, app_name, scaffold, target_vcluster, oam_yaml, sha)
 
     def submit_wait(self, oam_yaml: str) -> SubmitResult:
         """Deferred sibling of submit() — for OAMs whose ComponentDefinitions don't exist yet.
 
-        Skips vela.dry_run (would fail by design) and fires oam-apply-wait, which polls vela
-        dry-run until prereqs land then creates the ArgoCD Application. Does NOT route through
-        oam-driven-contract — the contract assumes valid OAM at submit-time; submit_wait is
-        explicitly for the case where the OAM references not-yet-merged CDs.
+        Skips vela.dry_run (would fail by design — that's why the caller chose
+        submit_wait) and routes straight to the declarative path. The wait is now
+        intrinsic to the substrate, not a workflow:
+
+          - The AppContainerClaim is created immediately; its Crossplane composition
+            reconciles continuously and only progresses once the referenced CDs land.
+          - ArgoCD reconciles the resulting Application; its health/sync conditions
+            (read via app.status / StatusUseCase) report when prereqs are satisfied.
+
+        RETIRE-WFT (#149): this replaces the oam-apply-wait WorkflowTemplate poll.
+        There is no Argo REST call and no token on this path. Response shape is
+        unchanged (SubmitResult); workflow_name carries the claim name so the
+        existing {ok, commit_sha, workflow_name, message} contract holds. Poll
+        progress with app.status(<name>).
         """
         try:
             app = yaml.safe_load(oam_yaml)
             md = app["metadata"]
             app_name = md["name"]
-            namespace = md.get("namespace", "default")
         except Exception as e:  # noqa: BLE001
             return SubmitResult(ok=False, message=f"invalid OAM Application YAML: {e}")
 
@@ -124,6 +134,7 @@ class SubmitUseCase:
 
         # SKIP vela.dry_run — caller chose submit_wait because it would fail.
 
+        # Central-ledger commit (the durable gate / audit record), same as submit().
         path = f"oam/applications/{app_name}.yaml"
         committed, sha = self.github.commit_file(
             path, oam_yaml,
@@ -133,22 +144,18 @@ class SubmitUseCase:
         if not committed:
             return SubmitResult(ok=False, message="gitops commit failed")
 
-        try:
-            wf = self.argo.create_workflow_from_template(_OAM_WAIT_TEMPLATE, {
-                "oam-application": base64.b64encode(oam_yaml.encode()).decode(),
-                "app-name": app_name,
-                "namespace": namespace,
-                "target-vcluster": target_vcluster or "host",
-                "gitops-path": path,
-            })
-            wf_name = wf.get("metadata", {}).get("name", "unknown")
-        except Exception as e:  # noqa: BLE001
-            return SubmitResult(ok=False, commit_sha=sha,
-                                message=f"committed {sha} but oam-apply-wait trigger failed: {e}")
+        scaffold = self._needs_scaffold(app)
+        if scaffold is None or self.claims is None:
+            # No scaffolding component (or no claim client): nothing to provision
+            # imperatively. The OAM is committed to the ledger; once its CDs land
+            # the consumer can re-run submit() to deliver. Report queued.
+            return SubmitResult(ok=True, commit_sha=sha,
+                                message=(f"queued {app_name}; committed {sha}; OAM stored in "
+                                         f"the gitops ledger — resubmit once its "
+                                         f"ComponentDefinitions are available"))
 
-        return SubmitResult(ok=True, commit_sha=sha, workflow_name=wf_name,
-                            message=f"queued {app_name}; committed {sha}; workflow {wf_name} "
-                                    f"will poll vela dry-run until ready")
+        # Same declarative provisioning as submit(): the claim/ArgoCD do the waiting.
+        return self._declarative_scaffold(app, app_name, scaffold, target_vcluster, oam_yaml, sha)
 
     # ----------------------------------------------------------------------
     # Routing helpers
@@ -279,59 +286,6 @@ class SubmitUseCase:
                             message=(f"submitted {app_name}; committed {sha}; {msg}; "
                                      f"composition will create {svc_repo} + seed OAM + "
                                      f"ArgoCD app (target={target_vcluster or 'host'})"))
-
-    def _fire_oam_driven_contract(self, app: dict[str, Any], app_name: str, namespace: str,
-                                  scaffold_comp: dict[str, Any], target_vcluster: str | None,
-                                  oam_yaml: str, sha: str) -> SubmitResult:
-        """Fire the forked /microservice chain with the consumer's OAM passed in.
-
-        The workflow will create source + gitops repos, scaffold boilerplate code, build + push
-        the image to ACR, then (via the apply-consumer-oam step) overwrite the boilerplate OAM
-        in the per-service gitops repo with the consumer's actual OAM. ArgoCD reconciles.
-        """
-        props = scaffold_comp.get("properties") or {}
-        # Build component name → type map so we can resolve OAM-style
-        # references like `database: <component-name>` into the workflow's
-        # expected type literal (postgresql, redis, …). Falls back to the
-        # raw value when the reference doesn't match a sibling component.
-        comp_types = {c.get("name"): c.get("type", "") for c in app.get("spec", {}).get("components", [])}
-        def _resolve_dep(key: str, default: str) -> str:
-            raw = props.get(key)
-            if not raw:
-                return default
-            return comp_types.get(raw, raw)
-        # Derive framework from language when unset / "auto". PR #23 narrowed
-        # the WFT enum to fastapi|springboot only, so "auto" no longer passes
-        # validate-parameters. Keep the consumer-facing OAM lenient (framework
-        # optional) but always forward a concrete value to the workflow.
-        _lang = props.get("language", "python")
-        _fw = props.get("framework")
-        if not _fw or _fw == "auto":
-            _fw = {"python": "fastapi", "java": "springboot"}.get(_lang, "fastapi")
-        params = {
-            "resource-name": scaffold_comp["name"],
-            "namespace": namespace,
-            "user": "capability-mcp",
-            "description": f"OAM-driven via app.submit ({app_name})",
-            "microservice-language": _lang,
-            "microservice-framework": _fw,
-            "microservice-database": _resolve_dep("database", "none"),
-            "microservice-cache": _resolve_dep("cache", "none"),
-            "target-vcluster": target_vcluster or "host",
-            "auto-create-dependencies": "true",
-            # The forked-only param — consumer's full OAM, base64-encoded, multi-component-safe.
-            "oam-application": base64.b64encode(oam_yaml.encode()).decode(),
-        }
-        try:
-            wf = self.argo.create_workflow_from_template(_OAM_DRIVEN_TEMPLATE, params)
-            wf_name = wf.get("metadata", {}).get("name", "unknown")
-        except Exception as e:  # noqa: BLE001
-            return SubmitResult(ok=False, commit_sha=sha,
-                                message=f"committed {sha} but oam-driven-contract trigger failed: {e}")
-        return SubmitResult(ok=True, commit_sha=sha, workflow_name=wf_name,
-                            message=(f"submitted {app_name}; committed {sha}; workflow {wf_name}; "
-                                     f"scaffold target = {scaffold_comp['name']} "
-                                     f"({props.get('language','?')})"))
 
     def _fire_oam_apply(self, app_name: str, namespace: str, target_vcluster: str | None,
                         oam_yaml: str, sha: str, path: str) -> SubmitResult:

@@ -7,7 +7,10 @@ resources themselves:
   - ArgoCD Application <name>-oam -> sync + health, aggregated from the
     destination cluster (host or vcluster) by ArgoCD itself
 
-This replaces "watch the oam-driven-contract workflow" without touching the
+This is the canonical "where is my service" surface now that the legacy
+oam-driven-contract / oam-apply-wait workflows are retired (RETIRE-WFT #149):
+app.submit_wait routes through the same claim + ArgoCD path, so app.status(name)
+is how consumers poll deferred (submit_wait) deliveries. It does not touch the
 existing lifecycle.state surface (which stays audit-event-based for the
 orchestrator's use-case trajectory — different key, different question).
 """

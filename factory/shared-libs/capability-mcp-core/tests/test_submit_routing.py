@@ -1,17 +1,13 @@
-"""Unit tests for app.submit declarative-spine routing (W4).
+"""Unit tests for app.submit declarative-spine routing (W4; RETIRE-WFT #149).
 
 Routing matrix:
-  - no scaffold component            -> oam-apply (legacy)
+  - no scaffold component            -> oam-apply (legacy, bring-your-own-image)
   - scaffold + repo exists           -> direct commit to per-service repo (no workflow)
   - scaffold + repo absent           -> AppContainerClaim creation (no workflow)
-  - scaffold + SUBMIT_USE_WFT=true   -> legacy oam-driven-contract WFT
-  - scaffold + claims client absent  -> legacy oam-driven-contract WFT
+  - scaffold + claims client absent  -> error (legacy oam-driven-contract WFT retired)
 """
 from __future__ import annotations
 
-import base64
-
-import pytest
 import yaml
 
 from src.application.submit_use_case import SubmitUseCase
@@ -68,11 +64,6 @@ class FakeClaims:
         return self.ok, f"AppContainerClaim {name} created"
 
 
-@pytest.fixture(autouse=True)
-def _no_wft_env(monkeypatch):
-    monkeypatch.delenv("SUBMIT_USE_WFT", raising=False)
-
-
 def _uc(github=None, claims=...):
     gh = github or FakeGitHub()
     cl = FakeClaims() if claims is ... else claims
@@ -126,20 +117,16 @@ def test_update_commits_to_per_service_repo():
     assert not uc.argo.fired
 
 
-def test_wft_env_hatch_fires_legacy_chain(monkeypatch):
-    monkeypatch.setenv("SUBMIT_USE_WFT", "true")
-    uc, gh = _uc()
-    res = uc.submit(_oam())
-    assert res.ok
-    assert uc.argo.fired and uc.argo.fired[0][0] == "oam-driven-contract"
-    assert not uc.claims.created
-
-
-def test_missing_claims_client_falls_back_to_wft():
+def test_missing_claims_client_errors_no_wft(monkeypatch):
+    # RETIRE-WFT #149: the legacy oam-driven-contract fallback was removed. With
+    # no claim client a scaffold submission must error (committed but unprovisioned)
+    # and MUST NOT fire any workflow.
+    monkeypatch.setenv("SUBMIT_USE_WFT", "true")  # stale env must have no effect
     uc, gh = _uc(claims=None)
     res = uc.submit(_oam())
-    assert res.ok
-    assert uc.argo.fired and uc.argo.fired[0][0] == "oam-driven-contract"
+    assert not res.ok
+    assert "no claim client" in res.message
+    assert not uc.argo.fired, "no legacy WFT may fire after retirement"
 
 
 def test_vcluster_target_propagates_to_claim():
