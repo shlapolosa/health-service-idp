@@ -503,7 +503,7 @@ spec:
                     resource-type: microservice
                   annotations:
                     description: scaffolded via declarative spine (app.submit)
-                    webservice.oam.dev/source: claim-driven
+                    webservice.oam.dev/source: OAM-driven
                 spec:
                   name: {{ $spec.name }}
                   language: {{ $spec.language | default "python" }}
