@@ -14,6 +14,18 @@ metadata:
     parameter-contract: "compliant"
     supported-tiers: "1,2,3"
     maintainer: "platform-team"
+    # RETIRE-WFT (#149, 2026-06-06): partially deprecated.
+    # The webservice / app.submit / Slack /microservice paths NO LONGER fire this
+    # template — they use the AppContainerClaim path (proven E2E patient2-api).
+    # NOT archived because it is still a LIVE dependency of these
+    # ComponentDefinitions, which render Argo Workflows referencing it by name at
+    # OAM reconcile time:
+    #   - realtime-platform.cd.yaml
+    #   - rasa-chatbot.cd.yaml
+    #   - graphql-gateway.cd.yaml
+    #   - camunda-orchestrator.cd.yaml
+    # Archive this template only after those CDs are migrated to the claim path.
+    deprecation-status: "partial; retained for realtime-platform/rasa-chatbot/graphql-gateway/camunda-orchestrator CDs"
 spec:
   entrypoint: create-microservice
   arguments:
