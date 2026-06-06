@@ -3,7 +3,7 @@ kind: ComponentDefinition
 metadata:
   name: auth0-idp
   annotations:
-    definition.oam.dev/description: "Auth0 identity provider integration via External Secrets"
+    definition.oam.dev/description: "Auth0 identity provider binding via External Secrets (Azure Key Vault) — renders the normalized <name>-conn Secret"
     definition.oam.dev/requires-source-code: "false"
     definition.oam.dev/shape: external-secret
 spec:
@@ -19,8 +19,12 @@ spec:
           apiVersion: "external-secrets.io/v1"
           kind: "ExternalSecret"
           metadata: {
-            name: parameter.name + "-auth0-credentials"
+            name: context.name + "-conn"
             namespace: context.namespace
+            labels: {
+              "binding.cafe.io/category": "identity"
+              "app.oam.dev/component":    context.name
+            }
             if parameter.targetEnvironment != _|_ {
               annotations: {
                 "app.oam.dev/cluster": parameter.targetEnvironment
@@ -29,51 +33,166 @@ spec:
           }
           spec: {
             refreshInterval: "1h"
+            // IDP wiring 2026-06-06: was "aws-secretsmanager" (EKS-era, never
+            // existed on this AKS cluster). Now Azure Key Vault kv-socrates-6706
+            // via the azure-keyvault ClusterSecretStore.
             secretStoreRef: {
               kind: "ClusterSecretStore"
-              name: "aws-secretsmanager"
+              name: "azure-keyvault"
             }
             target: {
-              name: parameter.name + "-auth0-credentials"
+              // Binding contract: webservices referencing this component via
+              // `identity: <name>` envFrom "<name>-conn". Key names match what
+              // the Spring identity-service template binds (${AUTH0_DOMAIN} etc.).
+              name: context.name + "-conn"
               creationPolicy: "Owner"
+              template: {
+                engineVersion: "v2"
+                data: {
+                  AUTH0_DOMAIN:        "{{ .domain }}"
+                  AUTH0_CLIENT_ID:     "{{ .clientId }}"
+                  AUTH0_CLIENT_SECRET: "{{ .clientSecret }}"
+                  AUTH0_AUDIENCE:      "{{ .audience }}"
+                  JWT_ISSUER_URI:      "https://{{ .domain }}/"
+                  JWT_JWK_SET_URI:     "https://{{ .domain }}/.well-known/jwks.json"
+                }
+              }
             }
             data: [
               {
                 secretKey: "clientId"
-                remoteRef: {
-                  key: "auth0/credentials"
-                  property: "clientId"
-                }
+                remoteRef: { key: parameter.kvSecretPrefix + "-client-id" }
               },
               {
                 secretKey: "clientSecret"
-                remoteRef: {
-                  key: "auth0/credentials"
-                  property: "clientSecret"
-                }
+                remoteRef: { key: parameter.kvSecretPrefix + "-client-secret" }
               },
               {
                 secretKey: "domain"
-                remoteRef: {
-                  key: "auth0/credentials"
-                  property: "domain"
-                }
+                remoteRef: { key: parameter.kvSecretPrefix + "-domain" }
               },
               {
                 secretKey: "audience"
-                remoteRef: {
-                  key: "auth0/credentials"
-                  property: "audience"
-                }
-              }
+                remoteRef: { key: parameter.kvSecretPrefix + "-audience" }
+              },
             ]
           }
         }
-        
+
+        // Default-admin seeding (platform rule 2026-06-06: every externally
+        // exposed service gets an identity with a ready admin user). The Job
+        // envFroms the synced "<name>-conn" secret, obtains a Management API
+        // token via client credentials, relaxes the DB connection password
+        // policy, and idempotently creates admin/<seedPassword> with
+        // app_metadata {profiles:[admin,user], active_profile:admin} - which
+        // the profile-claims post-login Action turns into token claims.
+        // Requires the M2M grant to carry create:users/update:users/
+        // read:connections/update:connections scopes.
+        if parameter.seedAdminUser {
+          outputs: {
+            "admin-seed": {
+              apiVersion: "batch/v1"
+              kind:       "Job"
+              metadata: {
+                name:      context.name + "-admin-seed"
+                namespace: context.namespace
+                labels: {
+                  "app.kubernetes.io/name":       context.name
+                  "app.kubernetes.io/component":  "admin-seed"
+                  "app.kubernetes.io/managed-by": "kubevela"
+                }
+              }
+              spec: {
+                ttlSecondsAfterFinished: 3600
+                backoffLimit: 6
+                template: {
+                  spec: {
+                    restartPolicy: "OnFailure"
+                    containers: [{
+                      name:  "admin-seed"
+                      image: "python:3.11-slim"
+                      envFrom: [{
+                        secretRef: { name: context.name + "-conn" }
+                      }]
+                      env: [
+                        { name: "SEED_EMAIL",    value: parameter.seedEmail },
+                        { name: "SEED_PASSWORD", value: parameter.seedPassword },
+                        { name: "SEED_CONNECTION", value: parameter.seedConnection },
+                      ]
+                      command: ["python3", "-u", "-c"]
+                      args: ["""
+                        import json, os, urllib.request, urllib.error
+                        dom = os.environ['AUTH0_DOMAIN']
+                        def call(method, path, payload=None, token=None):
+                            req = urllib.request.Request('https://%s%s' % (dom, path), method=method,
+                                data=json.dumps(payload).encode() if payload is not None else None,
+                                headers={'Content-Type': 'application/json',
+                                         **({'Authorization': 'Bearer ' + token} if token else {})})
+                            try:
+                                with urllib.request.urlopen(req, timeout=30) as r:
+                                    return r.status, json.loads(r.read() or '{}')
+                            except urllib.error.HTTPError as e:
+                                return e.code, json.loads(e.read() or '{}')
+                        st, tok = call('POST', '/oauth/token', {
+                            'grant_type': 'client_credentials',
+                            'client_id': os.environ['AUTH0_CLIENT_ID'],
+                            'client_secret': os.environ['AUTH0_CLIENT_SECRET'],
+                            'audience': 'https://%s/api/v2/' % dom})
+                        assert st == 200, 'mgmt token failed: %s %s' % (st, tok)
+                        t = tok['access_token']
+                        conn_name = os.environ['SEED_CONNECTION']
+                        st, conns = call('GET', '/api/v2/connections?strategy=auth0', token=t)
+                        assert st == 200, 'list connections failed (check read:connections scope): %s %s' % (st, conns)
+                        conn = next((c for c in conns if c['name'] == conn_name), None)
+                        assert conn, 'connection %s not found' % conn_name
+                        opts = conn.get('options', {})
+                        if opts.get('passwordPolicy') != 'none':
+                            opts['passwordPolicy'] = 'none'
+                            st, r = call('PATCH', '/api/v2/connections/' + conn['id'], {'options': opts}, token=t)
+                            print('password policy ->none:', st)
+                        md = {'profiles': ['admin', 'user'], 'active_profile': 'admin'}
+                        st, r = call('POST', '/api/v2/users', {
+                            'email': os.environ['SEED_EMAIL'], 'username': 'admin',
+                            'password': os.environ['SEED_PASSWORD'], 'connection': conn_name,
+                            'email_verified': True, 'app_metadata': md}, token=t)
+                        if st == 201:
+                            print('admin user created:', r.get('user_id'))
+                        elif st == 409:
+                            st2, users = call('GET', '/api/v2/users-by-email?email=' + os.environ['SEED_EMAIL'], token=t)
+                            uid = users[0]['user_id']
+                            call('PATCH', '/api/v2/users/' + uid, {'app_metadata': md}, token=t)
+                            print('admin user existed; app_metadata converged:', uid)
+                        else:
+                            raise SystemExit('user create failed (check create:users scope): %s %s' % (st, r))
+                        print('admin seed complete')
+                        """]
+                    }]
+                  }
+                }
+              }
+            }
+          }
+        }
+
         parameter: {
-          // Required
-          name: string
-          
-          // Optional
+          // +usage=Key Vault secret-name prefix; expects <prefix>-domain/-client-id/-client-secret/-audience in kv-socrates-6706. Defaults to auth0.
+          kvSecretPrefix: *"auth0" | string
+
+          // +usage=Create a default admin user (admin/<seedPassword>, profiles [admin,user]) via the Management API. Default true.
+          seedAdminUser: *true | bool
+
+          // +usage=Default admin password. CHANGE IN PRODUCTION.
+          seedPassword: *"admin" | string
+
+          // +usage=Email for the seeded admin user.
+          seedEmail: *"admin@cafe.io" | string
+
+          // +usage=Auth0 database connection to seed the user into.
+          seedConnection: *"Username-Password-Authentication" | string
+
+          // +usage=DEPRECATED (accepted for backward compat; component name is used instead).
+          name?: string
+
+          // +usage=Optional vCluster deployment target.
           targetEnvironment?: string
         }

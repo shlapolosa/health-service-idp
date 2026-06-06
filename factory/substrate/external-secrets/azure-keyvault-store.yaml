@@ -1,0 +1,25 @@
+# ClusterSecretStore for Azure Key Vault (IDP wiring, 2026-06-06).
+# Replaces the EKS-era assumption baked into auth0-idp.cd.yaml (which pointed
+# at a non-existent "aws-secretsmanager" store - no ClusterSecretStore existed
+# on this AKS cluster at all). Auth: the platform SP (same identity as the
+# azure-credentials secret) via eso-azure-sp in the external-secrets namespace;
+# requires "Key Vault Secrets User" on kv-socrates-6706 (RBAC-mode vault).
+apiVersion: external-secrets.io/v1
+kind: ClusterSecretStore
+metadata:
+  name: azure-keyvault
+spec:
+  provider:
+    azurekv:
+      authType: ServicePrincipal
+      vaultUrl: https://kv-socrates-6706.vault.azure.net
+      tenantId: df03bef9-a306-41fe-9933-493e3e70d1c6
+      authSecretRef:
+        clientId:
+          name: eso-azure-sp
+          namespace: external-secrets
+          key: clientId
+        clientSecret:
+          name: eso-azure-sp
+          namespace: external-secrets
+          key: clientSecret

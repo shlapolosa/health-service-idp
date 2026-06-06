@@ -79,7 +79,7 @@ spec:
                   // Binding contract (2026-06-06): database/cache refs envFrom the
                   // sibling component's normalized "<name>-conn" Secret. optional:true
                   // so the ksvc starts before the backing release converges.
-                  if parameter.envFrom != _|_ || parameter.database != _|_ || parameter.cache != _|_ {
+                  if parameter.envFrom != _|_ || parameter.database != _|_ || parameter.cache != _|_ || parameter.identity != _|_ {
                     envFrom: [
                       if parameter.envFrom != _|_ {
                         for ref in parameter.envFrom { ref }
@@ -97,6 +97,14 @@ spec:
                         {
                           secretRef: {
                             name:     parameter.cache + "-conn"
+                            optional: true
+                          }
+                        }
+                      },
+                      if parameter.identity != _|_ if parameter.identity != "none" {
+                        {
+                          secretRef: {
+                            name:     parameter.identity + "-conn"
                             optional: true
                           }
                         }
@@ -165,4 +173,7 @@ spec:
 
           // +usage=Name of a sibling cache component (e.g. redis) to bind. Injects envFrom "<name>-conn" (REDIS_HOST/REDIS_PORT/REDIS_PASSWORD/REDIS_URL/CACHE_URL).
           cache?: string
+
+          // +usage=Name of a sibling identity component (e.g. auth0-idp) to bind. Injects envFrom "<name>-conn" (AUTH0_*/JWT_ISSUER_URI/JWT_JWK_SET_URI).
+          identity?: string
         }

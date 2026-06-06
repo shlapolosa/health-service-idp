@@ -18,12 +18,21 @@ recipes:
         - { category: compute-service }
         - { qa: { exposure: public } }
     emit:
-      - trait:expose-api
+      - component:auth0-idp
+      - property:webservice.identity=<auth0-component-name>
+      - trait:expose-api(identity=<auth0-component-name>)
     docs: |
-      Attach the expose-api trait to the webservice component. A Job publishes the service's
-      public /openapi.json into Azure APIM (aigw-apim-dev-w4x7ibwk4e2is) as api-id=<component>,
-      path svc/<name> — externally browsable spec + auth/rate-limits via the developer portal.
-      Multi-webservice OAMs: attach per component; each publishes its own API.
+      PLATFORM RULE: every externally exposed webservice ships with identity. Generate
+      THREE artifacts together: (1) an auth0-idp component — syncs Auth0 credentials from
+      Key Vault into "<name>-conn" (AUTH0_*/JWT_ISSUER_URI) and seeds a default admin user
+      (admin/admin, profiles [admin,user] -> per-profile token claims via the post-login
+      Action); (2) `identity: <auth0-component>` on the webservice — envFroms the conn
+      secret so the service validates Bearer JWTs; (3) the expose-api trait WITH
+      identity=<auth0-component> — publishes /openapi.json into Azure APIM
+      (aigw-apim-dev-w4x7ibwk4e2is, path svc/<name>) AND locks the API behind a
+      validate-jwt policy against the same issuer/audience. Tokens minted by the IdP are
+      verified at the gateway AND in the service. Multi-webservice OAMs: one auth0-idp
+      component may serve several webservices; attach the trait per exposed component.
 
   - id: web-service-needs-db
     triggers:

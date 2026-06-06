@@ -52,6 +52,14 @@ spec:
                       mountPath: "/azure"
                       readOnly:  true
                     }]
+                    if parameter.identity != _|_ {
+                      envFrom: [{
+                        secretRef: {
+                          name:     parameter.identity + "-conn"
+                          optional: true
+                        }
+                      }]
+                    }
                     env: [
                       { name: "SVC_NAME",   value: context.name },
                       { name: "SVC_NS",     value: context.namespace },
@@ -95,6 +103,19 @@ spec:
                         --service-url "$PUBLIC_URL" \\
                         --protocols https http
                       echo "published: APIM api-id=$SVC_NAME path=$API_SUFFIX -> $PUBLIC_URL"
+
+                      # Identity wiring: when an identity component is bound, lock the
+                      # API behind validate-jwt - APIM verifies tokens minted by the
+                      # IdP (JWT_ISSUER_URI/AUTH0_AUDIENCE from "<identity>-conn").
+                      if [ -n "${JWT_ISSUER_URI:-}" ]; then
+                        printf '<policies><inbound><base /><validate-jwt header-name="Authorization" failed-validation-httpcode="401" failed-validation-error-message="Unauthorized"><openid-config url="%s.well-known/openid-configuration" /><audiences><audience>%s</audience></audiences></validate-jwt></inbound><backend><base /></backend><outbound><base /></outbound><on-error><base /></on-error></policies>' "$JWT_ISSUER_URI" "$AUTH0_AUDIENCE" > /tmp/policy.xml
+                        python3 -c "import json; json.dump({'properties':{'format':'xml','value':open('/tmp/policy.xml').read()}}, open('/tmp/policy.json','w'))"
+                        APIM_ID=$(az apim show -g "$APIM_RG" -n "$APIM_NAME" --query id -o tsv)
+                        az rest --method PUT --url "https://management.azure.com${APIM_ID}/apis/${SVC_NAME}/policies/policy?api-version=2022-08-01" --body @/tmp/policy.json
+                        echo "validate-jwt policy applied: issuer=$JWT_ISSUER_URI audience=$AUTH0_AUDIENCE"
+                      else
+                        echo "no identity bound - API published WITHOUT jwt validation"
+                      fi
                       """]
                   }]
                 }
@@ -118,4 +139,7 @@ spec:
 
           // +usage=APIM URL path prefix; final API path is <prefix>/<component-name>.
           apiPathPrefix: *"svc" | string
+
+          // +usage=Name of a sibling identity component (e.g. auth0-idp). When set, the published API is locked behind an APIM validate-jwt policy using that component's JWT_ISSUER_URI/AUTH0_AUDIENCE.
+          identity?: string
         }

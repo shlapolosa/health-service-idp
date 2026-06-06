@@ -141,7 +141,7 @@ spec:
                   // REDIS_* + CACHE_URL. optional:true so the ksvc starts even
                   // before the backing release converges.
                   // presence checks only - CUE does not short-circuit && over optional fields
-                  if parameter.envFrom != _|_ || parameter.realtime != _|_ || parameter.database != _|_ || parameter.cache != _|_ {
+                  if parameter.envFrom != _|_ || parameter.realtime != _|_ || parameter.database != _|_ || parameter.cache != _|_ || parameter.identity != _|_ {
                     envFrom: [
                       if parameter.envFrom != _|_ {
                         for envRef in parameter.envFrom {
@@ -161,6 +161,14 @@ spec:
                         {
                           secretRef: {
                             name: parameter.cache + "-conn"
+                            optional: true
+                          }
+                        }
+                      },
+                      if parameter.identity != _|_ if parameter.identity != "none" {
+                        {
+                          secretRef: {
+                            name: parameter.identity + "-conn"
                             optional: true
                           }
                         }
@@ -278,5 +286,7 @@ spec:
           
           // Optional database and cache settings
           database?: string
+          // +usage=Name of a sibling identity component (e.g. auth0-idp) to bind. Injects envFrom "<name>-conn" (AUTH0_*/JWT_ISSUER_URI).
+          identity?: string
           cache?: string
         }
