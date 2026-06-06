@@ -85,7 +85,7 @@ spec:
                         for ref in parameter.envFrom { ref }
                       }
                     ] + [
-                      if parameter.database != _|_ {
+                      if parameter.database != _|_ if parameter.database != "none" {
                         {
                           secretRef: {
                             name:     parameter.database + "-conn"
@@ -93,7 +93,7 @@ spec:
                           }
                         }
                       },
-                      if parameter.cache != _|_ {
+                      if parameter.cache != _|_ if parameter.cache != "none" {
                         {
                           secretRef: {
                             name:     parameter.cache + "-conn"

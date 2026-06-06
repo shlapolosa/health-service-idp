@@ -140,7 +140,8 @@ spec:
                   // by the postgresql/redis CDs). Keys: DB_* + DATABASE_URL,
                   // REDIS_* + CACHE_URL. optional:true so the ksvc starts even
                   // before the backing release converges.
-                  if parameter.envFrom != _|_ || parameter.realtime != _|_ || (parameter.database != _|_ && parameter.database != "none") || (parameter.cache != _|_ && parameter.cache != "none") {
+                  // presence checks only - CUE does not short-circuit && over optional fields
+                  if parameter.envFrom != _|_ || parameter.realtime != _|_ || parameter.database != _|_ || parameter.cache != _|_ {
                     envFrom: [
                       if parameter.envFrom != _|_ {
                         for envRef in parameter.envFrom {
@@ -148,7 +149,7 @@ spec:
                         }
                       }
                     ] + [
-                      if parameter.database != _|_ && parameter.database != "none" {
+                      if parameter.database != _|_ if parameter.database != "none" {
                         {
                           secretRef: {
                             name: parameter.database + "-conn"
@@ -156,7 +157,7 @@ spec:
                           }
                         }
                       },
-                      if parameter.cache != _|_ && parameter.cache != "none" {
+                      if parameter.cache != _|_ if parameter.cache != "none" {
                         {
                           secretRef: {
                             name: parameter.cache + "-conn"

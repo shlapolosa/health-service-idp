@@ -1,10 +1,15 @@
-# Connectivity recipes (P8.5) — pre-approved patterns the architect picks from when synthesising
-# composite OAM. One row per recipe. The LLM never invents recipes; it picks from this file.
+# Connectivity recipes (P8.5 → BIND-3) — pre-approved patterns the architect picks from when
+# synthesising composite OAM. One row per recipe. The LLM never invents recipes; it picks from
+# this file.
 #
 # Each recipe declares:
 #   triggers — conditions that match the recipe (intake QA fields, composite shape, KB profile)
-#   emit     — list of TraitDefinition / Secret / config artifacts to bundle with the CD
+#   emit     — the REAL lever to apply (trait:<name> to attach, property:<comp>.<key>=<ref> to set)
 #   docs     — short text the ADR cites when explaining why the recipe was applied
+#
+# Binding contract (implemented 2026-06-06): every backing component renders a normalized
+# Secret "<component-name>-conn" (pure CUE); webservices that reference a sibling by name
+# envFrom it automatically (optional:true, so rendering never blocks on the backing release).
 recipes:
 
   - id: web-service-exposed
@@ -13,52 +18,61 @@ recipes:
         - { category: compute-service }
         - { qa: { exposure: public } }
     emit:
-      - oam/traits/expose-https.yaml
+      - trait:expose-api
     docs: |
-      Public compute services get an HTTPS-terminating Knative VirtualService + cert-manager
-      Issuer. Cert is auto-renewed via ACME.
+      Attach the expose-api trait to the webservice component. A Job publishes the service's
+      public /openapi.json into Azure APIM (aigw-apim-dev-w4x7ibwk4e2is) as api-id=<component>,
+      path svc/<name> — externally browsable spec + auth/rate-limits via the developer portal.
+      Multi-webservice OAMs: attach per component; each publishes its own API.
 
   - id: web-service-needs-db
     triggers:
       composite:
         contains: [compute-service, datastore]
     emit:
-      - oam/traits/datastore-secret-binding.yaml
+      - property:webservice.database=<datastore-component-name>
     docs: |
-      Service consuming a datastore gets a Secret reference populated with the datastore's
-      connection string (host, port, db, user/password from Crossplane). Bound as env vars
-      DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD on the compute pod.
+      Set `database: <datastore-component-name>` on the webservice component (works on
+      webservice AND webservice-shape). The postgresql component renders Secret "<name>-conn"
+      and the webservice envFroms it: the app sees DB_HOST, DB_PORT, DB_NAME, DB_USER,
+      DB_PASSWORD and DATABASE_URL. Multi-webservice OAMs bind per-component: each webservice
+      names the datastore it consumes (same or different).
+
+  - id: cache-aside-db
+    triggers:
+      composite:
+        contains: [compute-service, cache]
+    emit:
+      - property:webservice.cache=<cache-component-name>
+    docs: |
+      Set `cache: <cache-component-name>` on the webservice component. The redis component
+      renders Secret "<name>-conn" and the webservice envFroms it: REDIS_HOST, REDIS_PORT,
+      REDIS_PASSWORD, REDIS_URL and CACHE_URL. Pattern is cache-aside (app-managed
+      read-through; no write-through automation). Document TTL strategy in the ADR.
 
   - id: producer-needs-broker
     triggers:
       composite:
         contains: [compute-service, messaging]
     emit:
-      - oam/traits/broker-producer-binding.yaml
+      - property:webservice.realtime=<realtime-platform-component-name>
     docs: |
-      Producer service consuming a messaging capability gets BROKER_URL + auth env vars from
-      the messaging component's service. Best practice: idempotent producers + at-least-once
-      semantics.
+      Messaging on this platform goes through Lenses (realtime-platform), not raw broker
+      bootstrap. Set `realtime: <realtime-platform-name>` on the webservice: it envFroms
+      <name>-kafka-secret, <name>-lenses-secret, <name>-mqtt-secret, <name>-db-secret,
+      <name>-metabase-secret (all optional) and gets REALTIME_PLATFORM_NAME /
+      REALTIME_INTEGRATION_ENABLED. Topic management + governance live in Lenses HQ.
 
   - id: consumer-needs-broker
     triggers:
       composite:
         contains: [messaging, analytics]
     emit:
-      - oam/traits/broker-consumer-binding.yaml
+      - property:webservice.realtime=<realtime-platform-component-name>
     docs: |
-      Consumer service consuming a messaging capability gets BROKER_URL + consumer group +
-      subscription config. Best practice: graceful shutdown + dead-letter routing.
-
-  - id: cache-aside-db
-    triggers:
-      composite:
-        contains: [datastore, cache]
-    emit:
-      - oam/traits/cache-binding.yaml
-    docs: |
-      Cache + datastore composite: emit CACHE_URL env. Pattern is cache-aside (read-through
-      app-managed; no write-through automation). Document TTL strategy in the ADR.
+      Consumers use the same Lenses-mediated contract as producers (realtime: reference ->
+      *-kafka-secret/*-lenses-secret envFrom). Best practice: graceful shutdown + dead-letter
+      routing; configure consumer groups via the Lenses connection rather than raw bootstrap.
 
   - id: secret-from-key-vault
     triggers:
