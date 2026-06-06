@@ -57,6 +57,53 @@ spec:
           }
         }
         
+        // Binding contract (2026-06-06): normalized connection Secret.
+        // Webservices referencing this component via `cache: <name>` get
+        // envFrom "<name>-conn" automatically (webservice CD).
+        // Host mirrors bitnami fullname logic: release name containing
+        // "redis" => fullname == release; otherwise "<release>-redis".
+        // Master service carries writes in both architectures.
+        outputs: {
+          "conn-secret": {
+            // Hidden fields (stripped at render). Host mirrors bitnami fullname:
+            // release containing "redis" => fullname == release; else "<release>-redis".
+            // =~ instead of strings.Contains: vela 1.10.3 CUE-import bug; the
+            // webhook also rejects template-top-level context refs, hence in-block.
+            _fn: string
+            if context.name =~ "redis" {
+              _fn: context.name
+            }
+            if !(context.name =~ "redis") {
+              _fn: context.name + "-redis"
+            }
+            _host: _fn + "-master." + context.namespace + ".svc.cluster.local"
+            apiVersion: "v1"
+            kind:       "Secret"
+            metadata: {
+              name:      context.name + "-conn"
+              namespace: context.namespace
+              labels: {
+                "binding.cafe.io/category": "cache"
+                "app.oam.dev/component":    context.name
+              }
+            }
+            type: "Opaque"
+            stringData: {
+              REDIS_HOST: _host
+              REDIS_PORT: "6379"
+              if parameter.authEnabled {
+                REDIS_PASSWORD: parameter.password
+                REDIS_URL:      "redis://:" + parameter.password + "@" + _host + ":6379/0"
+                CACHE_URL:      "redis://:" + parameter.password + "@" + _host + ":6379/0"
+              }
+              if !parameter.authEnabled {
+                REDIS_URL: "redis://" + _host + ":6379/0"
+                CACHE_URL: "redis://" + _host + ":6379/0"
+              }
+            }
+          }
+        }
+
         parameter: {
           authEnabled: *true | bool
           password: *"redis-password" | string

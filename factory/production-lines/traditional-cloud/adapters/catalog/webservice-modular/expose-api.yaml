@@ -1,0 +1,121 @@
+apiVersion: core.oam.dev/v1beta1
+kind: TraitDefinition
+metadata:
+  name: expose-api
+  namespace: default
+  annotations:
+    definition.oam.dev/description: >
+      Publishes the service's OpenAPI spec to Azure APIM (BIND-2, 2026-06-06).
+      Renders a Job that logs in with the cluster's azure-credentials SP, waits
+      for the service's public /openapi.json (Knative URL through the Istio
+      ingress), then `az apim api import`s it. Result: the spec is externally
+      browsable in the APIM developer portal with auth/rate-limits, one API per
+      component (multi-webservice OAMs publish one API each). Re-running the
+      Job upserts (same --api-id). Activates the long-dormant exposeApi intent.
+spec:
+  appliesToWorkloads:
+    - webservice
+    - webservice-shape
+  podDisruptive: false
+  schematic:
+    cue:
+      template: |
+        outputs: {
+          "apim-publish": {
+            apiVersion: "batch/v1"
+            kind:       "Job"
+            metadata: {
+              name:      context.name + "-apim-publish"
+              namespace: context.namespace
+              labels: {
+                "app.kubernetes.io/name":       context.name
+                "app.kubernetes.io/component":  "apim-publish"
+                "app.kubernetes.io/managed-by": "kubevela"
+                "trait.oam.dev/name":           "expose-api"
+              }
+            }
+            spec: {
+              ttlSecondsAfterFinished: 3600
+              backoffLimit: 4
+              template: {
+                spec: {
+                  restartPolicy: "OnFailure"
+                  volumes: [{
+                    name: "azure-creds"
+                    secret: { secretName: "azure-credentials" }
+                  }]
+                  containers: [{
+                    name:  "apim-publish"
+                    image: "mcr.microsoft.com/azure-cli:2.64.0"
+                    volumeMounts: [{
+                      name:      "azure-creds"
+                      mountPath: "/azure"
+                      readOnly:  true
+                    }]
+                    env: [
+                      { name: "SVC_NAME",   value: context.name },
+                      { name: "SVC_NS",     value: context.namespace },
+                      { name: "PUBLIC_URL", value: "http://" + context.name + "." + context.namespace + "." + parameter.publicHost },
+                      { name: "SPEC_PATH",  value: parameter.openApiPath },
+                      { name: "APIM_NAME",  value: parameter.apimName },
+                      { name: "APIM_RG",    value: parameter.apimResourceGroup },
+                      { name: "API_SUFFIX", value: parameter.apiPathPrefix + "/" + context.name },
+                    ]
+                    command: ["/bin/sh", "-c"]
+                    args: ["""
+                      set -e
+                      echo "expose-api: publishing $SVC_NAME OpenAPI to APIM $APIM_NAME"
+                      CID=$(python3 -c "import json;print(json.load(open('/azure/azure-creds.json'))['clientId'])")
+                      CSC=$(python3 -c "import json;print(json.load(open('/azure/azure-creds.json'))['clientSecret'])")
+                      TEN=$(python3 -c "import json;print(json.load(open('/azure/azure-creds.json'))['tenantId'])")
+                      SUB=$(python3 -c "import json;print(json.load(open('/azure/azure-creds.json'))['subscriptionId'])")
+                      az login --service-principal -u "$CID" -p "$CSC" --tenant "$TEN" >/dev/null
+                      az account set --subscription "$SUB"
+
+                      # Wait for the service's spec to be publicly reachable (CI may
+                      # still be building the image on day-0; backoffLimit covers
+                      # the long tail).
+                      for i in $(seq 1 30); do
+                        if curl -fsS --max-time 10 "$PUBLIC_URL$SPEC_PATH" -o /tmp/openapi.json; then
+                          echo "spec fetched from $PUBLIC_URL$SPEC_PATH"
+                          break
+                        fi
+                        echo "spec not ready yet ($i/30), retrying in 20s..."
+                        sleep 20
+                      done
+                      test -s /tmp/openapi.json || { echo "spec never became reachable"; exit 1; }
+
+                      az apim api import \\
+                        --resource-group "$APIM_RG" \\
+                        --service-name "$APIM_NAME" \\
+                        --api-id "$SVC_NAME" \\
+                        --path "$API_SUFFIX" \\
+                        --specification-format OpenApiJson \\
+                        --specification-path /tmp/openapi.json \\
+                        --service-url "$PUBLIC_URL" \\
+                        --protocols https http
+                      echo "published: APIM api-id=$SVC_NAME path=$API_SUFFIX -> $PUBLIC_URL"
+                      """]
+                  }]
+                }
+              }
+            }
+          }
+        }
+
+        parameter: {
+          // +usage=External wildcard host the Knative ingress serves (default: cluster nip.io domain).
+          publicHost: *"20.233.105.82.nip.io" | string
+
+          // +usage=Path serving the OpenAPI JSON spec (FastAPI default /openapi.json).
+          openApiPath: *"/openapi.json" | string
+
+          // +usage=Azure APIM instance to publish into.
+          apimName: *"aigw-apim-dev-w4x7ibwk4e2is" | string
+
+          // +usage=Resource group of the APIM instance.
+          apimResourceGroup: *"rg-ai-gateway-dev-uae" | string
+
+          // +usage=APIM URL path prefix; final API path is <prefix>/<component-name>.
+          apiPathPrefix: *"svc" | string
+        }

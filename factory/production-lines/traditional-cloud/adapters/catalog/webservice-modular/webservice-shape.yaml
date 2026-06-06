@@ -76,8 +76,32 @@ spec:
                       value: v
                     }
                   ]
-                  if parameter.envFrom != _|_ {
-                    envFrom: parameter.envFrom
+                  // Binding contract (2026-06-06): database/cache refs envFrom the
+                  // sibling component's normalized "<name>-conn" Secret. optional:true
+                  // so the ksvc starts before the backing release converges.
+                  if parameter.envFrom != _|_ || parameter.database != _|_ || parameter.cache != _|_ {
+                    envFrom: [
+                      if parameter.envFrom != _|_ {
+                        for ref in parameter.envFrom { ref }
+                      }
+                    ] + [
+                      if parameter.database != _|_ if parameter.database != "none" {
+                        {
+                          secretRef: {
+                            name:     parameter.database + "-conn"
+                            optional: true
+                          }
+                        }
+                      },
+                      if parameter.cache != _|_ if parameter.cache != "none" {
+                        {
+                          secretRef: {
+                            name:     parameter.cache + "-conn"
+                            optional: true
+                          }
+                        }
+                      },
+                    ]
                   }
                   livenessProbe: {
                     httpGet: {
@@ -135,4 +159,10 @@ spec:
               name: string
             }
           }]
+
+          // +usage=Name of a sibling datastore component (e.g. postgresql) to bind. Injects envFrom "<name>-conn" (DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD/DATABASE_URL).
+          database?: string
+
+          // +usage=Name of a sibling cache component (e.g. redis) to bind. Injects envFrom "<name>-conn" (REDIS_HOST/REDIS_PORT/REDIS_PASSWORD/REDIS_URL/CACHE_URL).
+          cache?: string
         }
