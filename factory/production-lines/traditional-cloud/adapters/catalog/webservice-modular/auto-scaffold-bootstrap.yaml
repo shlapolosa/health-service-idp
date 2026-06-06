@@ -45,10 +45,25 @@ spec:
               gitHubOrg:      parameter.githubOrg
               dockerRegistry: parameter.dockerRegistry
               language:       parameter.language
-              framework:      parameter.framework
-              if parameter.deliveryTarget != _|_ {
-                deliveryTarget: parameter.deliveryTarget
-              }
+              // Derive framework from language when not explicitly set - the
+              // previous flat *"fastapi" default produced language=java/
+              // framework=fastapi claims, so mscv rejected the scaffold
+              // (caught: patient2-identity, 2026-06-06; same asymmetry class
+              // as #126/#132 in the submit path). First-match list idiom -
+              // CUE has no direct absence test.
+              framework: [
+                if parameter.framework != _|_ {parameter.framework},
+                if parameter.language == "java" {"springboot"},
+                "fastapi",
+              ][0]
+              // This trait renders on the host cluster only (see description),
+              // and the composition gates ApplicationClaim/mscv scaffolding on
+              // deliveryTarget being set - defaulting to "host" instead of
+              // omitting means trait-created claims actually scaffold source.
+              deliveryTarget: [
+                if parameter.deliveryTarget != _|_ {parameter.deliveryTarget},
+                "host",
+              ][0]
             }
           }
         }
@@ -57,8 +72,8 @@ spec:
           // +usage=Language of the service to scaffold. CUE-enforced enum (single source of truth; matches webservice CD + XRD).
           language: "python" | "java"
 
-          // +usage=Framework matching the language (fastapi for python, springboot for java).
-          framework: *"fastapi" | "springboot"
+          // +usage=Framework matching the language. Omit to derive from language (python->fastapi, java->springboot).
+          framework?: "fastapi" | "springboot"
 
           // +usage=GitHub org for the new source repo. Defaults to shlapolosa.
           githubOrg: *"shlapolosa" | string
