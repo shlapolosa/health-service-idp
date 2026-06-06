@@ -49,6 +49,8 @@ class K8sClaimClient:
         github_org: str = "shlapolosa",
         docker_registry: str = "healthidpuaeacr.azurecr.io",
         description: str = "created by app.submit (declarative spine)",
+        database: str = "none",
+        cache: str = "none",
     ) -> tuple[bool, str]:
         """Create (or converge onto) the AppContainerClaim `name`. Returns (ok, message).
 
@@ -75,6 +77,8 @@ class K8sClaimClient:
                 "dockerRegistry": docker_registry,
                 "language": language,
                 "framework": framework,
+                "database": database,
+                "cache": cache,
                 "deliveryTarget": delivery_target,
                 "oamApplication": oam_application_b64,
             },

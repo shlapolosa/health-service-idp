@@ -471,6 +471,51 @@ spec:
                         factor: 2
                         maxDuration: 3m
           {{- end }}
+          {{- if $spec.deliveryTarget }}
+          ---
+          # Service-code scaffolding: the ApplicationClaim's composition pushes the
+          # language boilerplate into microservices/<name> in the source repo VIA THE
+          # EXISTING TEMPLATE REPOS (onion-architecture-template for python/fastapi,
+          # chat-template for rasa, graphql-federation-gateway-template for nodejs),
+          # which triggers CI -> image build -> gitops image pin. This absorbs the
+          # legacy WFT's create-microservice-claim step - same templates, no new
+          # codegen. Gated on deliveryTarget so claims created by the legacy chain
+          # (which creates its own ApplicationClaim) are untouched.
+          apiVersion: kubernetes.crossplane.io/v1alpha2
+          kind: Object
+          metadata:
+            name: {{ $spec.name }}-app-claim
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: application-claim
+          spec:
+            providerConfigRef:
+              name: kubernetes-provider
+            forProvider:
+              manifest:
+                apiVersion: platform.example.org/v1alpha1
+                kind: ApplicationClaim
+                metadata:
+                  name: {{ $spec.name }}
+                  namespace: default
+                  labels:
+                    created-by: app-container-claim
+                    parameter-contract-version: "v1.0"
+                    resource-type: microservice
+                  annotations:
+                    description: scaffolded via declarative spine (app.submit)
+                    webservice.oam.dev/source: claim-driven
+                spec:
+                  name: {{ $spec.name }}
+                  language: {{ $spec.language | default "python" }}
+                  framework: {{ $spec.framework | default "fastapi" }}
+                  database: {{ $spec.database | default "none" }}
+                  cache: {{ $spec.cache | default "none" }}
+                  exposeApi: false
+                  appContainer: {{ $spec.name }}
+                  {{- if ne $spec.deliveryTarget "host" }}
+                  targetVCluster: {{ $spec.deliveryTarget }}
+                  {{- end }}
+          {{- end }}
           {{- if and $spec.deliveryTarget (ne $spec.deliveryTarget "host") }}
           ---
           apiVersion: kubernetes.crossplane.io/v1alpha2

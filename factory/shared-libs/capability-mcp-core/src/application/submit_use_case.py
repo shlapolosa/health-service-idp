@@ -95,7 +95,7 @@ class SubmitUseCase:
             return self._fire_oam_driven_contract(app, app_name, namespace, scaffold,
                                                   target_vcluster, oam_yaml, sha)
 
-        return self._declarative_scaffold(app_name, scaffold, target_vcluster, oam_yaml, sha)
+        return self._declarative_scaffold(app, app_name, scaffold, target_vcluster, oam_yaml, sha)
 
     def submit_wait(self, oam_yaml: str) -> SubmitResult:
         """Deferred sibling of submit() — for OAMs whose ComponentDefinitions don't exist yet.
@@ -178,7 +178,8 @@ class SubmitUseCase:
             return comp
         return None
 
-    def _declarative_scaffold(self, app_name: str, scaffold_comp: dict[str, Any],
+    def _declarative_scaffold(self, app: dict[str, Any], app_name: str,
+                              scaffold_comp: dict[str, Any],
                               target_vcluster: str | None, oam_yaml: str,
                               sha: str) -> SubmitResult:
         """Declarative-spine path: update via direct repo commit, day-0 via claim.
@@ -206,8 +207,20 @@ class SubmitUseCase:
                                          f"{svc_repo}/{_SVC_OAM_PATH}; ArgoCD will reconcile "
                                          f"(ledger {sha})"))
 
-        # DAY-0 path: create the AppContainerClaim. Composition does the rest.
+        # DAY-0 path: create the AppContainerClaim. Composition does the rest
+        # (repos via templates, OAM seed, ApplicationClaim for service code,
+        # ArgoCD app). Resolve database/cache OAM-style references to sibling
+        # component types, same as the legacy path.
         props = scaffold_comp.get("properties") or {}
+        comp_types = {c.get("name"): c.get("type", "")
+                      for c in app.get("spec", {}).get("components", [])}
+
+        def _resolve_dep(key: str, default: str) -> str:
+            raw = props.get(key)
+            if not raw:
+                return default
+            return comp_types.get(raw, raw)
+
         _lang = props.get("language", "python")
         _fw = props.get("framework")
         if not _fw or _fw == "auto":
@@ -217,6 +230,8 @@ class SubmitUseCase:
             oam_application_b64=base64.b64encode(oam_yaml.encode()).decode(),
             language=_lang,
             framework=_fw,
+            database=_resolve_dep("database", "none"),
+            cache=_resolve_dep("cache", "none"),
             delivery_target=target_vcluster or "host",
             description=f"OAM-driven via app.submit ({app_name})",
         )

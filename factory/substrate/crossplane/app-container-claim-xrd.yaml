@@ -71,6 +71,14 @@ spec:
                 description: Scaffold framework matching language (used only when oamApplication is not provided)
                 enum: [fastapi, springboot]
                 default: fastapi
+              database:
+                type: string
+                description: Backing database for the scaffolded service (passed through to the composed ApplicationClaim)
+                default: "none"
+              cache:
+                type: string
+                description: Backing cache for the scaffolded service (passed through to the composed ApplicationClaim)
+                default: "none"
               deliveryTarget:
                 type: string
                 description: >-
