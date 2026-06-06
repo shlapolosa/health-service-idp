@@ -474,51 +474,17 @@ spec:
             ;;
         esac
         
-        # Validate Tier 3 - Microservice-specific Parameters
-        case "{{inputs.parameters.microservice-language}}" in
-          python|java|go|nodejs|rust|rasa)
-            echo "✅ Valid microservice-language: {{inputs.parameters.microservice-language}}"
-            ;;
-          *)
-            echo "❌ Invalid microservice-language: {{inputs.parameters.microservice-language}}"
-            echo "Must be one of: python, java, go, nodejs, rust, rasa"
-            exit 1
-            ;;
-        esac
-        
-        case "{{inputs.parameters.microservice-framework}}" in
-          fastapi|springboot|gin|express|axum|auto|chatbot|graphql-gateway)
-            echo "✅ Valid microservice-framework: {{inputs.parameters.microservice-framework}}"
-            ;;
-          *)
-            echo "❌ Invalid microservice-framework: {{inputs.parameters.microservice-framework}}"
-            echo "Must be one of: fastapi, springboot, gin, express, axum, auto, chatbot, graphql-gateway"
-            exit 1
-            ;;
-        esac
-        
-        case "{{inputs.parameters.microservice-database}}" in
-          none|postgres|postgresql|mysql|mongodb|cassandra)
-            echo "✅ Valid microservice-database: {{inputs.parameters.microservice-database}}"
-            ;;
-          *)
-            echo "❌ Invalid microservice-database: {{inputs.parameters.microservice-database}}"
-            echo "Must be one of: none, postgres, postgresql, mysql, mongodb, cassandra"
-            exit 1
-            ;;
-        esac
-        
-        case "{{inputs.parameters.microservice-cache}}" in
-          none|redis|memcached|hazelcast)
-            echo "✅ Valid microservice-cache: {{inputs.parameters.microservice-cache}}"
-            ;;
-          *)
-            echo "❌ Invalid microservice-cache: {{inputs.parameters.microservice-cache}}"
-            echo "Must be one of: none, redis, memcached, hazelcast"
-            exit 1
-            ;;
-        esac
-        
+        # W7 (declarative-spine, 2026-06-06): Tier-3 enum validation REMOVED.
+        # language/framework/database/cache schemas live in exactly one place —
+        # the ComponentDefinition CUE (webservice.cd.yaml) enforced by vela
+        # dry-run at app.submit time, mirrored by the ApplicationClaim XRD.
+        # The bash copies here were the third divergent schema (tasks #129,
+        # #131, #132, #135). Structural checks (DNS names, required params)
+        # are kept; value enums are not re-validated.
+        echo "📋 Tier-3 values (schema enforced upstream by CD CUE + XRD):"
+        echo "   language={{inputs.parameters.microservice-language}} framework={{inputs.parameters.microservice-framework}}"
+        echo "   database={{inputs.parameters.microservice-database}} cache={{inputs.parameters.microservice-cache}}"
+
         # Validate GitHub organization
         if [ -z "{{inputs.parameters.github-org}}" ]; then
           echo "❌ GitHub organization is required"
