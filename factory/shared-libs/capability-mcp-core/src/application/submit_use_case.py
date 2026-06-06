@@ -254,15 +254,33 @@ class SubmitUseCase:
         in the per-service gitops repo with the consumer's actual OAM. ArgoCD reconciles.
         """
         props = scaffold_comp.get("properties") or {}
+        # Build component name → type map so we can resolve OAM-style
+        # references like `database: <component-name>` into the workflow's
+        # expected type literal (postgresql, redis, …). Falls back to the
+        # raw value when the reference doesn't match a sibling component.
+        comp_types = {c.get("name"): c.get("type", "") for c in app.get("spec", {}).get("components", [])}
+        def _resolve_dep(key: str, default: str) -> str:
+            raw = props.get(key)
+            if not raw:
+                return default
+            return comp_types.get(raw, raw)
+        # Derive framework from language when unset / "auto". PR #23 narrowed
+        # the WFT enum to fastapi|springboot only, so "auto" no longer passes
+        # validate-parameters. Keep the consumer-facing OAM lenient (framework
+        # optional) but always forward a concrete value to the workflow.
+        _lang = props.get("language", "python")
+        _fw = props.get("framework")
+        if not _fw or _fw == "auto":
+            _fw = {"python": "fastapi", "java": "springboot"}.get(_lang, "fastapi")
         params = {
             "resource-name": scaffold_comp["name"],
             "namespace": namespace,
             "user": "capability-mcp",
             "description": f"OAM-driven via app.submit ({app_name})",
-            "microservice-language": props.get("language", "python"),
-            "microservice-framework": props.get("framework", "auto"),
-            "microservice-database": props.get("database", "none"),
-            "microservice-cache": props.get("cache", "none"),
+            "microservice-language": _lang,
+            "microservice-framework": _fw,
+            "microservice-database": _resolve_dep("database", "none"),
+            "microservice-cache": _resolve_dep("cache", "none"),
             "target-vcluster": target_vcluster or "host",
             "auto-create-dependencies": "true",
             # The forked-only param — consumer's full OAM, base64-encoded, multi-component-safe.

@@ -48,7 +48,10 @@ spec:
                 apiVersion: batch/v1
                 kind: Job
                 metadata:
-                  name: '{{ .observed.composite.resource.spec.name }}-microservice-creator'
+                  # Short suffix keeps the auto-injected `job-name` label
+                  # ≤63 chars (microservice-creator was too long for the
+                  # 43-char `need-an-webservice-…-api` service name).
+                  name: '{{ .observed.composite.resource.spec.name }}-mscv'
                   namespace: default
                 spec:
                   ttlSecondsAfterFinished: 600

@@ -34,7 +34,7 @@ spec:
     # (validate-microservice-parameters now errors on empty). docker-registry
     # defaults to the platform's actual registry (was docker.io/socrates12345).
     - name: github-org
-      value: ""
+      value: "shlapolosa"
     - name: docker-registry
       value: "healthidpuaeacr.azurecr.io"
     - name: slack-channel
@@ -101,9 +101,11 @@ spec:
         default: "system"
       - name: description
         default: "CLAUDE.md-compliant microservice"
-      # Bug-F: see top-of-file note. No hardcoded defaults — caller must pass github-org.
+      # github-org defaults to the platform org so MCP submissions that don't
+      # include it (e.g. capability-mcp app.submit, which derives nothing from
+      # the OAM spec) still pass validate-microservice-parameters.
       - name: github-org
-        default: ""
+        default: "shlapolosa"
       - name: docker-registry
         default: "healthidpuaeacr.azurecr.io"
       - name: slack-channel
@@ -479,8 +481,9 @@ spec:
         # the ComponentDefinition CUE (webservice.cd.yaml) enforced by vela
         # dry-run at app.submit time, mirrored by the ApplicationClaim XRD.
         # The bash copies here were the third divergent schema (tasks #129,
-        # #131, #132, #135). Structural checks (DNS names, required params)
-        # are kept; value enums are not re-validated.
+        # #131, #132, #135; supersedes PR #23's narrowed copies). Structural
+        # checks (DNS names, required params) are kept; value enums are not
+        # re-validated.
         echo "📋 Tier-3 values (schema enforced upstream by CD CUE + XRD):"
         echo "   language={{inputs.parameters.microservice-language}} framework={{inputs.parameters.microservice-framework}}"
         echo "   database={{inputs.parameters.microservice-database}} cache={{inputs.parameters.microservice-cache}}"

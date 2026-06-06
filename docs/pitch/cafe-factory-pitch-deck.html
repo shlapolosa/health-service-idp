@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gateway / CAFE — pitch deck</title>
+<style>
+  :root{
+    --ink:#0f2336; --muted:#5d6b79; --line:#dde5ee; --bg:#0b1f2e;
+    --accent:#13a89e; --accent2:#2f6fb0; --warn:#c8651f; --pill:#eef5f5;
+    --trad:#2f6fb0; --ai:#13a89e; --gov:#7a5cc4;
+    --cw:1040px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--ink);
+    font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  .deck{height:100vh;overflow-y:auto;scroll-snap-type:y mandatory;scroll-behavior:smooth}
+  .slide{min-height:100vh;scroll-snap-align:start;display:flex;flex-direction:column;justify-content:center;
+    padding:46px 6vw 64px;position:relative;background:#f5f8fb;border-bottom:1px solid #d7e0ea}
+  .slide:nth-child(odd){background:#fff}
+  .slide.dense{justify-content:flex-start;padding-top:44px}
+  /* shared content envelope: every block shares one left edge + one max width, so headers align with content */
+  .slide>*{max-width:var(--cw)}
+  .kick{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:800;margin:0 0 10px}
+  h1{font-size:38px;line-height:1.1;letter-spacing:-.02em;margin:0 0 14px;font-weight:800}
+  h2{font-size:26px;line-height:1.2;letter-spacing:-.01em;margin:0 0 12px;font-weight:800}
+  h3{font-size:15px;margin:16px 0 7px;color:var(--accent2);font-weight:800}
+  p{margin:9px 0;max-width:74ch}
+  b{font-weight:700}
+  .lead{font-size:20px;line-height:1.5;max-width:66ch}
+  .vs{border-left:4px solid var(--warn);background:#fbf0e6;padding:14px 18px;border-radius:8px;margin:14px 0;max-width:74ch;font-size:15px}
+  .qbox{border-left:4px solid var(--accent2);background:#eaf1f8;padding:16px 20px;border-radius:8px;margin:8px 0;font-size:21px;line-height:1.45;max-width:68ch;font-weight:600}
+  .stats{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0 4px}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 16px;min-width:130px}
+  .stat .n{font-size:30px;font-weight:800;color:var(--warn);line-height:1}
+  .stat .l{font-size:12.5px;color:var(--muted);margin-top:4px}
+  .src{font-size:11.5px;color:var(--muted);margin-top:14px;max-width:84ch}
+  .src a{color:var(--accent2)}
+  .sub{font-size:13px;color:var(--muted);margin:-2px 0 10px;max-width:64ch}
+  /* real artifact images, side by side */
+  .imgcols{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:4px 0}
+  .imgcols figure{margin:0}
+  .imgcols img{width:100%;height:auto;border-radius:8px;border:1px solid var(--line);display:block;box-shadow:0 3px 12px rgba(16,36,58,.16)}
+  .imgcols figcaption{font-size:12px;color:var(--muted);margin-top:5px}
+  .imgcols figcaption b{color:var(--accent2)}
+  /* box-in-box foundations M1–M3 */
+  .bib{border:2px solid var(--accent2);border-radius:12px;padding:16px 14px 14px;margin-top:18px;background:#fff;position:relative}
+  .bib .bib-l{position:absolute;top:-11px;left:16px;background:#fff;padding:0 8px;font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--accent2)}
+  .bibrow{display:flex;gap:14px}
+  .bibbox{flex:1;border:1px solid var(--line);border-radius:9px;padding:12px 14px;background:#f7f9fc}
+  .bibbox .m{font-size:11px;font-weight:800;letter-spacing:.05em;color:var(--accent)}
+  .bibbox .t{font-weight:800;font-size:16px;color:var(--ink);margin-top:1px}
+  .bibbox .d{font-size:12.5px;color:var(--muted);margin-top:5px}
+  .cit{display:flex;align-items:flex-start;gap:14px;margin-top:16px;padding:14px 18px;border-radius:12px;background:#0f2336;color:#dce7f2}
+  .cit .sh{font-size:22px;line-height:1}
+  .cit .ct{font-weight:800;color:#fff;font-size:14px;letter-spacing:.03em}
+  .cit .cd{font-size:12.5px;color:#aebfd0;margin-top:3px;max-width:90ch}
+  .cit a{color:#7fcec8}
+  .badge{display:inline-block;background:#eaf1f8;border:1px solid #9bb6d6;color:var(--accent2);border-radius:999px;padding:3px 11px;font-size:12px;font-weight:700;margin:0 0 8px}
+  /* Gateway hi-fi mockup */
+  .gwwrap{margin:6px 0}
+  .gw{font-size:11px;color:#0f2336}
+  .gwframe{border:1px solid #cfd8e3;border-radius:10px;overflow:hidden;background:#fff;box-shadow:0 10px 30px rgba(16,36,58,.18)}
+  .gwbar{display:flex;align-items:center;gap:6px;background:#e9eef4;padding:7px 10px;border-bottom:1px solid #dbe3ec}
+  .gwbar .dot{width:9px;height:9px;border-radius:50%}
+  .gwbar .url{flex:1;background:#fff;border:1px solid #dbe3ec;border-radius:6px;font-size:10px;color:#8a98a6;padding:3px 8px;margin-left:6px}
+  .gwhead{display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid #eef1f5}
+  .gwlogo{font-weight:800;color:#0e7c7b;font-size:13px}
+  .gwnav{display:flex;gap:14px;color:#5d6b79;font-size:11px;font-weight:600}
+  .gwnav .on{color:#0f2336;border-bottom:2px solid #13a89e;padding-bottom:7px;margin-bottom:-9px}
+  .gwav{margin-left:auto;width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#13a89e,#2f6fb0)}
+  .gwbody{display:grid;grid-template-columns:1fr 1.15fr;gap:12px;padding:14px}
+  .gwcard{border:1px solid #eef1f5;border-radius:8px;padding:12px;background:#fbfcfe}
+  .gwcard h5{margin:0 0 7px;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:#5d6b79}
+  .gwta{background:#fff;border:1px solid #dbe3ec;border-radius:6px;padding:9px;font-size:11px;color:#3a4a5c;line-height:1.45}
+  .gwseg{display:inline-flex;border:1px solid #dbe3ec;border-radius:6px;overflow:hidden;margin-top:9px;font-size:10.5px;font-weight:700}
+  .gwseg span{padding:5px 12px;color:#5d6b79}
+  .gwseg .sel{background:#2f6fb0;color:#fff}
+  .gwtog{display:flex;gap:8px;margin-top:9px}
+  .gwpill{border:1px solid #9ed3cf;background:#e7f4f3;color:#0e7c7b;border-radius:999px;padding:3px 10px;font-weight:700;font-size:10.5px}
+  .gwbtn{margin-top:11px;background:#13a89e;color:#fff;text-align:center;border-radius:7px;padding:9px;font-weight:700;font-size:12px}
+  .gwnodes{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .gwn{border-radius:6px;padding:5px 9px;font-size:10px;font-weight:700;border:1px solid}
+  .gwn.k{border-color:#9bb6d6;color:#2f6fb0;background:#eaf1f8}
+  .gwn.a{border-color:#7fcec8;color:#0e7c7b;background:#e7f4f3}
+  .gwnodes .ar{color:#9aa7b4;font-weight:800}
+  .gwgauge{display:flex;align-items:center;gap:9px;margin:6px 0;font-size:10.5px}
+  .gwgauge .lab{flex:0 0 64px;color:#5d6b79;font-weight:600}
+  .gwgauge .track{flex:1;height:8px;border-radius:4px;background:#e2d8f4;position:relative;overflow:hidden}
+  .gwgauge .fill{position:absolute;left:0;top:0;bottom:0;background:#7a5cc4;border-radius:4px}
+  .gwgauge .pct{flex:0 0 36px;text-align:right;font-weight:800;color:#7a5cc4}
+  .gwfoot{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid #eef1f5}
+  .gwfoot .pbtn{border:1px solid #2f6fb0;color:#2f6fb0;border-radius:6px;padding:5px 11px;font-size:10.5px;font-weight:700}
+  .gwfoot .ok{margin-left:auto;background:#e7f4f3;color:#0e7c7b;border:1px solid #9ed3cf;border-radius:999px;padding:4px 11px;font-size:10.5px;font-weight:800}
+  /* seamless layered stack */
+  .stack{border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(16,36,58,.10);margin-top:12px;max-width:920px}
+  .band{display:flex;align-items:stretch;gap:0}
+  .band .blab{flex:0 0 130px;display:flex;align-items:center;justify-content:flex-end;padding:0 14px;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;text-align:right}
+  .band .body{flex:1;padding:16px}
+  .band.platform{background:#eef5f5} .band.platform .blab{color:var(--accent2)}
+  .band.ctrl{background:#f1f3f8} .band.ctrl .blab{color:#3a4a5c}
+  .band.sell{background:#0f23360e} .band.sell .blab{color:var(--ink)}
+  .twoblk{display:flex;gap:14px}
+  .blk{flex:1;border-radius:8px;padding:11px 14px}
+  .blk .bt{font-weight:800;font-size:14px;margin-bottom:2px}
+  .blk .bd{font-size:12.5px;color:var(--muted)}
+  .blk.arch{background:#eaf1f8} .blk.arch .bt{color:var(--accent2)}
+  .blk.gov2{background:#efeaf8} .blk.gov2 .bt{color:var(--gov)}
+  .pillars{display:flex;gap:28px}
+  .pillar{flex:1}
+  .pillar .pt{font-weight:800;font-size:14px;color:var(--ink)}
+  .pillar .pd{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .selltwo{display:flex;gap:30px;flex-wrap:wrap;font-size:14px}
+  .selltwo b{color:var(--ink)}
+  /* slide 2 — use case → platform → solution */
+  .flow2{display:flex;align-items:stretch;gap:12px;margin:14px 0;flex-wrap:wrap}
+  .fbox{border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:#fff;display:flex;flex-direction:column;justify-content:center;min-width:150px}
+  .fbox.uc{background:#eef1f5}
+  .fbox.sol{background:#e7f4f3;border:1px solid #7fcec8}
+  .fbox .ft{font-weight:800;font-size:15px;color:var(--ink)}
+  .fbox .fd{font-size:12px;color:var(--muted);margin-top:3px}
+  .farr{display:flex;align-items:center;font-size:22px;color:#9aa7b4;font-weight:800}
+  .platform2{flex:1 1 360px;border:2px solid var(--accent2);border-radius:12px;padding:16px 14px 14px;background:#f3f7fb;position:relative}
+  .platform2 .pl{position:absolute;top:-11px;left:16px;background:#f3f7fb;padding:0 8px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--accent2)}
+  .spaces{display:flex;align-items:stretch;gap:10px}
+  .space{flex:1;border-radius:9px;padding:12px;background:#fff;border:1px solid var(--line)}
+  .space.sln{border-color:#7fcec8} .space.exe{border-color:#9bb6d6}
+  .space .st{font-weight:800;font-size:14px} .space.sln .st{color:var(--ai)} .space.exe .st{color:var(--trad)}
+  .space .sd{font-size:12px;color:var(--muted);margin-top:4px}
+  .space b{color:var(--ink)}
+  .hl{font-weight:800;background:#ffe29a;border-radius:3px;padding:0 4px;color:#0f2336}
+  .ministacks{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+  .ministacks span{background:#eaf1f8;border:1px solid #9bb6d6;color:#2f6fb0;border-radius:6px;padding:3px 9px;font-size:10.5px;font-weight:700}
+  .govstrip{margin-top:11px;background:#efeaf8;border:1px solid #d9cdf0;border-radius:8px;padding:9px 13px;font-size:12px;color:#4a3d6b;font-weight:600}
+  .govstrip b{color:var(--gov)}
+  .spacearr{display:flex;align-items:center;color:#9aa7b4;font-weight:800;font-size:18px}
+  .delivlead{font-size:13px;color:var(--ink);margin:16px 0 6px;font-weight:700}
+  .deliv{display:flex;gap:14px}
+  .dmodel{flex:1;border-radius:10px;padding:13px 16px;border:1px solid var(--line);background:#fff}
+  .dmodel.cafe{border-left:5px solid var(--gov)} .dmodel.cafe .dt{color:var(--gov)}
+  .dmodel.gw{border-left:5px solid var(--accent)} .dmodel.gw .dt{color:var(--accent)}
+  .dmodel .dt{font-weight:800;font-size:15px}
+  .dmodel .dd{font-size:12.5px;color:var(--muted);margin-top:4px}
+  /* slide 4 — SaaS vs client boundary */
+  .zones{display:flex;align-items:stretch;margin-top:6px;border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+  .zone{flex:1;padding:14px 16px}
+  .zone.saas{background:#13a89e12;border-right:2px dashed #8a98a6} .zone.client{background:#2f6fb010}
+  .zone .zt{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+  .zone.saas .zt{color:var(--accent)} .zone.client .zt{color:var(--accent2)}
+  .zone .zh{font-weight:800;font-size:14px;margin:2px 0 5px;color:var(--ink)}
+  .zone ul{margin:4px 0 0;padding-left:18px;font-size:12.5px;color:var(--muted)} .zone li{margin:3px 0}
+  .zone b{color:var(--ink)}
+  @media (max-width:860px){.flow2{flex-direction:column}.farr{transform:rotate(90deg)}.spaces,.deliv,.zones{flex-direction:column}.spacearr{transform:rotate(90deg)}.zone.saas{border-right:none;border-bottom:2px dashed #8a98a6}}
+  /* process diagram */
+  .diagram{margin:8px 0;max-width:100%}
+  .lane{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:7px 0;padding:11px 14px;border-radius:12px;border:1px dashed var(--line);background:#fff}
+  .lane.trad{border-color:var(--trad);background:#2f6fb00a}
+  .lane.ai{border-color:var(--ai);background:#13a89e0d}
+  .lane .lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;min-width:120px}
+  .lane.trad .lbl{color:var(--trad)} .lane.ai .lbl{color:var(--ai)}
+  .step{background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12.5px;font-weight:600;white-space:nowrap}
+  .step.k{border-color:var(--trad);color:var(--trad)} .step.a{border-color:var(--ai);color:var(--ai)}
+  .arr{color:var(--muted);font-weight:800}
+  .diamond{background:#fff7e8;border:1px solid var(--warn);color:var(--warn);border-radius:8px;padding:6px 10px;font-size:12.5px;font-weight:700}
+  .govbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:7px 0;padding:10px 14px;border-radius:12px;background:#7a5cc40f;border:1px solid var(--gov)}
+  .govbar .lbl{color:var(--gov);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;min-width:120px}
+  .chip{background:#fff;border:1px solid var(--gov);color:var(--gov);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600}
+  .contrib{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}
+  .contrib .c{border-radius:10px;padding:11px 14px;font-size:12.5px;color:#fff}
+  .contrib .c.t{background:var(--trad)} .contrib .c.a{background:var(--ai)} .contrib .c.g{background:var(--gov)}
+  .contrib .c b{color:#fff}
+  .out{display:inline-flex;align-items:center;gap:8px;background:#0f2336;color:#fff;border-radius:10px;padding:8px 14px;font-weight:700;font-size:13.5px;margin-top:5px}
+  .counter{position:fixed;right:16px;bottom:14px;background:#0b1f2e;color:#fff;font-size:12px;padding:4px 10px;border-radius:999px;opacity:.6;z-index:50}
+  .hint{position:fixed;left:16px;bottom:14px;color:#9fb2c4;font-size:11px;z-index:50}
+  @media (max-width:860px){.imgcols,.contrib{grid-template-columns:1fr}.bibrow,.pillars{flex-direction:column;gap:12px}.gwbody{grid-template-columns:1fr}h1{font-size:30px}}
+  @media print{.deck{height:auto;overflow:visible}.slide{min-height:auto;page-break-after:always;border:none}.counter,.hint{display:none}body{background:#fff}}
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+  <!-- 1 — PROBLEM (S / C / Q) -->
+  <section class="slide dense">
+    <div class="kick">The problem · Situation → Complication → Question</div>
+    <h2>AI adoption is mandatory — and it’s breaking the enterprise.</h2>
+    <h3>Situation</h3>
+    <p>AI adoption is now mandatory. <b>88%</b> of enterprises have deployed AI in at least one major business area; boards and chief executives are demanding scale.</p>
+    <h3>Complication</h3>
+    <div class="stats">
+      <div class="stat"><div class="n">21%</div><div class="l">fully confident in their AI governance</div></div>
+      <div class="stat"><div class="n">79%</div><div class="l">struggling with adoption (↑ double digits year over year)</div></div>
+      <div class="stat"><div class="n">54%</div><div class="l">of senior execs say AI is “tearing the company apart”</div></div>
+    </div>
+    <p>The available answers force a bad trade-off: <b>buy a platform</b> (IBM watsonx, Azure AI Foundry, Amazon Bedrock — lock-in, your data leaves your boundary) <b>or hire a systems integrator</b> (Accenture, Deloitte — slow, bespoke, ends in a slide deck). Governance/exposure tooling (Tenable, Credo AI, Holistic AI) <b>detects and gates after the fact</b>. <b>Nobody connects</b> <i>use case → governed architecture → running system.</i></p>
+    <h3>Question</h3>
+    <div class="qbox">So — how does your organisation get from an AI use case to a governed, running system today, and how long does that take?</div>
+    <p class="src"><b>Sources:</b>
+      <a href="https://writer.com/blog/enterprise-ai-adoption-2026/">WRITER 2026 (79%, 54%)</a> ·
+      <a href="https://www.adoptify.ai/blogs/a-governance-led-ai-adoption-framework-for-enterprises/">Adoptify AI (88%, 21%)</a> ·
+      <a href="https://www.tenable.com/products/ai-exposure">Tenable One AI Exposure</a>. ⚠ Verify figures against primary sources before presenting.
+    </p>
+  </section>
+
+  <!-- 2 — SOLUTION OVERVIEW (putting it together + what we sell) -->
+  <section class="slide dense">
+    <div class="kick">The answer · use case → governed solution</div>
+    <h2>From a use case to a governed, architecturally-compliant solution.</h2>
+    <p class="lead" style="max-width:74ch">You bring a use case. The <b>platform</b> turns it into a running solution that is <b>governed by default</b> and <b>architecturally compliant</b> — composed only from approved components, within the guardrails.</p>
+    <div class="flow2">
+      <div class="fbox uc"><div class="ft">Use case</div><div class="fd">a business need, in plain terms</div></div>
+      <div class="farr">→</div>
+      <div class="platform2">
+        <span class="pl">Platform</span>
+        <div class="spaces">
+          <div class="space sln">
+            <div class="st">Solution space</div>
+            <div class="sd"><span class="hl">Agentic</span> solution definition — targeting the chosen stack:</div>
+            <div class="ministacks"><span>Sovereign</span><span>Hosted (enterprise)</span></div>
+          </div>
+          <div class="spacearr">→</div>
+          <div class="space exe">
+            <div class="st">Execution space</div>
+            <div class="sd">Automatically provisioned through <span class="hl">automation</span></div>
+            <div class="ministacks"><span>Implementation runtime</span></div>
+          </div>
+        </div>
+        <div class="govstrip"><b>Governance</b> spans both spaces — identity · data-loss prevention · evaluation gate · audit · CAFE 7-domain coverage.</div>
+      </div>
+      <div class="farr">→</div>
+      <div class="fbox sol"><div class="ft">Governed, compliant solution</div><div class="fd">running · governed by default · architecturally compliant</div></div>
+    </div>
+    <div class="delivlead">Two ways to get the platform — both include or lead to it:</div>
+    <div class="deliv">
+      <div class="dmodel cafe"><div class="dt">CAFE — co-create</div><div class="dd">We realise the platform with you, in your estate (sovereign or hosted). You adopt and own the framework.</div></div>
+      <div class="dmodel gw"><div class="dt">Gateway — SaaS</div><div class="dd">The platform as a product — your infrastructure or hosted. Buy it; run use cases from day one.</div></div>
+    </div>
+    <p class="src">The platform has two spaces: the <b>solution space</b> creates the solution; the <b>execution space</b> realises it for the specific use case. CAFE co-creates the platform; Gateway delivers it as SaaS. The next slides detail CAFE (the method) and Gateway (the product).</p>
+  </section>
+
+  <!-- 3 — FACTORY METAPHOR (build vs outsource = who runs the floor) -->
+  <section class="slide dense">
+    <div class="kick">The metaphor · the platform is a factory</div>
+    <h2>Build the factory in-house, or outsource it. Same blueprint, same outputs.</h2>
+    <p class="lead">A factory has a <b>blueprint</b>, <b>production lines</b>, and a <b>floor</b> they run on. CAFE plays each role, in order — and your only real choice is who operates the floor. Either way, the outputs land in your infrastructure.</p>
+
+    <div class="bib" style="margin-top:14px">
+      <span class="bib-l">The factory · three layers</span>
+      <div class="bibrow">
+        <div class="bibbox">
+          <div class="m">BLUEPRINT</div>
+          <div class="t">CAFE — the spec</div>
+          <div class="d">Domains, M1–M5 artifacts, guardrails. The contract every production line must honour. Identical in both modes.</div>
+        </div>
+        <div class="bibbox">
+          <div class="m">PRODUCTION LINES</div>
+          <div class="t">CAMs — per manufacturer</div>
+          <div class="d">Traditional Cloud · Agentic AI · Sovereign. Each CAM is a CAFE-compliant line; multiple lines can run on one floor.</div>
+        </div>
+        <div class="bibbox">
+          <div class="m">FLOOR</div>
+          <div class="t">Factory floor — the cluster</div>
+          <div class="d">Where the lines actually run. Production lines turn use cases into deployable services as outputs.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="delivlead" style="margin-top:18px">Who operates the floor — the only real choice.</div>
+    <div class="zones">
+      <div class="zone client" style="background:#2f6fb010">
+        <div class="zt">Build in-house · you own the factory</div>
+        <div class="zh">CAFE + CAMs → your factory</div>
+        <ul>
+          <li>You consume the <b>CAFE spec + CAMs</b> as artifacts and stand the factory up yourself.</li>
+          <li>You operate the floor on your infrastructure; pick which production lines to enable.</li>
+          <li>You can add new CAMs (new manufacturers) over time — same blueprint contract.</li>
+        </ul>
+      </div>
+      <div class="zone saas">
+        <div class="zt">Outsource · Gateway runs the factory</div>
+        <div class="zh">We run the floor; products land in your estate</div>
+        <ul>
+          <li>We operate the <b>factory floor</b> as SaaS; you configure which production lines to enable.</li>
+          <li>Outputs — running services — deploy to <b>your subscription / your infrastructure</b>.</li>
+          <li>No lock-in: same CAFE spec means taking the floor in-house later is a migration of operation, not architecture.</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="src"><b>What stays the same in both modes:</b> the CAFE spec, the CAMs you choose to enable, multi-line composition (one floor can run Traditional + AI lines side by side), and where the products end up (your infrastructure). Only the operator of the floor differs. The next slides detail the blueprint (CAFE) and the floor we run for you (Gateway).</p>
+  </section>
+
+  <!-- 4 — CAFE (artifacts) -->
+  <section class="slide dense">
+    <div class="kick">The answer · CAFE — the method</div>
+    <h2>CAFE composes from a governed artifact set.</h2>
+    <div class="sub">Composable AI Framework for Enterprise — 7 governed domains operationalised as five interlocking artifacts (M1–M5). The closed component set + enforced guardrails make the output <b>governed by construction.</b></div>
+    <div class="imgcols">
+      <figure><img src="assets/m4-capability-map.png" alt="M4 — Technical Capability Map"><figcaption><b>M4 — Technical Capability Map:</b> the closed set of governed components, organised by domain.</figcaption></figure>
+      <figure><img src="assets/m5-reference-architecture.png" alt="M5 — Reference Architecture"><figcaption><b>M5 — Reference Architecture:</b> composed only from M4 components, within the M3 guardrails.</figcaption></figure>
+    </div>
+    <div class="bib">
+      <span class="bib-l">Foundations · M1–M3 (M4 &amp; M5 compose on top of these)</span>
+      <div class="bibrow">
+        <div class="bibbox"><div class="m">M1</div><div class="t">Topology</div><div class="d">Agent typology — the allowed archetypes and their determinism tiers (what kinds of agents may exist).</div></div>
+        <div class="bibbox"><div class="m">M2</div><div class="t">Decision tree</div><div class="d">Routing — how an incoming use case is classified and sent to the right archetype.</div></div>
+        <div class="bibbox"><div class="m">M3</div><div class="t">Guardrails</div><div class="d">OWASP-aligned invariants every component must satisfy — enforced, not advisory.</div></div>
+      </div>
+    </div>
+    <div class="cit">
+      <span class="sh">🛡️</span>
+      <div>
+        <div class="ct">Security · Citadel — built into the architecture</div>
+        <div class="cd">The M5 reference architecture ships secure-by-default on Microsoft’s <b style="color:#cfe6e4">Foundry Citadel</b> pattern: Entra ID identity, Microsoft Defender for AI (threat detection + red-teaming), Purview (data governance / sensitivity labels), API Management AI gateway, and the Foundry control plane for observability + evaluations. <a href="https://github.com/Azure-Samples/foundry-citadel-platform">Azure-Samples/foundry-citadel-platform</a></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 — GATEWAY (hi-fi mockup) -->
+  <section class="slide dense">
+    <div class="kick">The answer · Gateway — the product</div>
+    <h2>Gateway runs the method.</h2>
+    <span class="badge">Gateway is itself a reference implementation of the M5 reference architecture</span>
+    <div class="sub">Gateway eats its own dog food: it’s built on the very M5 architecture it generates, and its flagship use case is the <b>use-case agent</b> — the agent that intakes a use case, composes a governed architecture, and hands off to provisioning.</div>
+    <div class="gwwrap">
+      <div class="gw">
+        <div class="gwframe">
+          <div class="gwbar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">app.gateway.ai/compose</span></div>
+          <div class="gwhead"><span class="gwlogo">▦ Gateway</span><span class="gwnav"><span class="on">Compose</span><span>Catalog</span><span>Governance</span><span>Runs</span></span><span class="gwav"></span></div>
+          <div class="gwbody">
+            <div class="gwcard">
+              <h5>New use case</h5>
+              <div class="gwta">Deploy a use-case agent — intake a business use case, classify intent, compose a governed M5 architecture, then hand off to provisioning.</div>
+              <div class="gwseg"><span class="sel">Sovereign</span><span>Hosted</span></div>
+              <div class="gwtog"><span class="gwpill">AI ✓</span><span class="gwpill">Traditional ✓</span></div>
+              <div class="gwbtn">Generate architecture →</div>
+            </div>
+            <div>
+              <div class="gwcard" style="margin-bottom:10px">
+                <h5>Composed architecture · use-case agent</h5>
+                <div class="gwnodes"><span class="gwn k">Intake</span><span class="ar">→</span><span class="gwn k">Intent classify</span></div>
+                <div class="gwnodes" style="margin-top:7px"><span class="gwn a">Compose M5 (agent)</span><span class="ar">→</span><span class="gwn a">Govern → Provision</span></div>
+              </div>
+              <div class="gwcard">
+                <h5>Governance scorecard</h5>
+                <div class="gwgauge"><span class="lab">Identity</span><span class="track"><span class="fill" style="width:100%"></span></span><span class="pct">100%</span></div>
+                <div class="gwgauge"><span class="lab">DLP</span><span class="track"><span class="fill" style="width:92%"></span></span><span class="pct">92%</span></div>
+                <div class="gwgauge"><span class="lab">Eval gate</span><span class="track"><span class="fill" style="width:78%"></span></span><span class="pct">78%</span></div>
+                <div class="gwgauge"><span class="lab">Audit</span><span class="track"><span class="fill" style="width:100%"></span></span><span class="pct">100%</span></div>
+                <div class="gwgauge"><span class="lab">Domains</span><span class="track"><span class="fill" style="width:86%"></span></span><span class="pct">6/7</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="gwfoot"><span class="pbtn">Provision ▸ KubeVela</span><span class="pbtn">Provision ▸ Azure</span><span class="ok">governed ✓</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="delivlead">Where it runs — Gateway SaaS owns the <b style="color:var(--accent)">solution space</b>; the <b style="color:var(--accent2)">execution space</b> stays in your environment.</div>
+    <div class="zones">
+      <div class="zone saas">
+        <div class="zt">Gateway SaaS · we run</div>
+        <div class="zh">Solution space</div>
+        <ul>
+          <li>Intake the use case (the use-case agent)</li>
+          <li>Compose the governed, M5-compliant architecture + governance</li>
+          <li>Hand the deployable solution to your environment ▸</li>
+        </ul>
+      </div>
+      <div class="zone client">
+        <div class="zt">Your environment · your subscription &amp; tenant</div>
+        <div class="zh">Execution space</div>
+        <ul>
+          <li>The realised solution runs on <b>your subscriptions / instances</b></li>
+          <li>Presents to users in <b>Microsoft Teams</b></li>
+          <li>Reads your <b>systems of record</b> — data never leaves your boundary</li>
+        </ul>
+      </div>
+    </div>
+    <p class="src">The solution for the use case belongs to you, so it runs where your users and data are — your subscriptions, Teams, your systems of record. Gateway-as-SaaS <b>composes</b> it; your environment <b>executes</b> it.</p>
+  </section>
+
+  <!-- 6 — DEMO PROCESS DIAGRAM -->
+  <section class="slide dense">
+    <div class="kick">The proof · demo</div>
+    <h2>Accounts-Payable invoice exception handling</h2>
+    <p style="max-width:80ch">One operational flow, two halves — <b style="color:var(--trad)">deterministic (traditional)</b> and <b style="color:var(--ai)">agentic (AI)</b> — both <b style="color:var(--gov)">governed by default</b>. The highlighted cards show <b>where Gateway + CAFE contribute.</b></p>
+    <div class="diagram">
+      <div class="out">📄 Invoice arrives</div>
+      <div class="lane trad">
+        <span class="lbl">Traditional · deterministic</span>
+        <span class="step k">Intake</span><span class="arr">→</span>
+        <span class="step k">Text extraction (OCR)</span><span class="arr">→</span>
+        <span class="step k">Store</span><span class="arr">→</span>
+        <span class="step k">3-way match</span><span class="arr">→</span>
+        <span class="diamond">match? ◇</span><span class="arr">— yes →</span>
+        <span class="step k">Auto-approve → ERP</span>
+      </div>
+      <div class="lane ai">
+        <span class="lbl">AI · agentic (on exception)</span>
+        <span class="arr">no →</span>
+        <span class="step a">Agent investigates</span><span class="arr">→</span>
+        <span class="step a">Decides</span><span class="arr">→</span>
+        <span class="step a">Drafts vendor email + rationale</span>
+      </div>
+      <div class="govbar">
+        <span class="lbl">Governance · CAFE</span>
+        <span class="chip">per-agent identity</span><span class="chip">data-loss prevention</span>
+        <span class="chip">evaluation gate</span><span class="chip">audit trail</span><span class="chip">7-domain coverage</span>
+      </div>
+      <div class="out">👤 Accounts-payable clerk — exception queue, one-click approve</div>
+      <div class="contrib">
+        <div class="c t"><b>Gateway provisions the traditional backbone</b><br>Open Application Model → implementation runtime applies it. Deterministic, automated.</div>
+        <div class="c a"><b>Gateway composes the agentic layer</b><br>Azure AI Foundry / Copilot Studio (enterprise) or Claude Code / local agents (sovereign).</div>
+        <div class="c g"><b>CAFE generates the governance</b><br>Produced live as the system composes — not bolted on after, not a tool that just says “no.”</div>
+      </div>
+    </div>
+    <p class="src">Sweet spot: detection/matching is deterministic; the <i>resolution</i> is agentic. Demo safety: present the highest reliably-ready tier; control-room fallback to a pre-built walkthrough. Same-shape alternatives: order/fulfillment exception management; information-technology incident triage.</p>
+  </section>
+
+  <!-- 7 — DEMO WALKTHROUGH · SUBMIT -->
+  <section class="slide dense">
+    <div class="kick">The proof · live demo · 1 of 4</div>
+    <h2>Submit a use case.</h2>
+    <div class="sub">A business user describes the idea in plain terms — via the <b>Use-case Intake agent in Microsoft Teams</b>, <b>Microsoft 365 Copilot</b>, or the <b>Microsoft Form</b>. No template, no architecture knowledge required.</div>
+    <div class="imgcols" style="grid-template-columns:1fr 1fr 1fr">
+      <figure><img src="assets/demo-1-intake-teams.png" alt="Teams Use-case Intake agent"><figcaption><b>Teams · Use-case Intake:</b> the agent explains how it works — three ways to reach it — then captures the idea conversationally.</figcaption></figure>
+      <figure><img src="assets/demo-1b-intake-copilot.png" alt="Microsoft 365 Copilot Use-case Intake agent"><figcaption><b>Microsoft 365 Copilot:</b> the same Use-case Intake agent, surfaced inside Copilot.</figcaption></figure>
+      <figure><img src="assets/demo-2-intake-form.png" alt="Microsoft Form AI Use-Case Intake"><figcaption><b>Microsoft Forms · AI Use-Case Intake:</b> which part of the org it’s for, and — in one or two sentences — what problem we’re solving.</figcaption></figure>
+    </div>
+    <p class="src">Either channel feeds the same governed intake. The use-case agent classifies intent and hands off to the Foundry architect — no bespoke scoping workshop.</p>
+  </section>
+
+  <!-- 8 — DEMO WALKTHROUGH · STAY IN THE LOOP -->
+  <section class="slide dense">
+    <div class="kick">The proof · live demo · 2 of 4</div>
+    <h2>Stay in the loop.</h2>
+    <div class="sub">As the use case progresses, the business user is notified right where they work — <b>“Architecture ready”</b> lands in Teams the moment the Foundry Composer finishes composing a governed M5 architecture.</div>
+    <div class="imgcols" style="grid-template-columns:1fr;max-width:760px">
+      <figure><img src="assets/demo-3-notify-workflows.png" alt="Teams Workflows notifications"><figcaption><b>Teams · Workflows:</b> “Architecture ready for ucs-…”, then “You approved the architecture…”, then “🎉 Architecture approved — DevOps Epic ready to start!” — progress is pushed, not chased.</figcaption></figure>
+    </div>
+    <p class="src">No status meetings, no inbox archaeology. The platform reports its own progress as it composes, governs, and provisions.</p>
+  </section>
+
+  <!-- 9 — DEMO WALKTHROUGH · REVIEW & APPROVE -->
+  <section class="slide dense">
+    <div class="kick">The proof · live demo · 3 of 4</div>
+    <h2>Architect reviews &amp; approves.</h2>
+    <div class="sub">An approver receives a full <b>approval card in Teams</b> — submitter, business context, the problem, and the constraints — and can <b>Approve</b>, <b>Request changes</b>, or <b>Reject</b> without leaving the chat.</div>
+    <div class="imgcols" style="grid-template-columns:1fr;max-width:760px">
+      <figure><img src="assets/demo-4-approval-card.png" alt="Teams approval card"><figcaption><b>Teams · Approvals:</b> “Architecture review: Clinical, post-discharge patient follow-up” — the human governance gate, with the complete context surfaced inline for an informed sign-off.</figcaption></figure>
+    </div>
+    <p class="src">Governance is a decision a person makes — with everything they need in one card — not a form to chase down later. The gate is built into the flow.</p>
+  </section>
+
+  <!-- 10 — DEMO WALKTHROUGH · OUTCOMES -->
+  <section class="slide dense">
+    <div class="kick">The proof · live demo · 4 of 4</div>
+    <h2>Outcomes, automatically.</h2>
+    <div class="sub">On approval, the platform creates the <b>governed architecture and a DevOps Epic</b> — with Features and Stories ready to build — and tracks the submission as <b>approved</b> in SharePoint. From idea to a backlog the delivery team can start, automatically.</div>
+    <div class="imgcols">
+      <figure><img src="assets/demo-5-devops-epic.png" alt="Azure DevOps Epic"><figcaption><b>Azure DevOps · Epic 2901:</b> “Architecture approved: ucs-20260507123100-05” — business context, data sources, target systems and constraints in the description, with Features 1/2/3 in Related Work.</figcaption></figure>
+      <figure><img src="assets/demo-6-sharepoint-list.png" alt="SharePoint UseCaseSubmissions list"><figcaption><b>SharePoint · UseCaseSubmissions:</b> “uc-test-001” tracked end-to-end — architecture_status <b>ready</b>, approval_status <b>approved</b>, with the architecture_md document attached.</figcaption></figure>
+    </div>
+    <p class="src">Use case in, governed architecture + a started DevOps backlog out — every step recorded. This is the gap closed: from a business idea to a running, governed system, in days.</p>
+  </section>
+
+  <!-- 11 — ELEVATOR (end) -->
+  <section class="slide">
+    <div class="kick">In one breath</div>
+    <h1>Governed AI adoption,<br>built and running — not slideware.</h1>
+    <p class="lead">
+      We solve <b>the gap between AI ambition and governed delivery</b> — where adoption stalls in pilots, slideware, and ungoverned shadow AI — by <b>turning a use case into a running, governed architecture across both AI and traditional workloads, on sovereign or hosted infrastructure.</b>
+      Unlike AI platforms that hand you a toolbox, systems integrators that hand you a slide deck, and exposure/governance tools that flag the mess after it exists, we <b>generate governance as the system composes itself and provision it into live infrastructure — we create <i>and</i> implement, governed by default, with no lock-in</b> — which brings <b>a governed, production-ready system in days, not quarters.</b>
+    </p>
+    <div class="vs">
+      <b>vs Tenable (and exposure-management tools).</b> Tenable One AI Exposure <i>discovers</i> sanctioned + shadow AI, correlates exposure, enforces acceptable-use policy, and contains risky agents — it manages the <b>symptom</b> of ungoverned AI <i>after</i> it exists. <b>Gateway removes the cause:</b> the sanctioned, governed system is the turnkey path, so the sprawl never forms. They watch the runtime; we compose it right — complementary, and Gateway can feed per-agent identity + audit trails to a tool like Tenable.
+    </div>
+  </section>
+
+</div>
+
+<div class="counter" id="counter">1 / 11</div>
+<div class="hint">← → / space to navigate · ⌘P to export PDF</div>
+
+<script>
+  const deck=document.getElementById('deck');
+  const slides=[...document.querySelectorAll('.slide')];
+  const counter=document.getElementById('counter');
+  let i=0;
+  function go(n){i=Math.max(0,Math.min(slides.length-1,n));slides[i].scrollIntoView();counter.textContent=(i+1)+' / '+slides.length;}
+  addEventListener('keydown',e=>{
+    if(['ArrowRight','ArrowDown',' ','PageDown'].includes(e.key)){e.preventDefault();go(i+1);}
+    else if(['ArrowLeft','ArrowUp','PageUp'].includes(e.key)){e.preventDefault();go(i-1);}
+  });
+  deck.addEventListener('scroll',()=>{const idx=Math.round(deck.scrollTop/innerHeight);if(idx!==i){i=idx;counter.textContent=(i+1)+' / '+slides.length;}},{passive:true});
+</script>
+</body>
+</html>

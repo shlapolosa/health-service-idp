@@ -40,19 +40,19 @@ spec:
               language:
                 type: string
                 description: Programming language for the application
+                # Narrowed 2026-06-01: only python+java have working scaffold paths
+                # in application-claim-composition. nodejs/rasa/go/rust would
+                # pass enum validation but fail at microservice-creator Job.
                 enum:
                   - python
                   - java
-                  - rasa
-                  - nodejs
               framework:
                 type: string
                 description: Application framework to use
+                # Same constraint — only python/fastapi + java/springboot scaffold.
                 enum:
                   - fastapi
                   - springboot
-                  - chatbot
-                  - graphql-gateway
               hasFrontend:
                 type: boolean
                 description: Whether the application includes a frontend component
@@ -60,7 +60,7 @@ spec:
               database:
                 type: string
                 description: Database type to provision for the application
-                enum: [postgres, none]
+                enum: [postgres, postgresql, mysql, mongodb, cassandra, none]
                 default: none
               cache:
                 type: string

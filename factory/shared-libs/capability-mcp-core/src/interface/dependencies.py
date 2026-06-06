@@ -24,7 +24,7 @@ from ..infrastructure.vela_client import VelaClient
 @lru_cache
 def get_argo() -> ArgoWorkflowsClient:
     return ArgoWorkflowsClient(
-        server_url=os.getenv("ARGO_SERVER_URL", "http://argo-server.argo:2746"),
+        server_url=os.getenv("ARGO_SERVER_URL", "http://argo-workflows-server.argo:2746"),
         namespace=os.getenv("ARGO_NAMESPACE", "argo"),
         token_file=os.getenv("ARGO_TOKEN_FILE", "/var/run/secrets/argo/token"),
     )

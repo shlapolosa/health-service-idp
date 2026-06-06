@@ -29,7 +29,7 @@ spec:
         - name: LOG_LEVEL
           value: "INFO"
         - name: ARGO_SERVER_URL
-          value: "http://argo-server.argo:2746"
+          value: "http://argo-workflows-server.argo:2746"
         - name: ARGO_TOKEN_FILE
           value: "/var/run/secrets/argo/token"
         - name: OAM_NAMESPACE
@@ -58,13 +58,13 @@ spec:
         - name: AUTH_DISABLED
           value: "true"
         - name: APIM_AUDIENCE
-          value: ""
+          value: "capability-mcp-factory.default.20.233.105.82.nip.io,capability-mcp-factory.default,capability-mcp-factory.default.svc,capability-mcp-factory.default.svc.cluster.local,localhost"
         - name: ENTRA_TENANT
-          value: ""
+          value: "capability-mcp-factory.default.20.233.105.82.nip.io,capability-mcp-factory.default,capability-mcp-factory.default.svc,capability-mcp-factory.default.svc.cluster.local,localhost"
         - name: ALLOWED_OIDS
-          value: ""
+          value: "capability-mcp-factory.default.20.233.105.82.nip.io,capability-mcp-factory.default,capability-mcp-factory.default.svc,capability-mcp-factory.default.svc.cluster.local,localhost"
         - name: ALLOWED_HOSTS
-          value: ""
+          value: "capability-mcp-factory.default.20.233.105.82.nip.io,capability-mcp-factory.default,capability-mcp-factory.default.svc,capability-mcp-factory.default.svc.cluster.local,localhost"
         volumeMounts:
         - name: argo-token
           mountPath: /var/run/secrets/argo

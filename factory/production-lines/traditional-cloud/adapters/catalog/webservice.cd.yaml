@@ -39,7 +39,11 @@ spec:
               if parameter.language != _|_ {
                 "webservice.oam.dev/bootstrap": "true"
                 "webservice.oam.dev/language": parameter.language
-                "webservice.oam.dev/framework": parameter.framework
+                // framework is optional; only label when explicitly set
+                // (regression-fix 2026-06-01: was unconditional, broke language-only path)
+                if parameter.framework != _|_ {
+                  "webservice.oam.dev/framework": parameter.framework
+                }
                 if parameter.source != _|_ {
                   "webservice.oam.dev/source": parameter.source
                 }
@@ -82,6 +86,16 @@ spec:
                 containers: [{
                   // Use the image parameter directly (always provided)
                   image: parameter.image
+                  // Inject numeric runAsUser so Knative's runAsNonRoot enforcement
+                  // can verify non-root even when the image uses a named USER
+                  // (e.g. `USER app` from auto-scaffolded Dockerfiles).
+                  // Without this, kubelet errors:
+                  //   "container has runAsNonRoot and image has non-numeric user, cannot verify"
+                  securityContext: {
+                    runAsUser: 1000
+                    runAsNonRoot: true
+                    allowPrivilegeEscalation: false
+                  }
                   ports: [{
                     containerPort: parameter.port
                     name: "http1"
@@ -270,7 +284,7 @@ spec:
                         "          {\"name\": \"auto-create-dependencies\", \"value\": \"true\"},\n" +
                         "          {\"name\": \"resource-size\", \"value\": \"medium\"},\n" +
                         "          {\"name\": \"microservice-language\", \"value\": \"" + parameter.language + "\"},\n" +
-                        "          {\"name\": \"microservice-framework\", \"value\": \"" + parameter.framework + "\"},\n" +
+                        "          {\"name\": \"microservice-framework\", \"value\": \"" + (*parameter.framework | "auto") + "\"},\n" +
                         "          {\"name\": \"microservice-database\", \"value\": \"" + (*parameter.database | "none") + "\"},\n" +
                         "          {\"name\": \"microservice-cache\", \"value\": \"" + (*parameter.cache | "none") + "\"},\n" +
                         "          {\"name\": \"microservice-realtime\", \"value\": \"" + (*parameter.realtime | "") + "\"},\n" +
@@ -309,8 +323,11 @@ spec:
         }
         
         parameter: {
-          // Required Parameters
-          image: string  // Full image path
+          // image defaults to ACR placeholder built by the auto-scaffold workflow
+          // when `language:` is set. Consumers can override to BYO image.
+          // (Regression-fix 2026-06-01: CUE-R5 removed this default and broke
+          //  the architect-v1 A5(a) language-only auto-scaffold path.)
+          image: *"healthidpuaeacr.azurecr.io/\(context.name):latest" | string
 
           port: *8080 | int
           healthPath: *"/health" | string
@@ -327,8 +344,14 @@ spec:
               name: string
             }
           }]
-          language?: string
-          framework?: string
+          // Narrowed 2026-06-01 to match XRD/WFT enum constraint (PR #23).
+          // Only python+java have working scaffold paths; anything else passes
+          // catalog.validate() but fast-fails at oam-driven-contract
+          // validate-parameters. Tightening here closes the feedback loop so
+          // architect-v1 gets schema-side rejection at catalog time, before
+          // the workflow is even fired.
+          language?: "python" | "java"
+          framework?: "fastapi" | "springboot"
           source?: string
           realtime?: string
           repository?: string
