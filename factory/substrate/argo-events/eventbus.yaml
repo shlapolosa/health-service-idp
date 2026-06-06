@@ -1,0 +1,16 @@
+# Default EventBus for argo-events. Discovered missing 2026-06-06: without it
+# the controller deploys NO EventSource/Sensor pods, so BOTH the legacy
+# oam-to-slack-api sensor and the W5 argocd-health-to-slack sensor were dead
+# (EventBusNotFound). Likely lost during the U8-era upgrades. JetStream is the
+# non-deprecated bus; 3 replicas is the JetStream minimum.
+apiVersion: argoproj.io/v1alpha1
+kind: EventBus
+metadata:
+  name: default
+  namespace: argo-events
+spec:
+  jetstream:
+    version: latest
+    replicas: 3
+    persistence:
+      volumeSize: 1Gi
