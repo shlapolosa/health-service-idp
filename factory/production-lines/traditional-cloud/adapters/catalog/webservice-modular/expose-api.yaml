@@ -55,8 +55,16 @@ spec:
                     if parameter.identity != _|_ {
                       envFrom: [{
                         secretRef: {
+                          // REQUIRED (not optional): envFrom binds at container
+                          // start, and on day-0 the ESO-synced "<identity>-conn"
+                          // secret can land seconds AFTER this pod starts -
+                          // optional:true silently published the API without
+                          // validate-jwt (caught in E2E re-run 2026-06-06).
+                          // optional:false makes kubelet hold the container
+                          // (CreateContainerConfigError -> retry) until the
+                          // secret exists - declarative gating, no polling.
                           name:     parameter.identity + "-conn"
-                          optional: true
+                          optional: false
                         }
                       }]
                     }
