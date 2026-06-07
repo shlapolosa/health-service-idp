@@ -1,8 +1,37 @@
 # Archived Execute adapters
 
-WorkflowTemplates that have been retired from the active substrate. They are kept
-here (not deleted) for audit / rollback reference only. **They are not applied to
-any cluster** and nothing in the codebase fires them.
+WorkflowTemplates (and other retired substrate artifacts) that have been removed
+from the active substrate. They are kept here (not deleted) for audit / rollback
+reference only. **They are not applied to any cluster** and nothing in the
+codebase fires them.
+
+## realtime-xrds.yaml (archived 2026-06-07)
+
+- **Archived:** 2026-06-07 (workstream XP-MODERN, #158/#156). Duplicate / stale
+  XRD bundle for the realtime platform.
+- **Why:** it redefined the SAME XRD as the canonical, RT-1-extended
+  `factory/substrate/crossplane/realtime-platform-claim-xrd.yaml`
+  (`xrealtimeplatformclaims.platform.example.org`, kind `XRealtimePlatformClaim`),
+  but with a DIVERGENT, stale schema — nested `kafkaConfig.topics` (array of
+  strings), `mqttConfig`, `snowflakeConfig`, and NO `appContainer` and NO flat
+  `spec.topics[]` (name/partitions/retention). The active
+  `realtime-platform-claim-composition.yaml` reads `spec.name` and (post-RT-1)
+  `spec.topics[]`, i.e. it is wired to the CANONICAL XRD, not this one. Two XRDs
+  with the same `metadata.name` are a last-apply-wins collision; the canonical
+  file is the live/conceptual shape, so this duplicate is the one to retire.
+- **Also bundled (and equally dead):** three XRDs with NO Composition and NO
+  reference anywhere in the repo — `XIoTBrokerClaim`, `XStreamProcessorClaim`,
+  `XAnalyticsDashboardClaim`. Archived with the file rather than split out.
+- **Replaced by:** `factory/substrate/crossplane/realtime-platform-claim-xrd.yaml`
+  (canonical, RT-1 `spec.topics[]`), consumed by the XP-MODERN pipeline-mode
+  `realtime-platform-claim-composition.yaml`.
+- **To resurrect:** `git mv` it back to
+  `factory/substrate/crossplane/realtime-xrds.yaml` — but first reconcile its
+  schema against the canonical XRD to avoid the duplicate-name collision, and add
+  Compositions for the three orphan XRD kinds if you actually want them.
+
+---
+
 
 ## oam-driven-contract.yaml
 

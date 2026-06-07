@@ -1,6 +1,17 @@
 ---
 # Simplified GraphQLPlatformClaim Composition - No database dependencies
-# Creates minimal infrastructure for GraphQL gateway service discovery
+# Creates minimal infrastructure for GraphQL gateway service discovery.
+#
+# XP-MODERN (#158): rewritten from legacy spec.resources patch-and-transform to the
+# platform-idiomatic Crossplane v2 function-go-templating pipeline (mirrors
+# factory/production-lines/traditional-cloud/adapters/composition/application-claim-composition.yaml).
+# All 6 resources are now provider-kubernetes Objects (kubernetes.m.crossplane.io/v1alpha1
+# + ClusterProviderConfig 'kubernetes-provider'), behaviour-preserving 1:1: same
+# Namespace/ConfigMap/ServiceAccount/ClusterRole/ClusterRoleBinding/NetworkPolicy, same
+# spec.name-derived names, namespaced resources in the '<name>-graphql' namespace.
+# The hasura-backup variant (graphql-platform-claim-composition-hasura-backup.yaml)
+# is the deferred DB-backed artifact and stays untouched.
+
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
 metadata:
@@ -8,230 +19,201 @@ metadata:
   labels:
     crossplane.io/xrd: xgraphqlplatformclaims.platform.example.org
 spec:
+  writeConnectionSecretsToNamespace: crossplane-system
   compositeTypeRef:
     apiVersion: platform.example.org/v1alpha1
     kind: XGraphQLPlatformClaim
-  resources:
-    # 1. Create dedicated namespace for GraphQL infrastructure
-    - name: graphql-namespace
-      base:
-        apiVersion: v1
-        kind: Namespace
-        metadata:
-          labels:
-            platform.example.org/type: "graphql"
-            app.kubernetes.io/component: "graphql-gateway"
-      patches:
-      - type: CombineFromComposite
-        combine:
-          variables:
-          - fromFieldPath: spec.name
-          strategy: string
-          string:
-            fmt: "%s-graphql"
-        toFieldPath: metadata.name
-        
-    # 2. Gateway configuration ConfigMap
-    - name: gateway-config
-      base:
-        apiVersion: v1
-        kind: ConfigMap
-        metadata:
-          name: gateway-config
-          namespace: default
-        data:
-          config.yaml: |
-            # GraphQL Gateway Configuration
-            gateway:
-              name: "api-gateway"
-              autoDiscovery: true
-              refreshInterval: "5m"
-            serviceDiscovery:
-              selector:
-                app.kubernetes.io/managed-by: kubevela
-              namespaces: ["default"]
-            cors:
-              enabled: true
-              origin: "*"
-            playground:
-              enabled: true
-      patches:
-      - fromFieldPath: spec.name
-        toFieldPath: metadata.name
-        transforms:
-        - type: string
-          string:
-            fmt: "%s-gateway-config"
-      - type: CombineFromComposite
-        combine:
-          variables:
-          - fromFieldPath: spec.name
-          strategy: string
-          string:
-            fmt: "%s-graphql"
-        toFieldPath: metadata.namespace
-      - fromFieldPath: spec.name
-        toFieldPath: data.gateway-name
-      - type: CombineFromComposite
-        combine:
-          variables:
-          - fromFieldPath: spec.name
-          strategy: string
-          string:
-            fmt: |
-              # GraphQL Gateway Configuration
-              gateway:
-                name: "%s"
-                autoDiscovery: true
-                refreshInterval: "5m"
-              serviceDiscovery:
-                selector:
-                  app.kubernetes.io/managed-by: kubevela
-                namespaces: ["default"]
-              cors:
-                enabled: true
-                origin: "*"
-              playground:
-                enabled: true
-        toFieldPath: data.config\.yaml
-            
-    # 3. Service Account for service discovery
-    - name: graphql-service-account
-      base:
-        apiVersion: v1
-        kind: ServiceAccount
-        metadata:
-          name: graphql-discovery-sa
-          namespace: default
-      patches:
-      - fromFieldPath: spec.name
-        toFieldPath: metadata.name
-        transforms:
-        - type: string
-          string:
-            fmt: "%s-discovery-sa"
-      - type: CombineFromComposite
-        combine:
-          variables:
-          - fromFieldPath: spec.name
-          strategy: string
-          string:
-            fmt: "%s-graphql"
-        toFieldPath: metadata.namespace
-        
-    # 4. ClusterRole for service discovery
-    - name: graphql-cluster-role
-      base:
-        apiVersion: rbac.authorization.k8s.io/v1
-        kind: ClusterRole
-        metadata:
-          name: graphql-discovery-role
-        rules:
-        - apiGroups: ["serving.knative.dev"]
-          resources: ["services"]
-          verbs: ["get", "list", "watch"]
-        - apiGroups: [""]
-          resources: ["services", "endpoints"]
-          verbs: ["get", "list", "watch"]
-        - apiGroups: ["apps"]
-          resources: ["deployments"]
-          verbs: ["get", "list", "watch"]
-      patches:
-      - fromFieldPath: spec.name
-        toFieldPath: metadata.name
-        transforms:
-        - type: string
-          string:
-            fmt: "%s-discovery-role"
-            
-    # 5. ClusterRoleBinding
-    - name: graphql-cluster-role-binding
-      base:
-        apiVersion: rbac.authorization.k8s.io/v1
-        kind: ClusterRoleBinding
-        metadata:
-          name: graphql-discovery-binding
-        subjects:
-        - kind: ServiceAccount
-          name: graphql-discovery-sa
-          namespace: default
-        roleRef:
-          kind: ClusterRole
-          name: graphql-discovery-role
-          apiGroup: rbac.authorization.k8s.io
-      patches:
-      - fromFieldPath: spec.name
-        toFieldPath: metadata.name
-        transforms:
-        - type: string
-          string:
-            fmt: "%s-discovery-binding"
-      - fromFieldPath: spec.name
-        toFieldPath: subjects[0].name
-        transforms:
-        - type: string
-          string:
-            fmt: "%s-discovery-sa"
-      - type: CombineFromComposite
-        combine:
-          variables:
-          - fromFieldPath: spec.name
-          strategy: string
-          string:
-            fmt: "%s-graphql"
-        toFieldPath: subjects[0].namespace
-      - fromFieldPath: spec.name
-        toFieldPath: roleRef.name
-        transforms:
-        - type: string
-          string:
-            fmt: "%s-discovery-role"
-            
-    # 6. NetworkPolicy for gateway security
-    - name: graphql-network-policy
-      base:
-        apiVersion: networking.k8s.io/v1
-        kind: NetworkPolicy
-        metadata:
-          name: graphql-gateway-policy
-          namespace: default
-        spec:
-          podSelector:
-            matchLabels:
-              app.kubernetes.io/component: graphql-gateway
-          policyTypes:
-          - Ingress
-          - Egress
-          ingress:
-          - from:
-            - namespaceSelector: {}
-            ports:
-            - protocol: TCP
-              port: 8080
-          egress:
-          - to: []
-            ports:
-            - protocol: TCP
-              port: 8080
-            - protocol: TCP
-              port: 443
-            - protocol: UDP
-              port: 53
-      patches:
-      - fromFieldPath: spec.name
-        toFieldPath: metadata.name
-        transforms:
-        - type: string
-          string:
-            fmt: "%s-gateway-policy"
-      - type: CombineFromComposite
-        combine:
-          variables:
-          - fromFieldPath: spec.name
-          strategy: string
-          string:
-            fmt: "%s-graphql"
-        toFieldPath: metadata.namespace
-        
-  # Connection details for applications to use
-  writeConnectionSecretsToNamespace: crossplane-system
+  mode: Pipeline
+  pipeline:
+  - step: render
+    functionRef:
+      name: function-go-templating
+    input:
+      apiVersion: gotemplating.fn.crossplane.io/v1beta1
+      kind: GoTemplate
+      source: Inline
+      inline:
+        template: |
+          {{- $spec := .observed.composite.resource.spec }}
+          {{- $name := $spec.name }}
+          ---
+          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-graphql-namespace'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: graphql-namespace
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: v1
+                kind: Namespace
+                metadata:
+                  name: '{{ $name }}-graphql'
+                  labels:
+                    platform.example.org/type: graphql
+                    app.kubernetes.io/component: graphql-gateway
+            providerConfigRef:
+              kind: ClusterProviderConfig
+              name: kubernetes-provider
+          ---
+          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-gateway-config'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: gateway-config
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: v1
+                kind: ConfigMap
+                metadata:
+                  name: '{{ $name }}-gateway-config'
+                  namespace: '{{ $name }}-graphql'
+                data:
+                  gateway-name: '{{ $name }}'
+                  config.yaml: |
+                    # GraphQL Gateway Configuration
+                    gateway:
+                      name: "{{ $name }}"
+                      autoDiscovery: true
+                      refreshInterval: "5m"
+                    serviceDiscovery:
+                      selector:
+                        app.kubernetes.io/managed-by: kubevela
+                      namespaces: ["default"]
+                    cors:
+                      enabled: true
+                      origin: "*"
+                    playground:
+                      enabled: true
+            providerConfigRef:
+              kind: ClusterProviderConfig
+              name: kubernetes-provider
+          ---
+          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-graphql-service-account'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: graphql-service-account
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: v1
+                kind: ServiceAccount
+                metadata:
+                  name: '{{ $name }}-discovery-sa'
+                  namespace: '{{ $name }}-graphql'
+            providerConfigRef:
+              kind: ClusterProviderConfig
+              name: kubernetes-provider
+          ---
+          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-graphql-cluster-role'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: graphql-cluster-role
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: rbac.authorization.k8s.io/v1
+                kind: ClusterRole
+                metadata:
+                  name: '{{ $name }}-discovery-role'
+                rules:
+                - apiGroups:
+                  - serving.knative.dev
+                  resources:
+                  - services
+                  verbs:
+                  - get
+                  - list
+                  - watch
+                - apiGroups:
+                  - ''
+                  resources:
+                  - services
+                  - endpoints
+                  verbs:
+                  - get
+                  - list
+                  - watch
+                - apiGroups:
+                  - apps
+                  resources:
+                  - deployments
+                  verbs:
+                  - get
+                  - list
+                  - watch
+            providerConfigRef:
+              kind: ClusterProviderConfig
+              name: kubernetes-provider
+          ---
+          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-graphql-cluster-role-binding'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: graphql-cluster-role-binding
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: rbac.authorization.k8s.io/v1
+                kind: ClusterRoleBinding
+                metadata:
+                  name: '{{ $name }}-discovery-binding'
+                subjects:
+                - kind: ServiceAccount
+                  name: '{{ $name }}-discovery-sa'
+                  namespace: '{{ $name }}-graphql'
+                roleRef:
+                  kind: ClusterRole
+                  name: '{{ $name }}-discovery-role'
+                  apiGroup: rbac.authorization.k8s.io
+            providerConfigRef:
+              kind: ClusterProviderConfig
+              name: kubernetes-provider
+          ---
+          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-graphql-network-policy'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: graphql-network-policy
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: networking.k8s.io/v1
+                kind: NetworkPolicy
+                metadata:
+                  name: '{{ $name }}-gateway-policy'
+                  namespace: '{{ $name }}-graphql'
+                spec:
+                  podSelector:
+                    matchLabels:
+                      app.kubernetes.io/component: graphql-gateway
+                  policyTypes:
+                  - Ingress
+                  - Egress
+                  ingress:
+                  - from:
+                    - namespaceSelector: {}
+                    ports:
+                    - protocol: TCP
+                      port: 8080
+                  egress:
+                  - to: []
+                    ports:
+                    - protocol: TCP
+                      port: 8080
+                    - protocol: TCP
+                      port: 443
+                    - protocol: UDP
+                      port: 53
+            providerConfigRef:
+              kind: ClusterProviderConfig
+              name: kubernetes-provider
