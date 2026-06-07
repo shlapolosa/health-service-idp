@@ -267,6 +267,11 @@ class SubmitUseCase:
                 continue
             props = comp.get("properties") or {}
             lang = props.get("language")
+            if not lang and comp.get("type") == "graphql-gateway":
+                # GQL-1: gateway implementation language is a platform detail
+                # (nodejs/Mesh) - consumers declare intent, default it instead
+                # of skipping (caught patient7: gateway not scaffolded).
+                lang = "nodejs"
             if not lang:
                 continue
             # Image must be the auto-default (or absent) — if consumer set a non-default
@@ -320,6 +325,11 @@ class SubmitUseCase:
                 continue
             props = comp.get("properties") or {}
             lang = props.get("language")
+            if not lang and comp.get("type") == "graphql-gateway":
+                # GQL-1: gateway implementation language is a platform detail
+                # (nodejs/Mesh) - consumers declare intent, default it instead
+                # of skipping (caught patient7: gateway not scaffolded).
+                lang = "nodejs"
             if not lang:
                 continue
             img = props.get("image", "")

@@ -422,3 +422,12 @@ def test_single_cache_no_advisory():
         {"name": "d1", "type": "postgresql", "properties": {}},
     ]}}
     assert SubmitUseCase._backing_sharing_advisory(app) is None
+
+
+def test_graphql_gateway_language_defaults_to_nodejs():
+    app = {"spec": {"components": [
+        {"name": "gw", "type": "graphql-gateway", "properties": {"name": "gw"}},
+    ]}}
+    services = SubmitUseCase._webservice_services(app)
+    assert services and services[0]["language"] == "nodejs"
+    assert services[0]["framework"] == "graphql-gateway"
