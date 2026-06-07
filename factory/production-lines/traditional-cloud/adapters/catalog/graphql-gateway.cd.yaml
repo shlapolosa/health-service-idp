@@ -18,6 +18,8 @@ spec:
   schematic:
     cue:
       template: |
+        import "encoding/json"
+
         // Primary Output: GraphQL Gateway Knative Service (OAM-compliant workload)
         output: {
           apiVersion: "serving.knative.dev/v1"
@@ -127,18 +129,82 @@ spec:
                       value: "graphql.federation/enabled"
                     },
                   ] + [
+                    // GQL-1 (#155): explicit federated sources injected by app.submit
+                    // (or set directly by the consumer). When present, the template
+                    // prefers this authoritative list over runtime kubectl discovery.
+                    if parameter.sources != _|_ {
+                      {
+                        name:  "MESH_SOURCES"
+                        value: json.Marshal(parameter._meshSources)
+                      }
+                    },
+                    if parameter.sources != _|_ {
+                      {
+                        name:  "EXPLICIT_SOURCES"
+                        value: "true"
+                      }
+                    },
+                    // Forward the incoming Authorization JWT to every upstream when an
+                    // identity is bound (single-identity invariant => all upstreams
+                    // trust the same issuer).
+                    if parameter.identity != _|_ {
+                      {
+                        name:  "FORWARD_AUTH"
+                        value: "true"
+                      }
+                    },
+                  ] + [
                     for k, v in parameter.environment {
                       name: k
                       value: v
                     }
                   ]
-                  if parameter.envFrom != _|_ {
-                    envFrom: parameter.envFrom
+                  // Binding-contract parity with webservice CD (2026-06-06): identity/
+                  // database/cache refs envFrom the sibling component's "<name>-conn"
+                  // Secret. optional:true so the ksvc starts before the backing release
+                  // converges. presence checks only — CUE does not short-circuit && over
+                  // optional fields.
+                  if parameter.envFrom != _|_ || parameter.database != _|_ || parameter.cache != _|_ || parameter.identity != _|_ {
+                    envFrom: [
+                      if parameter.envFrom != _|_ {
+                        for envRef in parameter.envFrom {
+                          envRef
+                        }
+                      }
+                    ] + [
+                      if parameter.identity != _|_ if parameter.identity != "none" {
+                        {
+                          secretRef: {
+                            name:     parameter.identity + "-conn"
+                            optional: true
+                          }
+                        }
+                      },
+                      if parameter.database != _|_ if parameter.database != "none" {
+                        {
+                          secretRef: {
+                            name:     parameter.database + "-conn"
+                            optional: true
+                          }
+                        }
+                      },
+                      if parameter.cache != _|_ if parameter.cache != "none" {
+                        {
+                          secretRef: {
+                            name:     parameter.cache + "-conn"
+                            optional: true
+                          }
+                        }
+                      },
+                    ]
                   }
                   // Health checks for robust deployment
+                  // GQL-1 (#155): probe /health to match the platform contract served
+                  // by every other shape (python/java). The template aliases
+                  // /health -> /healthz so legacy /healthz keeps working too.
                   livenessProbe: {
                     httpGet: {
-                      path: "/healthz"
+                      path: "/health"
                       port: 8080
                     }
                     initialDelaySeconds: 30
@@ -146,7 +212,7 @@ spec:
                   }
                   readinessProbe: {
                     httpGet: {
-                      path: "/healthz"
+                      path: "/health"
                       port: 8080
                     }
                     initialDelaySeconds: 5
@@ -394,6 +460,44 @@ spec:
           framework?: string    // graphql-gateway
           repository?: string   // Git repository template name (defaults to name)
           
+          // GQL-1 (#155): explicit federated sources. Each entry is either a bare
+          // component name (resolved to the in-cluster FQDN + /openapi.json) or an
+          // object with an explicit url/openApiPath (external/custom upstreams).
+          // app.submit auto-fills this from sibling webservice components when omitted.
+          sources?: [...( string | {
+            name:        string
+            url?:        string  // full base URL; if set, used verbatim with openApiPath
+            openApiPath?: string // defaults to /openapi.json
+            headers?:    {[string]: string}
+          })]
+
+          // Computed (internal): normalized Mesh source list -> MESH_SOURCES env JSON.
+          // Bare name => http://<name>.<ns>.svc.cluster.local/openapi.json.
+          // Object    => (url | http://<name>.<ns>.svc.cluster.local) + (openApiPath | /openapi.json).
+          if parameter.sources != _|_ {
+            _meshSources: [
+              for s in parameter.sources {
+                if (s & string) != _|_ {
+                  name:   s
+                  source: "http://" + s + "." + context.namespace + ".svc.cluster.local/openapi.json"
+                }
+                if (s & string) == _|_ {
+                  name:   s.name
+                  source: [if s.url != _|_ {s.url}, "http://" + s.name + "." + context.namespace + ".svc.cluster.local"][0] + [if s.openApiPath != _|_ {s.openApiPath}, "/openapi.json"][0]
+                  if s.headers != _|_ {
+                    headers: s.headers
+                  }
+                }
+              },
+            ]
+          }
+
+          // Binding-contract refs (parity with webservice CD): sibling component names
+          // whose normalized "<name>-conn" Secret is mounted via envFrom.
+          identity?: string  // auth0-idp component; enables Authorization pass-through
+          database?: string
+          cache?:    string
+
           // Advanced Options
           customResolvers?: [...{
             name: string

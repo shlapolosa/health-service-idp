@@ -66,6 +66,12 @@ class SubmitUseCase:
         except Exception as e:  # noqa: BLE001
             return SubmitResult(ok=False, message=f"invalid OAM Application YAML: {e}")
 
+        # GQL-1 (#155): render-inject explicit `sources:` onto any graphql-gateway
+        # component that omitted them, before validation/commit. app.submit is the
+        # only place that can see sibling components, so it authors the authoritative
+        # explicit list; the template's runtime kubectl discovery stays as fallback.
+        oam_yaml = self._inject_graphql_sources(app, namespace, oam_yaml)
+
         target_vcluster = self._target_vcluster(app)
 
         # 2a. identity topology rule (platform invariant, 2026-06-06):
@@ -127,8 +133,13 @@ class SubmitUseCase:
             app = yaml.safe_load(oam_yaml)
             md = app["metadata"]
             app_name = md["name"]
+            namespace = md.get("namespace", "default")
         except Exception as e:  # noqa: BLE001
             return SubmitResult(ok=False, message=f"invalid OAM Application YAML: {e}")
+
+        # GQL-1 (#155): same render-injection as submit() so the deferred path also
+        # commits the authoritative explicit sources to the ledger.
+        oam_yaml = self._inject_graphql_sources(app, namespace, oam_yaml)
 
         target_vcluster = self._target_vcluster(app)
 
@@ -231,17 +242,29 @@ class SubmitUseCase:
             return fw
         return cls._FW_FOR_LANG.get(lang, "fastapi")
 
+    # Component types that scaffold into the monorepo. webservice is the original
+    # UNIFY-1 case; graphql-gateway (GQL-1 #155) is a nodejs/graphql-gateway shape
+    # whose scaffold-claim was previously only emitted by its CD — but in the
+    # app.submit monorepo flow the gateway never got a microservices/<name>/ folder
+    # because the walk keyed on `type == "webservice"` only. Including it here
+    # scaffolds the gateway zero-touch like every webservice (patient5 monorepo proof).
+    _SCAFFOLD_TYPES = ("webservice", "graphql-gateway")
+
     @classmethod
     def _webservice_services(cls, app: dict[str, Any]) -> list[dict[str, str]]:
-        """UNIFY-1 (#153): derive services[] from EVERY webservice component that
-        needs scaffolding (language set, image absent/default). One AppContainerClaim
-        per OAM ranges over this to emit one ApplicationClaim per service, all sharing
-        the OAM-named repo (microservices/<name>/ per service). Backward compatible:
-        a single-component OAM yields a one-element list.
+        """UNIFY-1 (#153) + GQL-1 (#155): derive services[] from EVERY scaffoldable
+        component that needs scaffolding (language set, image absent/default). One
+        AppContainerClaim per OAM ranges over this to emit one ApplicationClaim per
+        service, all sharing the OAM-named repo (microservices/<name>/ per service).
+        Backward compatible: a single-component OAM yields a one-element list.
+
+        GQL-1: `type: graphql-gateway` components with `language: nodejs` are now
+        included as `{language:"nodejs", framework:"graphql-gateway"}` so the gateway
+        scaffolds into the monorepo exactly like a webservice (previously skipped).
         """
         services: list[dict[str, str]] = []
         for comp in app.get("spec", {}).get("components", []) or []:
-            if comp.get("type") != "webservice":
+            if comp.get("type") not in cls._SCAFFOLD_TYPES:
                 continue
             props = comp.get("properties") or {}
             lang = props.get("language")
@@ -257,6 +280,58 @@ class SubmitUseCase:
                 "framework": cls._derive_framework(lang, props.get("framework")),
             })
         return services
+
+    @staticmethod
+    def _inject_graphql_sources(app: dict[str, Any], namespace: str,
+                                oam_yaml: str) -> str:
+        """GQL-1 (#155): render-inject explicit `sources:` onto graphql-gateway
+        components that omit them.
+
+        app.submit is the only render stage that can see sibling components (the CD's
+        CUE template only sees its own component's params). For each graphql-gateway
+        component WITHOUT an explicit `sources:`, derive the list from the OAM's
+        sibling webservice components:
+
+            sources:
+              - name: <svc>
+                url:  http://<svc>.<ns>.svc.cluster.local
+                specPath: /openapi.json
+
+        This becomes the authoritative federated source list (pins exact in-cluster
+        URLs, removes the cold-start race). The template's runtime kubectl+annotation
+        discovery stays as the zero-config fallback when no sources are present.
+
+        Mutates `app` in place and returns the re-serialised YAML when a change was
+        made; otherwise returns the original `oam_yaml` untouched (no reformatting).
+        """
+        comps = app.get("spec", {}).get("components", []) or []
+        gateways = [c for c in comps if c.get("type") == "graphql-gateway"]
+        if not gateways:
+            return oam_yaml
+
+        webservice_names = [
+            c.get("name") for c in comps
+            if c.get("type") in ("webservice", "webservice-shape") and c.get("name")
+        ]
+
+        changed = False
+        for gw in gateways:
+            props = gw.setdefault("properties", {})
+            if props.get("sources"):
+                continue  # explicit sources already supplied — leave them authoritative
+            if not webservice_names:
+                continue  # nothing to federate; runtime fallback handles discovery
+            props["sources"] = [
+                {
+                    "name": svc,
+                    "url": f"http://{svc}.{namespace}.svc.cluster.local",
+                    "specPath": "/openapi.json",
+                }
+                for svc in webservice_names
+            ]
+            changed = True
+
+        return yaml.safe_dump(app, sort_keys=False) if changed else oam_yaml
 
     def _declarative_scaffold(self, app: dict[str, Any], app_name: str,
                               scaffold_comp: dict[str, Any],

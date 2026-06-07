@@ -335,3 +335,80 @@ See companion doc `gql-1-existing-implementation-analysis.md`. Material impacts 
    binding contract + /openapi.json platform contract); Hasura remains a possible future
    `database-graphql` component for direct-Postgres exposure — separate, not GQL-1.
 4. Work items absorbed into Phase 1: consolidation/deletion list from the analysis doc.
+
+---
+
+## IMPLEMENTED (2026-06-07)
+
+Branch `worktree-agent-a6b440bc18dc840d2`. All four workstreams shipped + consolidation.
+
+### 1. submit gap + sources injection (`submit_use_case.py`)
+- `_SCAFFOLD_TYPES = ("webservice", "graphql-gateway")`; `_webservice_services()` now
+  appends `type: graphql-gateway` components with `language: nodejs` as
+  `{language:"nodejs", framework:"graphql-gateway"}` → the gateway scaffolds into the
+  monorepo zero-touch like a webservice.
+- New static `_inject_graphql_sources(app, ns, oam_yaml)`: for any graphql-gateway
+  component WITHOUT explicit `sources:`, injects sibling webservice components as
+  `sources: [{name, url: http://<name>.<ns>.svc.cluster.local, specPath: /openapi.json}]`
+  into the component properties BEFORE the gitops commit. Explicit sources are left
+  authoritative; no-webservice OAMs leave it to the runtime fallback. Wired into both
+  `submit()` and `submit_wait()`.
+- Tests: 6 new in `tests/test_submit_routing.py` (gateway-in-services, auto-inject,
+  explicit-preserved, no-webservices-no-inject, byo-image-excluded, e2e-commit). Full
+  capability-mcp-core suite green: **80 passed**.
+
+### 2. CD enhancement (`graphql-gateway.cd.yaml`)
+- `import "encoding/json"` (proven safe on this platform — neon-postgres.cd.yaml uses
+  `import "encoding/base64"`).
+- New params: `sources?` (bare string | {name,url?,openApiPath?,headers?}), `identity?`,
+  `database?`, `cache?`. Computed internal `_meshSources` normalizes each entry to
+  `{name, source, headers?}`.
+- Renders `MESH_SOURCES` env (JSON via `json.Marshal`), `EXPLICIT_SOURCES=true`,
+  `FORWARD_AUTH=true` (when identity set). envFrom `<ref>-conn` (optional:true) for
+  identity/database/cache — binding-contract parity with webservice.cd.yaml.
+- Probes switched `/healthz` → `/health`.
+- Validated with `vela dry-run --offline`: Service+GraphQLPlatformClaim+AppContainerClaim
+  all render; MESH_SOURCES JSON + envFrom + probes correct; no-sources gateway compiles
+  with no MESH_SOURCES (pure fallback).
+- NOTE/simplification: MESH_SOURCES is rendered as an ENV only (the template reads env),
+  NOT also into the gateway-config ConfigMap — that would require changing the
+  GraphQLPlatformClaim XRD/composition; env is sufficient and the template honours it.
+
+### 3. Consolidation (deleted dead, per analysis doc)
+DELETED: `factory/substrate/crossplane/graphql-platform-component.yaml`,
+`graphql-gateway-configmap.yaml`, `compositions/graphql-platform-composition.yaml`
+(duplicate `XGraphQLPlatform`/`xgraphqlplatforms` XRD — ACTIVE one kept:
+`graphql-platform-claim-xrd.yaml`, kind `GraphQLPlatformClaim`, which the CD emits),
+and the entire `graphql/mesh-gateway/` substrate copy (engine, legacy `server*.js`,
+bash `generate-mesh-config.sh`, mesh-config-template, package-simple — the federation
+engine now lives ONLY in the template repo, its correct home). The retired Argo WFT
+`execute/workflow-templates/graphql-gateway-template.yaml` was already absent.
+ANNOTATED (not deleted): `graphql-platform-claim-composition-hasura-backup.yaml` marked
+DEFERRED (future `database-graphql` candidate). KEPT: active claim XRD+composition,
+`graphql/schema-discovery/` (used only by hasura-backup), examples, rbac.
+
+### 4. Template changes (`graphql-federation-gateway-template`, commit d992733, NOT pushed)
+- `mesh-manager.js`: `applyExplicitSources()` builds the Mesh from `MESH_SOURCES` JSON
+  (deriving baseUrl = host root of the spec URL) and bypasses kubectl discovery;
+  `buildOperationHeaders()` forwards `Authorization: {context.headers.authorization}`
+  when `FORWARD_AUTH != false`.
+- `gateway-server.js`: `EXPLICIT_SOURCES` gate skips the discovery loop; adds `/health`,
+  `/ready`, `/openapi.json` (platform contract; `{status:"healthy",service:<name>}`)
+  alongside legacy `/healthz`,`/readyz`.
+- `start.sh`: short-circuits to `node src/index.js` when `EXPLICIT_SOURCES=true`
+  (no kubectl, no bash discovery layer).
+- Probes: `knative-service.yaml` + Dockerfile HEALTHCHECK → `/health`.
+- Validation: `node --check` green on all changed JS; standalone smoke of the
+  MESH_SOURCES parse/baseUrl/auth/prefix logic passed. `bash -n start.sh` clean.
+
+### Deferred / not done (with reasons)
+- **No patient7 e2e harness (§8)**: requires a live cluster (no kubectl/az allowed in
+  this run). Submit-side covered by unit tests; CD by offline vela dry-run; template by
+  node --check + logic smoke.
+- **Template push**: committed locally only (orchestrator pushes after review).
+- **Pre-existing template bug**: `src/schema-generator.js` line 81 has a latent syntax
+  error (`'';\n` literal) — NOT introduced here, NOT on the explicit-sources path; flag
+  for separate fix.
+- **MESH_SOURCES in ConfigMap**: env-only (see §2 NOTE).
+- **GraphQL Mesh version pinning (R3)**: pins left untouched (patient5 image built on
+  them); not bumped.

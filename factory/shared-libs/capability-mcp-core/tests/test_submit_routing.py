@@ -288,3 +288,92 @@ def test_update_path_repo_named_after_oam_not_component():
     # orders-gitops must NOT be treated as the OAM repo -> day-0 claim path taken
     assert uc.claims.created, "wrong-named existing repo must not short-circuit to update"
     assert uc.claims.created[0][0] == "patient4"
+
+
+# ---------------------------------------------------------------------------
+# GQL-1 (#155): graphql-gateway scaffolding + sources render-injection
+# ---------------------------------------------------------------------------
+
+def _gql_oam(app_name="patient7", gw_sources=None, with_webservices=True,
+             gw_props_extra=None):
+    comps = []
+    if with_webservices:
+        for n in ("patient-api", "appointments-api"):
+            comps.append({"name": n, "type": "webservice",
+                          "properties": {"name": n, "language": "python"}})
+    gw_props = {"name": f"{app_name}-graph", "language": "nodejs"}
+    if gw_sources is not None:
+        gw_props["sources"] = gw_sources
+    if gw_props_extra:
+        gw_props.update(gw_props_extra)
+    comps.append({"name": f"{app_name}-graph", "type": "graphql-gateway",
+                  "properties": gw_props})
+    return yaml.safe_dump({
+        "apiVersion": "core.oam.dev/v1beta1", "kind": "Application",
+        "metadata": {"name": app_name, "namespace": "default"},
+        "spec": {"components": comps},
+    })
+
+
+def test_graphql_gateway_added_to_services():
+    # the nodejs/graphql-gateway component must scaffold into the monorepo alongside
+    # the python webservices (previously skipped — walk keyed on webservice only).
+    uc, gh = _uc()
+    res = uc.submit(_gql_oam())
+    assert res.ok, res.message
+    _, kw = uc.claims.created[0]
+    svc = {s["name"]: s["framework"] for s in kw["services"]}
+    assert svc == {"patient-api": "fastapi", "appointments-api": "fastapi",
+                   "patient7-graph": "graphql-gateway"}
+    assert {s["name"]: s["language"] for s in kw["services"]}["patient7-graph"] == "nodejs"
+
+
+def test_sources_auto_injected_when_omitted():
+    # app.submit injects sibling webservices as the gateway's authoritative sources.
+    app = yaml.safe_load(_gql_oam())  # no sources on gateway
+    out = SubmitUseCase._inject_graphql_sources(app, "default", _gql_oam())
+    gw = [c for c in yaml.safe_load(out)["spec"]["components"]
+          if c["type"] == "graphql-gateway"][0]
+    srcs = gw["properties"]["sources"]
+    assert [s["name"] for s in srcs] == ["patient-api", "appointments-api"]
+    assert srcs[0]["url"] == "http://patient-api.default.svc.cluster.local"
+    assert srcs[0]["specPath"] == "/openapi.json"
+
+
+def test_explicit_sources_preserved():
+    # a consumer-supplied sources list is authoritative — not overwritten.
+    explicit = [{"name": "x", "url": "http://x.ns.svc:9000", "specPath": "/spec"}]
+    app = yaml.safe_load(_gql_oam(gw_sources=explicit))
+    out = SubmitUseCase._inject_graphql_sources(app, "default",
+                                                _gql_oam(gw_sources=explicit))
+    gw = [c for c in yaml.safe_load(out)["spec"]["components"]
+          if c["type"] == "graphql-gateway"][0]
+    assert gw["properties"]["sources"] == explicit
+
+
+def test_no_webservices_no_injection():
+    # gateway with no sibling webservices: nothing injected (runtime fallback covers it).
+    app = yaml.safe_load(_gql_oam(with_webservices=False))
+    out = SubmitUseCase._inject_graphql_sources(app, "default",
+                                                _gql_oam(with_webservices=False))
+    gw = [c for c in yaml.safe_load(out)["spec"]["components"]
+          if c["type"] == "graphql-gateway"][0]
+    assert "sources" not in (gw.get("properties") or {})
+
+
+def test_byo_image_gateway_excluded_from_services():
+    # a gateway pinned to a prebuilt image is not scaffolded.
+    app = yaml.safe_load(_gql_oam(
+        gw_props_extra={"image": "ghcr.io/acme/gw:1.0"}))
+    services = SubmitUseCase._webservice_services(app)
+    assert [s["name"] for s in services] == ["patient-api", "appointments-api"]
+
+
+def test_submit_end_to_end_commits_injected_sources():
+    # full submit path: the ledger commit + claim both see the injected gateway.
+    uc, gh = _uc()
+    res = uc.submit(_gql_oam())
+    assert res.ok, res.message
+    assert (None, "oam/applications/patient7.yaml") in gh.commits
+    _, kw = uc.claims.created[0]
+    assert any(s["name"] == "patient7-graph" for s in kw["services"])
