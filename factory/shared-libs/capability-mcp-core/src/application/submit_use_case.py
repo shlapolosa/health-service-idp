@@ -200,6 +200,21 @@ class SubmitUseCase:
             return ("identity topology: components %s are externally exposed but the OAM "
                     "has no identity component - add ONE auth0-idp component and reference "
                     "it via `identity:` + expose-api(identity=...)" % ", ".join(exposed))
+
+        # Singleton platform components (user invariant 2026-06-07, same class
+        # as one-identity-per-OAM): an OAM declares at most ONE realtime-platform
+        # and at most ONE graphql-gateway; every webservice REUSES it via its
+        # `realtime:` ref / the gateway's sources list instead of declaring
+        # another instance.
+        for singleton_type, reuse_hint in (
+            ("realtime-platform", "bind webservices to it via `realtime: <name>`"),
+            ("graphql-gateway", "add upstream services to its `sources:` instead"),
+        ):
+            dupes = [c.get("name") for c in comps if c.get("type") == singleton_type]
+            if len(dupes) > 1:
+                return ("singleton topology: found %d %s components (%s) - an OAM must "
+                        "declare at most ONE; %s"
+                        % (len(dupes), singleton_type, ", ".join(dupes), reuse_hint))
         return None
 
     def _needs_scaffold(self, app: dict[str, Any]) -> dict[str, Any] | None:

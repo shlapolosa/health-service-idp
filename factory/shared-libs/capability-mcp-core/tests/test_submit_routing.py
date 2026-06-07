@@ -377,3 +377,29 @@ def test_submit_end_to_end_commits_injected_sources():
     assert (None, "oam/applications/patient7.yaml") in gh.commits
     _, kw = uc.claims.created[0]
     assert any(s["name"] == "patient7-graph" for s in kw["services"])
+
+
+def test_duplicate_realtime_platform_rejected():
+    app = {"spec": {"components": [
+        {"name": "rt-a", "type": "realtime-platform", "properties": {}},
+        {"name": "rt-b", "type": "realtime-platform", "properties": {}},
+    ]}}
+    err = SubmitUseCase._validate_identity_topology(app)
+    assert err and "singleton topology" in err and "realtime-platform" in err
+
+
+def test_duplicate_graphql_gateway_rejected():
+    app = {"spec": {"components": [
+        {"name": "gw-a", "type": "graphql-gateway", "properties": {}},
+        {"name": "gw-b", "type": "graphql-gateway", "properties": {}},
+    ]}}
+    err = SubmitUseCase._validate_identity_topology(app)
+    assert err and "graphql-gateway" in err and "sources" in err
+
+
+def test_single_realtime_and_gateway_accepted():
+    app = {"spec": {"components": [
+        {"name": "rt", "type": "realtime-platform", "properties": {}},
+        {"name": "gw", "type": "graphql-gateway", "properties": {}},
+    ]}}
+    assert SubmitUseCase._validate_identity_topology(app) is None
