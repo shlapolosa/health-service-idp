@@ -176,6 +176,20 @@ spec:
                       if parameter.realtime != _|_ {
                         {
                           secretRef: {
+                            // RT-1 (#156): aggregate <realtime>-conn (normalized
+                            // KAFKA_*/LENSES_*/TOPIC_* keys). optional:false per the
+                            // day-0 lesson (expose-api.yaml) — block container start
+                            // until the binding Secret exists rather than boot a
+                            // mis-wired producer/consumer. Legacy per-purpose
+                            // secrets below stay optional:true for one release.
+                            name: parameter.realtime + "-conn"
+                            optional: false
+                          }
+                        }
+                      },
+                      if parameter.realtime != _|_ {
+                        {
+                          secretRef: {
                             name: parameter.realtime + "-kafka-secret"
                             optional: true
                           }
@@ -184,7 +198,7 @@ spec:
                       if parameter.realtime != _|_ {
                         {
                           secretRef: {
-                            name: parameter.realtime + "-mqtt-secret" 
+                            name: parameter.realtime + "-mqtt-secret"
                             optional: true
                           }
                         }

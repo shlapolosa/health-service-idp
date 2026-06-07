@@ -70,6 +70,30 @@ spec:
                 pattern: "^[0-9]+[dwm]$"
                 default: "7d"
                 description: "Data retention period (e.g. 7d, 30d, 6m)"
+              # RT-1 (#156): declarative Kafka topics. The composition's
+              # topic-provisioning Job loops over this and POSTs each to the
+              # Lenses HQ REST API. Absent/empty -> the Job seeds the default
+              # health-domain topic set (backward compatible).
+              topics:
+                type: array
+                description: "Kafka topics to provision via Lenses HQ"
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                      pattern: '^[a-zA-Z0-9._-]+$'
+                      maxLength: 249
+                    partitions:
+                      type: integer
+                      minimum: 1
+                      default: 3
+                    retention:
+                      type: integer
+                      description: "retention.ms"
+                      minimum: 1
+                      default: 604800000
+                  required: ["name"]
               scaling:
                 type: object
                 properties:

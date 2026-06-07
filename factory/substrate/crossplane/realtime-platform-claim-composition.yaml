@@ -1443,9 +1443,26 @@ spec:
                         sed '/creationTimestamp:/d' | \
                         kubectl apply -f -
                       echo "Secret copied successfully"
+                      # RT-1 (#156): also mirror the realtime CD-rendered <name>-conn
+                      # aggregate (carrying TOPIC_<name> keys) into the realtime
+                      # namespace so the topic-provisioning Job can envFrom it.
+                      # Best-effort: absent on first reconcile pass, retried by Job.
+                      if kubectl get secret "$CONN_SECRET" -n default >/dev/null 2>&1; then
+                        kubectl get secret "$CONN_SECRET" -n default -o yaml | \
+                          sed "s/namespace: default/namespace: $TARGET_NAMESPACE/" | \
+                          sed '/resourceVersion:/d' | \
+                          sed '/uid:/d' | \
+                          sed '/creationTimestamp:/d' | \
+                          kubectl apply -f -
+                        echo "Conn secret $CONN_SECRET copied to $TARGET_NAMESPACE"
+                      else
+                        echo "Conn secret $CONN_SECRET not yet present in default — skipping (topic Job will retry)"
+                      fi
                     env:
                     - name: TARGET_NAMESPACE
                       value: placeholder-realtime
+                    - name: CONN_SECRET
+                      value: placeholder-conn
         providerConfigRef:
           name: kubernetes-provider
     patches:
@@ -1463,6 +1480,13 @@ spec:
       - type: string
         string:
           fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].env[1].value
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-conn"
     - type: FromCompositeFieldPath
       fromFieldPath: spec.name
       toFieldPath: metadata.name
@@ -1879,6 +1903,125 @@ spec:
       - type: string
         string:
           fmt: "%s-realtime-kafka-config-job"
+
+  # RT-1 (#156): Parametrized topic-provisioning Job. Replaces the hard-coded
+  # health-domain topic Job (was factory/.../realtime-platform/09-stream-
+  # processing-setup.yaml — now an example only). Topics declared on the
+  # realtime-platform OAM component flow XRD spec.topics -> realtime CD
+  # <name>-conn Secret as TOPIC_<name>=<name> keys; this Job envFroms that
+  # Secret, enumerates every TOPIC_* var and POSTs each to the Lenses HQ REST
+  # API (the platform's topic-management contract, admin:admin). When no
+  # TOPIC_* vars are present (no topics declared) it seeds the legacy
+  # health-domain default set — fully backward compatible.
+  - name: realtime-topic-provisioning-job
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: placeholder-topic-provisioning
+              namespace: placeholder-realtime
+              labels:
+                app.kubernetes.io/name: topic-provisioning
+                app.kubernetes.io/component: setup
+            spec:
+              backoffLimit: 6
+              template:
+                metadata:
+                  annotations:
+                    sidecar.istio.io/inject: "false"
+                spec:
+                  restartPolicy: OnFailure
+                  initContainers:
+                  - name: wait-for-lenses-hq
+                    image: curlimages/curl:8.5.0
+                    command:
+                    - sh
+                    - -c
+                    - |
+                      until curl -fsS http://lenses-hq:9991/api/health >/dev/null 2>&1 || curl -fsS http://lenses-hq:9991/ >/dev/null 2>&1; do
+                        echo "Waiting for Lenses HQ..."; sleep 10
+                      done
+                      echo "Lenses HQ ready"; sleep 20
+                  containers:
+                  - name: topic-provisioner
+                    image: curlimages/curl:8.5.0
+                    envFrom:
+                    - secretRef:
+                        name: placeholder-conn
+                        optional: true
+                    command:
+                    - sh
+                    - -c
+                    - |
+                      set -u
+                      LENSES="http://lenses-hq:9991/api/v1/kafka/topics"
+                      create_topic() {
+                        NAME="$1"; PARTS="${2:-3}"; RET="${3:-604800000}"
+                        echo "Creating topic $NAME (partitions=$PARTS retention.ms=$RET)"
+                        curl -s -X POST "$LENSES" \
+                          -H "Content-Type: application/json" \
+                          -u admin:admin \
+                          -d "{\"name\":\"$NAME\",\"partitions\":$PARTS,\"replication\":1,\"configs\":{\"cleanup.policy\":\"delete\",\"retention.ms\":\"$RET\"}}" \
+                          || echo "$NAME may already exist"
+                      }
+                      DECLARED=0
+                      # Enumerate TOPIC_<name>=<name> vars injected from <name>-conn.
+                      for VAR in $(env | grep '^TOPIC_' | cut -d= -f1); do
+                        eval "TVAL=\${$VAR}"
+                        [ -n "$TVAL" ] || continue
+                        create_topic "$TVAL" "${TOPIC_PARTITIONS:-3}" "${TOPIC_RETENTION:-604800000}"
+                        DECLARED=1
+                      done
+                      if [ "$DECLARED" = "0" ]; then
+                        echo "No declared topics — seeding default health-domain set"
+                        for T in device_data blood_pressure_device_topic heart_rate_device_topic oxygen_saturation_device_topic temperature_device_topic health_alerts_topic; do
+                          create_topic "$T" 3 604800000
+                        done
+                      fi
+                      echo "Topic provisioning complete"
+                    resources:
+                      requests:
+                        memory: "64Mi"
+                        cpu: "50m"
+                      limits:
+                        memory: "128Mi"
+                        cpu: "100m"
+        providerConfigRef:
+          name: kubernetes-provider
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].envFrom[0].secretRef.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-conn"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-topic-provisioning"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "%s-realtime-topic-provisioning-job"
 
   # Multi-Environment Secret Sync CronJob (deployed once in default namespace)
   - name: multi-env-secret-sync-cronjob

@@ -1,0 +1,66 @@
+# RT-1 (#156) north-star example: a realtime platform with declarative topics,
+# a realtime-service (websocket gateway over the topics), a producer + consumer
+# webservice, and ONE identity component authing all exposed APIs.
+#
+# Apply via app.submit (declarative spine) — the realtime-service scaffolds a
+# fastapi websocket variant (agent_common.realtime_fastapi) into
+# microservices/telemetry-gateway/ of the OAM's shared repo.
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: telemetry-platform
+  namespace: default
+spec:
+  components:
+    # 1. Realtime platform WITH declarative topics (RT-1: topics is first-class)
+    - name: telemetry-stream
+      type: realtime-platform
+      properties:
+        name: telemetry-stream
+        database: postgres
+        visualization: metabase
+        iot: true
+        topics:
+          - { name: sensor_raw, partitions: 3, retention: 604800000 }
+          - { name: sensor_agg, partitions: 3, retention: 604800000 }
+          - { name: alerts,     partitions: 1, retention: 86400000 }
+
+    # 2. Realtime-service: reads+writes topics, exposes /ws (RT-1 new CD)
+    - name: telemetry-gateway
+      type: realtime-service
+      properties:
+        name: telemetry-gateway
+        language: python            # scaffolds microservices/telemetry-gateway/ (realtime flavor)
+        realtime: telemetry-stream  # envFrom telemetry-stream-conn (KAFKA_*/LENSES_*/TOPIC_*)
+        websocket: true
+        consumes: [sensor_agg, alerts]
+        produces: [sensor_raw]
+        identity: telemetry-auth
+      traits:
+        - type: expose-api
+          properties: { identity: telemetry-auth }
+
+    # 3. Producer webservice (existing realtime: binding)
+    - name: ingest-api
+      type: webservice
+      properties:
+        name: ingest-api
+        language: python
+        realtime: telemetry-stream  # envFrom telemetry-stream-conn + legacy -*-secret refs
+        identity: telemetry-auth
+      traits:
+        - type: expose-api
+          properties: { identity: telemetry-auth }
+
+    # 4. Consumer webservice
+    - name: alert-worker
+      type: webservice
+      properties:
+        name: alert-worker
+        language: python
+        realtime: telemetry-stream
+
+    # 5. Single identity component (platform invariant: exactly one)
+    - name: telemetry-auth
+      type: auth0-idp
+      properties: { name: telemetry-auth }

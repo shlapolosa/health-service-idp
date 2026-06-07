@@ -53,6 +53,17 @@ spec:
                 enum:
                   - fastapi
                   - springboot
+              # RT-1 (#156): optional scaffold flavor. Keeps the framework enum clean
+              # (realtime is fastapi + extra deps, not a new framework). When
+              # "realtime" the mscv Job materializes a websocket variant wired to
+              # agent_common.realtime_fastapi. Default "webservice" = current behavior.
+              serviceFlavor:
+                type: string
+                description: Scaffold flavor (webservice|realtime). realtime adds websocket+aiokafka to the fastapi scaffold.
+                enum:
+                  - webservice
+                  - realtime
+                default: webservice
               hasFrontend:
                 type: boolean
                 description: Whether the application includes a frontend component

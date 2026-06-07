@@ -1,3 +1,11 @@
+# RT-1 (#156): SUPERSEDED AS THE DEFAULT TOPIC SOURCE.
+# Topic provisioning is now parametrized in
+# realtime-platform-claim-composition.yaml (resource
+# `realtime-topic-provisioning-job`), driven by RealtimePlatformClaim.spec.topics
+# (OAM realtime-platform `topics:` -> XRD -> <name>-conn TOPIC_* -> Lenses).
+# This file remains as the HEALTH-DOMAIN EXAMPLE: the hard-coded device topics +
+# the Lenses SQL stream-processing transforms (which the composition Job does NOT
+# create). Apply it manually if you want the legacy health streams + SQL.
 ---
 apiVersion: v1
 kind: ConfigMap
