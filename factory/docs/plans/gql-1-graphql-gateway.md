@@ -314,3 +314,24 @@ No new CRD, no new CD, no new workflow. Everything composes on proven spines.
 Template-readiness verdict: **needs changes** (4 concrete: env-driven explicit sources,
 `/health`+`/openapi.json` aliases, Authorization pass-through, prefer `MESH_SOURCES`
 over kubectl). The auto-graph-from-OpenAPI core works as-is.
+
+---
+
+## ADDENDUM (post-plan, 2026-06-07): existing implementation reconciliation
+
+USER DIRECTIVE: "there was already a graphql implementation — analyse and enhance."
+See companion doc `gql-1-existing-implementation-analysis.md`. Material impacts on this plan:
+
+1. **The discovery engine exists TWICE**: in the template repo (this plan's basis) AND
+   vendored at `factory/substrate/crossplane/graphql/mesh-gateway/src/` (service-discovery.js
+   kubectl walk + discovery-loop + schema-generator). Consolidate to ONE copy (template repo
+   is the right home; substrate copy becomes dead after the CD scaffolds from template).
+2. **TWO competing XRDs** (`xgraphqlplatformclaims` vs `xgraphqlplatforms`) — consolidate
+   to the active one; delete the duplicate + `graphql-platform-component.yaml` + the manual
+   configmap + legacy `generate-mesh-config.sh` bash variant (dead per analysis).
+3. **Hasura decision point**: CLAUDE.md TODO #4 chose Hasura, but the shipped engine is
+   GraphQL Mesh over OpenAPI; the hasura-backup composition is a non-functional skeleton.
+   This plan formally RECOMMENDS Mesh-over-OpenAPI as the platform engine (it matches the
+   binding contract + /openapi.json platform contract); Hasura remains a possible future
+   `database-graphql` component for direct-Postgres exposure — separate, not GQL-1.
+4. Work items absorbed into Phase 1: consolidation/deletion list from the analysis doc.
