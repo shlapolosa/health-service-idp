@@ -104,7 +104,7 @@ spec:
                 template:
                   spec:
                     restartPolicy: OnFailure
-                        volumes:
+                    volumes:
                       - name: azure-creds
                         secret:
                           secretName: azure-credentials
