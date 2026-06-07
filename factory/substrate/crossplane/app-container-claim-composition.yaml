@@ -128,10 +128,28 @@ spec:
           policy:
             fromFieldPath: Optional
       - name: source-repo-setup
+        # EVENT-1 (#150): this P&T resource name IS the composition-resource-name,
+        # so the conditional-delivery go-templating step looks it up via
+        # getComposedResource . "source-repo-setup". provider-kubernetes v1.2.1
+        # watches the managed Job and attaches its live runtime status to
+        # status.atProvider.manifest (verified against the provider Object API:
+        # "the provider watches the target Kubernetes resource and attaches its
+        # runtime status to the Object resource at status.atProvider.manifest").
+        # We therefore gate the per-service ApplicationClaim render on
+        # .status.atProvider.manifest.status.succeeded >= 1, NOT on the Object's
+        # own Ready condition. readiness.policy stays SuccessfulCreate (the
+        # default, set explicitly) so this Object reaches Ready on create and
+        # never blocks the composite's own readiness — the ORDERING is enforced
+        # by the downstream gate reading atProvider, not by Object readiness.
+        # (AllTrue/DeriveFromObject are unsuitable here: AllTrue evaluates the
+        # Object's OWN conditions, and a Job exposes Complete/Failed, not the
+        # Ready condition DeriveFromObject's hasReadyCondition() looks for.)
         base:
           apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           spec:
+            readiness:
+              policy: SuccessfulCreate
             forProvider:
               manifest:
                 apiVersion: batch/v1
@@ -493,6 +511,48 @@ spec:
           # legacy WFT's create-microservice-claim step - same templates, no new
           # codegen. Gated on deliveryTarget so claims created by the legacy chain
           # (which creates its own ApplicationClaim) are untouched.
+          # =====================================================================
+          # EVENT-1 ORDERING GATE (#150) — replaces 12251b4's mscv poll loop.
+          # ---------------------------------------------------------------------
+          # ORDERING CONTRACT: the per-service ApplicationClaim Objects (and the
+          # legacy single ApplicationClaim) are rendered ONLY AFTER the
+          # source-repo-setup Job has SUCCEEDED. That Job pushes
+          # .github/workflows/comprehensive-gitops.yml into the source repo; if a
+          # service-code commit lands before that workflow file exists, GitHub
+          # never builds it (the E2E-FULL items-api race). Previously the mscv
+          # Job band-aided this with a 60x10s GitHub Contents-API poll
+          # ("Waiting for CI workflow file in remote before pushing..."); that
+          # poll is deleted in the ApplicationClaim composition by this change.
+          #
+          # MECHANISM (empirically verified, provider-kubernetes v1.2.1):
+          #   - source-repo-setup is a P&T resource; its name == the
+          #     composition-resource-name, so getComposedResource resolves it.
+          #   - The provider WATCHES the managed Job and mirrors its live runtime
+          #     status into status.atProvider.manifest.status (provider Object
+          #     API doc: "the provider watches the target Kubernetes resource and
+          #     attaches its runtime status to the Object resource at
+          #     status.atProvider.manifest"). A completed Job sets
+          #     status.succeeded >= 1.
+          #   - We gate on that field rather than the Object's Ready condition:
+          #     AllTrue inspects the OBJECT's own conditions (not the Job's), and
+          #     DeriveFromObject's hasReadyCondition() looks for a Ready
+          #     condition the Job never has (it exposes Complete/Failed).
+          #
+          # RECONCILE FLOW: first reconcile -> getComposedResource returns nil
+          # (not yet observed) -> $srsReady false -> only repos + setup Job are
+          # rendered. The Job's status change triggers Crossplane to re-reconcile;
+          # a later reconcile observes status.succeeded >= 1 -> $srsReady true ->
+          # the claims are rendered on top of the now-present workflow file.
+          # =====================================================================
+          {{- $srs := getComposedResource . "source-repo-setup" }}
+          {{- $srsReady := false }}
+          {{- if $srs }}
+          {{-   $atp := dig "status" "atProvider" "manifest" "status" (dict) $srs }}
+          {{-   if ge (int (dig "succeeded" 0 $atp)) 1 }}
+          {{-     $srsReady = true }}
+          {{-   end }}
+          {{- end }}
+          {{- if $srsReady }}
           {{- if $spec.services }}
           {{- range $svc := $spec.services }}
           {{- $svcLang := $svc.language | default "python" }}
@@ -578,6 +638,7 @@ spec:
                   targetVCluster: {{ $spec.deliveryTarget }}
                   {{- end }}
           {{- end }}
+          {{- end }}{{/* closes EVENT-1 $srsReady gate */}}
           {{- end }}
           {{- if and $spec.deliveryTarget (ne $spec.deliveryTarget "host") }}
           ---
