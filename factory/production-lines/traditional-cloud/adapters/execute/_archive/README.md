@@ -60,3 +60,13 @@ oam-driven-contract` at its step level, and BOTH WorkflowTemplates remain live
 on the cluster. This git archival is therefore record-keeping only — do NOT
 delete the on-cluster oam-driven-contract WorkflowTemplate until pattern2 is
 migrated or retired (tracked as RETIRE-WFT-3).
+
+## oam-webhook-registration.yaml (archived 2026-06-07)
+
+Legacy pre-spine admission machinery: a MutatingWebhookConfiguration
+(oam-microservice-creator) pointing at a plain-Deployment slack-api-server.
+Superseded by the declarative spine (app.submit + claims) and the Knative
+slack-api-server. It sat unnoticed in factory/substrate/argo-events/ until
+the platform-definitions GitOps app synced it and resurrected the legacy
+Deployment, which then fought Knative for Service ownership. Belongs to the
+RETIRE-WFT-3 (#154) cleanup scope.
