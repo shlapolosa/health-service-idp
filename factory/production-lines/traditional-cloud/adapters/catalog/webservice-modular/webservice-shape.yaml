@@ -116,8 +116,10 @@ spec:
                       path: parameter.healthPath
                       port: parameter.port
                     }
-                    initialDelaySeconds: 30
+                    // JVM boot grace - see webservice.cd.yaml liveness comment.
+                    initialDelaySeconds: 90
                     periodSeconds:       10
+                    failureThreshold:    6
                   }
                   readinessProbe: {
                     httpGet: {

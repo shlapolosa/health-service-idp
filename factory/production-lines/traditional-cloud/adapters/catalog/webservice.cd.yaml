@@ -221,8 +221,13 @@ spec:
                       path: parameter.healthPath
                       port: parameter.port
                     }
-                    initialDelaySeconds: 30
+                    // JVM services boot in 45-60s under the default cpu limit;
+                    // 30s delay + 3x10s failures killed healthy spring pods at
+                    // ~60s (patient2-identity rev 00005, 2026-06-07). ~150s
+                    // grace before first possible kill; harmless for python.
+                    initialDelaySeconds: 90
                     periodSeconds: 10
+                    failureThreshold: 6
                   }
                   readinessProbe: {
                     httpGet: {
