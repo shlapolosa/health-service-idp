@@ -1,0 +1,1 @@
+{"nodes": [{"id": "classify_router_client_classifyrouterclient", "label": "ClassifyRouterClient", "file_type": "code", "source_file": "factory/shared-libs/capability-mcp-core/src/infrastructure/classify_router_client.py", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null}], "edges": [], "hyperedges": []}

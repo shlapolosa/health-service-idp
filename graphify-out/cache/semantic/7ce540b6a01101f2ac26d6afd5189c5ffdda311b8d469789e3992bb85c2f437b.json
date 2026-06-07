@@ -1,0 +1,1 @@
+{"nodes": [{"id": "utilities_restart_crossplane_providers_restart", "label": "restart-crossplane-providers.sh", "file_type": "code", "source_file": "factory/utilities/restart-crossplane-providers.sh", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null}], "edges": [], "hyperedges": []}

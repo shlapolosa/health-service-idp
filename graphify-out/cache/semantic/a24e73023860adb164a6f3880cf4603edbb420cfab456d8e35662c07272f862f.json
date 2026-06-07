@@ -1,0 +1,1 @@
+{"nodes": [{"id": "searxng_deployment", "label": "In-cluster SearXNG deployment", "file_type": "code", "source_file": "factory/adapters/mcp-web-gateway/searxng-deployment.yaml", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null}], "edges": [], "hyperedges": []}

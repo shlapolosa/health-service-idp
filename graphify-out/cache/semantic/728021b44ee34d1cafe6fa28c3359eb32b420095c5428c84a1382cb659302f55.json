@@ -1,0 +1,1 @@
+{"nodes": [{"id": "argo_client_argoworkflowsclient", "label": "ArgoWorkflowsClient", "file_type": "code", "source_file": "factory/shared-libs/capability-mcp-core/src/infrastructure/argo_client.py", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null}], "edges": [], "hyperedges": []}

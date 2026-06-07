@@ -1,0 +1,10 @@
+technology: nats-jetstream
+category: messaging
+profile: {durability: strong, footprint: light}
+provisioning:
+  kind: helm-chart
+  source: helm:nats
+  requires_cluster_permissions: true
+  cluster_permissions:
+    - {resources: [namespaces], verbs: [create]}
+maturity: published

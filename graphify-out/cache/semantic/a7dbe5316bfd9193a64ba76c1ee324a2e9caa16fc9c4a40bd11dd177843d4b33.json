@@ -1,0 +1,1 @@
+{"nodes": [{"id": "crossplane_app_container_claim_xrd_xappcontainerclaim", "label": "XAppContainerClaim XRD", "file_type": "code", "source_file": "factory/substrate/crossplane/app-container-claim-xrd.yaml", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null}], "edges": [], "hyperedges": []}

@@ -1,0 +1,1 @@
+{"nodes": [{"id": "rasa_chatbot_cd", "label": "rasa-chatbot ComponentDefinition", "file_type": "code", "source_file": "factory/production-lines/traditional-cloud/adapters/catalog/rasa-chatbot.cd.yaml", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null}], "edges": [], "hyperedges": []}

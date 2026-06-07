@@ -1,0 +1,1 @@
+{"nodes": [{"id": "crossplane_crossplane_network_policy_crossplane_network_policy", "label": "crossplane-network-policy NetworkPolicy", "file_type": "code", "source_file": "factory/substrate/crossplane/crossplane-network-policy.yaml", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null}], "edges": [], "hyperedges": []}

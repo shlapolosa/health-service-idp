@@ -1,0 +1,1 @@
+{"nodes": [{"id": "argo_argo_workflow_executor_rbac_argo_workflow_executor", "label": "argo-workflow-executor Role + RoleBinding", "file_type": "code", "source_file": "factory/substrate/argo/argo-workflow-executor-rbac.yaml", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null}], "edges": [], "hyperedges": []}

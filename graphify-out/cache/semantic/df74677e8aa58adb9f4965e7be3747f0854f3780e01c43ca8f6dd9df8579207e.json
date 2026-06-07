@@ -1,0 +1,1 @@
+{"nodes": [{"id": "slack_commands_pattern_commands_fixture", "label": "pattern_commands slack fixture", "file_type": "document", "source_file": "factory/adapters/intake-slack/tests/fixtures/slack_commands/pattern_commands.json", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null}], "edges": [], "hyperedges": []}
