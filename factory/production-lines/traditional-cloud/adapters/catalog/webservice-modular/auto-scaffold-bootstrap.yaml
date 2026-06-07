@@ -5,6 +5,16 @@ metadata:
   namespace: default
   annotations:
     definition.oam.dev/description: >
+      DEPRECATED (UNIFY-1, #153, 2026-06-07). This per-component trait emits ONE
+      AppContainerClaim PER webservice-shape component, which is exactly what
+      produced the patient4 fan-out (N source repos + N gitops repos + ~4N ArgoCD
+      apps + phantom single-component OAM seeds). The monorepo-per-OAM pattern is
+      now owned by app.submit: it creates ONE AppContainerClaim named after the OAM,
+      carrying spec.services[] (one entry per webservice), whose composition emits
+      one ApplicationClaim per service into the SHARED repo (microservices/<name>/).
+      This trait is retained ONLY for backward compatibility with any OAM still
+      attaching it directly; do NOT add it to new components. Prefer app.submit.
+      ---
       Trait that, when attached to a webservice-shape component, declares the
       bootstrap intent as an AppContainerClaim. The claim's composition creates
       the source + gitops repos (deletionPolicy Orphan), seeds boilerplate +

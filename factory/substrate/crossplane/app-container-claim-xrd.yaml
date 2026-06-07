@@ -76,6 +76,43 @@ spec:
                 description: Scaffold framework matching language (fastapi/python, springboot/java, chatbot/rasa, graphql-gateway/nodejs)
                 enum: [fastapi, springboot, chatbot, graphql-gateway]
                 default: fastapi
+              # --- UNIFY-1 (#153, 2026-06-07): monorepo-per-OAM. -------------------
+              # When set, the composition ranges over services[] and emits ONE
+              # ApplicationClaim per entry, all sharing appContainer == this claim's
+              # spec.name (the single source/gitops repo). Each service lands in
+              # microservices/<name>/ of the shared repo. The top-level
+              # language/framework above remain for single-service backward compat:
+              # claims WITHOUT services[] behave exactly as before (one claim,
+              # appContainer == spec.name). Additive + optional.
+              services:
+                type: array
+                description: >-
+                  Webservice components derived from the consumer OAM. Each entry
+                  scaffolds microservices/<name>/ in the shared AppContainer repo.
+                  When present, supersedes the top-level language/framework for
+                  per-service scaffolding (those remain the single-service default).
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                      description: Service name (DNS-1123); becomes microservices/<name>/ and the image name
+                      pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+                      maxLength: 63
+                    language:
+                      type: string
+                      description: Scaffold language for this service (maps to a template repo)
+                      enum: [python, java, rasa, nodejs]
+                      default: python
+                    framework:
+                      type: string
+                      description: >-
+                        Scaffold framework. When unset it is derived from language by
+                        the composition (python->fastapi, java->springboot,
+                        rasa->chatbot, nodejs->graphql-gateway).
+                      enum: [fastapi, springboot, chatbot, graphql-gateway]
+                  required:
+                  - name
               database:
                 type: string
                 description: Backing database for the scaffolded service (passed through to the composed ApplicationClaim)
