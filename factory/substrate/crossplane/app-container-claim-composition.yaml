@@ -148,6 +148,12 @@ spec:
           apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           spec:
+            # EVENT-1 latency fix (caught patient6, 2026-06-07): atProvider is
+            # only refreshed on the provider's slow poll unless watch is opted
+            # in - the ordering gate opened ~30min after the Job finished.
+            # watch:true => provider watches the Job; its completion updates
+            # the Object immediately and re-reconciles the composite.
+            watch: true
             readiness:
               policy: SuccessfulCreate
             forProvider:
