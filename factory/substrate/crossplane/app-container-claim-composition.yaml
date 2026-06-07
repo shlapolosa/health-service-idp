@@ -558,6 +558,26 @@ spec:
           {{-     $srsReady = true }}
           {{-   end }}
           {{- end }}
+          {{- /* LATCH (hardening, caught live 2026-06-07): the gate must never
+               CLOSE once opened. A composition change that replaces the
+               source-repo-setup Object resets atProvider (new Job, no
+               status.succeeded yet) - without the latch that un-rendered every
+               already-composed ApplicationClaim and Crossplane GARBAGE
+               COLLECTED the live claims of EVERY app (observed: patient5/6/7
+               claim deletions + a dormant ghost resurrection on the watch:true
+               rollout). If ANY app-claim Object is already composed, ordering
+               was satisfied in the past - keep rendering. */}}
+          {{- if not $srsReady }}
+          {{-   range $cr := .observed.resources }}
+          {{-     if and (not $srsReady) $cr.resource }}
+          {{-       if eq (dig "kind" "" $cr.resource) "Object" }}
+          {{-         if eq (dig "spec" "forProvider" "manifest" "kind" "" $cr.resource) "ApplicationClaim" }}
+          {{-           $srsReady = true }}
+          {{-         end }}
+          {{-       end }}
+          {{-     end }}
+          {{-   end }}
+          {{- end }}
           {{- if $srsReady }}
           {{- if $spec.services }}
           {{- range $svc := $spec.services }}
