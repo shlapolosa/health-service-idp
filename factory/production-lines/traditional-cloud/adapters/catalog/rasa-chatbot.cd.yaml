@@ -254,149 +254,47 @@ spec:
           }
         }
         
-        // Repository Creation Workflow (conditional - same pattern as webservice and realtime-platform)
+        // Repository Creation (conditional - claim path, RETIRE-WFT-2 #152).
+        // Replaces the curl-Job that fired the oam-driven-contract Argo workflow
+        // with a declarative AppContainerClaim (same pattern as auto-scaffold-bootstrap
+        // / webservice). The claim's composition scaffolds source+gitops repos and
+        // (when deliveryTarget is set) an ArgoCD Application. Idempotent by claim name;
+        // server-side apply converges with any day-0 claim from app.submit.
         if parameter.language != _|_ {
           outputs: {
             // Always include actions server
             "actions-server": outputs["actions-server"]
-            
-            // Add workflow trigger when language specified
-            "workflow-trigger": {
-              apiVersion: "batch/v1"
-              kind: "Job"
+
+            // Add scaffold claim when language specified
+            "scaffold-claim": {
+              apiVersion: "platform.example.org/v1alpha1"
+              kind:       "AppContainerClaim"
               metadata: {
-                name: context.name + "-workflow-trigger"
+                // Deterministic name = component name; converges with any day-0 claim.
+                name:      context.name
                 namespace: context.namespace
                 labels: {
-                  "app.kubernetes.io/name": context.name
-                  "app.kubernetes.io/component": "workflow-trigger"
+                  "app.kubernetes.io/name":       context.name
+                  "app.kubernetes.io/component":  "scaffold-claim"
                   "app.kubernetes.io/managed-by": "kubevela"
-                  "app.kubernetes.io/part-of": "rasa-chatbot"
+                  "app.kubernetes.io/part-of":    "rasa-chatbot"
                 }
                 annotations: {
-                  "rasa-chatbot.oam.dev/trigger-type": "argo-workflow"
-                  "rasa-chatbot.oam.dev/workflow-template": "oam-driven-contract"
-                  "rasa-chatbot.oam.dev/source": "oam-driven"
+                  "rasa-chatbot.oam.dev/source":        "oam-driven"
                   "rasa-chatbot.oam.dev/platform-type": "chatbot"
                 }
               }
               spec: {
-                template: {
-                  spec: {
-                    serviceAccountName: "argo-workflows-client"
-                    restartPolicy: "Never"
-                    volumes: []
-                    containers: [{
-                      name: "workflow-trigger"
-                      image: "curlimages/curl:7.85.0"
-                      command: ["sh", "-c"]
-                      args: [
-                        """
-                        echo "Triggering Argo Workflow for Rasa chatbot repository creation..."
-                        echo "Service: $(SERVICE_NAME)"
-                        echo "Language: $(LANGUAGE)"
-                        echo "Framework: $(FRAMEWORK)"
-                        echo "Repository: $(REPOSITORY)"
-                        
-                        # Create workflow JSON for Argo submission
-                        cat > /tmp/workflow.json << 'WORKFLOW_EOF'
-                        {
-                          "namespace": "argo",
-                          "serverDryRun": false,
-                          "workflow": {
-                            "metadata": {
-                              "generateName": "rasa-chatbot-creation-",
-                              "namespace": "argo",
-                              "labels": {
-                                "created-by": "oam-componentdefinition",
-                                "service-name": "$(SERVICE_NAME)",
-                                "source": "oam-driven",
-                                "chatbot-type": "rasa"
-                              }
-                            },
-                            "spec": {
-                              "workflowTemplateRef": {
-                                "name": "oam-driven-contract"
-                              },
-                              "arguments": {
-                                "parameters": [
-                                  {"name": "resource-name", "value": "$(SERVICE_NAME)"},
-                                  {"name": "resource-type", "value": "microservice"},
-                                  {"name": "namespace", "value": "$(NAMESPACE)"},
-                                  {"name": "user", "value": "oam-system"},
-                                  {"name": "description", "value": "OAM-driven RASA chatbot via ComponentDefinition"},
-                                  {"name": "github-org", "value": "shlapolosa"},
-                                  {"name": "docker-registry", "value": "docker.io/socrates12345"},
-                                  {"name": "slack-channel", "value": "#oam-notifications"},
-                                  {"name": "slack-user-id", "value": "OAM"},
-                                  {"name": "security-enabled", "value": "true"},
-                                  {"name": "observability-enabled", "value": "true"},
-                                  {"name": "backup-enabled", "value": "false"},
-                                  {"name": "environment-tier", "value": "development"},
-                                  {"name": "auto-create-dependencies", "value": "true"},
-                                  {"name": "resource-size", "value": "medium"},
-                                  {"name": "microservice-language", "value": "$(LANGUAGE)"},
-                                  {"name": "microservice-framework", "value": "$(FRAMEWORK)"},
-                                  {"name": "microservice-database", "value": "none"},
-                                  {"name": "microservice-cache", "value": "redis"},
-                                  {"name": "microservice-expose-api", "value": "true"},
-                                  {"name": "target-vcluster", "value": ""},
-                                  {"name": "parent-appcontainer", "value": "$(REPOSITORY)"},
-                                  {"name": "repository-name", "value": "$(REPOSITORY)"}
-                                ]
-                              }
-                            }
-                          }
-                        }
-                        WORKFLOW_EOF
-                        
-                        echo "📋 Workflow JSON created, submitting to Argo..."
-                        cat /tmp/workflow.json
-                        
-                        # Submit to Argo Workflows
-                        RESPONSE=$(curl -s -w 'HTTPSTATUS:%{http_code}' -X POST -H "Content-Type: application/json" -H "Accept: application/json" -d @/tmp/workflow.json http://argo-server.argo.svc.cluster.local:2746/api/v1/workflows/argo)
-                        HTTP_STATUS=$(echo $RESPONSE | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
-                        BODY=$(echo $RESPONSE | sed -e 's/HTTPSTATUS:.*//g')
-                        echo "📊 HTTP Status:" $HTTP_STATUS
-                        echo "📄 Response:" $BODY
-                        if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 201 ]; then
-                          echo "✅ Workflow submission successful!"
-                          echo "$BODY" | grep -o '"name":"[^"]*"' | head -1
-                        else
-                          echo "❌ Workflow submission failed with status:" $HTTP_STATUS
-                          echo "Response:" $BODY
-                          exit 1
-                        fi
-                        
-                        echo "Rasa chatbot workflow trigger completed"
-                        """
-                      ]
-                      env: [
-                        {
-                          name: "SERVICE_NAME"
-                          value: context.name
-                        },
-                        {
-                          name: "LANGUAGE"
-                          value: parameter.language
-                        },
-                        {
-                          name: "FRAMEWORK"
-                          value: parameter.framework
-                        },
-                        {
-                          name: "REPOSITORY"
-                          value: (*parameter.repository | context.name)
-                        },
-                        {
-                          name: "NAMESPACE"
-                          value: context.namespace
-                        }
-                      ]
-                      volumeMounts: []
-                    }]
-                  }
-                }
+                name:           context.name
+                description:    "OAM-driven RASA chatbot via ComponentDefinition (declarative spine)"
+                gitHubOrg:      "shlapolosa"
+                dockerRegistry: "healthidpuaeacr.azurecr.io"
+                // Rasa scaffolding language -> chat-template (ApplicationClaim XRD enum).
+                language: "rasa"
+                // Framework derived: rasa -> chatbot.
+                framework: "chatbot"
+                // First-match-default: explicit targetEnvironment, else "host".
+                deliveryTarget: [if parameter.targetEnvironment != _|_ {parameter.targetEnvironment}, "host"][0]
               }
             }
           }

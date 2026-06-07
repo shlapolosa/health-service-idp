@@ -653,132 +653,44 @@ spec:
               "istio-virtualservice": outputs["istio-virtualservice"]
             }
             
-            // Add workflow trigger
-            "workflow-trigger": {
-              apiVersion: "batch/v1"
-              kind: "Job"
+            // Add scaffold claim (claim path, RETIRE-WFT-2 #152).
+            // NOTE: orchestrator backing infra (Zeebe/event-streaming/saga wiring) is
+            // provisioned by the ALWAYS-created OrchestrationPlatformClaim above, and the
+            // UI stack (Operate/Tasklist/Optimize) by the Knative outputs above. The old
+            // workflow-trigger only did source-repo scaffolding (same microservice-creation
+            // params as webservice), so it maps cleanly to an AppContainerClaim (same
+            // pattern as auto-scaffold-bootstrap / webservice). Idempotent by claim name;
+            // server-side apply converges with any day-0 claim from app.submit.
+            "scaffold-claim": {
+              apiVersion: "platform.example.org/v1alpha1"
+              kind:       "AppContainerClaim"
               metadata: {
-                name: context.name + "-workflow-trigger"
+                // Deterministic name = component name; converges with any day-0 claim.
+                name:      context.name
                 namespace: context.namespace
                 labels: {
-                  "app.kubernetes.io/name": context.name
-                  "app.kubernetes.io/component": "workflow-trigger"
+                  "app.kubernetes.io/name":       context.name
+                  "app.kubernetes.io/component":  "scaffold-claim"
+                  "app.kubernetes.io/managed-by": "kubevela"
+                  "app.kubernetes.io/part-of":    "orchestration-platform"
+                }
+                annotations: {
+                  "orchestrator.oam.dev/source":        "oam-driven"
+                  "orchestrator.oam.dev/platform-type": "camunda-orchestrator"
                 }
               }
               spec: {
-                template: {
-                  spec: {
-                    serviceAccountName: "argo-workflows-client"
-                    restartPolicy: "Never"
-                    containers: [{
-                      name: "workflow-trigger"
-                      image: "curlimages/curl:7.85.0"
-                      command: ["/bin/sh", "-c"]
-                      args: [
-                        """
-                        echo "Triggering Argo Workflow for Camunda orchestrator repository creation..."
-                        echo "Service: $(SERVICE_NAME)"
-                        echo "Language: $(LANGUAGE)"
-                        echo "Framework: $(FRAMEWORK)"
-                        echo "Repository: $(REPOSITORY)"
-                        
-                        # Create workflow JSON for Argo submission
-                        cat > /tmp/workflow.json << 'WORKFLOW_EOF'
-                        {
-                          "namespace": "argo",
-                          "serverDryRun": false,
-                          "workflow": {
-                            "metadata": {
-                              "generateName": "camunda-orchestrator-creation-",
-                              "namespace": "argo",
-                              "labels": {
-                                "created-by": "oam-componentdefinition",
-                                "service-name": "$(SERVICE_NAME)",
-                                "source": "oam-driven",
-                                "platform-type": "camunda-orchestrator"
-                              }
-                            },
-                            "spec": {
-                              "workflowTemplateRef": {
-                                "name": "oam-driven-contract"
-                              },
-                              "arguments": {
-                                "parameters": [
-                                  {"name": "resource-name", "value": "$(SERVICE_NAME)"},
-                                  {"name": "resource-type", "value": "microservice"},
-                                  {"name": "namespace", "value": "$(NAMESPACE)"},
-                                  {"name": "user", "value": "oam-system"},
-                                  {"name": "description", "value": "OAM-driven Camunda orchestrator with UI stack"},
-                                  {"name": "github-org", "value": "shlapolosa"},
-                                  {"name": "docker-registry", "value": "docker.io/socrates12345"},
-                                  {"name": "slack-channel", "value": "#oam-notifications"},
-                                  {"name": "slack-user-id", "value": "OAM"},
-                                  {"name": "security-enabled", "value": "true"},
-                                  {"name": "observability-enabled", "value": "true"},
-                                  {"name": "backup-enabled", "value": "false"},
-                                  {"name": "environment-tier", "value": "development"},
-                                  {"name": "auto-create-dependencies", "value": "true"},
-                                  {"name": "resource-size", "value": "large"},
-                                  {"name": "microservice-language", "value": "$(LANGUAGE)"},
-                                  {"name": "microservice-framework", "value": "$(FRAMEWORK)"},
-                                  {"name": "microservice-database", "value": "postgres"},
-                                  {"name": "microservice-cache", "value": "redis"},
-                                  {"name": "microservice-expose-api", "value": "true"},
-                                  {"name": "target-vcluster", "value": ""},
-                                  {"name": "parent-appcontainer", "value": "$(REPOSITORY)"},
-                                  {"name": "repository-name", "value": "$(REPOSITORY)"}
-                                ]
-                              }
-                            }
-                          }
-                        }
-                        WORKFLOW_EOF
-                        
-                        echo "📋 Workflow JSON created, submitting to Argo..."
-                        
-                        # Submit to Argo Workflows
-                        RESPONSE=$(curl -s -w 'HTTPSTATUS:%{http_code}' -X POST -H "Content-Type: application/json" -H "Accept: application/json" -d @/tmp/workflow.json http://argo-server.argo.svc.cluster.local:2746/api/v1/workflows/argo)
-                        HTTP_STATUS=$(echo $RESPONSE | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
-                        BODY=$(echo $RESPONSE | sed -e 's/HTTPSTATUS:.*//g')
-                        echo "📊 HTTP Status:" $HTTP_STATUS
-                        echo "📄 Response:" $BODY
-                        if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 201 ]; then
-                          echo "✅ Workflow submission successful!"
-                          echo "$BODY" | grep -o '"name":"[^"]*"' | head -1
-                        else
-                          echo "❌ Workflow submission failed with status:" $HTTP_STATUS
-                          echo "Response:" $BODY
-                          exit 1
-                        fi
-                        
-                        echo "Camunda orchestrator workflow trigger completed"
-                        """
-                      ]
-                      env: [
-                        {
-                          name: "SERVICE_NAME"
-                          value: context.name
-                        },
-                        {
-                          name: "LANGUAGE"
-                          value: parameter.language
-                        },
-                        {
-                          name: "FRAMEWORK"
-                          value: parameter.framework
-                        },
-                        {
-                          name: "REPOSITORY"
-                          value: (*parameter.repository | context.name)
-                        },
-                        {
-                          name: "NAMESPACE"
-                          value: context.namespace
-                        }
-                      ]
-                    }]
-                  }
-                }
+                name:           context.name
+                description:    "OAM-driven Camunda orchestrator via ComponentDefinition (declarative spine)"
+                gitHubOrg:      "shlapolosa"
+                dockerRegistry: "healthidpuaeacr.azurecr.io"
+                // Map language onto the ApplicationClaim XRD enum [python, java, rasa, nodejs].
+                // First-match-default: pass through supported values, else default python.
+                language: [if parameter.language == "java" {"java"}, if parameter.language == "nodejs" {"nodejs"}, "python"][0]
+                // Framework derived from chosen language: java->springboot, nodejs->graphql-gateway, else fastapi.
+                framework: [if parameter.language == "java" {"springboot"}, if parameter.language == "nodejs" {"graphql-gateway"}, "fastapi"][0]
+                // First-match-default: explicit targetEnvironment, else "host".
+                deliveryTarget: [if parameter.targetEnvironment != _|_ {parameter.targetEnvironment}, "host"][0]
               }
             }
           }

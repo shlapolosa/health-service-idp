@@ -14,18 +14,16 @@ metadata:
     parameter-contract: "compliant"
     supported-tiers: "1,2,3"
     maintainer: "platform-team"
-    # RETIRE-WFT (#149, 2026-06-06): partially deprecated.
-    # The webservice / app.submit / Slack /microservice paths NO LONGER fire this
-    # template — they use the AppContainerClaim path (proven E2E patient2-api).
-    # NOT archived because it is still a LIVE dependency of these
-    # ComponentDefinitions, which render Argo Workflows referencing it by name at
-    # OAM reconcile time:
-    #   - realtime-platform.cd.yaml
-    #   - rasa-chatbot.cd.yaml
-    #   - graphql-gateway.cd.yaml
-    #   - camunda-orchestrator.cd.yaml
-    # Archive this template only after those CDs are migrated to the claim path.
-    deprecation-status: "partial; retained for realtime-platform/rasa-chatbot/graphql-gateway/camunda-orchestrator CDs"
+    # RETIRE-WFT (#149, 2026-06-06) + RETIRE-WFT-2 (#152, 2026-06-07): FULLY RETIRED.
+    # The webservice / app.submit / Slack /microservice paths were migrated to the
+    # AppContainerClaim path in #149 (proven E2E patient2-api). The last four CD
+    # dependencies — realtime-platform / rasa-chatbot / graphql-gateway /
+    # camunda-orchestrator — were migrated in #152: their CUE now emits an
+    # AppContainerClaim ("scaffold-claim") instead of a curl-Job that POSTed an
+    # Argo Workflow referencing this template. NOTHING fires this template anymore.
+    # ARCHIVED here for audit/rollback only; not applied to any cluster.
+    # Replacement proven by patient3/4/5 zero-touch E2Es (2026-06-07). See README.md.
+    deprecation-status: "retired; archived 2026-06-07 (RETIRE-WFT-2 #152); no live dependencies"
 spec:
   entrypoint: create-microservice
   arguments:
