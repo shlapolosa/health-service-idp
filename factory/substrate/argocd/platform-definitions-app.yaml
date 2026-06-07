@@ -31,6 +31,9 @@ spec:
     directory:
       recurse: true
       include: '*.yaml'
+      # examples/ are documentation, not desired state - syncing them deploys
+      # live OAM Applications (caught: telemetry-platform from RT-1's example).
+      exclude: 'examples/*.yaml'
   - repoURL: https://github.com/shlapolosa/health-service-idp.git
     targetRevision: main
     path: factory/production-lines/traditional-cloud/adapters/composition
