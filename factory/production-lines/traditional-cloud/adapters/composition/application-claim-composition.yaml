@@ -347,49 +347,6 @@ spec:
           apiVersion: kubernetes.m.crossplane.io/v1alpha1
           kind: Object
           metadata:
-            name: '{{ .observed.composite.resource.spec.name }}-repo-sync'
-            namespace: '{{ .observed.composite.resource.metadata.namespace | default "default" }}'
-            annotations:
-              gotemplating.fn.crossplane.io/composition-resource-name: '{{ .observed.composite.resource.spec.name }}-repo-sync-rn'
-          spec:
-            forProvider:
-              manifest:
-                apiVersion: batch/v1
-                kind: Job
-                metadata:
-                  name: '{{ .observed.composite.resource.spec.name }}-repo-sync'
-                  namespace: '{{ .observed.composite.resource.metadata.namespace | default "default" }}'
-                spec:
-                  ttlSecondsAfterFinished: 600
-                  backoffLimit: 2
-                  template:
-                    metadata:
-                      annotations:
-                        sidecar.istio.io/inject: 'false'
-                    spec:
-                      serviceAccountName: crossplane-github-provider
-                      restartPolicy: OnFailure
-                      containers:
-                      - name: repository-sync
-                        image: alpine/k8s:1.28.4
-                        command:
-                        - /bin/sh
-                        - -c
-                        - "set -euo pipefail\necho \"\U0001F504 Synchronizing repository status from AppContainerClaim...\"\n\n# Wait for AppContainerClaim to be ready and get repository URL\nAPP_CONTAINER=\"$APP_CONTAINER_NAME\"\nSERVICE_NAME=\"$SERVICE_NAME\"\nNAMESPACE=\"$NAMESPACE\"\n\necho \"Waiting for AppContainerClaim $APP_CONTAINER to be ready...\"\n\nTIMEOUT=300\nELAPSED=0\n\nwhile [ $ELAPSED -lt $TIMEOUT ]; do\n  # Check if AppContainerClaim exists and get repository URL\n  REPO_URL=$(kubectl get appcontainerclaim \"$APP_CONTAINER\" -n \"$NAMESPACE\" -o jsonpath='{.status.sourceRepository.url}' 2>/dev/null || echo \"\")\n  CLONE_URL=$(kubectl get appcontainerclaim \"$APP_CONTAINER\" -n \"$NAMESPACE\" -o jsonpath='{.status.sourceRepository.cloneUrl}' 2>/dev/null || echo \"\")\n  \n  if [ -n \"$REPO_URL\" ]; then\n    echo \"\u2705 Found repository URL: $REPO_URL\"\n    echo \"\u2705 Found clone URL: $CLONE_URL\"\n    \n    # Find associated Knative service\n    KNATIVE_SERVICE=\"\"\n    if kubectl get ksvc \"$SERVICE_NAME\" -n \"$NAMESPACE\" >/dev/null 2>&1; then\n      KNATIVE_SERVICE=\"$SERVICE_NAME\"\n    elif kubectl get ksvc \"${SERVICE_NAME}-realtime-service\" -n \"$NAMESPACE\" >/dev/null 2>&1; then\n      KNATIVE_SERVICE=\"${SERVICE_NAME}-realtime-service\"\n    elif kubectl get ksvc \"${SERVICE_NAME}-service\" -n \"$NAMESPACE\" >/dev/null 2>&1; then\n      KNATIVE_SERVICE=\"${SERVICE_NAME}-service\"\n    fi\n    \n    echo \"Found Knative Service: $KNATIVE_SERVICE\"\n    \n    # Update ApplicationClaim status\n    kubectl patch applicationclaim \"$SERVICE_NAME\" -n \"$NAMESPACE\" --type=merge --subresource=status -p \"{\n      \\\"status\\\": {\n        \\\"repository\\\": {\n          \\\"url\\\": \\\"$REPO_URL\\\",\n          \\\"cloneUrl\\\": \\\"$CLONE_URL\\\"\n        },\n        \\\"application\\\": {\n          \\\"knativeService\\\": \\\"$KNATIVE_SERVICE\\\"\n        }\n      }\n    }\"\n    \n    echo \"\u2705 ApplicationClaim status synchronized from AppContainerClaim\"\n    exit 0\n  fi\n  \n  echo \"Waiting for AppContainerClaim repository status... (${ELAPSED}s/${TIMEOUT}s)\"\n  sleep 10\n  ELAPSED=$((ELAPSED + 10))\ndone\n\necho \"\u274C Timeout waiting for AppContainerClaim repository status\"\nexit 1\n"
-                        env:
-                        - name: SERVICE_NAME
-                          value: '{{ .observed.composite.resource.spec.name }}'
-                        - name: APP_CONTAINER_NAME
-                          value: '{{ .observed.composite.resource.spec.appContainer }}'
-                        - name: NAMESPACE
-                          value: '{{ .observed.composite.resource.spec.namespace | default "default" }}'
-            providerConfigRef:
-              kind: ClusterProviderConfig
-              name: kubernetes-provider
-          ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
-          kind: Object
-          metadata:
             name: '{{ .observed.composite.resource.spec.name }}-argocd-setup'
             namespace: '{{ .observed.composite.resource.metadata.namespace | default "default" }}'
             annotations:
