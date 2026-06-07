@@ -33,7 +33,8 @@ def create_realtime_agent_app(
     endpoints: List[Dict[str, str]],
     websocket_endpoints: Optional[List[Dict[str, str]]] = None,
     streaming_endpoints: Optional[List[Dict[str, str]]] = None,
-    config: Optional[AgentConfig] = None
+    config: Optional[AgentConfig] = None,
+    verify_token: Optional[Callable[[Optional[str]], bool]] = None,
 ) -> FastAPI:
     """
     Create a FastAPI app for a real-time enabled agent microservice
@@ -52,6 +53,29 @@ def create_realtime_agent_app(
     agent: Optional[RealtimeAgent] = None
     websocket_manager = WebSocketConnectionManager()
     agent_config = config
+
+    # RT-1 (#156): WebSocket auth. APIM does not proxy /ws (Developer-SKU
+    # POST-body bug + websocket gaps), so /ws is exposed via Istio and JWT is
+    # verified in-service here. Default verifier: if JWT_ISSUER_URI is present
+    # (from the bound <identity>-conn) require a non-empty bearer/?token=;
+    # otherwise (no identity bound) /ws is open (backward compatible).
+    # NOTE: this is a presence/issuer-config gate, not full signature
+    # validation — see plan §8 "limits"; a real verify_token should be passed
+    # by services needing cryptographic verification.
+    _jwt_issuer = os.getenv("JWT_ISSUER_URI") or os.getenv("AUTH0_ISSUER")
+
+    def _default_verify_token(token: Optional[str]) -> bool:
+        if not _jwt_issuer:
+            return True  # no identity bound -> open
+        return bool(token)
+
+    _verify = verify_token or _default_verify_token
+
+    def _extract_ws_token(ws: WebSocket) -> Optional[str]:
+        auth = ws.headers.get("authorization") or ws.headers.get("Authorization")
+        if auth and auth.lower().startswith("bearer "):
+            return auth[7:].strip()
+        return ws.query_params.get("token")
     
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -229,6 +253,10 @@ def create_realtime_agent_app(
             manager: WebSocketConnectionManager = Depends(get_websocket_manager)
         ):
             """Main WebSocket endpoint for real-time communication"""
+            # RT-1 (#156): in-service JWT gate on the upgrade.
+            if not _verify(_extract_ws_token(websocket)):
+                await websocket.close(code=4401)  # 4401 ~ unauthorized
+                return
             await manager.connect(websocket)
             
             try:
@@ -249,6 +277,10 @@ def create_realtime_agent_app(
             manager: WebSocketConnectionManager = Depends(get_websocket_manager)
         ):
             """WebSocket endpoint specifically for real-time events"""
+            # RT-1 (#156): in-service JWT gate on the upgrade.
+            if not _verify(_extract_ws_token(websocket)):
+                await websocket.close(code=4401)
+                return
             await manager.connect(websocket, metadata={"endpoint_type": "events"})
             
             try:

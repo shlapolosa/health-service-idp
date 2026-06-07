@@ -593,6 +593,8 @@ spec:
                   name: {{ $svc.name }}
                   language: {{ $svcLang }}
                   framework: {{ $svcFw }}
+                  {{- /* RT-1 (#156): pass scaffold flavor through to ApplicationClaim. */}}
+                  serviceFlavor: {{ $svc.flavor | default "webservice" }}
                   database: {{ $spec.database | default "none" }}
                   cache: {{ $spec.cache | default "none" }}
                   exposeApi: false

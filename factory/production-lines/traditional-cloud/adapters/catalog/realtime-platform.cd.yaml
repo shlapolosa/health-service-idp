@@ -96,14 +96,42 @@ spec:
                       value: "true"
                     }
                   ] + [
+                    // RT-1: one TOPIC_<UPPERNAME> env per declared topic so the
+                    // realtime-service discovers its topic catalog without a join
+                    // (CUE in vela 1.10.6 has no strings.ToUpper/Join without
+                    // imports — names are pre-uppercased on the OAM side; we emit
+                    // both raw + the convention key for the consumer).
+                    if parameter.topics != _|_ {
+                      for t in parameter.topics {
+                        {
+                          name:  "TOPIC_" + t.name
+                          value: t.name
+                        }
+                      }
+                    }
+                  ] + [
                     for k, v in parameter.environment {
                       name: k
                       value: v
                     }
                   ]
-                  if parameter.envFrom != _|_ {
-                    envFrom: parameter.envFrom
-                  }
+                  // RT-1: bind the aggregate <name>-conn secret in addition to any
+                  // explicit envFrom. optional:true so the ksvc boots before the
+                  // RealtimePlatformClaim / conn-secret converges.
+                  envFrom: [
+                    if parameter.envFrom != _|_ {
+                      for ref in parameter.envFrom {
+                        ref
+                      }
+                    }
+                  ] + [
+                    {
+                      secretRef: {
+                        name:     context.name + "-conn"
+                        optional: true
+                      }
+                    }
+                  ]
                   // Health checks for robust deployment
                   livenessProbe: {
                     httpGet: {
@@ -153,6 +181,45 @@ spec:
               }
               if parameter.mqttUsers != _|_ {
                 mqttUsers: parameter.mqttUsers
+              }
+              // RT-1: declarative topics flow into the XRD so the composition's
+              // topic-provisioning Job POSTs each to Lenses. Backward compat:
+              // absent -> composition keeps the default health-domain topic set.
+              if parameter.topics != _|_ {
+                topics: parameter.topics
+              }
+            }
+          }
+
+          // RT-1: aggregate <name>-conn Secret (binding-contract normalization,
+          // pure-CUE output like postgresql/redis CDs). ADDITIVE — the five
+          // legacy <name>-*-secret refs rendered by the RealtimePlatformClaim
+          // composition remain for one release. Service DNS is deterministic
+          // (<name>-kafka.<name>-realtime.svc...), so these can be computed here.
+          "conn-secret": {
+            apiVersion: "v1"
+            kind:       "Secret"
+            metadata: {
+              name:      context.name + "-conn"
+              namespace: context.namespace
+              labels: {
+                "binding.cafe.io/category": "realtime"
+                "app.oam.dev/component":    context.name
+              }
+            }
+            type: "Opaque"
+            stringData: {
+              KAFKA_BOOTSTRAP_SERVERS:   context.name + "-kafka." + context.name + "-realtime.svc.cluster.local:9092"
+              KAFKA_SCHEMA_REGISTRY_URL: "http://" + context.name + "-kafka." + context.name + "-realtime.svc.cluster.local:8081"
+              LENSES_URL:                "http://" + context.name + "-lenses-hq." + context.name + "-realtime.svc.cluster.local:9991"
+              LENSES_HQ_URL:             "http://" + context.name + "-lenses-hq." + context.name + "-realtime.svc.cluster.local:9991"
+              LENSES_WS_URL:             "ws://" + context.name + "-lenses-hq." + context.name + "-realtime.svc.cluster.local:9991"
+              REALTIME_PLATFORM_NAME:    context.name
+              REALTIME_INTEGRATION_ENABLED: "true"
+              if parameter.topics != _|_ {
+                for t in parameter.topics {
+                  "TOPIC_\(t.name)": t.name
+                }
               }
             }
           }
@@ -244,6 +311,15 @@ spec:
           database: *"postgres" | "postgres" | "mysql" | "mongodb"
           visualization: *"metabase" | "metabase" | "grafana"
           iot: *true | bool
+
+          // RT-1: declarative topics (first-class). Each is provisioned to Lenses
+          // by the composition's topic Job and surfaced via <name>-conn TOPIC_*.
+          // Omit for backward compat (composition seeds the health-domain set).
+          topics?: [...{
+            name: string
+            partitions: *3 | int
+            retention:  *604800000 | int
+          }]
           
           // Advanced optional
           dataRetention?: string // "7d", "30d", etc.

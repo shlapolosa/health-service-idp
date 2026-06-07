@@ -111,6 +111,14 @@ spec:
                         the composition (python->fastapi, java->springboot,
                         rasa->chatbot, nodejs->graphql-gateway).
                       enum: [fastapi, springboot, chatbot, graphql-gateway]
+                    # RT-1 (#156): optional scaffold flavor passed through to the
+                    # per-service ApplicationClaim.spec.serviceFlavor. realtime
+                    # seeds a websocket+aiokafka fastapi variant. Default webservice.
+                    flavor:
+                      type: string
+                      description: Scaffold flavor (webservice|realtime) for this service.
+                      enum: [webservice, realtime]
+                      default: webservice
                   required:
                   - name
               database:

@@ -177,7 +177,8 @@ class SubmitUseCase:
             return bool((c.get("properties") or {}).get("exposeApi"))
 
         exposed = [c.get("name") for c in comps
-                   if c.get("type") in ("webservice", "webservice-shape") and _is_exposed(c)]
+                   if c.get("type") in ("webservice", "webservice-shape", "realtime-service")
+                   and _is_exposed(c)]
 
         if len(identity_comps) > 1:
             return ("identity topology: found %d identity components (%s) - an OAM must "
@@ -205,7 +206,7 @@ class SubmitUseCase:
         deployment via apply-consumer-oam.)
         """
         for comp in app.get("spec", {}).get("components", []) or []:
-            if comp.get("type") != "webservice":
+            if comp.get("type") not in self._SCAFFOLD_TYPES:
                 continue
             props = comp.get("properties") or {}
             lang = props.get("language")
@@ -220,6 +221,11 @@ class SubmitUseCase:
                 continue
             return comp
         return None
+
+    # RT-1 (#156): component types that trigger source-code scaffolding.
+    # realtime-service is a fastapi variant (websocket+aiokafka) — it scaffolds
+    # exactly like webservice but carries flavor:realtime (see _webservice_services).
+    _SCAFFOLD_TYPES = ("webservice", "realtime-service")
 
     _FW_FOR_LANG = {"python": "fastapi", "java": "springboot",
                     "rasa": "chatbot", "nodejs": "graphql-gateway"}
@@ -241,7 +247,8 @@ class SubmitUseCase:
         """
         services: list[dict[str, str]] = []
         for comp in app.get("spec", {}).get("components", []) or []:
-            if comp.get("type") != "webservice":
+            ctype = comp.get("type")
+            if ctype not in cls._SCAFFOLD_TYPES:
                 continue
             props = comp.get("properties") or {}
             lang = props.get("language")
@@ -251,11 +258,17 @@ class SubmitUseCase:
             default_img = f"healthidpuaeacr.azurecr.io/{comp.get('name')}:latest"
             if img and img != default_img:
                 continue  # bring-your-own image: not scaffolded
-            services.append({
+            entry: dict[str, str] = {
                 "name": comp.get("name"),
                 "language": lang,
                 "framework": cls._derive_framework(lang, props.get("framework")),
-            })
+            }
+            # RT-1 (#156): realtime-service carries flavor:realtime so the
+            # AppContainerClaim composition sets ApplicationClaim.serviceFlavor
+            # and the mscv Job seeds the websocket+aiokafka fastapi variant.
+            if ctype == "realtime-service":
+                entry["flavor"] = "realtime"
+            services.append(entry)
         return services
 
     def _declarative_scaffold(self, app: dict[str, Any], app_name: str,
