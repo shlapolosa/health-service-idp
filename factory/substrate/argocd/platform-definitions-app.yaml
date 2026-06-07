@@ -49,7 +49,7 @@ spec:
       # compositions (legacy spec.resources) + duplicate XRDs that predate
       # PR3 — they broke the app with ComparisonError/RepeatedResource.
       # Widen back to *.yaml after the crossplane-dir cleanup task.
-      include: 'app-container-claim-*.yaml'
+      include: '{app-container-claim-*.yaml,application-claim-xrd.yaml,realtime-platform-claim-*.yaml,graphql-platform-claim-composition.yaml,graphql-platform-claim-xrd.yaml}'
   - repoURL: https://github.com/shlapolosa/health-service-idp.git
     targetRevision: main
     path: factory/substrate/argo-events
