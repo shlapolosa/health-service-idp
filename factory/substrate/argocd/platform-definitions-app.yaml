@@ -1,0 +1,67 @@
+# Definitions-GitOps sync (hardening item, 2026-06-07).
+#
+# Until now every ComponentDefinition / TraitDefinition / XRD / Composition /
+# sensor reached the cluster only via manual `kubectl apply` — the exact drift
+# vector behind the 2026-06-06 stale-expose-api near-miss (fix committed to
+# git but an older trait live on cluster). This Application makes ArgoCD the
+# reconciler for platform definitions: main branch of the source repo is the
+# single source of truth; selfHeal reverts any out-of-band mutation.
+#
+# Deliberate choices:
+# - prune: false  — path refactors must never cascade-delete live definitions;
+#   removals are done explicitly (REFACTOR-H archive pattern + manual delete).
+# - ServerSideApply — large CRDs (XRD-generated) exceed client-side
+#   last-applied annotation limits, and SSA respects fields owned by
+#   controllers (learned via the knative creator-annotation rejection).
+# - substrate/crossplane/templates/ excluded — comprehensive-gitops-template.yml
+#   is a GitHub Actions workflow consumed by scaffold Jobs, not a k8s manifest.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-definitions
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  sources:
+  - repoURL: https://github.com/shlapolosa/health-service-idp.git
+    targetRevision: main
+    path: factory/production-lines/traditional-cloud/adapters/catalog
+    directory:
+      recurse: true
+      include: '*.yaml'
+  - repoURL: https://github.com/shlapolosa/health-service-idp.git
+    targetRevision: main
+    path: factory/substrate/crossplane
+    directory:
+      recurse: false
+      include: '*.yaml'
+  - repoURL: https://github.com/shlapolosa/health-service-idp.git
+    targetRevision: main
+    path: factory/substrate/argo-events
+    directory:
+      recurse: true
+      include: '*.yaml'
+  - repoURL: https://github.com/shlapolosa/health-service-idp.git
+    targetRevision: main
+    path: factory/substrate/external-secrets
+    directory:
+      recurse: true
+      include: '*.yaml'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+    - ServerSideApply=true
+    - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
