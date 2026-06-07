@@ -50,3 +50,13 @@ To resurrect: `git mv` the file back to `../oam-driven-contract.yaml`, re-add th
 `oam-driven-contract` ArgoCD/substrate include, reinstate the WFT routing in
 `submit_use_case.py` / intake-slack `argo_client.py`, and revert the four CD
 `scaffold-claim` outputs back to their `workflow-trigger` curl-Jobs.
+
+## CORRECTION (post-merge review, 2026-06-07)
+
+"No live dependencies" above is NOT fully accurate: `pattern2-compositional-workflow`
+(this same execute/ dir, wired into intake-slack's /oam/webhook path via
+Pattern2CompositionalHandler) still carries a live `workflowTemplateRef:
+oam-driven-contract` at its step level, and BOTH WorkflowTemplates remain live
+on the cluster. This git archival is therefore record-keeping only — do NOT
+delete the on-cluster oam-driven-contract WorkflowTemplate until pattern2 is
+migrated or retired (tracked as RETIRE-WFT-3).
