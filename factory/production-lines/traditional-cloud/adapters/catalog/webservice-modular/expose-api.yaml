@@ -20,6 +20,36 @@ spec:
   schematic:
     cue:
       template: |
+        // EVENT-2 (#151): stamp the ksvc workload so the substrate sensor
+        // (factory/substrate/argo-events/ksvc-ready-apim-publish.yaml) can fire
+        // an APIM-publish Job the instant the service reports Ready - instead of
+        // the trait Job polling $PUBLIC_URL$SPEC_PATH and burning retries during
+        // the day-0 CI build. The label is the EventSource selector; the
+        // annotations carry everything the sensor-built Job needs (it has no
+        // access to these trait parameters otherwise). The trait Job below is
+        // KEPT (sensor-as-accelerator, belt-and-braces): the zero-touch contract
+        // must not depend on a healthy event-bus, and both Jobs upsert by the
+        // same --api-id so they are mutually idempotent.
+        patch: {
+          metadata: {
+            labels: {
+              "expose-api.cafe.io/publish": "true"
+            }
+            annotations: {
+              "expose-api.cafe.io/path-prefix": parameter.apiPathPrefix
+              "expose-api.cafe.io/apim-name":   parameter.apimName
+              "expose-api.cafe.io/apim-rg":     parameter.apimResourceGroup
+              "expose-api.cafe.io/spec-path":   parameter.openApiPath
+              "expose-api.cafe.io/public-host": parameter.publicHost
+              // identity is optional - first-match idiom emits the bound name or "".
+              "expose-api.cafe.io/identity": [
+                if parameter.identity != _|_ {parameter.identity},
+                "",
+              ][0]
+            }
+          }
+        }
+
         outputs: {
           "apim-publish": {
             apiVersion: "batch/v1"
@@ -88,16 +118,20 @@ spec:
                       az login --service-principal -u "$CID" -p "$CSC" --tenant "$TEN" >/dev/null
                       az account set --subscription "$SUB"
 
-                      # Wait for the service's spec to be publicly reachable (CI may
-                      # still be building the image on day-0; backoffLimit covers
-                      # the long tail).
-                      for i in $(seq 1 30); do
+                      # Wait for the service's spec to be publicly reachable. This
+                      # is now the FALLBACK path (EVENT-2 #151): the substrate
+                      # ksvc-ready sensor normally publishes the moment the service
+                      # reports Ready, so this trait Job only has to cover the case
+                      # where the event-bus is unhealthy. Poll reduced 30x20s ->
+                      # 10x30s (still ~5min) - backoffLimit + the event accelerator
+                      # cover the day-0 CI-build long tail without burning retries.
+                      for i in $(seq 1 10); do
                         if curl -fsS --max-time 10 "$PUBLIC_URL$SPEC_PATH" -o /tmp/openapi.json; then
                           echo "spec fetched from $PUBLIC_URL$SPEC_PATH"
                           break
                         fi
-                        echo "spec not ready yet ($i/30), retrying in 20s..."
-                        sleep 20
+                        echo "spec not ready yet ($i/10), retrying in 30s..."
+                        sleep 30
                       done
                       test -s /tmp/openapi.json || { echo "spec never became reachable"; exit 1; }
 

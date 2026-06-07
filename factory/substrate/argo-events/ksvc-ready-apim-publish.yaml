@@ -1,0 +1,314 @@
+---
+# EVENT-2 (#151): event-driven APIM publication on ksvc readiness.
+#
+# Background: the expose-api TraitDefinition used to render an apim-publish Job
+# that POLLED $PUBLIC_URL$SPEC_PATH 30x20s waiting for the service to serve its
+# OpenAPI spec. On day-0 the CI image build takes ~5-10 min, so that Job burned
+# its retries/backoff and we observed FailureTarget exhaustion. Target state:
+# publish fires WHEN the ksvc becomes Ready, via Argo Events - no polling.
+#
+# Design (mirrors argocd-health-to-slack.yaml + argo-events-oam-watcher.yaml):
+#   EventSource: watch Knative Services in `default` carrying the trait-stamped
+#                label expose-api.cafe.io/publish: "true" (eventTypes: UPDATE -
+#                readiness is a status transition on an already-existing object).
+#   Sensor:      data-filter for the Ready condition == True (gjson array filter,
+#                see below), then a k8s `create` trigger that materialises the
+#                SAME publish Job the trait renders today, parameterised from the
+#                ksvc event (name + namespace + the expose-api.cafe.io/*
+#                annotations the trait stamps - APIM coords + identity binding).
+#
+# Transition strategy: SENSOR-AS-ACCELERATOR. The trait STILL renders its own
+# Job (belt-and-braces) so the zero-touch contract never depends on the
+# event-bus being healthy (it has been silently dead before - see eventbus.yaml).
+# Both Jobs run the identical `az apim api import` which UPSERTS by --api-id, so
+# they are mutually idempotent. The sensor Job is named "<svc>-apim-publish-evt"
+# to never collide with the trait's "<svc>-apim-publish".
+#
+# Ready=True filtering technique: the resource EventSource delivers the ksvc
+# object at data.body; the sensor reads it via dataKey "body". Knative exposes
+# readiness as an entry in status.conditions[] with type=="Ready". An exact
+# match against a conditions ARRAY isn't expressible with a plain dotted path,
+# so we use argo-events' gjson query syntax (the same #(name==...) idiom shown
+# in the upstream multi-path filter docs) to pluck the Ready condition's status:
+#     body.status.conditions.#(type=="Ready").status  ==  "True"
+# If the array shape ever drifts and the filter passes loosely, the triggered
+# Job is still safe: it re-checks readiness by fetching the spec (3x10s) and
+# `az apim api import` upserts, so a spurious fire is a no-op re-publish.
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: ksvc-ready-watcher
+  namespace: argo-events
+spec:
+  template:
+    serviceAccountName: apim-publish-event-sa
+  resource:
+    ksvc-ready:
+      namespace: default
+      group: serving.knative.dev
+      version: v1
+      resource: services
+      eventTypes:
+        - UPDATE
+      # Only services the expose-api trait opted in (it stamps this label on the
+      # ksvc workload metadata). Keeps the watch + bus traffic scoped.
+      filter:
+        labels:
+          - key: expose-api.cafe.io/publish
+            operation: "=="
+            value: "true"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: ksvc-ready-apim-publish
+  namespace: argo-events
+spec:
+  template:
+    serviceAccountName: apim-publish-event-sa
+  dependencies:
+    - name: ksvc-ready-dep
+      eventSourceName: ksvc-ready-watcher
+      eventName: ksvc-ready
+      # Fire only when the Knative Ready condition is True. gjson array filter:
+      # pick the conditions element whose type=="Ready", compare its .status.
+      filters:
+        dataLogicalOperator: "and"
+        data:
+          - path: 'body.status.conditions.#(type=="Ready").status'
+            type: string
+            value:
+              - "True"
+  triggers:
+    - template:
+        name: apim-publish-evt-trigger
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: batch/v1
+              kind: Job
+              metadata:
+                # Overridden per-event via parameters below. generateName keeps
+                # repeated readiness flaps from colliding; the Job body upserts.
+                generateName: apim-publish-evt-
+                namespace: default
+                labels:
+                  app.kubernetes.io/component: apim-publish
+                  app.kubernetes.io/managed-by: argo-events
+                  trait.oam.dev/name: expose-api
+                  expose-api.cafe.io/source: sensor
+              spec:
+                ttlSecondsAfterFinished: 1800
+                backoffLimit: 2
+                template:
+                  spec:
+                    restartPolicy: OnFailure
+                    serviceAccountName: apim-publish-event-sa
+                    volumes:
+                      - name: azure-creds
+                        secret:
+                          secretName: azure-credentials
+                    containers:
+                      - name: apim-publish
+                        image: mcr.microsoft.com/azure-cli:2.64.0
+                        volumeMounts:
+                          - name: azure-creds
+                            mountPath: /azure
+                            readOnly: true
+                        env:
+                          # All overridden per-event from the ksvc annotations
+                          # (see parameters:). Defaults mirror the trait params
+                          # so a missing annotation degrades gracefully.
+                          - name: SVC_NAME
+                            value: PLACEHOLDER_SVC
+                          - name: SVC_NS
+                            value: default
+                          - name: PUBLIC_HOST
+                            value: "20.233.105.82.nip.io"
+                          - name: SPEC_PATH
+                            value: "/openapi.json"
+                          - name: APIM_NAME
+                            value: "aigw-apim-dev-w4x7ibwk4e2is"
+                          - name: APIM_RG
+                            value: "rg-ai-gateway-dev-uae"
+                          - name: API_PREFIX
+                            value: "svc"
+                          - name: IDENTITY
+                            value: ""
+                        command: ["/bin/sh", "-c"]
+                        args:
+                          - |
+                            set -e
+                            PUBLIC_URL="http://${SVC_NAME}.${SVC_NS}.${PUBLIC_HOST}"
+                            API_SUFFIX="${API_PREFIX}/${SVC_NAME}"
+                            echo "expose-api(evt): publishing $SVC_NAME OpenAPI to APIM $APIM_NAME"
+                            CID=$(python3 -c "import json;print(json.load(open('/azure/azure-creds.json'))['clientId'])")
+                            CSC=$(python3 -c "import json;print(json.load(open('/azure/azure-creds.json'))['clientSecret'])")
+                            TEN=$(python3 -c "import json;print(json.load(open('/azure/azure-creds.json'))['tenantId'])")
+                            SUB=$(python3 -c "import json;print(json.load(open('/azure/azure-creds.json'))['subscriptionId'])")
+                            az login --service-principal -u "$CID" -p "$CSC" --tenant "$TEN" >/dev/null
+                            az account set --subscription "$SUB"
+
+                            # The ksvc is Ready (that is why this event fired), so
+                            # the spec MUST serve almost immediately - short retry
+                            # only to ride out ingress propagation, not a CI build.
+                            for i in 1 2 3; do
+                              if curl -fsS --max-time 10 "$PUBLIC_URL$SPEC_PATH" -o /tmp/openapi.json; then
+                                echo "spec fetched from $PUBLIC_URL$SPEC_PATH"
+                                break
+                              fi
+                              echo "spec not ready yet ($i/3), retrying in 10s..."
+                              sleep 10
+                            done
+                            # Idempotent no-op exit: if the spec still is not up the
+                            # service was not actually ready (loose filter) - exit 0
+                            # and let the trait Job (or the next event) handle it.
+                            test -s /tmp/openapi.json || { echo "spec not reachable - exiting 0 (idempotent)"; exit 0; }
+
+                            # --display-name overrides the spec's info.title:
+                            # scaffolded services may share the template title and
+                            # APIM requires unique display names.
+                            az apim api import \
+                              --resource-group "$APIM_RG" \
+                              --service-name "$APIM_NAME" \
+                              --api-id "$SVC_NAME" \
+                              --display-name "$SVC_NAME" \
+                              --path "$API_SUFFIX" \
+                              --specification-format OpenApiJson \
+                              --specification-path /tmp/openapi.json \
+                              --service-url "$PUBLIC_URL" \
+                              --protocols https http \
+                              --subscription-required false
+                            echo "published: APIM api-id=$SVC_NAME path=$API_SUFFIX -> $PUBLIC_URL"
+
+                            # Identity / validate-jwt: NOT applied here. The event
+                            # Job is the ACCELERATOR - it gets the spec into APIM the
+                            # instant the ksvc is Ready (the part that the polling
+                            # design kept failing on day-0). Applying validate-jwt
+                            # needs the IdP issuer/audience from the "<identity>-conn"
+                            # secret, which the sensor cannot mount selectively (the
+                            # identity name is only known at event time, and envFrom
+                            # with optional:false would block this Job behind a secret
+                            # that may not exist yet - reintroducing the day-0 wait we
+                            # are removing). The trait Job OWNS the jwt policy: it
+                            # envFroms "<identity>-conn" (optional:false) and applies
+                            # validate-jwt idempotently. Both Jobs upsert the same
+                            # --api-id, so the trait Job layering jwt on top of this
+                            # Job's import is the intended division of labour.
+                            if [ -n "${IDENTITY}" ]; then
+                              echo "identity=$IDENTITY bound - validate-jwt policy is applied by the trait Job (envFrom <identity>-conn); this accelerator only imports the spec"
+                            else
+                              echo "no identity bound - API published WITHOUT jwt validation"
+                            fi
+          # Per-event parameterisation: stamp the Job from the ksvc event payload.
+          # `value:` on each src is the fallback when the annotation is absent.
+          parameters:
+            # service name -> Job name + all SVC_NAME envs
+            - src:
+                dependencyName: ksvc-ready-dep
+                dataKey: body.metadata.name
+              dest: spec.template.spec.containers.0.env.0.value
+            - src:
+                dependencyName: ksvc-ready-dep
+                dataKey: body.metadata.namespace
+              dest: spec.template.spec.containers.0.env.1.value
+            # namespace for the Job itself
+            - src:
+                dependencyName: ksvc-ready-dep
+                dataKey: body.metadata.namespace
+              dest: metadata.namespace
+            # APIM coords + path prefix + spec path + public host + identity, all
+            # read from the trait-stamped annotations on the ksvc.
+            - src:
+                dependencyName: ksvc-ready-dep
+                dataKey: body.metadata.annotations.expose-api\.cafe\.io/public-host
+                value: "20.233.105.82.nip.io"
+              dest: spec.template.spec.containers.0.env.2.value
+            - src:
+                dependencyName: ksvc-ready-dep
+                dataKey: body.metadata.annotations.expose-api\.cafe\.io/spec-path
+                value: "/openapi.json"
+              dest: spec.template.spec.containers.0.env.3.value
+            - src:
+                dependencyName: ksvc-ready-dep
+                dataKey: body.metadata.annotations.expose-api\.cafe\.io/apim-name
+                value: "aigw-apim-dev-w4x7ibwk4e2is"
+              dest: spec.template.spec.containers.0.env.4.value
+            - src:
+                dependencyName: ksvc-ready-dep
+                dataKey: body.metadata.annotations.expose-api\.cafe\.io/apim-rg
+                value: "rg-ai-gateway-dev-uae"
+              dest: spec.template.spec.containers.0.env.5.value
+            - src:
+                dependencyName: ksvc-ready-dep
+                dataKey: body.metadata.annotations.expose-api\.cafe\.io/path-prefix
+                value: "svc"
+              dest: spec.template.spec.containers.0.env.6.value
+            - src:
+                dependencyName: ksvc-ready-dep
+                dataKey: body.metadata.annotations.expose-api\.cafe\.io/identity
+                value: ""
+              dest: spec.template.spec.containers.0.env.7.value
+          retryStrategy:
+            steps: 3
+            duration: "3s"
+            factor: 2
+---
+# ServiceAccount for the EventSource (watch ksvc) + Sensor (create Jobs).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: apim-publish-event-sa
+  namespace: argo-events
+---
+# EventSource side: read Knative Services cluster-wide (watch is list/watch).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ksvc-ready-event-role
+rules:
+  - apiGroups: ["serving.knative.dev"]
+    resources: ["services"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ksvc-ready-event-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ksvc-ready-event-role
+subjects:
+  - kind: ServiceAccount
+    name: apim-publish-event-sa
+    namespace: argo-events
+---
+# Sensor side: create Jobs (+read secrets the Job mounts) in `default`.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: apim-publish-job-creator
+  namespace: default
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: apim-publish-job-creator-binding
+  namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: apim-publish-job-creator
+subjects:
+  - kind: ServiceAccount
+    name: apim-publish-event-sa
+    namespace: argo-events
