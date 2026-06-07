@@ -403,3 +403,22 @@ def test_single_realtime_and_gateway_accepted():
         {"name": "gw", "type": "graphql-gateway", "properties": {}},
     ]}}
     assert SubmitUseCase._validate_identity_topology(app) is None
+
+
+def test_multiple_caches_advisory_not_rejection():
+    app = {"spec": {"components": [
+        {"name": "c1", "type": "redis", "properties": {}},
+        {"name": "c2", "type": "redis", "properties": {}},
+        {"name": "d1", "type": "postgresql", "properties": {}},
+    ]}}
+    assert SubmitUseCase._validate_identity_topology(app) is None  # allowed
+    adv = SubmitUseCase._backing_sharing_advisory(app)
+    assert adv and "2 redis" in adv and "frugal default" in adv
+
+
+def test_single_cache_no_advisory():
+    app = {"spec": {"components": [
+        {"name": "c1", "type": "redis", "properties": {}},
+        {"name": "d1", "type": "postgresql", "properties": {}},
+    ]}}
+    assert SubmitUseCase._backing_sharing_advisory(app) is None

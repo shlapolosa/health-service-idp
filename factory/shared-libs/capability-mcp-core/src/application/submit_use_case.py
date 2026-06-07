@@ -80,6 +80,7 @@ class SubmitUseCase:
         topo_err = self._validate_identity_topology(app)
         if topo_err:
             return SubmitResult(ok=False, message=f"validation failed:\n{topo_err}")
+        advisory = self._backing_sharing_advisory(app)
 
         # 2b. validate (fail-fast gate)
         ok, diag = self.vela.dry_run(oam_yaml)
@@ -100,7 +101,9 @@ class SubmitUseCase:
         scaffold = self._needs_scaffold(app)
         if scaffold is None:
             # No scaffolding (backing services / bring-your-own-image) → legacy oam-apply.
-            return self._fire_oam_apply(app_name, namespace, target_vcluster, oam_yaml, sha, path)
+            return self._with_advisory(
+                self._fire_oam_apply(app_name, namespace, target_vcluster, oam_yaml, sha, path),
+                advisory)
 
         if self.claims is None:
             # Claim client not wired (should not happen in prod — dependencies.py
@@ -109,7 +112,35 @@ class SubmitUseCase:
                                 message=f"committed {sha} but no claim client is "
                                         f"configured; cannot scaffold {app_name}")
 
-        return self._declarative_scaffold(app, app_name, scaffold, target_vcluster, oam_yaml, sha)
+        return self._with_advisory(
+            self._declarative_scaffold(app, app_name, scaffold, target_vcluster, oam_yaml, sha),
+            advisory)
+
+    @staticmethod
+    def _backing_sharing_advisory(app: dict[str, Any]) -> str | None:
+        """Cache/db are capacity resources, not singletons (unlike auth0-idp/
+        realtime-platform/graphql-gateway): >1 per OAM is ALLOWED for deliberate
+        isolation, but the frugal default is ONE shared instance referenced by
+        every webservice — so we advise rather than reject (user decision
+        2026-06-07). Sharing is collision-safe since the templates namespace
+        cache keys and tables by service name."""
+        comps = app.get("spec", {}).get("components", []) or []
+        notes = []
+        for btype, ref in (("redis", "cache:"), ("postgresql", "database:")):
+            names = [c.get("name") for c in comps if c.get("type") == btype]
+            if len(names) > 1:
+                notes.append(f"advisory: {len(names)} {btype} components ({', '.join(names)}) - "
+                             f"the frugal default is ONE shared instance referenced via `{ref}`; "
+                             f"keep multiples only for deliberate isolation")
+        return "\n".join(notes) or None
+
+    @staticmethod
+    def _with_advisory(result: "SubmitResult", advisory: str | None) -> "SubmitResult":
+        if advisory and result.ok:
+            return SubmitResult(ok=result.ok, commit_sha=result.commit_sha,
+                                workflow_name=result.workflow_name,
+                                message=f"{result.message}\n{advisory}")
+        return result
 
     def submit_wait(self, oam_yaml: str) -> SubmitResult:
         """Deferred sibling of submit() — for OAMs whose ComponentDefinitions don't exist yet.
