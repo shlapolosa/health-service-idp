@@ -36,7 +36,7 @@ spec:
         # lifecycle-v1: adds non-breaking CAFE lifecycle wiring — emits observe events
         # per slack command and optionally drives lifecycle-orchestrator /run on deploy-intent.
         # LIFECYCLE_MODE controls behavior: events_only (default) | full | off.
-        image: healthidpuaeacr.azurecr.io/slack-api-server:user1000
+        image: healthidpuaeacr.azurecr.io/slack-api-server:retire-wft-3c0af95
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
