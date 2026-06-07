@@ -104,8 +104,7 @@ spec:
                 template:
                   spec:
                     restartPolicy: OnFailure
-                    serviceAccountName: apim-publish-event-sa
-                    volumes:
+                        volumes:
                       - name: azure-creds
                         secret:
                           secretName: azure-credentials
