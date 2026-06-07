@@ -42,7 +42,11 @@ spec:
     path: factory/substrate/crossplane
     directory:
       recurse: false
-      include: '*.yaml'
+      # Spine files only: the dir still holds ~11 stale pre-Crossplane-v2
+      # compositions (legacy spec.resources) + duplicate XRDs that predate
+      # PR3 — they broke the app with ComparisonError/RepeatedResource.
+      # Widen back to *.yaml after the crossplane-dir cleanup task.
+      include: 'app-container-claim-*.yaml'
   - repoURL: https://github.com/shlapolosa/health-service-idp.git
     targetRevision: main
     path: factory/substrate/argo-events
