@@ -304,12 +304,17 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
             return False, error_msg
 
     # ------------------------------------------------------------------
-    # Declarative-spine W6: intake convergence. When CAPABILITY_MCP_URL is
-    # set, /microservice goes through capability-mcp-mfg-tc app.submit
-    # (the one contract: vela dry-run -> gitops commit -> claim) instead of
-    # firing the Argo WFT directly. No Argo token on this path — kills the
-    # recurring 24h 401 class (#134) and the framework=auto divergence.
-    # Unset CAPABILITY_MCP_URL = legacy WFT behavior (rollback hatch).
+    # Declarative-spine W6: intake convergence. /microservice goes through
+    # capability-mcp-mfg-tc app.submit (the one contract: vela dry-run ->
+    # gitops commit -> AppContainerClaim) — never the Argo WFT directly. No
+    # Argo token on this path — kills the recurring 24h 401 class (#134) and
+    # the framework=auto divergence.
+    #
+    # RETIRE-WFT (#149, 2026-06-06): the legacy direct-WFT-fire fallback for
+    # /microservice was removed once the claim path was proven E2E
+    # (patient2-api). CAPABILITY_MCP_URL is now REQUIRED for /microservice; if
+    # unset, trigger_microservice_creation errors rather than firing the
+    # archived oam-driven-contract template.
     # ------------------------------------------------------------------
 
     @staticmethod
@@ -369,126 +374,27 @@ class ArgoWorkflowsClient(VClusterDispatcherInterface):
             return False, f"capability-mcp app.submit request failed: {e}"
 
     def trigger_microservice_creation(self, payload: Dict) -> Tuple[bool, str]:
-        """Trigger Microservice creation via app.submit (declarative spine) or legacy WFT."""
+        """Trigger Microservice creation via capability-mcp app.submit (declarative spine).
+
+        RETIRE-WFT (#149): the legacy direct-fire of the oam-driven-contract
+        WorkflowTemplate was removed. /microservice now goes EXCLUSIVELY through
+        capability-mcp app.submit, which creates an AppContainerClaim (proven E2E
+        against patient2-api, 2026-06-06). CAPABILITY_MCP_URL is required.
+        """
         microservice_name = payload.get("microservice-name", "unknown")
 
         mcp_url = os.getenv("CAPABILITY_MCP_URL", "").strip()
-        if mcp_url:
-            logger.info(f"🚀 Routing microservice creation for {microservice_name} via capability-mcp app.submit")
-            return self._submit_via_capability_mcp(payload, mcp_url)
-
-        # Create workflow submission for Microservice
-        workflow_spec = {
-            "namespace": self.namespace,
-            "serverDryRun": False,
-            "workflow": {
-                "metadata": {
-                    "generateName": "microservice-creation-",
-                    "namespace": self.namespace,
-                    "labels": {
-                        "created-by": "slack-api",
-                        "microservice-name": microservice_name,
-                        "user": payload.get("user", "unknown"),
-                        "language": payload.get("language", "python"),
-                        "database": payload.get("database", "none"),
-                        "cache": payload.get("cache", "none")
-                    }
-                },
-                "spec": {
-                    "workflowTemplateRef": {
-                        # Stage 6 of oam-apply consolidation (2026-05-30): switched to
-                        # oam-driven-contract. The new template behaves IDENTICALLY to
-                        # microservice-standard-contract when no `oam-application` parameter
-                        # is passed (Slack doesn't pass it). One workflow source of truth
-                        # across slack-api-server and capability-mcp app.submit.
-                        "name": "oam-driven-contract"
-                    },
-                    "arguments": {
-                        "parameters": [
-                            # TIER 1: Universal Parameters
-                            {"name": "resource-name", "value": payload.get("microservice-name", "")},
-                            {"name": "resource-type", "value": "microservice"},
-                            {"name": "namespace", "value": payload.get("namespace", "default")},
-                            {"name": "user", "value": payload.get("user", "unknown")},
-                            {"name": "description", "value": payload.get("description", "CLAUDE.md-compliant microservice")},
-                            {"name": "github-org", "value": payload.get("github-org", "shlapolosa")},
-                            {"name": "docker-registry", "value": payload.get("docker-registry", self._get_default_registry())},
-                            {"name": "slack-channel", "value": payload.get("slack-channel", "unknown")},
-                            {"name": "slack-user-id", "value": payload.get("slack-user-id", "unknown")},
-                            
-                            # TIER 2: Platform Parameters
-                            {"name": "bootstrap-source", "value": "api-driven"},
-                            {"name": "security-enabled", "value": payload.get("security", "true")},
-                            {"name": "observability-enabled", "value": payload.get("observability", "true")},
-                            {"name": "backup-enabled", "value": "false"},
-                            {"name": "environment-tier", "value": "development"},
-                            {"name": "auto-create-dependencies", "value": payload.get("auto-create-vcluster", "true")},
-                            {"name": "resource-size", "value": "medium"},
-                            
-                            # TIER 3: Microservice-Specific Parameters
-                            {"name": "microservice-language", "value": payload.get("language", "python")},
-                            {"name": "microservice-framework", "value": "auto"},
-                            {"name": "microservice-database", "value": payload.get("database", "none")},
-                            {"name": "microservice-cache", "value": payload.get("cache", "none")},
-                            {"name": "microservice-realtime", "value": payload.get("realtime", "")},
-                            {"name": "microservice-expose-api", "value": "false"},
-                            {"name": "target-vcluster", "value": payload.get("target-vcluster", "")},
-                            {"name": "parent-appcontainer", "value": payload.get("parent-appcontainer", "")},
-                            {"name": "repository-name", "value": payload.get("repository-name", "")},
-                        ]
-                    }
-                }
-            }
-        }
-
-        logger.info(f"🚀 Triggering Microservice creation workflow for: {microservice_name}")
-        logger.debug(f"Workflow spec: {json.dumps(workflow_spec, indent=2)}")
-
-        # Submit workflow to Argo
-        url = f"{self.base_url}/workflows/{self.namespace}"
-        headers = self._get_auth_headers()
-
-        try:
-            response = requests.post(
-                url, 
-                headers=headers, 
-                json=workflow_spec, 
-                timeout=self.timeout,
-                verify=False  # Skip SSL verification for internal cluster communication
+        if not mcp_url:
+            error_msg = (
+                "CAPABILITY_MCP_URL is not set — /microservice requires the "
+                "capability-mcp app.submit path (the legacy oam-driven-contract "
+                "workflow was retired in #149). Configure CAPABILITY_MCP_URL."
             )
-
-            if response.status_code in [200, 201]:
-                workflow_data = response.json()
-                workflow_name = workflow_data.get("metadata", {}).get("name", "unknown")
-                success_msg = f"Microservice creation workflow started: {workflow_name}"
-                logger.info(f"✅ {success_msg}")
-                return True, success_msg
-            else:
-                error_msg = (
-                    f"Argo Workflows API error: {response.status_code} - {response.text}"
-                )
-                logger.error(f"❌ {error_msg}")
-                return False, error_msg
-
-        except requests.exceptions.Timeout:
-            error_msg = f"Argo Workflows API request timed out after {self.timeout} seconds"
-            logger.error(error_msg)
+            logger.error(f"❌ {error_msg}")
             return False, error_msg
 
-        except requests.exceptions.ConnectionError:
-            error_msg = "Failed to connect to Argo Workflows API"
-            logger.error(error_msg)
-            return False, error_msg
-
-        except requests.RequestException as e:
-            error_msg = f"Argo Workflows API request failed: {str(e)}"
-            logger.error(error_msg)
-            return False, error_msg
-
-        except Exception as e:
-            error_msg = f"Unexpected error calling Argo Workflows API: {str(e)}"
-            logger.error(error_msg, exc_info=True)
-            return False, error_msg
+        logger.info(f"🚀 Routing microservice creation for {microservice_name} via capability-mcp app.submit")
+        return self._submit_via_capability_mcp(payload, mcp_url)
 
     def _extract_size_from_resources(self, client_payload: Dict) -> str:
         """Extract size preset from resource specifications."""
