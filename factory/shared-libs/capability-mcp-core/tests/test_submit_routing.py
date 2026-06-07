@@ -63,6 +63,12 @@ class FakeClaims:
         self.created.append((name, kw))
         return self.ok, f"AppContainerClaim {name} created"
 
+    def reconcile_services(self, name, services):
+        # UNIFY-1: record reconcile calls; pretend all are new additions.
+        self.reconciled = getattr(self, "reconciled", [])
+        self.reconciled.append((name, services))
+        return [s["name"] for s in services]
+
 
 def _uc(github=None, claims=...):
     gh = github or FakeGitHub()
@@ -197,3 +203,88 @@ def test_unexposed_needs_no_identity():
     uc, gh = _uc()
     res = uc.submit(_multi_oam(n_identity=0, exposed=False))
     assert res.ok, res.message
+
+
+# ---------------------------------------------------------------------------
+# UNIFY-1 (#153): monorepo-per-OAM — one AppContainerClaim, services[] derived
+# ---------------------------------------------------------------------------
+
+def _monorepo_oam(app_name="patient4", svcs=(("orders", "python"), ("billing", "java"),
+                                            ("chat", "rasa"), ("gw", "nodejs"))):
+    comps = []
+    for name, lang in svcs:
+        comps.append({"name": name, "type": "webservice",
+                      "properties": {"name": name, "language": lang}})
+    return yaml.safe_dump({
+        "apiVersion": "core.oam.dev/v1beta1", "kind": "Application",
+        "metadata": {"name": app_name, "namespace": "default"},
+        "spec": {"components": comps},
+    })
+
+
+def test_day0_single_claim_named_after_oam_with_services():
+    uc, gh = _uc()
+    res = uc.submit(_monorepo_oam())
+    assert res.ok, res.message
+    assert len(uc.claims.created) == 1, "exactly ONE AppContainerClaim per OAM"
+    name, kw = uc.claims.created[0]
+    assert name == "patient4", "claim is named after the OAM, not a component"
+    services = kw["services"]
+    assert [s["name"] for s in services] == ["orders", "billing", "chat", "gw"]
+
+
+def test_services_framework_derived_from_language():
+    uc, gh = _uc()
+    uc.submit(_monorepo_oam())
+    _, kw = uc.claims.created[0]
+    fw = {s["name"]: s["framework"] for s in kw["services"]}
+    assert fw == {"orders": "fastapi", "billing": "springboot",
+                  "chat": "chatbot", "gw": "graphql-gateway"}
+
+
+def test_byo_image_component_excluded_from_services():
+    oam = yaml.safe_load(_monorepo_oam(svcs=(("orders", "python"), ("billing", "python"))))
+    # billing supplies a non-default prebuilt image -> not scaffolded
+    oam["spec"]["components"][1]["properties"]["image"] = "ghcr.io/acme/billing:1.2.3"
+    uc, gh = _uc()
+    res = uc.submit(yaml.safe_dump(oam))
+    assert res.ok, res.message
+    _, kw = uc.claims.created[0]
+    assert [s["name"] for s in kw["services"]] == ["orders"]
+
+
+def test_single_service_oam_still_one_element_services():
+    # backward compat: single webservice OAM still works; app==component name here.
+    uc, gh = _uc()
+    res = uc.submit(_oam())  # app/component both "my-svc"
+    assert res.ok, res.message
+    name, kw = uc.claims.created[0]
+    assert name == "my-svc"
+    assert [s["name"] for s in kw["services"]] == ["my-svc"]
+
+
+def test_update_path_reconciles_new_services():
+    # existing OAM repo -> update path commits OAM AND reconciles services[] so a
+    # newly-added component scaffolds its folder (no trait needed).
+    gh = FakeGitHub(existing_repos={"patient4-gitops"})
+    uc, gh = _uc(github=gh)
+    res = uc.submit(_monorepo_oam())
+    assert res.ok, res.message
+    assert ("patient4-gitops", "oam/applications/application.yaml") in gh.commits
+    assert getattr(uc.claims, "reconciled", []), "update path must reconcile services"
+    rname, rsvcs = uc.claims.reconciled[0]
+    assert rname == "patient4"
+    assert [s["name"] for s in rsvcs] == ["orders", "billing", "chat", "gw"]
+    assert "scaffolded new service" in res.message
+
+
+def test_update_path_repo_named_after_oam_not_component():
+    # the shared repo is <app>-gitops, NOT <first-component>-gitops (kills the
+    # per-service-repo phantom pattern).
+    gh = FakeGitHub(existing_repos={"orders-gitops"})  # component repo, NOT app repo
+    uc, gh = _uc(github=gh)
+    res = uc.submit(_monorepo_oam())
+    assert res.ok, res.message
+    # orders-gitops must NOT be treated as the OAM repo -> day-0 claim path taken
+    assert uc.claims.created, "wrong-named existing repo must not short-circuit to update"
+    assert uc.claims.created[0][0] == "patient4"

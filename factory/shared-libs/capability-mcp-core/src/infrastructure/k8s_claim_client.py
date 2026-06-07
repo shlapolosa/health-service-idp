@@ -51,6 +51,7 @@ class K8sClaimClient:
         description: str = "created by app.submit (declarative spine)",
         database: str = "none",
         cache: str = "none",
+        services: list[dict[str, str]] | None = None,
     ) -> tuple[bool, str]:
         """Create (or converge onto) the AppContainerClaim `name`. Returns (ok, message).
 
@@ -58,7 +59,27 @@ class K8sClaimClient:
         submit) — that is success, the composition is already reconciling. We do NOT
         patch oamApplication on conflict: the seed is write-once; updates flow as
         direct commits to the per-service gitops repo.
+
+        UNIFY-1 (#153): `services` (one entry {name, language, framework} per
+        webservice component of the OAM) is set on spec.services[]. The composition
+        ranges over it to emit one ApplicationClaim per service, all sharing this
+        claim's repo (monorepo-per-OAM). Omitted/empty → the composition falls back
+        to the single-service path (appContainer == name) for full backward compat.
         """
+        spec: dict[str, Any] = {
+            "name": name,
+            "description": description,
+            "gitHubOrg": github_org,
+            "dockerRegistry": docker_registry,
+            "language": language,
+            "framework": framework,
+            "database": database,
+            "cache": cache,
+            "deliveryTarget": delivery_target,
+            "oamApplication": oam_application_b64,
+        }
+        if services:
+            spec["services"] = services
         body: dict[str, Any] = {
             "apiVersion": f"{_GROUP}/{_VERSION}",
             "kind": "AppContainerClaim",
@@ -70,18 +91,7 @@ class K8sClaimClient:
                     "app.kubernetes.io/managed-by": "capability-mcp",
                 },
             },
-            "spec": {
-                "name": name,
-                "description": description,
-                "gitHubOrg": github_org,
-                "dockerRegistry": docker_registry,
-                "language": language,
-                "framework": framework,
-                "database": database,
-                "cache": cache,
-                "deliveryTarget": delivery_target,
-                "oamApplication": oam_application_b64,
-            },
+            "spec": spec,
         }
         try:
             self._custom_api().create_namespaced_custom_object(
@@ -97,6 +107,49 @@ class K8sClaimClient:
                 return True, f"AppContainerClaim {name} already exists (converging)"
             logger.error("AppContainerClaim create failed: %s", e)
             return False, f"AppContainerClaim create failed: {e}"
+
+    def reconcile_services(self, name: str, services: list[dict[str, str]]) -> list[str]:
+        """UNIFY-1 (#153) update-path reconcile. Patch the existing AppContainerClaim
+        `name` to ADD any service entries not already in spec.services[]. Returns the
+        list of newly added service names (empty if nothing to do / claim absent).
+
+        Closes the update-path scaffold gap: adding a webservice component to an
+        existing OAM scaffolds its microservices/<name>/ folder with no trait — the
+        composition emits an extra ApplicationClaim for the added service. Existing
+        entries are never mutated (write-once scaffold), so this is purely additive
+        and safe to re-run.
+        """
+        if not services:
+            return []
+        try:
+            obj = self._custom_api().get_namespaced_custom_object(
+                group=_GROUP, version=_VERSION, namespace=self.namespace,
+                plural=_PLURAL, name=name,
+            )
+        except Exception as e:  # noqa: BLE001
+            # Legacy single-service claims (pre-UNIFY-1) or no claim at all: no-op.
+            logger.info("reconcile_services: claim %s not found (%s) — skipping", name, e)
+            return []
+
+        existing = (obj.get("spec") or {}).get("services") or []
+        existing_names = {s.get("name") for s in existing}
+        to_add = [s for s in services if s.get("name") not in existing_names]
+        if not to_add:
+            return []
+
+        merged = existing + to_add
+        patch = {"spec": {"services": merged}}
+        try:
+            self._custom_api().patch_namespaced_custom_object(
+                group=_GROUP, version=_VERSION, namespace=self.namespace,
+                plural=_PLURAL, name=name, body=patch,
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.error("reconcile_services: patch of %s failed: %s", name, e)
+            return []
+        added = [s.get("name") for s in to_add]
+        logger.info("✅ AppContainerClaim %s services reconciled (+%s)", name, ", ".join(added))
+        return added
 
     def get_claim_status(self, name: str) -> Optional[dict[str, Any]]:
         """Return the claim's .status (or None). Used by app.status (W5)."""

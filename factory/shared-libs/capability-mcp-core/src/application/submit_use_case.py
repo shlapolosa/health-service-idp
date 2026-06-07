@@ -221,20 +221,61 @@ class SubmitUseCase:
             return comp
         return None
 
+    _FW_FOR_LANG = {"python": "fastapi", "java": "springboot",
+                    "rasa": "chatbot", "nodejs": "graphql-gateway"}
+
+    @classmethod
+    def _derive_framework(cls, lang: str, fw: str | None) -> str:
+        """framework from language when unset/"auto" (single source of truth)."""
+        if fw and fw != "auto":
+            return fw
+        return cls._FW_FOR_LANG.get(lang, "fastapi")
+
+    @classmethod
+    def _webservice_services(cls, app: dict[str, Any]) -> list[dict[str, str]]:
+        """UNIFY-1 (#153): derive services[] from EVERY webservice component that
+        needs scaffolding (language set, image absent/default). One AppContainerClaim
+        per OAM ranges over this to emit one ApplicationClaim per service, all sharing
+        the OAM-named repo (microservices/<name>/ per service). Backward compatible:
+        a single-component OAM yields a one-element list.
+        """
+        services: list[dict[str, str]] = []
+        for comp in app.get("spec", {}).get("components", []) or []:
+            if comp.get("type") != "webservice":
+                continue
+            props = comp.get("properties") or {}
+            lang = props.get("language")
+            if not lang:
+                continue
+            img = props.get("image", "")
+            default_img = f"healthidpuaeacr.azurecr.io/{comp.get('name')}:latest"
+            if img and img != default_img:
+                continue  # bring-your-own image: not scaffolded
+            services.append({
+                "name": comp.get("name"),
+                "language": lang,
+                "framework": cls._derive_framework(lang, props.get("framework")),
+            })
+        return services
+
     def _declarative_scaffold(self, app: dict[str, Any], app_name: str,
                               scaffold_comp: dict[str, Any],
                               target_vcluster: str | None, oam_yaml: str,
                               sha: str) -> SubmitResult:
         """Declarative-spine path: update via direct repo commit, day-0 via claim.
 
-        No Argo REST call anywhere — the claim's composition owns repo creation,
-        OAM seeding and the ArgoCD Application; CI closes the image loop.
+        UNIFY-1 (#153): tenancy unit is the OAM. ONE AppContainerClaim named after
+        the OAM app, carrying services[] (one entry per scaffolded webservice). Its
+        composition creates ONE source + ONE gitops repo and ranges over services[]
+        to emit one ApplicationClaim per service, each scaffolding microservices/<name>/
+        in the shared repo. No Argo REST call anywhere — the claim's composition owns
+        repo creation, OAM seeding and the ArgoCD Application; CI closes the image loop.
         """
-        comp_name = scaffold_comp["name"]
-        svc_repo = f"{comp_name}-gitops"
+        svc_repo = f"{app_name}-gitops"           # repo is named after the OAM (shared)
+        services = self._webservice_services(app)  # all scaffolded webservices
 
-        # UPDATE path: per-service repo already exists → the OAM file there is the
-        # single reconciled truth; commit straight to it. ArgoCD picks it up.
+        # UPDATE path: the OAM repo already exists → the OAM file there is the single
+        # reconciled truth; commit straight to it. ArgoCD picks it up.
         if self.github.repo_exists(svc_repo):
             ok, svc_sha = self.github.commit_file(
                 _SVC_OAM_PATH, oam_yaml,
@@ -245,15 +286,27 @@ class SubmitUseCase:
                 return SubmitResult(ok=False, commit_sha=sha,
                                     message=f"ledger committed {sha} but per-service "
                                             f"commit to {svc_repo} failed")
+            # UNIFY-1 update-path reconcile: a NEW webservice component added to an
+            # existing OAM must scaffold its microservices/<name>/ folder. The existing
+            # AppContainerClaim only knows about the services it was created with, so
+            # patch in any missing entries — the composition then emits an extra
+            # ApplicationClaim for the new service. No trait needed. Best-effort: an
+            # absent claim (legacy single-service claims pre-UNIFY-1) is a no-op.
+            reconcile_msg = ""
+            if self.claims is not None and services:
+                added = self.claims.reconcile_services(name=app_name, services=services)
+                if added:
+                    reconcile_msg = f"; scaffolded new service(s): {', '.join(added)}"
             return SubmitResult(ok=True, commit_sha=svc_sha,
                                 message=(f"updated {app_name}; committed {svc_sha} to "
                                          f"{svc_repo}/{_SVC_OAM_PATH}; ArgoCD will reconcile "
-                                         f"(ledger {sha})"))
+                                         f"(ledger {sha}){reconcile_msg}"))
 
-        # DAY-0 path: create the AppContainerClaim. Composition does the rest
-        # (repos via templates, OAM seed, ApplicationClaim for service code,
-        # ArgoCD app). Resolve database/cache OAM-style references to sibling
-        # component types, same as the legacy path.
+        # DAY-0 path: create the AppContainerClaim named after the OAM. Composition
+        # does the rest (one repo pair via templates, OAM seed, one ApplicationClaim
+        # per service for code scaffolding, ArgoCD app). database/cache are resolved
+        # from the FIRST scaffold component's OAM-style references (claim-level
+        # backing-service knobs are shared across the monorepo, as before).
         props = scaffold_comp.get("properties") or {}
         comp_types = {c.get("name"): c.get("type", "")
                       for c in app.get("spec", {}).get("components", [])}
@@ -265,15 +318,13 @@ class SubmitUseCase:
             return comp_types.get(raw, raw)
 
         _lang = props.get("language", "python")
-        _fw = props.get("framework")
-        if not _fw or _fw == "auto":
-            _fw = {"python": "fastapi", "java": "springboot",
-                   "rasa": "chatbot", "nodejs": "graphql-gateway"}.get(_lang, "fastapi")
+        _fw = self._derive_framework(_lang, props.get("framework"))
         ok, msg = self.claims.create_app_container_claim(
-            name=comp_name,
+            name=app_name,
             oam_application_b64=base64.b64encode(oam_yaml.encode()).decode(),
             language=_lang,
             framework=_fw,
+            services=services,
             database=_resolve_dep("database", "none"),
             cache=_resolve_dep("cache", "none"),
             delivery_target=target_vcluster or "host",
@@ -282,10 +333,12 @@ class SubmitUseCase:
         if not ok:
             return SubmitResult(ok=False, commit_sha=sha,
                                 message=f"committed {sha} but claim creation failed: {msg}")
-        return SubmitResult(ok=True, commit_sha=sha, workflow_name=comp_name,
+        svc_count = len(services) or 1
+        return SubmitResult(ok=True, commit_sha=sha, workflow_name=app_name,
                             message=(f"submitted {app_name}; committed {sha}; {msg}; "
                                      f"composition will create {svc_repo} + seed OAM + "
-                                     f"ArgoCD app (target={target_vcluster or 'host'})"))
+                                     f"ArgoCD app + scaffold {svc_count} service(s) "
+                                     f"(target={target_vcluster or 'host'})"))
 
     def _fire_oam_apply(self, app_name: str, namespace: str, target_vcluster: str | None,
                         oam_yaml: str, sha: str, path: str) -> SubmitResult:
