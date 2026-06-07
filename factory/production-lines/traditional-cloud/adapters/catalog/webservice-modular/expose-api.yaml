@@ -41,6 +41,7 @@ spec:
               "expose-api.cafe.io/apim-rg":     parameter.apimResourceGroup
               "expose-api.cafe.io/spec-path":   parameter.openApiPath
               "expose-api.cafe.io/public-host": parameter.publicHost
+              "expose-api.cafe.io/api-type":    parameter.apiType
               // identity is optional - first-match idiom emits the bound name or "".
               "expose-api.cafe.io/identity": [
                 if parameter.identity != _|_ {parameter.identity},
@@ -106,17 +107,39 @@ spec:
                       { name: "APIM_NAME",  value: parameter.apimName },
                       { name: "APIM_RG",    value: parameter.apimResourceGroup },
                       { name: "API_SUFFIX", value: parameter.apiPathPrefix + "/" + context.name },
+                      { name: "API_TYPE",   value: parameter.apiType },
+                      { name: "WS_URL",     value: "ws://" + context.name + "." + context.namespace + "." + parameter.publicHost + "/ws" },
                     ]
                     command: ["/bin/sh", "-c"]
                     args: ["""
                       set -e
-                      echo "expose-api: publishing $SVC_NAME OpenAPI to APIM $APIM_NAME"
+                      echo "expose-api: publishing $SVC_NAME ($API_TYPE) to APIM $APIM_NAME"
                       CID=$(python3 -c "import json;print(json.load(open('/azure/azure-creds.json'))['clientId'])")
                       CSC=$(python3 -c "import json;print(json.load(open('/azure/azure-creds.json'))['clientSecret'])")
                       TEN=$(python3 -c "import json;print(json.load(open('/azure/azure-creds.json'))['tenantId'])")
                       SUB=$(python3 -c "import json;print(json.load(open('/azure/azure-creds.json'))['subscriptionId'])")
                       az login --service-principal -u "$CID" -p "$CSC" --tenant "$TEN" >/dev/null
                       az account set --subscription "$SUB"
+
+                      if [ "$API_TYPE" = "websocket" ]; then
+                        # WebSocket APIs carry no OpenAPI spec - create/upsert the
+                        # APIM websocket API via ARM PUT (idempotent), then apply
+                        # validate-jwt exactly like the http path. (External-by-
+                        # default, user decision 2026-06-07. The earlier RT-1
+                        # Istio-only stance conflated the MCP POST-body v1-SKU bug
+                        # with websockets; Developer tier supports WS APIs.)
+                        APIM_ID=$(az apim show -g "$APIM_RG" -n "$APIM_NAME" --query id -o tsv)
+                        python3 -c "import json; json.dump({'properties':{'displayName':'$SVC_NAME','path':'$API_SUFFIX','type':'websocket','serviceUrl':'$WS_URL','protocols':['wss','ws']}}, open('/tmp/wsapi.json','w'))"
+                        az rest --method PUT --url "https://management.azure.com${APIM_ID}/apis/${SVC_NAME}?api-version=2022-08-01" --body @/tmp/wsapi.json
+                        echo "published websocket api: $SVC_NAME path=$API_SUFFIX -> $WS_URL"
+                        if [ -n "${JWT_ISSUER_URI:-}" ]; then
+                          printf '<policies><inbound><base /><validate-jwt header-name="Authorization" failed-validation-httpcode="401" failed-validation-error-message="Unauthorized"><openid-config url="%s.well-known/openid-configuration" /><audiences><audience>%s</audience></audiences></validate-jwt></inbound><backend><base /></backend><outbound><base /></outbound><on-error><base /></on-error></policies>' "$JWT_ISSUER_URI" "$AUTH0_AUDIENCE" > /tmp/policy.xml
+                          python3 -c "import json; json.dump({'properties':{'format':'xml','value':open('/tmp/policy.xml').read()}}, open('/tmp/policy.json','w'))"
+                          az rest --method PUT --url "https://management.azure.com${APIM_ID}/apis/${SVC_NAME}/policies/policy?api-version=2022-08-01" --body @/tmp/policy.json
+                          echo "validate-jwt applied to websocket api"
+                        fi
+                        exit 0
+                      fi
 
                       # Wait for the service's spec to be publicly reachable. This
                       # is now the FALLBACK path (EVENT-2 #151): the substrate
@@ -190,4 +213,7 @@ spec:
 
           // +usage=Name of a sibling identity component (e.g. auth0-idp). When set, the published API is locked behind an APIM validate-jwt policy using that component's JWT_ISSUER_URI/AUTH0_AUDIENCE.
           identity?: string
+
+          // +usage=APIM API type: http (OpenAPI import, default) or websocket (ws pass-through, no spec). realtime-service components default to websocket via app.submit.
+          apiType: *"http" | "websocket"
         }

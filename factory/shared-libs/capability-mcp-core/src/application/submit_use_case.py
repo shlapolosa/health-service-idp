@@ -72,6 +72,13 @@ class SubmitUseCase:
         # explicit list; the template's runtime kubectl discovery stays as fallback.
         oam_yaml = self._inject_graphql_sources(app, namespace, oam_yaml)
 
+        # External-by-default (user decision 2026-06-07): graphql-gateway and
+        # realtime-service are inherently external-facing - auto-attach the
+        # expose-api trait (APIM publication; websocket API type for realtime)
+        # wired to the OAM's singleton identity. Runs BEFORE topology
+        # validation so exposure=>identity is enforced on the result.
+        oam_yaml = self._auto_expose_external_components(app, oam_yaml)
+
         target_vcluster = self._target_vcluster(app)
 
         # 2a. identity topology rule (platform invariant, 2026-06-06):
@@ -115,6 +122,34 @@ class SubmitUseCase:
         return self._with_advisory(
             self._declarative_scaffold(app, app_name, scaffold, target_vcluster, oam_yaml, sha),
             advisory)
+
+    @staticmethod
+    def _auto_expose_external_components(app: dict[str, Any], oam_yaml: str) -> str:
+        """External-by-default: graphql-gateway + realtime-service components get
+        the expose-api trait auto-attached (identity = the OAM's singleton
+        auth0-idp; apiType websocket for realtime-service). Explicit traits are
+        left untouched; OAMs without an identity component will then fail the
+        exposure=>identity invariant with its existing actionable message."""
+        comps = app.get("spec", {}).get("components", []) or []
+        identity = next((c.get("name") for c in comps if c.get("type") == "auth0-idp"), None)
+        changed = False
+        for comp in comps:
+            ctype = comp.get("type")
+            if ctype not in ("graphql-gateway", "realtime-service"):
+                continue
+            traits = comp.setdefault("traits", [])
+            if any(t.get("type") == "expose-api" for t in traits):
+                continue
+            props: dict[str, Any] = {}
+            if identity:
+                props["identity"] = identity
+            if ctype == "realtime-service":
+                props["apiType"] = "websocket"
+            traits.append({"type": "expose-api", "properties": props})
+            changed = True
+        if changed:
+            return yaml.safe_dump(app, sort_keys=False)
+        return oam_yaml
 
     @staticmethod
     def _backing_sharing_advisory(app: dict[str, Any]) -> str | None:
@@ -171,6 +206,13 @@ class SubmitUseCase:
         # GQL-1 (#155): same render-injection as submit() so the deferred path also
         # commits the authoritative explicit sources to the ledger.
         oam_yaml = self._inject_graphql_sources(app, namespace, oam_yaml)
+
+        # External-by-default (user decision 2026-06-07): graphql-gateway and
+        # realtime-service are inherently external-facing - auto-attach the
+        # expose-api trait (APIM publication; websocket API type for realtime)
+        # wired to the OAM's singleton identity. Runs BEFORE topology
+        # validation so exposure=>identity is enforced on the result.
+        oam_yaml = self._auto_expose_external_components(app, oam_yaml)
 
         target_vcluster = self._target_vcluster(app)
 

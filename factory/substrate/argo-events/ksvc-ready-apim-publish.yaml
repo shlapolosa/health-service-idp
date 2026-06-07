@@ -133,12 +133,17 @@ spec:
                             value: "rg-ai-gateway-dev-uae"
                           - name: API_PREFIX
                             value: "svc"
+                          - name: API_TYPE
+                            value: "http"
                           - name: IDENTITY
                             value: ""
                         command: ["/bin/sh", "-c"]
                         args:
                           - |
                             set -e
+                            if [ "$API_TYPE" = "websocket" ]; then
+                              echo "websocket api-type: trait Job owns WS publication (ARM PUT); accelerator not applicable"; exit 0
+                            fi
                             PUBLIC_URL="http://${SVC_NAME}.${SVC_NS}.${PUBLIC_HOST}"
                             API_SUFFIX="${API_PREFIX}/${SVC_NAME}"
                             echo "expose-api(evt): publishing $SVC_NAME OpenAPI to APIM $APIM_NAME"
@@ -249,6 +254,11 @@ spec:
                 dataKey: body.metadata.annotations.expose-api\.cafe\.io/identity
                 value: ""
               dest: spec.template.spec.containers.0.env.7.value
+            - src:
+                dependencyName: ksvc-ready
+                dataKey: body.metadata.annotations.expose-api\.cafe\.io/api-type
+                value: "http"
+              dest: spec.template.spec.containers.0.env.8.value
           retryStrategy:
             steps: 3
             duration: "3s"

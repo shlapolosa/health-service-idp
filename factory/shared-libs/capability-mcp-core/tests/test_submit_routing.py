@@ -431,3 +431,34 @@ def test_graphql_gateway_language_defaults_to_nodejs():
     services = SubmitUseCase._webservice_services(app)
     assert services and services[0]["language"] == "nodejs"
     assert services[0]["framework"] == "graphql-gateway"
+
+
+def test_graphql_gateway_auto_exposed_with_identity():
+    app = {"spec": {"components": [
+        {"name": "auth", "type": "auth0-idp", "properties": {}},
+        {"name": "gw", "type": "graphql-gateway", "properties": {"name": "gw"}},
+    ]}}
+    out = SubmitUseCase._auto_expose_external_components(app, "orig")
+    gw = app["spec"]["components"][1]
+    t = [t for t in gw["traits"] if t["type"] == "expose-api"]
+    assert t and t[0]["properties"]["identity"] == "auth"
+    assert out != "orig"  # yaml re-dumped
+
+
+def test_realtime_service_auto_exposed_websocket():
+    app = {"spec": {"components": [
+        {"name": "auth", "type": "auth0-idp", "properties": {}},
+        {"name": "ws", "type": "realtime-service", "properties": {"name": "ws"}},
+    ]}}
+    SubmitUseCase._auto_expose_external_components(app, "orig")
+    t = [t for t in app["spec"]["components"][1]["traits"] if t["type"] == "expose-api"]
+    assert t and t[0]["properties"]["apiType"] == "websocket"
+
+
+def test_explicit_expose_trait_untouched():
+    app = {"spec": {"components": [
+        {"name": "gw", "type": "graphql-gateway", "properties": {},
+         "traits": [{"type": "expose-api", "properties": {"identity": "custom"}}]},
+    ]}}
+    out = SubmitUseCase._auto_expose_external_components(app, "orig")
+    assert out == "orig"
