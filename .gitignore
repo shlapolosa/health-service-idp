@@ -96,3 +96,4 @@ tasks.json
 tasks/ graphify-out/
 pytest-of-*/
 node-compile-cache/
+.claude/worktrees/
