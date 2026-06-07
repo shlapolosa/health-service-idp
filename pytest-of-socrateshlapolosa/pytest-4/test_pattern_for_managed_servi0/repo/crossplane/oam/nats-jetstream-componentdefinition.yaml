@@ -1,4 +1,0 @@
-apiVersion: core.oam.dev/v1beta1
-kind: ComponentDefinition
-metadata: {name: nats-jetstream}
-spec: {workload: {definition: {apiVersion: helm.crossplane.io/v1beta1, kind: Release}}}

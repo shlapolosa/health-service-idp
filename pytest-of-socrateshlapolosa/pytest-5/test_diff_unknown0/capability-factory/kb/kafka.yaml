@@ -1,8 +1,0 @@
-technology: kafka
-category: messaging
-profile: {durability: strong, throughputClass: very-high}
-provisioning:
-  kind: operator-backed
-  source: operator:strimzi
-  requires_cluster_permissions: false
-maturity: kb

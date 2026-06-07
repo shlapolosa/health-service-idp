@@ -1,9 +1,0 @@
-
-recipes:
-  - id: web-service-needs-db
-    triggers:
-      composite:
-        contains: [compute-service, datastore]
-    emit: [oam/traits/datastore-secret-binding.yaml]
-    docs: |
-      DB binding.
