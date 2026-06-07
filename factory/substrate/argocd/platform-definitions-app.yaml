@@ -33,6 +33,12 @@ spec:
       include: '*.yaml'
   - repoURL: https://github.com/shlapolosa/health-service-idp.git
     targetRevision: main
+    path: factory/production-lines/traditional-cloud/adapters/composition
+    directory:
+      recurse: false
+      include: '*.yaml'
+  - repoURL: https://github.com/shlapolosa/health-service-idp.git
+    targetRevision: main
     path: factory/substrate/crossplane
     directory:
       recurse: false
