@@ -1,4 +1,13 @@
 ---
+# DEFERRED (GQL-1 #155, 2026-06-07): NON-FUNCTIONAL Hasura skeleton — kept as the
+# future `database-graphql` candidate, NOT part of GQL-1. GQL-1 ships GraphQL Mesh
+# over OpenAPI federation (the active graphql-platform-claim-composition.yaml +
+# graphql-gateway.cd.yaml), which matches the /openapi.json + binding contracts.
+# This skeleton sets up secrets/metadata/netpol/endpoint but has NO running
+# graphql-engine workload and depends on a Postgres the active composition dropped.
+# Do NOT apply. To revive for direct-Postgres GraphQL: finish the graphql-engine
+# Deployment+Service and restore a Postgres dependency (see CLAUDE.md TODO #4).
+#
 # GraphQLPlatformClaim Composition - Creates all infrastructure for GraphQL gateway
 # Following the pattern of realtime-platform-claim-composition.yaml
 apiVersion: apiextensions.crossplane.io/v1
