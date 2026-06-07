@@ -94,3 +94,5 @@ setup-*.sh
 # Task files
 tasks.json
 tasks/ graphify-out/
+pytest-of-*/
+node-compile-cache/
