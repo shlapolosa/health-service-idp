@@ -98,6 +98,15 @@ spec:
                       memory: "128Mi"
                     }
                   }
+                  // Numeric runAsUser (not the image's USER mesh): Knative
+                  // secure-pod-defaults enforce runAsNonRoot, which can't verify
+                  // a non-numeric username (caught patient9-graph 2026-06-08;
+                  // same class as #136 for the webservice CD).
+                  securityContext: {
+                    runAsUser: 1000
+                    runAsNonRoot: true
+                    allowPrivilegeEscalation: false
+                  }
                   volumeMounts: [
                     {
                       name: "gateway-config"
