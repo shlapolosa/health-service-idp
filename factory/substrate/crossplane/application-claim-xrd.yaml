@@ -40,19 +40,24 @@ spec:
               language:
                 type: string
                 description: Programming language for the application
-                # Narrowed 2026-06-01: only python+java have working scaffold paths
-                # in application-claim-composition. nodejs/rasa/go/rust would
-                # pass enum validation but fail at microservice-creator Job.
+                # 2026-06-08: widened beyond python/java — mscv now has working
+                # scaffold branches for nodejs (graphql-federation-gateway-template,
+                # GQL-1 #155) and rasa (chat-template). go/rust still excluded (no
+                # template). Pairs with the framework enum below.
                 enum:
                   - python
                   - java
+                  - nodejs
+                  - rasa
               framework:
                 type: string
                 description: Application framework to use
-                # Same constraint — only python/fastapi + java/springboot scaffold.
+                # 2026-06-08: + graphql-gateway (nodejs/Mesh, GQL-1) + chatbot (rasa).
                 enum:
                   - fastapi
                   - springboot
+                  - graphql-gateway
+                  - chatbot
               # RT-1 (#156): optional scaffold flavor. Keeps the framework enum clean
               # (realtime is fastapi + extra deps, not a new framework). When
               # "realtime" the mscv Job materializes a websocket variant wired to
