@@ -68,7 +68,13 @@ spec:
                   {
                     name: "gateway-config"
                     configMap: {
-                      name: (*parameter.configMapName | context.name + "-config")
+                      // optional: GQL-1 moved mesh sources to the MESH_SOURCES env
+                      // (app.submit-injected), so this ConfigMap is no longer
+                      // created. optional:true lets the pod start without it
+                      // (the old graphql-gateway-configmap.yaml was deleted in
+                      // the GQL-1 consolidation — caught patient9-graph 2026-06-08).
+                      name:     (*parameter.configMapName | context.name + "-config")
+                      optional: true
                     }
                   }
                 ]
