@@ -79,11 +79,12 @@ spec:
                   }
                 ]
                 containers: [{
-                  // Image defaults to the platform registry (ACR) — CI builds
-                  // microservices/<name> and pushes healthidpuaeacr.azurecr.io/<name>
-                  // (was a stale docker.io/socrates12345 default that 401'd on pull;
-                  // caught patient7-graph 2026-06-08). Parity with webservice CD.
-                  image: *("healthidpuaeacr.azurecr.io/" + context.name + ":latest") | string
+                  // Use the image parameter directly (parity with webservice CD).
+                  // Defaults to the ACR :latest placeholder (CI builds microservices/<name>);
+                  // consumers / W3 digest commit-back override via OAM `properties.image`
+                  // (without this param the OAM image was silently dropped and the gateway
+                  // was stuck on a stale :latest digest — caught patient9-graph 2026-06-08).
+                  image: parameter.image
                   ports: [{
                     containerPort: 8080
                     name: "http1"
@@ -434,6 +435,10 @@ spec:
         }
         
         parameter: {
+          // Container image — defaults to the ACR :latest placeholder; overridable via
+          // OAM `properties.image` (BYO image or W3 digest pin). Parity with webservice CD.
+          image: *"healthidpuaeacr.azurecr.io/\(context.name):latest" | string
+
           // Repository-based image generation (required when repository specified)
           gatewayImage: *"" | string
           
