@@ -70,10 +70,24 @@ class FakeClaims:
         return [s["name"] for s in services]
 
 
-def _uc(github=None, claims=...):
+class FakeApimProducts:
+    def __init__(self, ok=True, raises=False):
+        self.ok = ok
+        self.raises = raises
+        self.calls = []  # (app_name, api_ids, display_name, description)
+
+    def reconcile_product(self, app_name, api_ids, display_name=None, description=""):
+        if self.raises:
+            raise RuntimeError("boom")
+        self.calls.append((app_name, list(api_ids), display_name, description))
+        return self.ok, f"product {app_name} reconciled ({len(api_ids)})"
+
+
+def _uc(github=None, claims=..., apim=...):
     gh = github or FakeGitHub()
     cl = FakeClaims() if claims is ... else claims
-    return SubmitUseCase(FakeVela(), gh, FakeArgo(), claims=cl), gh
+    ap = FakeApimProducts() if apim is ... else apim
+    return SubmitUseCase(FakeVela(), gh, FakeArgo(), claims=cl, apim_products=ap), gh
 
 
 def test_no_scaffold_routes_to_oam_apply():
@@ -462,3 +476,149 @@ def test_explicit_expose_trait_untouched():
     ]}}
     out = SubmitUseCase._auto_expose_external_components(app, "orig")
     assert out == "orig"
+
+
+# ---------------------------------------------------------------------------
+# APIM-PRODUCT-1 (#161): per-OAM Developer-Portal product membership + reconcile
+# ---------------------------------------------------------------------------
+
+from src.infrastructure.apim_product_client import ApimProductClient
+
+
+def _product_oam(app_name="patient9"):
+    """The live worked example: 2 exposed webservices + a graphql-gateway + an
+    internal-only webservice + identity. External set must be exactly the three
+    external components (incl. the gateway), NOT the internal one."""
+    comps = [
+        {"name": "auth", "type": "auth0-idp", "properties": {}},
+        {"name": "patient9-api", "type": "webservice",
+         "properties": {"name": "patient9-api", "language": "python"},
+         "traits": [{"type": "expose-api", "properties": {"identity": "auth"}}]},
+        {"name": "patient9-records", "type": "webservice",
+         "properties": {"name": "patient9-records", "language": "python", "exposeApi": True}},
+        {"name": "internal-worker", "type": "webservice",
+         "properties": {"name": "internal-worker", "language": "python"}},  # NOT exposed
+        {"name": "patient9-graph", "type": "graphql-gateway",
+         "properties": {"name": "patient9-graph"}},
+    ]
+    return {"apiVersion": "core.oam.dev/v1beta1", "kind": "Application",
+            "metadata": {"name": app_name, "namespace": "default"},
+            "spec": {"components": comps}}
+
+
+def test_external_api_ids_includes_gateway_excludes_internal():
+    app = _product_oam()
+    ids = SubmitUseCase._external_api_ids(app)
+    assert ids == ["patient9-api", "patient9-records", "patient9-graph"]
+    assert "internal-worker" not in ids  # internal-only webservice excluded
+
+
+def test_external_api_ids_gateway_always_unioned():
+    # a gateway with NO expose-api trait and NO exposeApi prop is STILL a member
+    # (it is handled as a singleton, deliberately outside the _is_exposed predicate).
+    app = {"spec": {"components": [
+        {"name": "gw", "type": "graphql-gateway", "properties": {"name": "gw"}},
+    ]}}
+    assert SubmitUseCase._external_api_ids(app) == ["gw"]
+
+
+def test_external_api_ids_realtime_service_when_exposed():
+    app = {"spec": {"components": [
+        {"name": "rt", "type": "realtime-service",
+         "properties": {"name": "rt"},
+         "traits": [{"type": "expose-api", "properties": {"apiType": "websocket"}}]},
+    ]}}
+    assert SubmitUseCase._external_api_ids(app) == ["rt"]
+
+
+def test_external_api_ids_empty_when_nothing_external():
+    app = {"spec": {"components": [
+        {"name": "w", "type": "webservice", "properties": {"name": "w"}},
+        {"name": "db", "type": "postgresql", "properties": {}},
+    ]}}
+    assert SubmitUseCase._external_api_ids(app) == []
+
+
+def test_product_reconcile_called_on_day0_submit():
+    apim = FakeApimProducts()
+    uc, gh = _uc(apim=apim)
+    res = uc.submit(_oam())  # single exposed-by? no trait -> not external
+    assert res.ok, res.message
+    # my-svc has no expose-api trait/prop -> no external apis -> no product call
+    assert apim.calls == []
+
+
+def test_product_reconcile_membership_passed():
+    apim = FakeApimProducts()
+    uc, gh = _uc(apim=apim)
+    res = uc.submit(yaml.safe_dump(_product_oam()))
+    assert res.ok, res.message
+    assert len(apim.calls) == 1
+    app_name, api_ids, display, desc = apim.calls[0]
+    assert app_name == "patient9"
+    # graphql-gateway is auto-exposed too (external-by-default), but membership is
+    # derived AFTER auto-expose; the set is the three external components.
+    assert set(api_ids) == {"patient9-api", "patient9-records", "patient9-graph"}
+    assert "product patient9 reconciled" in res.message
+
+
+def test_product_reconcile_failure_is_non_fatal():
+    apim = FakeApimProducts(raises=True)
+    uc, gh = _uc(apim=apim)
+    res = uc.submit(yaml.safe_dump(_product_oam()))
+    assert res.ok, "APIM product failure must NOT flip submit to failure"
+    assert "non-fatal" in res.message
+
+
+def test_no_apim_client_is_silent_noop():
+    uc, gh = _uc(apim=None)
+    res = uc.submit(yaml.safe_dump(_product_oam()))
+    assert res.ok, res.message  # no product reconciler wired -> no crash, no note
+
+
+def test_reserved_prefix_guard():
+    assert ApimProductClient.is_reserved("mcp-foo")
+    assert ApimProductClient.is_reserved("starter")
+    assert ApimProductClient.is_reserved("unlimited")
+    assert not ApimProductClient.is_reserved("patient9")
+    assert not ApimProductClient.is_reserved("items")
+
+
+def test_reserved_product_skipped_not_failed():
+    c = ApimProductClient(namespace="default")
+    ok, msg = c.reconcile_product("mcp-evil", ["a", "b"])
+    assert ok is True  # skip is success, never blocks submit
+    assert "reserved" in msg
+
+
+def test_product_properties_shape():
+    c = ApimProductClient()
+    props = c.build_product_properties("Patient 9", "the patient9 app")
+    assert props["state"] == "published"
+    assert props["subscriptionRequired"] is False  # JWT-only discovery, no sub-key
+    assert props["approvalRequired"] is False
+    assert props["displayName"] == "Patient 9"
+    assert props["description"] == "the patient9 app"
+
+
+def test_product_job_body_shape():
+    c = ApimProductClient(namespace="default", apim_name="apim-x", apim_rg="rg-x")
+    body = c._build_job("patient9", ["patient9-api", "patient9-graph"],
+                        "patient9", "desc")
+    assert body["kind"] == "Job"
+    assert body["metadata"]["generateName"].startswith("apim-product-patient9-")
+    assert body["metadata"]["labels"]["apim-product.cafe.io/app"] == "patient9"
+    ctr = body["spec"]["template"]["spec"]["containers"][0]
+    env = {e["name"]: e["value"] for e in ctr["env"]}
+    assert env["APP"] == "patient9"
+    assert env["APIM_NAME"] == "apim-x" and env["APIM_RG"] == "rg-x"
+    assert env["DESIRED"] == "patient9-api patient9-graph"
+    # az-rest converge calls present in the script
+    script = ctr["args"][0]
+    assert "products/$APP?api-version=2022-08-01" in script           # §3.1 create
+    assert "products/$APP/apis/$ID?api-version=2022-08-01" in script   # §3.2 link
+    assert "DELETE" in script                                          # §3.3 unlink
+    assert "groups/developers" in script                              # §3.4 portal
+    # azure-credentials secret mounted (reuses cluster SP, like EVENT-2)
+    vol = body["spec"]["template"]["spec"]["volumes"][0]
+    assert vol["secret"]["secretName"] == "azure-credentials"
