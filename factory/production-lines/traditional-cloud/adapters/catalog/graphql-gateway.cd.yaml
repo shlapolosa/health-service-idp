@@ -73,8 +73,11 @@ spec:
                   }
                 ]
                 containers: [{
-                  // Generate image from service name, require repository for deployment
-                  image: "docker.io/socrates12345/" + context.name + ":latest"
+                  // Image defaults to the platform registry (ACR) — CI builds
+                  // microservices/<name> and pushes healthidpuaeacr.azurecr.io/<name>
+                  // (was a stale docker.io/socrates12345 default that 401'd on pull;
+                  // caught patient7-graph 2026-06-08). Parity with webservice CD.
+                  image: *("healthidpuaeacr.azurecr.io/" + context.name + ":latest") | string
                   ports: [{
                     containerPort: 8080
                     name: "http1"
