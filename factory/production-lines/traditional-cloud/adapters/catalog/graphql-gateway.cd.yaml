@@ -66,16 +66,16 @@ spec:
                 serviceAccountName: "graphql-gateway-sa"
                 volumes: [
                   {
+                    // Writable scratch for the gateway's runtime-generated
+                    // .meshrc.yml. GQL-1 moved mesh sources to the MESH_SOURCES
+                    // env (app.submit-injected); the gateway synthesises
+                    // /app/config/.meshrc.yml at startup from those sources, so
+                    // /app/config MUST be writable. A configMap mount made it
+                    // read-only → "EROFS: read-only file system, open
+                    // '/app/config/.meshrc.yml'" (caught patient9-graph
+                    // 2026-06-08). emptyDir is writable and needs no creator.
                     name: "gateway-config"
-                    configMap: {
-                      // optional: GQL-1 moved mesh sources to the MESH_SOURCES env
-                      // (app.submit-injected), so this ConfigMap is no longer
-                      // created. optional:true lets the pod start without it
-                      // (the old graphql-gateway-configmap.yaml was deleted in
-                      // the GQL-1 consolidation — caught patient9-graph 2026-06-08).
-                      name:     (*parameter.configMapName | context.name + "-config")
-                      optional: true
-                    }
+                    emptyDir: {}
                   }
                 ]
                 containers: [{
