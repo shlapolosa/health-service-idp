@@ -22,6 +22,22 @@
 # (cluster-scoped), so a cluster-scoped XR cannot supply a namespace to a namespaced .m.
 # Object (that caused the 'empty namespace may not be set' error, 0/36 resources deployed).
 # Each composed manifest carries its own namespace ('{{ $name }}-realtime').
+#
+# LENSES-CE-62 (#166): re-based the Lenses streaming substrate onto Lenses 6.2
+# Community Edition. HQ/Agent images bumped lensting/...:6-preview (== 6.0.0-la.2,
+# a pre-GA build that hard-crashed `Fatal: validate license: must be at least length 1`)
+# -> lensesio/lenses-hq:6.2 + lensesio/lenses-agent:6.2 (GA). The lenses-credentials
+# Secret now carries the PUBLIC Community license key + ACCEPT_EULA=true (the no-cost
+# CE unlock shipped in the official CE docker-compose at lenses.io/community-edition/
+# download) and the env-var-cased keys the HQ/agent config scripts reference. The agent
+# self-registers via DEMO_HQ_* creds (auto agent key, no manual UI step). The CE-sanctioned
+# demo Kafka (lensesio/fast-data-dev:3.9.0, the SAME image the official CE compose ships
+# as "our demo Kafka image" — broker+schema-registry+connect) is retained; the conn-secret
+# wiring (<name>-kafka:9092 / :8081, <name>-lenses-hq:9991) and topic provisioning are
+# unchanged. NOTE: the official Lenses HQ *Helm* chart still expects a license string, so
+# the leanest license-free CE path is these images + the public community key, NOT a chart
+# swap. First UI login still prompts for a one-time access code (CE login gate); this does
+# NOT block HQ readiness or REST topic provisioning (admin:admin works for the API).
 
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
@@ -576,7 +592,11 @@ spec:
                             psql -h postgres -U lenses -c "CREATE DATABASE metabaseappdb;"
                       containers:
                       - name: lenses-hq
-                        image: lensting/lenses-hq:6-preview
+                        # #166: GA Community Edition image (was lensting/...:6-preview
+                        # == 6.0.0-la.2, a pre-GA build that crash-looped on the empty
+                        # license). 6.2 + the public Community license key = no-cost,
+                        # license-error-free HQ.
+                        image: lensesio/lenses-hq:6.2
                         command:
                         - lenses-hq
                         args:
@@ -701,7 +721,11 @@ spec:
                           mountPath: /mnt/settings
                       containers:
                       - name: lenses-agent
-                        image: lensting/lenses-agent:6-preview
+                        # #166: GA Community Edition agent (was lensting/...:6-preview).
+                        # Self-registers with HQ via DEMO_HQ_URL/USER/PASSWORD and writes
+                        # its agent key to DEMO_AGENTKEY_PATH — no manual "Add Environment"
+                        # UI step (matches the official CE docker-compose agent).
+                        image: lensesio/lenses-agent:6.2
                         envFrom:
                         - secretRef:
                             name: lenses-credentials
@@ -871,14 +895,21 @@ spec:
                   name: lenses-credentials
                   namespace: '{{ $name }}-realtime'
                 type: Opaque
-                data:
-                  license-key: ''
-                  accept-eula: ''
-                  hq-user: ''
-                  hq-password: ''
-                  db-username: ''
-                  db-password: ''
-                  agent-key: ''
+                # #166: Lenses 6.2 Community Edition. The CE images are unlocked by
+                # the PUBLIC "Community license key" (no purchase, no commercial
+                # license) shipped in the official CE docker-compose
+                # (lenses.io/community-edition/download) together with ACCEPT_EULA.
+                # stringData so the HQ initContainer's `cat <<EOF` interpolates real
+                # values; env-var key names (LICENSE_KEY/ACCEPT_EULA/HQ_USER/...) match
+                # the `$VAR` references in the HQ config + agent provisioning scripts.
+                stringData:
+                  LICENSE_KEY: license_key_2SFZ0BesCNu6NFv0-EOSIvY22ChSzNWXa5nSds2l4z3y7aBgRPKCVnaeMlS57hHNVboR2kKaQ8Mtv1LFt0MPBBACGhDT5If8PmTraUM5xXLz4MYv
+                  ACCEPT_EULA: 'true'
+                  HQ_USER: admin
+                  HQ_PASSWORD: admin
+                  DB_USERNAME: lenses
+                  DB_PASSWORD: lenses
+                  AGENT_KEY: ''
             providerConfigRef:
               name: kubernetes-provider
           ---
