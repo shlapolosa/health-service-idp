@@ -596,7 +596,10 @@ def test_product_properties_shape():
     props = c.build_product_properties("Patient 9", "the patient9 app")
     assert props["state"] == "published"
     assert props["subscriptionRequired"] is False  # JWT-only discovery, no sub-key
-    assert props["approvalRequired"] is False
+    # approvalRequired/terms must NOT be sent: APIM rejects them when
+    # subscriptionRequired:false (caught patient11 2026-06-09).
+    assert "approvalRequired" not in props
+    assert "terms" not in props
     assert props["displayName"] == "Patient 9"
     assert props["description"] == "the patient9 app"
 

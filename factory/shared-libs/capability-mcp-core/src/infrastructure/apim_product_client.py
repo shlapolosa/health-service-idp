@@ -102,13 +102,15 @@ class ApimProductClient:
     def build_product_properties(self, display_name: str, description: str) -> dict[str, Any]:
         """The §3.1 product payload `properties` block. JWT-only discovery product:
         subscriptionRequired:false (no sub-key enforcement), published to the portal."""
+        # NOTE: do NOT send approvalRequired/terms here. APIM rejects them when
+        # subscriptionRequired:false — "Cannot provide value for approvalRequired
+        # when no subscriptions are required" (caught patient11 2026-06-09). Those
+        # fields are only valid for subscription products (the dual-auth v2 path).
         return {
             "displayName": display_name,
             "description": description or display_name,
             "state": "published",            # what makes it visible in the Dev Portal
             "subscriptionRequired": False,    # JWT-only discovery (mirrors mcp-external)
-            "approvalRequired": False,
-            "terms": "",
         }
 
     def _build_job(self, app_name: str, api_ids: list[str],
