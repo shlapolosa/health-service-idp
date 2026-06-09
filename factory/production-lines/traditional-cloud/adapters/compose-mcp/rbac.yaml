@@ -18,6 +18,11 @@ rules:
 - apiGroups: ["argoproj.io"]
   resources: ["applications"]
   verbs: ["get", "list", "watch"]
+# APIM-PRODUCT-1 (#161): app.submit reconciles the per-OAM APIM product by
+# creating an `az rest` Job; the SA must be able to create/read those Jobs.
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["create", "get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
