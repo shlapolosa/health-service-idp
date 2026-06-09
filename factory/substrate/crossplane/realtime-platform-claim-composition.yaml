@@ -154,7 +154,7 @@ spec:
                     spec:
                       containers:
                       - name: postgres
-                        image: postgres:13
+                        image: postgres:16
                         ports:
                         - containerPort: 5432
                           name: postgres
@@ -573,7 +573,7 @@ spec:
                         - name: shared-config
                           mountPath: /shared
                       - name: wait-for-postgres
-                        image: postgres:13
+                        image: postgres:16
                         command:
                         - sh
                         - -c
@@ -816,7 +816,7 @@ spec:
                     spec:
                       initContainers:
                       - name: wait-for-postgres
-                        image: postgres:13
+                        image: postgres:16
                         command:
                         - sh
                         - -c
