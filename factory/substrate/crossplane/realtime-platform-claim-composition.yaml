@@ -1356,36 +1356,38 @@ spec:
                     spec:
                       restartPolicy: OnFailure
                       initContainers:
-                      - name: wait-for-lenses-hq
-                        image: curlimages/curl:8.5.0
+                      # #166: wait on the KAFKA BROKER, not HQ. Topic mgmt in Lenses
+                      # 6.2 GA moved off HQ's REST (/api/v1/kafka/topics now 404s — it
+                      # lives behind the Agent). kafka-topics against the broker is
+                      # version-independent and robust.
+                      - name: wait-for-kafka
+                        image: bitnami/kafka:3.6
                         command:
                         - sh
                         - -c
                         - |
-                          until curl -fsS http://lenses-hq:9991/api/health >/dev/null 2>&1 || curl -fsS http://lenses-hq:9991/ >/dev/null 2>&1; do
-                            echo "Waiting for Lenses HQ..."; sleep 10
+                          until kafka-topics.sh --bootstrap-server demo-kafka:9092 --list >/dev/null 2>&1; do
+                            echo "Waiting for Kafka broker..."; sleep 10
                           done
-                          echo "Lenses HQ ready"; sleep 20
+                          echo "Kafka broker ready"
                       containers:
                       - name: topic-provisioner
-                        image: curlimages/curl:8.5.0
-                        envFrom:
-                        - secretRef:
-                            name: '{{ $name }}-conn'
-                            optional: true
+                        # #166: kafka CLI image (was curl/HQ-REST). Creates topics
+                        # directly on the broker — same spec.topics[] loop, per-topic
+                        # partitions + retention.ms, idempotent (--if-not-exists).
+                        image: bitnami/kafka:3.6
                         command:
                         - sh
                         - -c
                         - |
                           set -u
-                          LENSES="http://lenses-hq:9991/api/v1/kafka/topics"
+                          BS="demo-kafka:9092"
                           create_topic() {
                             NAME="$1"; PARTS="${2:-3}"; RET="${3:-604800000}"
                             echo "Creating topic $NAME (partitions=$PARTS retention.ms=$RET)"
-                            curl -s -X POST "$LENSES" \
-                              -H "Content-Type: application/json" \
-                              -u admin:admin \
-                              -d "{\"name\":\"$NAME\",\"partitions\":$PARTS,\"replication\":1,\"configs\":{\"cleanup.policy\":\"delete\",\"retention.ms\":\"$RET\"}}" \
+                            kafka-topics.sh --bootstrap-server "$BS" --create --if-not-exists \
+                              --topic "$NAME" --partitions "$PARTS" --replication-factor 1 \
+                              --config retention.ms="$RET" --config cleanup.policy=delete \
                               || echo "$NAME may already exist"
                           }
                           {{- if $spec.topics }}
@@ -1398,6 +1400,8 @@ spec:
                             create_topic "$T" 3 604800000
                           done
                           {{- end }}
+                          echo "Topics now present:"
+                          kafka-topics.sh --bootstrap-server "$BS" --list
                           echo "Topic provisioning complete"
                         resources:
                           requests:
