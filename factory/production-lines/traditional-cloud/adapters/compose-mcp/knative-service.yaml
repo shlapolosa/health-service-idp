@@ -21,7 +21,7 @@ spec:
           secretName: argo-token
       containers:
       - name: capability-mcp-mfg-tc
-        image: healthidpuaeacr.azurecr.io/capability-mcp-mfg-tc:extdefault-1447695
+        image: healthidpuaeacr.azurecr.io/capability-mcp-mfg-tc:apim-product-353a11b
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
