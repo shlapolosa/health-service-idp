@@ -96,17 +96,17 @@ spec:
                       value: "true"
                     }
                   ] + [
-                    // RT-1: one TOPIC_<UPPERNAME> env per declared topic so the
-                    // realtime-service discovers its topic catalog without a join
-                    // (CUE in vela 1.10.6 has no strings.ToUpper/Join without
-                    // imports — names are pre-uppercased on the OAM side; we emit
-                    // both raw + the convention key for the consumer).
-                    if parameter.topics != _|_ {
-                      for t in parameter.topics {
-                        {
-                          name:  "TOPIC_" + t.name
-                          value: t.name
-                        }
+                    // RT-1: one TOPIC_<name> env per declared topic so the
+                    // realtime-service discovers its topic catalog without a join.
+                    // NOTE: must be `[ if cond for t in list {elem} ]` — wrapping
+                    // the `for` in `if cond { ... }` braces unifies all iterations
+                    // into ONE list element ("conflicting values TOPIC_x and
+                    // TOPIC_y" at a fixed index; caught rtdemo 2026-06-09 with 2+
+                    // topics). The guard+comprehension form appends correctly.
+                    if parameter.topics != _|_ for t in parameter.topics {
+                      {
+                        name:  "TOPIC_" + t.name
+                        value: t.name
                       }
                     }
                   ] + [
