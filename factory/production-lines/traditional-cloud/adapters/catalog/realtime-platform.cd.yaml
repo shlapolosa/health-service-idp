@@ -276,7 +276,11 @@ spec:
         
         parameter: {
           // Required (following webservice pattern)
-          image: *"socrates12345/\(context.name):latest" | string
+          // realtime-platform is INFRA (not scaffolded) — the processor ksvc uses
+          // the SHARED ACR realtime image, not a per-instance docker.io image (the
+          // old socrates12345/<name> default doesn't exist AND is rejected by the
+          // image-source-allowlist policy; caught rtdemo 2026-06-09).
+          image: *"healthidpuaeacr.azurecr.io/realtime_data_pipeline:latest" | string
           
           // Service Configuration
           port: *8080 | int
