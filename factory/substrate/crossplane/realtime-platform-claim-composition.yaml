@@ -15,9 +15,13 @@
 # applying one cluster-wide TOPIC_PARTITIONS/TOPIC_RETENTION to every topic. Empty/absent
 # spec.topics falls back to the default health-domain seed set (backward compatible).
 #
-# provider-kubernetes Objects use kubernetes.m.crossplane.io/v1alpha1 + ClusterProviderConfig
-# 'kubernetes-provider' (the v2-idiomatic namespaced Object API, matching the reference
-# application-claim-composition). NOT the cluster-scoped kubernetes.crossplane.io API.
+# RT-COMPOSITION-V2 (#165): provider-kubernetes Objects use the CLUSTER-SCOPED
+# kubernetes.crossplane.io/v1alpha1 Object API + legacy ProviderConfig 'kubernetes-provider'
+# (the ClusterProviderConfig kind under .m.crossplane.io does not exist on this cluster).
+# This matches the WORKING app-container-claim-composition.yaml. The XRD is LegacyCluster
+# (cluster-scoped), so a cluster-scoped XR cannot supply a namespace to a namespaced .m.
+# Object (that caused the 'empty namespace may not be set' error, 0/36 resources deployed).
+# Each composed manifest carries its own namespace ('{{ $name }}-realtime').
 
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
@@ -44,7 +48,7 @@ spec:
           {{- $spec := .observed.composite.resource.spec }}
           {{- $name := $spec.name }}
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-realtime-namespace'
@@ -60,10 +64,9 @@ spec:
                   labels:
                     app.kubernetes.io/part-of: realtime-platform
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-realtime-postgres-storage'
@@ -85,10 +88,9 @@ spec:
                     requests:
                       storage: 10Gi
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-realtime-postgres-secret'
@@ -108,10 +110,9 @@ spec:
                   POSTGRES_USER: bGVuc2Vz
                   POSTGRES_PASSWORD: bGVuc2Vz
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-realtime-postgres'
@@ -158,10 +159,9 @@ spec:
                         persistentVolumeClaim:
                           claimName: postgres-storage
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-realtime-postgres-service'
@@ -183,10 +183,9 @@ spec:
                     targetPort: 5432
                     name: postgres
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-realtime-mqtt-config'
@@ -209,10 +208,9 @@ spec:
                     log_type all
                     connection_messages true
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-realtime-mqtt'
@@ -255,10 +253,9 @@ spec:
                         configMap:
                           name: mosquitto-config
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-realtime-mqtt-service'
@@ -285,10 +282,9 @@ spec:
                     targetPort: 9001
                     name: websocket
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-realtime-mqtt-gateway'
@@ -313,10 +309,9 @@ spec:
                     hosts:
                     - '*'
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-realtime-mqtt-virtualservice'
@@ -344,10 +339,9 @@ spec:
                         port:
                           number: 1883
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-realtime-kafka'
@@ -426,10 +420,9 @@ spec:
                         - name: CONNECT_LOG4J_ROOT_LOGLEVEL
                           value: WARN
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-realtime-kafka-service'
@@ -459,10 +452,9 @@ spec:
                     targetPort: 8081
                     name: schema-registry
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-realtime-lenses-hq-config'
@@ -499,10 +491,9 @@ spec:
                     logger:
                       mode: text
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-realtime-lenses-hq'
@@ -618,10 +609,9 @@ spec:
                       - name: shared-config
                         emptyDir: {}
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-realtime-lenses-hq-service'
@@ -648,10 +638,9 @@ spec:
                     targetPort: 10000
                     name: agent-reg
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-realtime-lenses-agent'
@@ -747,10 +736,9 @@ spec:
                       - name: agent-settings
                         emptyDir: {}
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-realtime-lenses-agent-service'
@@ -774,10 +762,9 @@ spec:
                     targetPort: 9991
                     name: http
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-realtime-metabase'
@@ -841,10 +828,9 @@ spec:
                             memory: 1Gi
                             cpu: 500m
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-realtime-metabase-service'
@@ -868,10 +854,9 @@ spec:
                     targetPort: 3000
                     name: http
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-realtime-lenses-credentials'
@@ -895,10 +880,9 @@ spec:
                   db-password: ''
                   agent-key: ''
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-default-secret-copier-sa'
@@ -915,10 +899,9 @@ spec:
                   labels:
                     managed-by: crossplane
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-secret-copier-cluster-role'
@@ -956,10 +939,9 @@ spec:
                   - list
                   - patch
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-secret-copier-cluster-binding'
@@ -983,10 +965,9 @@ spec:
                   name: secret-copier
                   namespace: default
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-secret-copier-sa'
@@ -1001,10 +982,9 @@ spec:
                   name: secret-copier
                   namespace: '{{ $name }}-realtime'
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-secret-reader-role'
@@ -1056,10 +1036,9 @@ spec:
                   verbs:
                   - create
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-secret-copier-binding'
@@ -1081,10 +1060,9 @@ spec:
                   name: secret-reader
                   apiGroup: rbac.authorization.k8s.io
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-secret-copier-job'
@@ -1139,10 +1117,9 @@ spec:
                         - name: CONN_SECRET
                           value: '{{ $name }}-conn'
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-lenses-gateway'
@@ -1167,10 +1144,9 @@ spec:
                     hosts:
                     - lenses-hq.{{ $name }}-realtime.local
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-lenses-virtualservice'
@@ -1196,10 +1172,9 @@ spec:
                         port:
                           number: 9991
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-mqtt-secret'
@@ -1220,10 +1195,9 @@ spec:
                   MQTT_USER: realtime-user
                   MQTT_PASSWORD: realtime-pass
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-kafka-secret'
@@ -1242,10 +1216,9 @@ spec:
                   KAFKA_BOOTSTRAP_SERVERS: '{{ $name }}-kafka.{{ $name }}-realtime.svc.cluster.local:9092'
                   KAFKA_SCHEMA_REGISTRY_URL: http://{{ $name }}-kafka.{{ $name }}-realtime.svc.cluster.local:8081
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-lenses-secret'
@@ -1266,10 +1239,9 @@ spec:
                   LENSES_PASSWORD: lenses
                   LENSES_HQ_URL: http://{{ $name }}-lenses-hq.{{ $name }}-realtime.svc.cluster.local:9991
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-metabase-secret'
@@ -1289,10 +1261,9 @@ spec:
                   METABASE_USER: admin@metabase.local
                   METABASE_PASSWORD: metabase123
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-realtime-kafka-config-job'
@@ -1326,10 +1297,9 @@ spec:
                             fieldRef:
                               fieldPath: metadata.namespace
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-realtime-topic-provisioning-job'
@@ -1406,10 +1376,9 @@ spec:
                             memory: 128Mi
                             cpu: 100m
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: '{{ $name }}-multi-env-secret-sync'
@@ -1440,5 +1409,4 @@ spec:
                             - "echo \"Starting multi-environment secret sync...\"\n\n# Get all realtime namespaces\nNAMESPACES=$(kubectl get ns -l app.kubernetes.io/part-of=realtime-platform -o jsonpath='{.items[*].metadata.name}')\n\nif [ -z \"$NAMESPACES\" ]; then\n  echo \"No realtime-platform namespaces found\"\n  exit 0\nfi\n\nfor ns in $NAMESPACES; do\n  echo \"Processing namespace: $ns\"\n  \n  # Check if namespace still exists (it might have been deleted)\n  if ! kubectl get namespace \"$ns\" >/dev/null 2>&1; then\n    echo \"⚠️  Namespace $ns no longer exists, skipping...\"\n    continue\n  fi\n  \n  # Get the base secret from default namespace\n  BASE_SECRET=$(kubectl get secret lenses-credentials -n default -o yaml 2>/dev/null)\n  if [ $? -ne 0 ]; then\n    echo \"ERROR: lenses-credentials secret not found in default namespace\"\n    continue\n  fi\n  \n  # Look for namespace-specific agent key\n  AGENT_KEY_VAR=\"${ns}-agent-key\"\n  AGENT_KEY=$(kubectl get configmap env-agent-keys -n default -o jsonpath=\"{.data.${AGENT_KEY_VAR}}\" 2>/dev/null || echo \"\")\n  \n  if [ -z \"$AGENT_KEY\" ]; then\n    echo \"WARNING: No agent key found for namespace $ns\"\n    continue\n  fi\n  \n  echo \"Found agent key for $ns\"\n  \n  # Copy base secret to target namespace\n  echo \"$BASE_SECRET\" | \\\n    sed \"s/namespace: default/namespace: $ns/\" | \\\n    sed '/resourceVersion:/d' | \\\n    sed '/uid:/d' | \\\n    sed '/creationTimestamp:/d' | \\\n    kubectl apply -f -\n  \n  # Add namespace-specific agent key using kubectl patch\n  AGENT_KEY_B64=$(echo -n \"$AGENT_KEY\" | base64 -w 0)\n  kubectl patch secret lenses-credentials -n $ns --type='merge' -p=\"{\\\"data\\\":{\\\"AGENT_KEY\\\":\\\"$AGENT_KEY_B64\\\"}}\"\n  \n  if [ $? -eq 0 ]; then\n    echo \"✅ Secret synced successfully to $ns\"\n    \n    # Check if lenses-agent deployment exists before restarting\n    if kubectl get deployment lenses-agent -n $ns >/dev/null 2>&1; then\n      echo \"\U0001F504 Restarting lenses-agent in $ns...\"\n      kubectl rollout restart deployment/lenses-agent -n $ns\n    else\n      echo \"ℹ️  No lenses-agent deployment found in $ns (may not be deployed yet)\"\n    fi\n    \n  else\n    echo \"❌ Failed to sync secret to $ns\"\n  fi\ndone\n\necho \"Multi-environment secret sync completed\"\n"
                           restartPolicy: OnFailure
             providerConfigRef:
-              kind: ClusterProviderConfig
               name: kubernetes-provider
