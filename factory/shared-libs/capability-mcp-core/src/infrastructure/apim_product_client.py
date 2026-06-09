@@ -188,8 +188,11 @@ PRODJSON
 az rest --method PUT --url "$B/products/$APP?api-version={_API_VERSION}" --body @/tmp/product.json
 echo "product upserted: $APP (published, subscriptionRequired=false)"
 
-# §3.4 ensure portal discoverability via the developers group
+# §3.4 portal discoverability: link developers AND guests so the product is
+# visible to anonymous portal visitors too (not just signed-in developers).
+# Mirrors the built-in 'unlimited'/'starter' default visibility.
 az rest --method PUT --url "$B/products/$APP/groups/developers?api-version={_API_VERSION}" || true
+az rest --method PUT --url "$B/products/$APP/groups/guests?api-version={_API_VERSION}" || true
 
 # §3.2 link desired APIs that exist (skip-404 for day-0 ordering — the EVENT-2-
 # sibling sensor backfills the link when the ksvc becomes Ready).
