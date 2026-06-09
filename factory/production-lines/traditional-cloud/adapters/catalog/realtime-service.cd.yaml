@@ -91,16 +91,6 @@ spec:
                       name: "REALTIME_INTEGRATION_ENABLED"
                       value: "true"
                     },
-                    {
-                      // agent_common.get_agent_config() requires these; a realtime
-                      // stream gateway is a rule-based orchestrator (no LLM).
-                      name: "AGENT_TYPE"
-                      value: "orchestrator"
-                    },
-                    {
-                      name: "IMPLEMENTATION_TYPE"
-                      value: "deterministic"
-                    },
                   ] + [
                     // CONSUME_TOPICS / PRODUCE_TOPICS as comma-joined would need a
                     // CUE import; instead emit one CONSUME_<name>/PRODUCE_<name>=name
