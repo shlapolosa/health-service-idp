@@ -83,7 +83,7 @@ spec:
                 spec:
                   accessModes:
                   - ReadWriteOnce
-                  storageClassName: gp3
+                  storageClassName: default
                   resources:
                     requests:
                       storage: 10Gi
