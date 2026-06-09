@@ -42,7 +42,8 @@ _SVC_OAM_PATH = "oam/applications/application.yaml"  # single reconciled truth p
 
 class SubmitUseCase:
     def __init__(self, vela: VelaClient, github: GitHubClient, argo: ArgoWorkflowsClient,
-                 gitops_branch: str = "main", claims: K8sClaimClient | None = None):
+                 gitops_branch: str = "main", claims: K8sClaimClient | None = None,
+                 apim_products: Any | None = None):
         self.vela = vela
         self.github = github
         self.argo = argo
@@ -51,6 +52,10 @@ class SubmitUseCase:
         # construct the use-case without a real cluster client; day-0 scaffolds and
         # submit_wait REQUIRE it (the legacy WFT fallback was retired in #149).
         self.claims = claims
+        # APIM-PRODUCT-1 (#161): per-OAM Developer-Portal product reconciler. Optional
+        # so existing unit tests construct without it; when absent the product step is
+        # a silent no-op (purely additive — submit never depends on it succeeding).
+        self.apim_products = apim_products
 
     # ----------------------------------------------------------------------
     # Public surface (MCP tools wrap these)
@@ -108,9 +113,9 @@ class SubmitUseCase:
         scaffold = self._needs_scaffold(app)
         if scaffold is None:
             # No scaffolding (backing services / bring-your-own-image) → legacy oam-apply.
-            return self._with_advisory(
+            return self._reconcile_apim_product(app, self._with_advisory(
                 self._fire_oam_apply(app_name, namespace, target_vcluster, oam_yaml, sha, path),
-                advisory)
+                advisory))
 
         if self.claims is None:
             # Claim client not wired (should not happen in prod — dependencies.py
@@ -119,9 +124,9 @@ class SubmitUseCase:
                                 message=f"committed {sha} but no claim client is "
                                         f"configured; cannot scaffold {app_name}")
 
-        return self._with_advisory(
+        return self._reconcile_apim_product(app, self._with_advisory(
             self._declarative_scaffold(app, app_name, scaffold, target_vcluster, oam_yaml, sha),
-            advisory)
+            advisory))
 
     @staticmethod
     def _auto_expose_external_components(app: dict[str, Any], oam_yaml: str) -> str:
@@ -176,6 +181,43 @@ class SubmitUseCase:
                                 workflow_name=result.workflow_name,
                                 message=f"{result.message}\n{advisory}")
         return result
+
+    def _reconcile_apim_product(self, app: dict[str, Any],
+                                result: "SubmitResult") -> "SubmitResult":
+        """APIM-PRODUCT-1 (#161): after a successful submit, create/converge ONE
+        APIM Developer-Portal product per OAM grouping all its external APIs.
+
+        Purely additive and best-effort: it NEVER flips a successful submit to a
+        failure (the per-service APIs + their validate-jwt are already in place; the
+        product is a discovery layer). When no api ids are external, or no reconciler
+        is wired, it is a silent no-op. Membership = _external_api_ids (incl. the
+        always-external graphql-gateway). Day-0 ordering (product before svc/* APIs)
+        is handled by the Job's skip-404 + the EVENT-2-sibling sensor."""
+        if self.apim_products is None or not result.ok:
+            return result
+        api_ids = self._external_api_ids(app)
+        if not api_ids:
+            return result  # nothing external → no product needed
+        app_name = app.get("metadata", {}).get("name", "")
+        md = app.get("metadata", {}) or {}
+        anns = md.get("annotations", {}) or {}
+        display = anns.get("displayName") or app_name
+        description = anns.get("description", "")
+        try:
+            ok, msg = self.apim_products.reconcile_product(
+                app_name=app_name, api_ids=api_ids,
+                display_name=display, description=description,
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning("APIM product reconcile failed for %s (non-fatal): %s",
+                           app_name, e)
+            return SubmitResult(ok=result.ok, commit_sha=result.commit_sha,
+                                workflow_name=result.workflow_name,
+                                message=f"{result.message}\n"
+                                        f"note: APIM product step failed (non-fatal): {e}")
+        return SubmitResult(ok=result.ok, commit_sha=result.commit_sha,
+                            workflow_name=result.workflow_name,
+                            message=f"{result.message}\n{msg}")
 
     def submit_wait(self, oam_yaml: str) -> SubmitResult:
         """Deferred sibling of submit() — for OAMs whose ComponentDefinitions don't exist yet.
@@ -246,6 +288,55 @@ class SubmitUseCase:
     # ----------------------------------------------------------------------
 
     @staticmethod
+    def _is_exposed(c: dict[str, Any]) -> bool:
+        """A webservice-class component is externally exposed iff it carries the
+        `expose-api` trait OR sets `properties.exposeApi`. Factored out of
+        _validate_identity_topology so the APIM-product membership helper
+        (_external_api_ids) reuses the exact same predicate (APIM-PRODUCT-1 #161)."""
+        for t in c.get("traits") or []:
+            if t.get("type") == "expose-api":
+                return True
+        return bool((c.get("properties") or {}).get("exposeApi"))
+
+    # Component types whose exposure is gated by the _is_exposed predicate.
+    _EXPOSABLE_TYPES = ("webservice", "webservice-shape", "realtime-service")
+
+    @classmethod
+    def _external_api_ids(cls, app: dict[str, Any]) -> list[str]:
+        """APIM-PRODUCT-1 (#161): authoritative external-API id set for an OAM.
+
+        The product members = every webservice-class component carrying expose-api
+        (the _is_exposed predicate) UNION every graphql-gateway component. The
+        gateway is ALWAYS external (user decision 2026-06-07) — it is handled as a
+        platform singleton and is deliberately NOT in _validate_identity_topology's
+        `exposed` predicate, so it must be unioned in explicitly here or the gateway
+        API would never become a product member.
+
+        api-id == component name: the expose-api trait imports with
+        `--api-id "$SVC_NAME"` where SVC_NAME == context.name (expose-api.yaml:168),
+        and EVENT-2 uses the identical id. So the member id set IS the component-name
+        set — no APIM lookup needed. Order-preserving, de-duplicated.
+
+        NOTE membership uses the EXPOSED predicate, not the scaffold set
+        (_webservice_services): a bring-your-own-image webservice is exposed but not
+        scaffolded and is still a member.
+        """
+        comps = app.get("spec", {}).get("components", []) or []
+        ids: list[str] = []
+        for c in comps:
+            ctype = c.get("type")
+            name = c.get("name")
+            if not name:
+                continue
+            is_external = (
+                (ctype in cls._EXPOSABLE_TYPES and cls._is_exposed(c))
+                or ctype == "graphql-gateway"  # always external (singleton)
+            )
+            if is_external and name not in ids:
+                ids.append(name)
+        return ids
+
+    @staticmethod
     def _validate_identity_topology(app: dict[str, Any]) -> str | None:
         """Platform invariant: >=1 exposed webservice => exactly ONE identity
         component (type auth0-idp) authing all the OAM's APIs. Multiple identity
@@ -254,11 +345,7 @@ class SubmitUseCase:
         comps = app.get("spec", {}).get("components", []) or []
         identity_comps = [c.get("name") for c in comps if c.get("type") == "auth0-idp"]
 
-        def _is_exposed(c: dict[str, Any]) -> bool:
-            for t in c.get("traits") or []:
-                if t.get("type") == "expose-api":
-                    return True
-            return bool((c.get("properties") or {}).get("exposeApi"))
+        _is_exposed = SubmitUseCase._is_exposed
 
         exposed = [c.get("name") for c in comps
                    if c.get("type") in ("webservice", "webservice-shape", "realtime-service")

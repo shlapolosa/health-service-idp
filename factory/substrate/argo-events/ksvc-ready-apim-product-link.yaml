@@ -1,0 +1,179 @@
+---
+# APIM-PRODUCT-1 (#161): EVENT-2-sibling sensor — link a ksvc's svc/<name> API into
+# its OAM's APIM Developer-Portal product the moment the ksvc becomes Ready.
+#
+# Why this exists (the day-0 ordering gap): app.submit creates/converges the per-OAM
+# APIM product up-front (the authoritative full-membership reconcile, incl. removals).
+# But on day-0 the product reconcile runs BEFORE the svc/<name> APIs exist (CI build +
+# ksvc-Ready + EVENT-2 spec-import all come later), so a product->api link PUT 404s and
+# is skip-tolerated. This level-triggered sensor closes that gap: when the ksvc reports
+# Ready, EVENT-2 (ksvc-ready-apim-publish.yaml) imports the API, and THIS sibling links
+# it into the product whose id == the OAM-app label on the ksvc. The link PUT is
+# idempotent (PUT-by-id), so it is safe even if app.submit already linked it.
+#
+# Design mirrors EVENT-2 (ksvc-ready-apim-publish.yaml) EXACTLY: same EventSource shape,
+# same Ready=True gjson filter, same Job/az-rest pattern, and — critically — it REUSES
+# the existing apim-publish-event-sa service account and its RBAC (defined in EVENT-2),
+# which already lives in the argo-events namespace and is already granted Job-create in
+# `default`. We do NOT redefine the SA here to avoid the cross-namespace SA bug that bit
+# EVENT-2 (the SA must exist in the Job's namespace; binding is in the EVENT-2 manifest).
+#
+# Membership derivation at event time: the product id is the OAM app name. The ksvc
+# carries it via the standard app label `app.oam.dev/name` (stamped by KubeVela on every
+# rendered workload). If that label is absent the Job exits 0 (no-op) — app.submit's
+# up-front reconcile + a manual resubmit remain the backstop.
+#
+# Auth model: this only PUTs the product->api LINK. It does NOT touch the API's
+# validate-jwt policy (owned by the expose-api trait) nor add any sub-key requirement.
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: ksvc-ready-product-watcher
+  namespace: argo-events
+spec:
+  template:
+    # Reuse EVENT-2's SA (defined in ksvc-ready-apim-publish.yaml). It already has
+    # cluster-wide ksvc watch + Job-create in `default`.
+    serviceAccountName: apim-publish-event-sa
+  resource:
+    ksvc-ready-product:
+      namespace: default
+      group: serving.knative.dev
+      version: v1
+      resource: services
+      eventTypes:
+        - UPDATE
+      # Same opt-in label EVENT-2 watches: only services the expose-api trait
+      # published (which are exactly the product members) trigger a link attempt.
+      filter:
+        labels:
+          - key: expose-api.cafe.io/publish
+            operation: "=="
+            value: "true"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: ksvc-ready-apim-product-link
+  namespace: argo-events
+spec:
+  template:
+    serviceAccountName: apim-publish-event-sa
+  dependencies:
+    - name: ksvc-ready-product-dep
+      eventSourceName: ksvc-ready-product-watcher
+      eventName: ksvc-ready-product
+      # Fire only when the Knative Ready condition is True (same gjson array filter
+      # idiom as EVENT-2).
+      filters:
+        dataLogicalOperator: "and"
+        data:
+          - path: 'body.status.conditions.#(type=="Ready").status'
+            type: string
+            value:
+              - "True"
+  triggers:
+    - template:
+        name: apim-product-link-trigger
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: batch/v1
+              kind: Job
+              metadata:
+                generateName: apim-product-link-evt-
+                namespace: default
+                labels:
+                  app.kubernetes.io/component: apim-product
+                  app.kubernetes.io/managed-by: argo-events
+                  apim-product.cafe.io/source: sensor
+              spec:
+                ttlSecondsAfterFinished: 1800
+                backoffLimit: 2
+                template:
+                  spec:
+                    restartPolicy: OnFailure
+                    volumes:
+                      - name: azure-creds
+                        secret:
+                          secretName: azure-credentials
+                    containers:
+                      - name: apim-product-link
+                        image: mcr.microsoft.com/azure-cli:2.64.0
+                        volumeMounts:
+                          - name: azure-creds
+                            mountPath: /azure
+                            readOnly: true
+                        env:
+                          # SVC_NAME == api-id == component name (overridden per event).
+                          - name: SVC_NAME
+                            value: PLACEHOLDER_SVC
+                          # APP == OAM app name == product id (overridden from the
+                          # app.oam.dev/name label; empty => no-op exit 0).
+                          - name: APP
+                            value: ""
+                          - name: APIM_NAME
+                            value: "aigw-apim-dev-w4x7ibwk4e2is"
+                          - name: APIM_RG
+                            value: "rg-ai-gateway-dev-uae"
+                        command: ["/bin/sh", "-c"]
+                        args:
+                          - |
+                            set -e
+                            if [ -z "$APP" ]; then
+                              echo "no app.oam.dev/name label on ksvc $SVC_NAME - app.submit reconcile is the backstop; exiting 0"
+                              exit 0
+                            fi
+                            CID=$(python3 -c "import json;print(json.load(open('/azure/azure-creds.json'))['clientId'])")
+                            CSC=$(python3 -c "import json;print(json.load(open('/azure/azure-creds.json'))['clientSecret'])")
+                            TEN=$(python3 -c "import json;print(json.load(open('/azure/azure-creds.json'))['tenantId'])")
+                            SUB=$(python3 -c "import json;print(json.load(open('/azure/azure-creds.json'))['subscriptionId'])")
+                            az login --service-principal -u "$CID" -p "$CSC" --tenant "$TEN" >/dev/null
+                            az account set --subscription "$SUB"
+                            B="https://management.azure.com/subscriptions/$SUB/resourceGroups/$APIM_RG/providers/Microsoft.ApiManagement/service/$APIM_NAME"
+                            # Idempotent product->api link (PUT-by-id). The product is
+                            # created by app.submit; if it somehow does not exist yet the
+                            # link 404s and we exit 0 (app.submit / resubmit backfills the
+                            # product). We do NOT create the product here - that is the
+                            # submit-time authoritative full-membership reconcile's job.
+                            if az rest --method PUT --url "$B/products/$APP/apis/$SVC_NAME?api-version=2022-08-01" 2>/tmp/err; then
+                              echo "linked api $SVC_NAME into product $APP"
+                            else
+                              echo "link skipped (product or api not ready):"; cat /tmp/err; exit 0
+                            fi
+          parameters:
+            # service name -> SVC_NAME (api-id)
+            - src:
+                dependencyName: ksvc-ready-product-dep
+                dataKey: body.metadata.name
+              dest: spec.template.spec.containers.0.env.0.value
+            # OAM app name -> APP (product id), from the KubeVela-stamped app label.
+            - src:
+                dependencyName: ksvc-ready-product-dep
+                dataKey: body.metadata.labels.app\.oam\.dev/name
+                value: ""
+              dest: spec.template.spec.containers.0.env.1.value
+            # namespace for the Job itself
+            - src:
+                dependencyName: ksvc-ready-product-dep
+                dataKey: body.metadata.namespace
+              dest: metadata.namespace
+            - src:
+                dependencyName: ksvc-ready-product-dep
+                dataKey: body.metadata.annotations.expose-api\.cafe\.io/apim-name
+                value: "aigw-apim-dev-w4x7ibwk4e2is"
+              dest: spec.template.spec.containers.0.env.2.value
+            - src:
+                dependencyName: ksvc-ready-product-dep
+                dataKey: body.metadata.annotations.expose-api\.cafe\.io/apim-rg
+                value: "rg-ai-gateway-dev-uae"
+              dest: spec.template.spec.containers.0.env.3.value
+          retryStrategy:
+            steps: 3
+            duration: "3s"
+            factor: 2
+# NOTE: ServiceAccount + RBAC (apim-publish-event-sa, ksvc-ready-event-role/binding,
+# apim-publish-job-creator Role/binding in `default`) are DEFINED ONCE in
+# ksvc-ready-apim-publish.yaml (EVENT-2) and REUSED here — intentionally NOT
+# redeclared, to avoid the cross-namespace SA duplication that previously broke EVENT-2.

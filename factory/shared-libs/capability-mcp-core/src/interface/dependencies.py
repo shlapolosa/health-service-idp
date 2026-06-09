@@ -108,10 +108,21 @@ def get_status():
 
 
 @lru_cache
+def get_apim_products() -> "ApimProductClient":
+    from ..infrastructure.apim_product_client import ApimProductClient
+    return ApimProductClient(
+        namespace=os.getenv("CLAIM_NAMESPACE", "default"),
+        apim_name=os.getenv("APIM_NAME", "aigw-apim-dev-w4x7ibwk4e2is"),
+        apim_rg=os.getenv("APIM_RG", "rg-ai-gateway-dev-uae"),
+    )
+
+
+@lru_cache
 def get_submit() -> SubmitUseCase:
     return SubmitUseCase(get_vela(), get_github(), get_argo(),
                          gitops_branch=os.getenv("GITOPS_BRANCH", "main"),
-                         claims=get_claims())
+                         claims=get_claims(),
+                         apim_products=get_apim_products())
 
 
 # ---- S4 additions: factory.route (classify-router proxy) ----
