@@ -396,7 +396,11 @@ spec:
                           name: schema-registry
                         env:
                         - name: ADV_HOST
-                          value: demo-kafka
+                          # FQDN so cross-namespace clients (realtime-service ksvcs
+                          # live in `default`, Kafka in `{{ $name }}-realtime`) can
+                          # reach the broker. A short name only resolves in-namespace
+                          # → clients got "No connection to node 101".
+                          value: demo-kafka.{{ $name }}-realtime.svc.cluster.local
                         - name: RUNNING_SAMPLEDATA
                           value: '1'
                         - name: RUNTESTS
@@ -404,7 +408,7 @@ spec:
                         - name: KAFKA_LISTENERS
                           value: PLAINTEXT://:9092,DOCKERCOMPOSE://:19092,CONTROLLER://:16062
                         - name: KAFKA_ADVERTISED_LISTENERS
-                          value: PLAINTEXT://demo-kafka:9092,DOCKERCOMPOSE://demo-kafka:19092
+                          value: PLAINTEXT://demo-kafka.{{ $name }}-realtime.svc.cluster.local:9092,DOCKERCOMPOSE://demo-kafka.{{ $name }}-realtime.svc.cluster.local:19092
                         - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
                           value: DOCKERCOMPOSE:PLAINTEXT,CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,SSL:SSL,SASL_PLAINTEXT:SASL_PLAINTEXT,SASL_SSL:SASL_SSL
                         - name: DISABLE
