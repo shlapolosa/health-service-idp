@@ -76,3 +76,25 @@ def test_base_realtime_agent_still_abstract():
             description="x",
             config=cfg,
         )
+
+
+# --- get_realtime_status feeds the /health readiness probe ------------------
+
+def test_get_realtime_status_accepts_freeform_service_type():
+    # The gateway's agent_type is a service-name fragment ("rtdemo"), NOT an
+    # AgentType enum. AgentRealtimeStatus must accept it as a plain string,
+    # otherwise /health 500s and the Knative readiness probe never passes
+    # (regression for RT-1 #167 "Initial scale was never achieved").
+    cfg = get_agent_config(
+        default_agent_type="orchestrator",
+        default_implementation_type="deterministic",
+    )
+    agent = GenericRealtimeAgent(
+        agent_type="rtdemo",
+        agent_name="rtdemo-gateway",
+        description="x",
+        config=cfg,
+    )
+    status = agent.get_realtime_status()
+    assert status.agent_type == "rtdemo"
+    assert isinstance(status.implementation_type, str)
