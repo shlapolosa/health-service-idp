@@ -161,3 +161,22 @@ def test_streaming_topics_explicit_precedence(monkeypatch):
     monkeypatch.setenv("CONSUME_x", "x")
     cfg = get_agent_config(default_agent_type="orchestrator", default_implementation_type="deterministic")
     assert cfg.streaming_topics == ["a", "b"]
+
+
+# --- ws payload serialization (datetime/Enum) reaches the client ------------
+
+def test_ws_json_default_serializes_event_payload():
+    import json
+    from agent_common.models import ws_json_default, WebSocketMessage, RealtimeEvent, EventType
+    ev = RealtimeEvent(
+        event_type=EventType.DATA_PROCESSED,
+        source_service="rtdemo-stream",
+        source_agent="rtdemo",
+        data={"topic": "sensor_agg", "message": {"marker": "RT1-TELEMETRY"}},
+    )
+    msg = WebSocketMessage(message_type="event", payload=ev.__dict__, correlation_id=ev.correlation_id)
+    # Without default= this raises "Object of type datetime/EventType is not JSON serializable",
+    # which silently dropped every streamed broadcast to /ws (RT-1 #167).
+    out = json.dumps(msg.dict(), default=ws_json_default)
+    assert "RT1-TELEMETRY" in out
+    assert "data_processed" in out  # EventType -> .value
