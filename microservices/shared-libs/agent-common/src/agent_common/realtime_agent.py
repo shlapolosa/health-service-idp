@@ -11,6 +11,7 @@ from datetime import datetime
 from .base_microservice_agent import BaseMicroserviceAgent, BaseProcessor, AgentTask, AgentResponse
 from .config import AgentConfig
 from .models import (
+    ws_json_default,
     RealtimeEvent, EventType, ConnectionStatus, RealtimeConnectionInfo,
     AgentRealtimeStatus, KafkaMessageModel, MQTTMessageModel, WebSocketMessage
 )
