@@ -134,3 +134,30 @@ def test_ws_route_skipped_when_disabled(monkeypatch):
         endpoints=[],
     )
     assert _ws_routes(app) == []
+
+
+# --- data-flow wiring: gateway must consume its declared topic --------------
+
+def test_realtime_platform_from_cd_env_name(monkeypatch):
+    # CD injects REALTIME_PLATFORM_NAME; without honoring it realtime_platform
+    # stays None and the Kafka consumer/producer never initialize (no data → ws).
+    monkeypatch.delenv("REALTIME_PLATFORM", raising=False)
+    monkeypatch.setenv("REALTIME_PLATFORM_NAME", "rtdemo-stream")
+    cfg = get_agent_config(default_agent_type="orchestrator", default_implementation_type="deterministic")
+    assert cfg.realtime_platform == "rtdemo-stream"
+
+
+def test_streaming_topics_from_consume_binding(monkeypatch):
+    # CD injects CONSUME_<topic>=<topic>; the consumer must subscribe to it.
+    monkeypatch.delenv("STREAMING_TOPICS", raising=False)
+    monkeypatch.setenv("CONSUME_sensor_agg", "sensor_agg")
+    monkeypatch.setenv("CONSUME_other", "other")
+    cfg = get_agent_config(default_agent_type="orchestrator", default_implementation_type="deterministic")
+    assert cfg.streaming_topics == ["other", "sensor_agg"]  # sorted
+
+
+def test_streaming_topics_explicit_precedence(monkeypatch):
+    monkeypatch.setenv("STREAMING_TOPICS", "a,b")
+    monkeypatch.setenv("CONSUME_x", "x")
+    cfg = get_agent_config(default_agent_type="orchestrator", default_implementation_type="deterministic")
+    assert cfg.streaming_topics == ["a", "b"]
