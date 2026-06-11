@@ -34,6 +34,7 @@ downloads/
 eggs/
 .eggs/
 lib/
+!factory/production-lines/traditional-cloud/adapters/mscv-image/scripts/lib/
 lib64/
 parts/
 sdist/
