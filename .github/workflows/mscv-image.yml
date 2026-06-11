@@ -1,0 +1,68 @@
+name: mscv-image
+
+# HARD-1 (#168): build + push the microservice-creator (mscv) image to ACR.
+# Triggered on changes under the mscv-image adapter. The composition Job pins
+# healthidpuaeacr.azurecr.io/mscv:v<semver>; this workflow produces that tag
+# plus an immutable :<git-sha> tag.
+#
+# Auth reuses the existing azure/login OIDC pattern from architect-evals.yml
+# (secrets: AZURE_CLIENT_ID / AZURE_TENANT_ID / AZURE_SUBSCRIPTION_ID) — no new
+# secrets introduced. `az acr login` then yields the docker creds for push.
+# Build is linux/amd64 only (the cluster is AMD64).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'factory/production-lines/traditional-cloud/adapters/mscv-image/**'
+      - '.github/workflows/mscv-image.yml'
+  pull_request:
+    paths:
+      - 'factory/production-lines/traditional-cloud/adapters/mscv-image/**'
+      - '.github/workflows/mscv-image.yml'
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write          # azure/login OIDC
+  contents: read
+
+env:
+  ACR_NAME: healthidpuaeacr
+  ACR_LOGIN_SERVER: healthidpuaeacr.azurecr.io
+  IMAGE: mscv
+  MSCV_VERSION: v1.0.0     # bump in lockstep with the composition image: tag
+  CONTEXT: factory/production-lines/traditional-cloud/adapters/mscv-image
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute short SHA tag
+        id: vars
+        run: echo "sha=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to ACR
+        run: az acr login --name "${{ env.ACR_NAME }}"
+
+      # On PRs we build but do not push (no mutation of ACR from forks/PRs).
+      - name: Build and push image (amd64)
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ env.CONTEXT }}
+          file: ${{ env.CONTEXT }}/Dockerfile
+          platforms: linux/amd64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE }}:${{ env.MSCV_VERSION }}
+            ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE }}:${{ steps.vars.outputs.sha }}
