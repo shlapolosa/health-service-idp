@@ -1,0 +1,58 @@
+name: realtime-transport publish
+
+# Build the realtime-transport wheel and publish it as a GitHub Release asset on
+# every change under the package path. Scaffolds pin-install the release wheel URL
+# (see microservices/shared-libs/realtime-transport/README.md). No PyPI involved.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "microservices/shared-libs/realtime-transport/**"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write  # required to create releases + upload assets
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: microservices/shared-libs/realtime-transport
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Read package version
+        id: ver
+        run: echo "version=$(poetry version -s)" >> "$GITHUB_OUTPUT"
+
+      - name: Run tests
+        run: |
+          pip install pytest pytest-asyncio pytest-mock fastapi pydantic httpx websockets aiokafka
+          PYTHONPATH=src python -m pytest tests/ -q
+
+      - name: Build wheel
+        run: poetry build -f wheel
+
+      - name: Publish wheel as GitHub Release asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="realtime-transport-v${{ steps.ver.outputs.version }}"
+          WHEEL=$(ls dist/*.whl)
+          # Idempotent: create the release if absent, then (re)upload the wheel.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$WHEEL" --clobber
+          else
+            gh release create "$TAG" "$WHEEL" \
+              --title "$TAG" \
+              --notes "realtime-transport ${{ steps.ver.outputs.version }} wheel. Pin-install: see package README."
+          fi
