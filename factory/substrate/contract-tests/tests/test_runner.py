@@ -312,3 +312,15 @@ def test_collect_topics_aggregate_not_treated_as_per_topic():
 def test_infer_role_websocket_from_sensor_env():
     env = {"CONSUME_TOPICS": '["sensor_agg"]', "WEBSOCKET": '"true"'}
     assert r._infer_role(env) == "gateway"
+
+
+def test_ws_marker_matches_nested_envelope():
+    """The gateway broadcasts the consumed message inside its event envelope —
+    the marker is at payload.data.message, never top-level (live finding)."""
+    marker = {"marker_id": "ct-abc123def456"}
+    envelope = json.dumps({
+        "message_type": "event",
+        "payload": {"event_type": "data_processed",
+                    "data": {"topic": "sensor_agg", "message": marker}},
+    })
+    assert marker["marker_id"] in str(envelope)

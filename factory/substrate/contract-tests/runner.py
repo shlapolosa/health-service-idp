@@ -282,11 +282,14 @@ async def _default_ws_recv(cfg: Config, marker: Dict[str, object]) -> bool:
                 raw = await asyncio.wait_for(ws.recv(), timeout=remaining)
             except asyncio.TimeoutError:
                 return False
-            try:
-                msg = json.loads(raw)
-            except Exception:
-                continue
-            if isinstance(msg, dict) and msg.get("marker_id") == marker.get("marker_id"):
+            # Shape-agnostic match (live finding, third fire): the gateway wraps
+            # the consumed Kafka payload in its event envelope —
+            # {message_type:"event", payload:{..., data:{topic, message:{marker...}}}}
+            # — so the marker_id is NESTED, not top-level. The id is a unique
+            # ct-<hex12> string, so a substring match on the raw frame is
+            # unambiguous and survives envelope changes.
+            mid = str(marker.get("marker_id", ""))
+            if mid and mid in str(raw):
                 return True
     return False
 
