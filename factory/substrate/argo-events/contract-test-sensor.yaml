@@ -121,7 +121,7 @@ spec:
                         # :latest). Bump this tag when
                         # .github/workflows/contract-test-runner-ci.yml pushes
                         # a new runner build.
-                        image: healthidpuaeacr.azurecr.io/contract-test-runner:68b1bda
+                        image: healthidpuaeacr.azurecr.io/contract-test-runner:a878852
                         # The component's normalized connection secret. envFrom it
                         # so KAFKA_BOOTSTRAP_SERVERS + CONSUME_*/PRODUCE_* + any APIM
                         # sub-key land as env at RUNTIME (never baked in the image).
@@ -154,6 +154,18 @@ spec:
                           # external path, a CD/annotation can set these (env flag).
                           - name: APIM_MODE
                             value: "false"
+                          # Topic bindings (live finding, first fire): the per-topic
+                          # CONSUME_*/PRODUCE_* vars live on the COMPONENT ksvc env,
+                          # NOT in its -conn secret, so envFrom doesn't carry them.
+                          # The params below extract them from the ksvc event payload
+                          # (gjson array query) into these aggregates; runner.py
+                          # parses the JSON-array value.
+                          - name: CONSUME_TOPICS
+                            value: ""
+                          - name: PRODUCE_TOPICS
+                            value: ""
+                          - name: WEBSOCKET
+                            value: ""
           # Per-event parameterisation: stamp the Job from the ksvc event payload.
           # `value:` on each src is the fallback when the field/annotation is absent.
           parameters:
@@ -232,6 +244,24 @@ spec:
                 dataKey: body.metadata.annotations.realtime-service\.oam\.dev/role
                 value: ""
               dest: spec.template.spec.containers.0.env.4.value
+            # CONSUME_TOPICS (env 8) <- gjson array of the ksvc's CONSUME_* env values
+            - src:
+                dependencyName: contract-test-dep
+                dataKey: 'body.spec.template.spec.containers.0.env.#(name%"CONSUME_*")#.value'
+                value: ""
+              dest: spec.template.spec.containers.0.env.8.value
+            # PRODUCE_TOPICS (env 9) <- gjson array of the ksvc's PRODUCE_* env values
+            - src:
+                dependencyName: contract-test-dep
+                dataKey: 'body.spec.template.spec.containers.0.env.#(name%"PRODUCE_*")#.value'
+                value: ""
+              dest: spec.template.spec.containers.0.env.9.value
+            # WEBSOCKET (env 10) <- the ksvc's WEBSOCKET_ENABLED env value
+            - src:
+                dependencyName: contract-test-dep
+                dataKey: 'body.spec.template.spec.containers.0.env.#(name=="WEBSOCKET_ENABLED").value'
+                value: ""
+              dest: spec.template.spec.containers.0.env.10.value
           retryStrategy:
             steps: 3
             duration: "3s"
