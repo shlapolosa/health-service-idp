@@ -125,6 +125,11 @@ RTMAIN
     # so poetry resolves transport deps transitively. Idempotent.
     if [ -f pyproject.toml ]; then
       grep -q '^realtime-transport' pyproject.toml || sed -i '/\[tool.poetry.dependencies\]/a realtime-transport = {url = "https://github.com/shlapolosa/health-service-idp/releases/download/realtime-transport-v0.1.0/realtime_transport-0.1.0-py3-none-any.whl"}' pyproject.toml
+      # Align template pins with the wheel's requirements (caught live on rtdemo2:
+      # wheel needs fastapi >=0.115.14,<0.116.0 but the onion template pins
+      # ^0.104.0 -> poetry solver hard-fails the docker build). pydantic ^2.0.0
+      # already satisfies the wheel's >=2.11.7,<3. Idempotent.
+      sed -i 's/^fastapi = .*$/fastapi = "^0.115.14"/g' pyproject.toml
     fi
     echo "✅ realtime flavor applied (role=$ROLE, realtime-transport wheel)"
   fi

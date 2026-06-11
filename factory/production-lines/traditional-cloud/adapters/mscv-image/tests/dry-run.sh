@@ -46,7 +46,7 @@ version = "0.1.0"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-fastapi = "*"
+fastapi = "^0.104.0"
 EOF
 cat > "$TEMPLATE_FIXTURE/README.md" <<'EOF'
 # Template Service
@@ -192,7 +192,8 @@ def apply_expr(text, expr):
         flags = segs[2] if len(segs) > 2 else ''
         count = 0 if 'g' in flags else 1
         # GNU sed BRE-ish; our patterns are plain text so treat literally-ish
-        result = re.sub(pat, repl.replace('\\/', '/'), result, count=count)
+        # MULTILINE: GNU sed is line-based, so ^/$ anchors must match per-line.
+        result = re.sub(pat, repl.replace('\\/', '/'), result, count=count, flags=re.M)
     return result
 
 for f in files:
@@ -260,6 +261,13 @@ if grep -q '^realtime-transport = {url = "https://github.com/shlapolosa/health-s
   ok "pyproject pins the realtime-transport wheel"
 else
   bad "wheel dep missing from pyproject"
+fi
+# Caught live (rtdemo2 CI): template's fastapi ^0.104.0 conflicts with the
+# wheel's >=0.115.14,<0.116.0 — solver hard-fails the docker build.
+if grep -q '^fastapi = "\^0\.115\.14"' "$SVC_DIR/pyproject.toml"; then
+  ok "fastapi pin aligned to wheel requirement (^0.115.14)"
+else
+  bad "fastapi pin not aligned ($(grep '^fastapi' "$SVC_DIR/pyproject.toml" || echo missing))"
 fi
 if grep -q "def to_message" "$SVC_DIR/src/handlers.py" && grep -q "def transform" "$SVC_DIR/src/handlers.py"; then
   ok "handlers.py logic slot created"
