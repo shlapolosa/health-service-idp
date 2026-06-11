@@ -1,0 +1,85 @@
+name: contract-test-runner-ci
+
+# HARD-4 (#171): build + push the per-component-type contract-test runner image
+# to healthidpuaeacr.azurecr.io/contract-test-runner:<sha>.
+#
+# The image is the productised "rt1-flow" data-plane proof harness. The
+# contract-test sensor (factory/substrate/argo-events/contract-test-sensor.yaml)
+# runs it as a Job when a ksvc becomes Ready.
+#
+# Auth follows the existing OIDC pattern (.github/workflows/architect-evals.yml):
+# azure/login@v2 with AZURE_CLIENT_ID/TENANT_ID/SUBSCRIPTION_ID, then `az acr login`
+# (the SP must have AcrPush on healthidpuaeacr).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "factory/substrate/contract-tests/**"
+      - ".github/workflows/contract-test-runner-ci.yml"
+  pull_request:
+    paths:
+      - "factory/substrate/contract-tests/**"
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write       # azure/login OIDC
+  contents: read
+
+env:
+  ACR_NAME: healthidpuaeacr
+  REGISTRY: healthidpuaeacr.azurecr.io
+  IMAGE: contract-test-runner
+  CONTEXT: factory/substrate/contract-tests
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # Unit tests run with the runner module importable; the IO seam (Deps) is
+      # mocked so no broker/cluster/network is needed.
+      - name: Install test deps
+        run: pip install pytest aiokafka websockets httpx
+      - name: Unit tests
+        working-directory: ${{ env.CONTEXT }}
+        run: PYTHONPATH=. python -m pytest tests/ -q
+
+  build-push:
+    # Only push on main / manual; PRs just run tests above.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: ACR login
+        run: az acr login --name "${ACR_NAME}"
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push (amd64 — cluster arch)
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ env.CONTEXT }}
+          file: ${{ env.CONTEXT }}/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest
+
+      - name: Echo pinned tag (paste into contract-test-sensor.yaml TODO-pin)
+        run: echo "Pin the sensor Job image to ${REGISTRY}/${IMAGE}:${{ github.sha }}"

@@ -1,0 +1,303 @@
+---
+# HARD-4 (#171): per-component-type post-deploy CONTRACT TEST on ksvc readiness.
+#
+# WHY this exists: components ship "Ready" without data-plane proof. RT-1 was
+# green for days while ZERO telemetry flowed — a Knative readiness probe proves
+# the TRANSPORT (the pod accepts connections) but NOT the PIPELINE (a real message
+# travels consume->broadcast->ws, ingest->topic, or processor->transform->topic).
+# During RT-1 we hand-ran "rt1-flow" (an in-cluster pod using aiokafka+websockets
+# that produced a marker to the consumed topic and asserted it arrived on /ws).
+# This sensor PRODUCTISES that hand-run: when a labelled ksvc becomes Ready it
+# fires a contract-test Job (factory/substrate/contract-tests/runner.py) that runs
+# the type-appropriate data-plane proof and emits a one-line JSON verdict.
+#
+# DESIGN — mirrors EVENT-2 (ksvc-ready-apim-publish.yaml) EXACTLY:
+#   * same resource EventSource shape watching serving.knative.dev/services (UPDATE),
+#   * same Ready==True gjson array filter,
+#   * same k8s `create` Job trigger parameterised from the ksvc event payload.
+# It does NOT touch EVENT-2's SA/RBAC or any existing sensor — it stands up its
+# OWN SA (contract-test-event-sa) so the two are independent. The Job reads creds
+# at RUNTIME via envFrom the component's <comp>-conn secret (public-repo safe).
+#
+# DETECTION (how the component type/role is keyed) — stated explicitly:
+#   * type  = the ksvc's `app.kubernetes.io/component` label (stamped by every CD:
+#             realtime-service / graphql-gateway / webservice) -> CHECK_TYPE.
+#   * role  = (realtime only) the `realtime-service.oam.dev/role` annotation if the
+#             CD stamps it -> CHECK_ROLE; absent, runner.py infers it from the
+#             CONSUME_*/PRODUCE_*/WEBSOCKET env (gateway/ingest/processor).
+#   * app   = `app.oam.dev/name` label (KubeVela-stamped) -> COMPONENT_APP, used
+#             only for the Job's idempotency name + result label.
+#
+# SCOPE: the EventSource label filter opts in ONLY ksvcs that asked for a contract
+# test via `contract-test.cafe.io/enabled: "true"`. (That label is NOT yet stamped
+# by any CD — a follow-up CD change, owned by other agents, adds it. Until then this
+# sensor is inert: no Jobs fire, nothing existing changes. See the README.)
+#
+# IDEMPOTENCY: the Job is named deterministically per component+revision
+#   ct-<component>-<revision-hash>
+# from the ksvc's `serving.knative.dev/configurationGeneration` label, so repeated
+# Ready flaps of the SAME revision do not stack Jobs (a create of an existing name
+# is rejected — safe no-op). A genuinely new revision gets a new name and re-tests.
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: contract-test-watcher
+  namespace: argo-events
+spec:
+  template:
+    serviceAccountName: contract-test-event-sa
+  resource:
+    contract-test-ksvc:
+      namespace: default
+      group: serving.knative.dev
+      version: v1
+      resource: services
+      eventTypes:
+        - UPDATE
+      # Opt-in: only ksvcs labelled contract-test.cafe.io/enabled=true. Keeps the
+      # watch + bus traffic scoped and makes the contract test strictly additive
+      # (no labelled services today => zero behaviour change).
+      filter:
+        labels:
+          - key: contract-test.cafe.io/enabled
+            operation: "=="
+            value: "true"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: contract-test-on-ready
+  namespace: argo-events
+spec:
+  template:
+    serviceAccountName: contract-test-event-sa
+  dependencies:
+    - name: contract-test-dep
+      eventSourceName: contract-test-watcher
+      eventName: contract-test-ksvc
+      # Fire only when the Knative Ready condition is True (same gjson array filter
+      # idiom as EVENT-2: pick conditions[type=="Ready"], compare .status).
+      filters:
+        dataLogicalOperator: "and"
+        data:
+          - path: 'body.status.conditions.#(type=="Ready").status'
+            type: string
+            value:
+              - "True"
+  triggers:
+    - template:
+        name: contract-test-trigger
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: batch/v1
+              kind: Job
+              metadata:
+                # Deterministic name (overridden per-event via parameters below):
+                # ct-<component>-<configurationGeneration>. A re-fire for the same
+                # revision tries to create the same name and is rejected (no stack).
+                name: ct-PLACEHOLDER
+                namespace: default
+                labels:
+                  app.kubernetes.io/component: contract-test
+                  app.kubernetes.io/managed-by: argo-events
+                  contract-test.cafe.io/source: sensor
+              spec:
+                ttlSecondsAfterFinished: 1800
+                backoffLimit: 0          # one shot — a contract test is pass/fail, not retry-to-green
+                template:
+                  metadata:
+                    labels:
+                      app.kubernetes.io/component: contract-test
+                  spec:
+                    restartPolicy: Never
+                    securityContext:
+                      runAsNonRoot: true
+                      runAsUser: 1000
+                    containers:
+                      - name: contract-test
+                        # TODO-pin: replace :latest with the immutable
+                        # contract-test-runner:<sha> tag that
+                        # .github/workflows/contract-test-runner-ci.yml pushes.
+                        # Pinned to :latest as a PLACEHOLDER so this manifest is
+                        # valid before the first CI build exists.
+                        image: healthidpuaeacr.azurecr.io/contract-test-runner:latest
+                        # The component's normalized connection secret. envFrom it
+                        # so KAFKA_BOOTSTRAP_SERVERS + CONSUME_*/PRODUCE_* + any APIM
+                        # sub-key land as env at RUNTIME (never baked in the image).
+                        # optional:true => a component with no -conn secret (e.g. a
+                        # plain webservice/health check) still runs.
+                        envFrom:
+                          - secretRef:
+                              name: PLACEHOLDER-conn
+                              optional: true
+                        env:
+                          # All overridden per-event from the ksvc payload below.
+                          - name: COMPONENT_NAME
+                            value: PLACEHOLDER_SVC
+                          - name: COMPONENT_NS
+                            value: default
+                          - name: COMPONENT_APP
+                            value: ""
+                          - name: CHECK_TYPE
+                            value: "webservice"
+                          - name: CHECK_ROLE
+                            value: ""
+                          # KSVC_URL intentionally NOT set: runner.py's load_config
+                          # computes http://<COMPONENT_NAME>.<COMPONENT_NS>.svc.cluster.local
+                          # itself, so we avoid brittle string-concat across params.
+                          - name: WS_TOKEN
+                            value: "ct-probe"
+                          - name: CONTRACT_TIMEOUT
+                            value: "60"
+                          # APIM mode is OFF in-cluster by default. To exercise the
+                          # external path, a CD/annotation can set these (env flag).
+                          - name: APIM_MODE
+                            value: "false"
+          # Per-event parameterisation: stamp the Job from the ksvc event payload.
+          # `value:` on each src is the fallback when the field/annotation is absent.
+          parameters:
+            # --- idempotent Job name: ct-<component>-<configurationGeneration> ---
+            # Ordered ops on metadata.name (starts as "ct-PLACEHOLDER"):
+            #   1. overwrite -> "<name>"
+            #   2. prepend   -> "ct-<name>"
+            #   3. append    -> "ct-<name>-<generation>"
+            # Same revision => same name => the create is rejected (no Job stacking);
+            # a new revision bumps configurationGeneration => new name => re-test.
+            - src:
+                dependencyName: contract-test-dep
+                dataKey: body.metadata.name
+              dest: metadata.name
+              operation: overwrite
+            - src:
+                dependencyName: contract-test-dep
+                value: "ct-"
+              dest: metadata.name
+              operation: prepend
+            - src:
+                dependencyName: contract-test-dep
+                value: "-"
+              dest: metadata.name
+              operation: append
+            - src:
+                dependencyName: contract-test-dep
+                dataKey: body.metadata.labels.serving\.knative\.dev/configurationGeneration
+                value: "0"
+              dest: metadata.name
+              operation: append
+            # namespace for the Job itself
+            - src:
+                dependencyName: contract-test-dep
+                dataKey: body.metadata.namespace
+              dest: metadata.namespace
+            # envFrom secretRef name = <component>-conn. Two ordered ops on the
+            # same dest: overwrite the placeholder with the bare "<name>", then
+            # append the literal "-conn" suffix.
+            - src:
+                dependencyName: contract-test-dep
+                dataKey: body.metadata.name
+              dest: spec.template.spec.containers.0.envFrom.0.secretRef.name
+              operation: overwrite
+            - src:
+                dependencyName: contract-test-dep
+                # no dataKey: a literal suffix appended to complete "<name>-conn"
+                value: "-conn"
+              dest: spec.template.spec.containers.0.envFrom.0.secretRef.name
+              operation: append
+            # COMPONENT_NAME (env 0)
+            - src:
+                dependencyName: contract-test-dep
+                dataKey: body.metadata.name
+              dest: spec.template.spec.containers.0.env.0.value
+            # COMPONENT_NS (env 1)
+            - src:
+                dependencyName: contract-test-dep
+                dataKey: body.metadata.namespace
+              dest: spec.template.spec.containers.0.env.1.value
+            # COMPONENT_APP (env 2) <- app.oam.dev/name label
+            - src:
+                dependencyName: contract-test-dep
+                dataKey: body.metadata.labels.app\.oam\.dev/name
+                value: ""
+              dest: spec.template.spec.containers.0.env.2.value
+            # CHECK_TYPE (env 3) <- app.kubernetes.io/component label
+            - src:
+                dependencyName: contract-test-dep
+                dataKey: body.metadata.labels.app\.kubernetes\.io/component
+                value: "webservice"
+              dest: spec.template.spec.containers.0.env.3.value
+            # CHECK_ROLE (env 4) <- realtime-service.oam.dev/role annotation (optional)
+            - src:
+                dependencyName: contract-test-dep
+                dataKey: body.metadata.annotations.realtime-service\.oam\.dev/role
+                value: ""
+              dest: spec.template.spec.containers.0.env.4.value
+          retryStrategy:
+            steps: 3
+            duration: "3s"
+            factor: 2
+---
+# ServiceAccount for the EventSource (watch ksvc) + Sensor (create the Job).
+# Independent of EVENT-2's apim-publish-event-sa so neither owns the other.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: contract-test-event-sa
+  namespace: argo-events
+---
+# EventSource side: watch Knative Services cluster-wide (list/watch) + emit Events.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: contract-test-event-role
+rules:
+  - apiGroups: ["serving.knative.dev"]
+    resources: ["services"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: contract-test-event-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: contract-test-event-role
+subjects:
+  - kind: ServiceAccount
+    name: contract-test-event-sa
+    namespace: argo-events
+---
+# Sensor side, namespaced to `default`: create the contract-test Job and READ the
+# <comp>-conn secret it envFroms. Least privilege: jobs (create/get/list/delete)
+# and secrets (get/list) ONLY — it creates nothing else.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: contract-test-job-creator
+  namespace: default
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: contract-test-job-creator-binding
+  namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: contract-test-job-creator
+subjects:
+  - kind: ServiceAccount
+    name: contract-test-event-sa
+    namespace: argo-events
