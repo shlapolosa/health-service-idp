@@ -121,7 +121,7 @@ spec:
                         # :latest). Bump this tag when
                         # .github/workflows/contract-test-runner-ci.yml pushes
                         # a new runner build.
-                        image: healthidpuaeacr.azurecr.io/contract-test-runner:a878852
+                        image: healthidpuaeacr.azurecr.io/contract-test-runner:843a24c
                         # The component's normalized connection secret. envFrom it
                         # so KAFKA_BOOTSTRAP_SERVERS + CONSUME_*/PRODUCE_* + any APIM
                         # sub-key land as env at RUNTIME (never baked in the image).
