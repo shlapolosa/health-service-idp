@@ -30,6 +30,10 @@ spec:
               "app.kubernetes.io/name":       context.name
               "app.kubernetes.io/component":  "realtime-service"
               "app.kubernetes.io/managed-by": "kubevela"
+              // HARD-4 (#171): auto-enroll in the post-deploy contract test —
+              // the contract-test eventsource opts in ksvcs carrying this label
+              // and fires a data-plane check Job on every Ready transition.
+              "contract-test.cafe.io/enabled": "true"
             }
             annotations: {
               if parameter.targetEnvironment != _|_ {
