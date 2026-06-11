@@ -202,20 +202,18 @@ spec:
                 dependencyName: contract-test-dep
                 dataKey: body.metadata.namespace
               dest: metadata.namespace
-            # envFrom secretRef name = <component>-conn. Two ordered ops on the
-            # same dest: overwrite the placeholder with the bare "<name>", then
-            # append the literal "-conn" suffix.
+            # envFrom secretRef = the component's OWN first envFrom secret from the
+            # ksvc payload (live finding, second fire: the realtime BINDING secret
+            # is the PLATFORM's <realtime>-conn — e.g. rtdemo-stream-conn — not
+            # <component>-conn, which doesn't exist; the empty mount left
+            # KAFKA_BOOTSTRAP_SERVERS blank). Fallback to a harmless nonexistent
+            # name (optional:true) when the ksvc has no envFrom at all.
             - src:
                 dependencyName: contract-test-dep
-                dataKey: body.metadata.name
+                dataKey: body.spec.template.spec.containers.0.envFrom.0.secretRef.name
+                value: "contract-test-no-conn"
               dest: spec.template.spec.containers.0.envFrom.0.secretRef.name
               operation: overwrite
-            - src:
-                dependencyName: contract-test-dep
-                # no dataKey: a literal suffix appended to complete "<name>-conn"
-                value: "-conn"
-              dest: spec.template.spec.containers.0.envFrom.0.secretRef.name
-              operation: append
             # COMPONENT_NAME (env 0)
             - src:
                 dependencyName: contract-test-dep
