@@ -117,12 +117,11 @@ spec:
                       runAsUser: 1000
                     containers:
                       - name: contract-test
-                        # TODO-pin: replace :latest with the immutable
-                        # contract-test-runner:<sha> tag that
-                        # .github/workflows/contract-test-runner-ci.yml pushes.
-                        # Pinned to :latest as a PLACEHOLDER so this manifest is
-                        # valid before the first CI build exists.
-                        image: healthidpuaeacr.azurecr.io/contract-test-runner:latest
+                        # Pinned to the immutable sha tag (HARD-3 rule: never
+                        # :latest). Bump this tag when
+                        # .github/workflows/contract-test-runner-ci.yml pushes
+                        # a new runner build.
+                        image: healthidpuaeacr.azurecr.io/contract-test-runner:68b1bda
                         # The component's normalized connection secret. envFrom it
                         # so KAFKA_BOOTSTRAP_SERVERS + CONSUME_*/PRODUCE_* + any APIM
                         # sub-key land as env at RUNTIME (never baked in the image).
