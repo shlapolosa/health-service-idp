@@ -356,22 +356,37 @@ async def check_realtime_gateway(cfg: Config, deps: Deps) -> Verdict:
         return Verdict(cfg.component, cfg.ctype, "rt-gateway-ws-roundtrip", False,
                        "no CONSUME_* topic in env (cannot drive the gateway)")
     topic = cfg.consume_topics[0]
-    marker = _marker(cfg.component)
 
-    async def _drive() -> bool:
+    async def _drive(marker: Dict[str, object]) -> bool:
         # Connect ws first (so we don't miss the broadcast), produce, then await recv.
         recv_task = asyncio.ensure_future(deps.ws_recv(cfg, marker))
         await asyncio.sleep(1.0)  # let the subscription register before producing
         await deps.kafka_produce(cfg, topic, marker)
         return await recv_task
 
-    try:
-        ok = await asyncio.wait_for(_drive(), timeout=cfg.timeout + 5)
-    except asyncio.TimeoutError:
-        return Verdict(cfg.component, cfg.ctype, "rt-gateway-ws-roundtrip", False,
-                       "marker {} not received on /ws within {}s".format(marker["marker_id"], cfg.timeout))
-    detail = "marker {} {} on topic {} -> /ws".format(
-        marker["marker_id"], "delivered" if ok else "NOT delivered", topic)
+    # Up to 3 attempts with fresh markers (live finding, fifth fire): the sensor
+    # fires on the FIRST Ready event of a rollout, when traffic/consumer-group
+    # ownership may still sit with the outgoing revision's pod — a one-shot probe
+    # tests the OLD pod. Retrying rides out the transition window (~60s scale-down).
+    last_marker = None
+    ok = False
+    for attempt in range(3):
+        marker = _marker(cfg.component)
+        last_marker = marker
+        try:
+            ok = await asyncio.wait_for(_drive(marker), timeout=cfg.timeout + 5)
+        except asyncio.TimeoutError:
+            ok = False
+        except Exception as exc:  # transient connect errors during rollout
+            print("attempt {} error: {}".format(attempt + 1, exc), file=sys.stderr)
+            ok = False
+        if ok:
+            break
+        if attempt < 2:
+            await asyncio.sleep(20.0)
+    detail = "marker {} {} on topic {} -> /ws ({} attempt(s))".format(
+        last_marker["marker_id"], "delivered" if ok else "NOT delivered", topic,
+        attempt + 1)
     return Verdict(cfg.component, cfg.ctype, "rt-gateway-ws-roundtrip", ok, detail)
 
 

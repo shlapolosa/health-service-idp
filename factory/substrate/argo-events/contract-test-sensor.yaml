@@ -169,16 +169,18 @@ spec:
           # Per-event parameterisation: stamp the Job from the ksvc event payload.
           # `value:` on each src is the fallback when the field/annotation is absent.
           parameters:
-            # --- idempotent Job name: ct-<component>-<configurationGeneration> ---
-            # Ordered ops on metadata.name (starts as "ct-PLACEHOLDER"):
-            #   1. overwrite -> "<name>"
-            #   2. prepend   -> "ct-<name>"
-            #   3. append    -> "ct-<name>-<generation>"
-            # Same revision => same name => the create is rejected (no Job stacking);
-            # a new revision bumps configurationGeneration => new name => re-test.
+            # --- idempotent Job name: ct-<latestCreatedRevisionName> ---
+            # (live finding, fifth fire: the configurationGeneration LABEL does not
+            # exist on the ksvc top-level payload — the old key always fell back to
+            # "0", so ONE Job per component ever existed and re-fires for new
+            # revisions were rejected; the Job also raced the rollout and tested the
+            # OLD revision. status.latestCreatedRevisionName IS in the payload and
+            # is unique per revision: same revision => same name => no stacking;
+            # new revision => new name => re-test.)
             - src:
                 dependencyName: contract-test-dep
-                dataKey: body.metadata.name
+                dataKey: body.status.latestCreatedRevisionName
+                value: "unknown-rev"
               dest: metadata.name
               operation: overwrite
             - src:
@@ -186,17 +188,6 @@ spec:
                 value: "ct-"
               dest: metadata.name
               operation: prepend
-            - src:
-                dependencyName: contract-test-dep
-                value: "-"
-              dest: metadata.name
-              operation: append
-            - src:
-                dependencyName: contract-test-dep
-                dataKey: body.metadata.labels.serving\.knative\.dev/configurationGeneration
-                value: "0"
-              dest: metadata.name
-              operation: append
             # namespace for the Job itself
             - src:
                 dependencyName: contract-test-dep
