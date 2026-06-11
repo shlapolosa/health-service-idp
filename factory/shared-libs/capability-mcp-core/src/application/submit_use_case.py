@@ -29,6 +29,7 @@ from typing import Any
 
 import yaml
 
+from . import requirements_spec
 from ..domain.models import SubmitResult
 from ..infrastructure.argo_client import ArgoWorkflowsClient
 from ..infrastructure.github_client import GitHubClient
@@ -38,6 +39,8 @@ from ..infrastructure.vela_client import VelaClient
 logger = logging.getLogger(__name__)
 _OAM_TEMPLATE = "oam-apply"                       # legacy fallback for non-scaffold paths
 _SVC_OAM_PATH = "oam/applications/application.yaml"  # single reconciled truth per service repo
+# SPEC-1 (#173, dev-agent W1): where the use-case spec lands.
+_SVC_REQUIREMENTS_PATH = "REQUIREMENTS.md"        # app monorepo root (per-service gitops repo)
 
 
 class SubmitUseCase:
@@ -61,7 +64,7 @@ class SubmitUseCase:
     # Public surface (MCP tools wrap these)
     # ----------------------------------------------------------------------
 
-    def submit(self, oam_yaml: str) -> SubmitResult:
+    def submit(self, oam_yaml: str, requirements: str | None = None) -> SubmitResult:
         # 1. parse + identify the app
         try:
             app = yaml.safe_load(oam_yaml)
@@ -70,6 +73,15 @@ class SubmitUseCase:
             namespace = md.get("namespace", "default")
         except Exception as e:  # noqa: BLE001
             return SubmitResult(ok=False, message=f"invalid OAM Application YAML: {e}")
+
+        # SPEC-1 (#173, dev-agent W1): optional REQUIREMENTS.md travels with the
+        # submission. Validate fail-fast (before any commit), then carry the
+        # normalized content + deterministic hash through both routes. Omitted
+        # => exactly today's behaviour (no spec commit, spec_hash=None).
+        try:
+            spec = self._prepare_requirements(requirements)
+        except requirements_spec.RequirementsError as e:
+            return SubmitResult(ok=False, message=f"invalid requirements: {e}")
 
         # GQL-1 (#155): render-inject explicit `sources:` onto any graphql-gateway
         # component that omitted them, before validation/commit. app.submit is the
@@ -109,13 +121,18 @@ class SubmitUseCase:
         if not committed:
             return SubmitResult(ok=False, message="gitops commit failed")
 
+        # SPEC-1: commit the spec next to the OAM in the central ledger (audit/
+        # discovery sibling). Best-effort — a failed spec commit never blocks the
+        # OAM provisioning that already committed (purely additive).
+        self._commit_ledger_requirements(app_name, spec)
+
         # 4. ROUTE (declarative-spine W4)
         scaffold = self._needs_scaffold(app)
         if scaffold is None:
             # No scaffolding (backing services / bring-your-own-image) → legacy oam-apply.
-            return self._reconcile_apim_product(app, self._with_advisory(
+            return self._attach_spec_hash(self._reconcile_apim_product(app, self._with_advisory(
                 self._fire_oam_apply(app_name, namespace, target_vcluster, oam_yaml, sha, path),
-                advisory))
+                advisory)), spec)
 
         if self.claims is None:
             # Claim client not wired (should not happen in prod — dependencies.py
@@ -124,9 +141,10 @@ class SubmitUseCase:
                                 message=f"committed {sha} but no claim client is "
                                         f"configured; cannot scaffold {app_name}")
 
-        return self._reconcile_apim_product(app, self._with_advisory(
-            self._declarative_scaffold(app, app_name, scaffold, target_vcluster, oam_yaml, sha),
-            advisory))
+        return self._attach_spec_hash(self._reconcile_apim_product(app, self._with_advisory(
+            self._declarative_scaffold(app, app_name, scaffold, target_vcluster, oam_yaml, sha,
+                                       spec),
+            advisory)), spec)
 
     @staticmethod
     def _auto_expose_external_components(app: dict[str, Any], oam_yaml: str) -> str:
@@ -219,7 +237,7 @@ class SubmitUseCase:
                             workflow_name=result.workflow_name,
                             message=f"{result.message}\n{msg}")
 
-    def submit_wait(self, oam_yaml: str) -> SubmitResult:
+    def submit_wait(self, oam_yaml: str, requirements: str | None = None) -> SubmitResult:
         """Deferred sibling of submit() — for OAMs whose ComponentDefinitions don't exist yet.
 
         Skips vela.dry_run (would fail by design — that's why the caller chose
@@ -244,6 +262,12 @@ class SubmitUseCase:
             namespace = md.get("namespace", "default")
         except Exception as e:  # noqa: BLE001
             return SubmitResult(ok=False, message=f"invalid OAM Application YAML: {e}")
+
+        # SPEC-1 (#173): same optional requirements handling as submit() (fail-fast).
+        try:
+            spec = self._prepare_requirements(requirements)
+        except requirements_spec.RequirementsError as e:
+            return SubmitResult(ok=False, message=f"invalid requirements: {e}")
 
         # GQL-1 (#155): same render-injection as submit() so the deferred path also
         # commits the authoritative explicit sources to the ledger.
@@ -270,18 +294,91 @@ class SubmitUseCase:
         if not committed:
             return SubmitResult(ok=False, message="gitops commit failed")
 
+        # SPEC-1: commit the spec sibling to the ledger (best-effort), same as submit().
+        self._commit_ledger_requirements(app_name, spec)
+
         scaffold = self._needs_scaffold(app)
         if scaffold is None or self.claims is None:
             # No scaffolding component (or no claim client): nothing to provision
             # imperatively. The OAM is committed to the ledger; once its CDs land
             # the consumer can re-run submit() to deliver. Report queued.
-            return SubmitResult(ok=True, commit_sha=sha,
+            return self._attach_spec_hash(SubmitResult(ok=True, commit_sha=sha,
                                 message=(f"queued {app_name}; committed {sha}; OAM stored in "
                                          f"the gitops ledger — resubmit once its "
-                                         f"ComponentDefinitions are available"))
+                                         f"ComponentDefinitions are available")), spec)
 
         # Same declarative provisioning as submit(): the claim/ArgoCD do the waiting.
-        return self._declarative_scaffold(app, app_name, scaffold, target_vcluster, oam_yaml, sha)
+        return self._attach_spec_hash(
+            self._declarative_scaffold(app, app_name, scaffold, target_vcluster, oam_yaml, sha,
+                                       spec), spec)
+
+    # ----------------------------------------------------------------------
+    # SPEC-1 (#173, dev-agent W1): REQUIREMENTS.md handling
+    # ----------------------------------------------------------------------
+
+    @staticmethod
+    def _prepare_requirements(requirements: str | None) -> tuple[str, str] | None:
+        """Decode → validate → normalize → hash the optional requirements blob.
+
+        Returns (normalized_content, spec_hash) when requirements are supplied,
+        or None when omitted (legacy behaviour). Raises
+        requirements_spec.RequirementsError on malformed/empty content so the
+        caller can fail fast BEFORE any commit."""
+        if requirements is None or (isinstance(requirements, str) and not requirements.strip()):
+            return None
+        return requirements_spec.prepare(requirements)
+
+    def _commit_ledger_requirements(self, app_name: str,
+                                    spec: tuple[str, str] | None) -> None:
+        """Commit the spec next to the OAM in the central gitops ledger as
+        `oam/applications/<app>-REQUIREMENTS.md`. Best-effort (additive): a
+        failure is logged, never raised — the OAM has already committed."""
+        if spec is None:
+            return
+        content, shash = spec
+        path = f"oam/applications/{app_name}-REQUIREMENTS.md"
+        ok, _ = self.github.commit_file(
+            path, content,
+            message=f"spec: requirements for {app_name} ({shash})",
+            branch=self.gitops_branch,
+        )
+        if not ok:
+            logger.warning("SPEC-1: ledger requirements commit failed for %s "
+                           "(non-fatal)", app_name)
+
+    def _commit_monorepo_requirements(self, svc_repo: str,
+                                      spec: tuple[str, str] | None) -> str:
+        """Commit REQUIREMENTS.md at the app monorepo root. Idempotent: the
+        github client fetches the existing blob sha and a PUT of identical
+        content is a no-op update (same content => no churn). Returns a short
+        message fragment for the SubmitResult. Best-effort: a missing repo
+        (day-0) or transport error is reported, never raised."""
+        if spec is None:
+            return ""
+        content, shash = spec
+        try:
+            ok, _ = self.github.commit_file(
+                _SVC_REQUIREMENTS_PATH, content,
+                message=f"spec: requirements ({shash}) (capability-mcp app.submit)",
+                branch=self.gitops_branch, repo=svc_repo,
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning("SPEC-1: monorepo requirements commit raised for %s "
+                           "(non-fatal): %s", svc_repo, e)
+            return f"; spec {shash} (ledger only — monorepo commit errored)"
+        if ok:
+            return f"; spec {shash} -> {svc_repo}/{_SVC_REQUIREMENTS_PATH}"
+        return f"; spec {shash} (ledger only — monorepo not ready yet)"
+
+    @staticmethod
+    def _attach_spec_hash(result: "SubmitResult",
+                          spec: tuple[str, str] | None) -> "SubmitResult":
+        """Thread the spec hash into the returned SubmitResult (the W3 trigger
+        re-fire key). No-op when no requirements travelled with the submit."""
+        if spec is None:
+            return result
+        result.spec_hash = spec[1]
+        return result
 
     # ----------------------------------------------------------------------
     # Routing helpers
@@ -533,7 +630,8 @@ class SubmitUseCase:
     def _declarative_scaffold(self, app: dict[str, Any], app_name: str,
                               scaffold_comp: dict[str, Any],
                               target_vcluster: str | None, oam_yaml: str,
-                              sha: str) -> SubmitResult:
+                              sha: str,
+                              spec: tuple[str, str] | None = None) -> SubmitResult:
         """Declarative-spine path: update via direct repo commit, day-0 via claim.
 
         UNIFY-1 (#153): tenancy unit is the OAM. ONE AppContainerClaim named after
@@ -569,10 +667,13 @@ class SubmitUseCase:
                 added = self.claims.reconcile_services(name=app_name, services=services)
                 if added:
                     reconcile_msg = f"; scaffolded new service(s): {', '.join(added)}"
+            # SPEC-1: the monorepo exists on the update path — land REQUIREMENTS.md
+            # at its root (idempotent; the github client no-ops an unchanged blob).
+            spec_msg = self._commit_monorepo_requirements(svc_repo, spec)
             return SubmitResult(ok=True, commit_sha=svc_sha,
                                 message=(f"updated {app_name}; committed {svc_sha} to "
                                          f"{svc_repo}/{_SVC_OAM_PATH}; ArgoCD will reconcile "
-                                         f"(ledger {sha}){reconcile_msg}"))
+                                         f"(ledger {sha}){reconcile_msg}{spec_msg}"))
 
         # DAY-0 path: create the AppContainerClaim named after the OAM. Composition
         # does the rest (one repo pair via templates, OAM seed, one ApplicationClaim
@@ -606,11 +707,16 @@ class SubmitUseCase:
             return SubmitResult(ok=False, commit_sha=sha,
                                 message=f"committed {sha} but claim creation failed: {msg}")
         svc_count = len(services) or 1
+        # SPEC-1: on day-0 the monorepo doesn't exist yet (the composition creates
+        # it asynchronously), so the spec lives in the central ledger for now and is
+        # re-landed at the monorepo root on the next (update-path) submit. We still
+        # attempt the monorepo commit best-effort in case the repo already exists.
+        spec_msg = self._commit_monorepo_requirements(svc_repo, spec)
         return SubmitResult(ok=True, commit_sha=sha, workflow_name=app_name,
                             message=(f"submitted {app_name}; committed {sha}; {msg}; "
                                      f"composition will create {svc_repo} + seed OAM + "
                                      f"ArgoCD app + scaffold {svc_count} service(s) "
-                                     f"(target={target_vcluster or 'host'})"))
+                                     f"(target={target_vcluster or 'host'}){spec_msg}"))
 
     def _fire_oam_apply(self, app_name: str, namespace: str, target_vcluster: str | None,
                         oam_yaml: str, sha: str, path: str) -> SubmitResult:

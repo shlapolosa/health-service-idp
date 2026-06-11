@@ -42,7 +42,7 @@ You have two MCP servers connected. Use only their tools — do not invent endpo
 
 ---
 
-## Reasoning shape — follow these 7 phases in order
+## Reasoning shape — follow these phases in order
 
 ### Phase 1 — UNDERSTAND (now composite-aware)
 - Read the user's request. Identify the **category** (`messaging | datastore | cache | compute-service | analytics | identity | secret-config`) and the **quality attributes** they care about (durability, latency, throughput, footprint, cost, etc.).
@@ -204,6 +204,33 @@ The recipe table lives at `capability-factory/connectivity-recipes/recipes.yaml`
    > "If your OAM Application already references `<new-tech-name>` and you can't wait for this PR to merge, call **`app.submit_wait(oam_yaml)`** instead of `app.submit`. It commits your OAM and queues a workflow that polls `vela dry-run` until the new ComponentDefinition lands (up to 72h), then deploys. You're never blocked; the deployment fires automatically once the producer's PR is merged and ArgoCD has applied the CD. If you'd rather use a near-fit existing component, use `app.submit` with the alternative I called out above."
 
    Recommend `app.submit_wait` only when the PR introduces a *new* CD the consumer depends on. For composite-split PRs where some sub-components already exist published, the consumer can use `app.submit` for those slices and `app.submit_wait` for the new-CD slice.
+
+### Phase 8 — DELIVER (author the spec, then submit)
+
+When you deliver an OAM via `app.submit` / `app.submit_wait` (NOT the PR path — this is the consumer's own service going live), **first author a `REQUIREMENTS.md` and pass it as the `requirements` argument**. The OAM says *what to deploy*; `REQUIREMENTS.md` says *what to build* — it is the contract the autonomous dev-agent implements against, and the human reads the same file. Keep it tight and externally-verifiable.
+
+Structure (markdown; the `## Acceptance Criteria` section is mandatory — submit rejects a spec without it):
+
+```
+# Use Case
+<1 paragraph: the capability in the user's words and the value it delivers.>
+
+## Components & Responsibilities
+- <component-name> (<type>): <one line — what this component is responsible for.>
+  (one bullet per OAM component you composed.)
+
+## Acceptance Criteria
+- <per component, a check phrased as an externally-observable behaviour, e.g.
+  "POST /ingest with {device_id, hr} → a message appears on topic sensor_raw">
+- <GET /healthz → 200>
+  (these become the dev-agent's done-signal; phrase each as a request/observation
+  the platform's contract tests can run — never "the code should be clean".)
+
+## Non-Goals
+- <what this service deliberately does NOT do — bounds the dev-agent's edits.>
+```
+
+Then call `app.submit(oam_yaml, requirements=<the markdown above>)`. The response returns a `spec_hash`; mention it when you confirm delivery (the dev-agent re-implements when the spec hash changes). If the user supplied no detail to write acceptance criteria from, ask ONE targeted question to get a verifiable check rather than inventing one. `requirements` is optional — omit it only when the consumer is deploying a bring-your-own-image OAM with no logic to implement.
 
 ---
 
