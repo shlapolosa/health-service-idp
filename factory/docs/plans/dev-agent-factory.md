@@ -91,6 +91,15 @@ The **interface contract** that makes this tractable (not "agent, write me an ap
 - Schema kept minimal: the dev-agent and the human read the same file.
 
 ### W2 — dev-agent container image
+- **Runtime placement: in-cluster ephemeral K8s Job on AKS**, namespace `dev-agent-system`,
+  spawned by the Argo Events sensor (native trigger pattern, same as oam-apply/APIM Jobs).
+  Rationale: trigger origin is in-cluster; cleanest creds (Workload Identity → Key Vault for
+  FactoryBot key + ANTHROPIC_API_KEY via ExternalSecret); direct scoped-SA reads of platform
+  state; $0 compute when idle (~1 CPU/2-4Gi per pass); cluster-stopped ⇒ no events ⇒ no runs.
+  The container is the sandbox: NetworkPolicy restricts egress to github.com + api.anthropic.com,
+  making headless `--dangerously-skip-permissions` safe. Rejected: GitHub Actions runner (cluster
+  is the trigger origin anyway; key in org secrets), ACI/Container Apps (second substrate),
+  Anthropic-hosted agents (not wired to the event fabric).
 - `factory/production-lines/traditional-cloud/adapters/dev-agent/`: image with Claude Code
   (headless `claude -p`) + git + gh + task-master + python/poetry + node.
 - Entrypoint contract: env in (`APP_NAME`, `REPO_URL`, `SPEC_PATH`, `ATTEMPT`), then:
