@@ -105,18 +105,44 @@ class Config:
 def _collect_topics(prefix: str, environ: Dict[str, str]) -> List[str]:
     """The realtime-service CD emits one env var per topic: CONSUME_<t>=<t> /
     PRODUCE_<t>=<t> (it avoids a CUE import for comma-joining). Recover the
-    topic list from those keys; the *value* is the real topic name."""
+    topic list from those keys; the *value* is the real topic name.
+
+    Fallback (live finding, first sensor fire): those per-topic vars live on the
+    COMPONENT's ksvc env, not in its -conn secret — so the contract-test Job
+    doesn't inherit them via envFrom. The sensor instead extracts them from the
+    ksvc event payload (gjson) and passes an aggregate <PREFIX>TOPICS env whose
+    value is a JSON array (e.g. '["sensor_agg"]') or a comma-joined string."""
+    agg_key = prefix + "TOPICS"
     out: List[str] = []
     for k, v in environ.items():
-        if k.startswith(prefix) and v:
+        if k == agg_key or not v:
+            continue
+        if k.startswith(prefix):
             out.append(v)
+    agg = environ.get(agg_key, "").strip()
+    if agg:
+        try:
+            vals = json.loads(agg)
+            if isinstance(vals, list):
+                out.extend(str(t) for t in vals if t)
+            elif isinstance(vals, str) and vals:
+                out.append(vals)
+        except ValueError:
+            out.extend(t.strip() for t in agg.split(",") if t.strip())
     return sorted(set(out))
 
 
 def _infer_role(environ: Dict[str, str]) -> str:
     consume = bool(_collect_topics("CONSUME_", environ))
     produce = bool(_collect_topics("PRODUCE_", environ))
-    websocket = str(environ.get("WEBSOCKET", "")).lower() == "true"
+    # WEBSOCKET comes from the sensor (extracted from the ksvc's
+    # WEBSOCKET_ENABLED env); accept either name.
+    websocket = (
+        str(environ.get("WEBSOCKET", "") or environ.get("WEBSOCKET_ENABLED", ""))
+        .strip('"')
+        .lower()
+        == "true"
+    )
     if consume and produce and websocket:
         return "gateway"
     if produce and not consume:

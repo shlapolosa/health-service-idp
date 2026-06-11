@@ -288,3 +288,27 @@ def test_ws_url_incluster_uses_ws_scheme_no_key():
     url = r._ws_url(cfg)
     assert url.startswith("ws://gw.default.svc.cluster.local/ws?")
     assert "subscription-key" not in url
+
+
+# --- aggregate-topic fallback (live finding: per-topic vars live on the ksvc env,
+# not in the -conn secret; the sensor passes gjson-extracted aggregates) ----------
+
+def test_collect_topics_aggregate_json_array():
+    env = {"CONSUME_TOPICS": '["sensor_agg","other"]'}
+    assert r._collect_topics("CONSUME_", env) == ["other", "sensor_agg"]
+
+
+def test_collect_topics_aggregate_comma():
+    env = {"PRODUCE_TOPICS": "a, b"}
+    assert r._collect_topics("PRODUCE_", env) == ["a", "b"]
+
+
+def test_collect_topics_aggregate_not_treated_as_per_topic():
+    # CONSUME_TOPICS itself starts with CONSUME_ — its raw value must not leak in.
+    env = {"CONSUME_TOPICS": '["sensor_agg"]', "CONSUME_x": "x"}
+    assert r._collect_topics("CONSUME_", env) == ["sensor_agg", "x"]
+
+
+def test_infer_role_websocket_from_sensor_env():
+    env = {"CONSUME_TOPICS": '["sensor_agg"]', "WEBSOCKET": '"true"'}
+    assert r._infer_role(env) == "gateway"
