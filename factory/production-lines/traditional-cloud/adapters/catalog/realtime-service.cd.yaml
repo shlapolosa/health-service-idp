@@ -257,6 +257,17 @@ spec:
         }
 
         parameter: {
+          // Container image (HARD-3 #170). The `*default | string` form means:
+          // when OAM `properties.image` IS supplied it is used VERBATIM; the
+          // ":latest" placeholder only applies on the FIRST render (bootstrap),
+          // before generated-repo CI has built microservices/<name>. CI then
+          // commit-backs the immutable <repo>:<sha> into the gitops OAM AND bumps
+          // app.oam.dev/publishVersion (see comprehensive-gitops-template.yml +
+          // deployment-update.yml in app-container-claim-composition.yaml) — that
+          // re-pin is what unsticks the Knative revision from the stale :latest
+          // digest. A provided image MUST NOT end in ":latest"; that guard lives
+          // in the CI commit-back (RE2 has no negative-lookahead, so it is not
+          // cleanly expressible as a vela 1.10 CUE regex constraint).
           image: *"healthidpuaeacr.azurecr.io/\(context.name):latest" | string
           port: *8080 | int
           version: *"latest" | string

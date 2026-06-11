@@ -437,6 +437,12 @@ spec:
         parameter: {
           // Container image — defaults to the ACR :latest placeholder; overridable via
           // OAM `properties.image` (BYO image or W3 digest pin). Parity with webservice CD.
+          // HARD-3 #170: `*default | string` keeps a provided image VERBATIM; :latest
+          // applies ONLY on the first (bootstrap) render before generated-repo CI has
+          // built it. CI commit-backs <repo>:<sha> + bumps publishVersion so the ksvc
+          // revision is re-pinned off the stale :latest digest. A provided image MUST
+          // NOT end in ":latest" — guard enforced in the CI commit-back (RE2 has no
+          // negative-lookahead → not cleanly expressible as a vela 1.10 CUE regex).
           image: *"healthidpuaeacr.azurecr.io/\(context.name):latest" | string
 
           // Repository-based image generation (required when repository specified)
