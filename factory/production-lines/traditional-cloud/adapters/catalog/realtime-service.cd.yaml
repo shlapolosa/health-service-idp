@@ -223,8 +223,19 @@ spec:
         // Scaffold claim (RT-1): one AppContainerClaim carrying serviceFlavor:
         // realtime so the ApplicationClaim composition seeds the fastapi realtime
         // variant (overwrites src/main.py -> create_realtime_agent_app, adds
-        // aiokafka+websockets). Mirrors realtime-platform/webservice scaffold path.
-        if parameter.language != _|_ {
+        // aiokafka+websockets).
+        //
+        // RECREATE-STORM (#175): gated behind EXPLICIT `bootstrap: true`. The old
+        // `language != _|_` gate emitted a STANDALONE per-component AppContainerClaim
+        // on every render. Pre-UNIFY-1 that converged with the day-0 claim (app name
+        // == component name); under UNIFY-1 the app-level claim is named after the
+        // APP and fans out services[], so the per-component claim was a DUPLICATE
+        // owner: second repo pair, second ArgoCD family, second vela app fighting
+        // over the same ksvc, and a second CI racing to own the component's ACR
+        // image (how rtdemo-gateway:latest drifted to a broken build). Scaffolding
+        // belongs to app.submit / the bootstrap trait; opt in here ONLY for
+        // single-component OAMs applied outside app.submit.
+        if parameter.bootstrap != _|_ if parameter.bootstrap {
           outputs: {
             "scaffold-claim": {
               apiVersion: "platform.example.org/v1alpha1"
@@ -294,6 +305,8 @@ spec:
           language?: "python"
           // Realtime platform binding (required for a useful realtime-service).
           realtime?: string
+          // #175: opt-in standalone scaffold claim (single-component OAMs only).
+          bootstrap?: bool
           // Topics this service reads / writes (must be declared on the platform).
           consumes?: [...string]
           produces?: [...string]

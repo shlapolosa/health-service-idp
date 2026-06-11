@@ -55,6 +55,19 @@ cd $TEMP_DIR
 # Clone the AppContainer repository using GitHub token
 git clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/$APP_CONTAINER.git .
 
+# RECREATE-STORM (#175): NO-CLOBBER. A Crossplane reconcile / claim recreation can
+# re-run this Job long after the service was scaffolded AND HAND-EDITED (or
+# dev-agent-edited). Re-scaffolding overwrites src/main.py + vendored deps with a
+# fresh template (exactly how rtdemo commit 8885dca regressed the gateway image).
+# If the service dir already has an entrypoint artifact, scaffolding already
+# happened — exit 0 (idempotent success; the composition only needs the Job green).
+if [ -f "microservices/$SERVICE_NAME/src/main.py" ] \
+   || [ -f "microservices/$SERVICE_NAME/package.json" ] \
+   || [ -f "microservices/$SERVICE_NAME/pom.xml" ]; then
+  echo "microservices/$SERVICE_NAME already scaffolded (entrypoint artifact present) - skipping re-scaffold (no-clobber)"
+  exit 0
+fi
+
 # Determine template repository based on service type (sets TEMPLATE_REPO).
 mscv_select_template
 

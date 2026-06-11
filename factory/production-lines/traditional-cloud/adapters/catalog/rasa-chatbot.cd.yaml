@@ -260,7 +260,10 @@ spec:
         // / webservice). The claim's composition scaffolds source+gitops repos and
         // (when deliveryTarget is set) an ArgoCD Application. Idempotent by claim name;
         // server-side apply converges with any day-0 claim from app.submit.
-        if parameter.language != _|_ {
+        // RECREATE-STORM (#175): scaffold-claim emission gated behind EXPLICIT
+        // `bootstrap: true` (was `language != _|_`, which duplicated ownership
+        // under UNIFY-1 — see realtime-service.cd.yaml for the full rationale).
+        if parameter.bootstrap != _|_ if parameter.bootstrap {
           outputs: {
             // Always include actions server
             "actions-server": outputs["actions-server"]
@@ -301,6 +304,9 @@ spec:
         }
         
         parameter: {
+          // #175: opt-in standalone scaffold claim (single-component OAMs
+          // only — under UNIFY-1 scaffolding belongs to the app-level claim).
+          bootstrap?: bool
           // Required (following realtime-platform pattern)
           rasaImage: string
           actionsImage: string

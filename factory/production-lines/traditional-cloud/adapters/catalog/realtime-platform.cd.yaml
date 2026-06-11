@@ -232,7 +232,10 @@ spec:
         // microservice-creation params as webservice), so it maps cleanly to an
         // AppContainerClaim (same pattern as auto-scaffold-bootstrap / webservice).
         // Idempotent by claim name; server-side apply converges with day-0 claims.
-        if parameter.language != _|_ {
+        // RECREATE-STORM (#175): scaffold-claim emission gated behind EXPLICIT
+        // `bootstrap: true` (was `language != _|_`, which duplicated ownership
+        // under UNIFY-1 — see realtime-service.cd.yaml for the full rationale).
+        if parameter.bootstrap != _|_ if parameter.bootstrap {
           outputs: {
             // Always include infrastructure
             "realtime-infrastructure": outputs["realtime-infrastructure"]
@@ -275,6 +278,9 @@ spec:
         }
         
         parameter: {
+          // #175: opt-in standalone scaffold claim (single-component OAMs
+          // only — under UNIFY-1 scaffolding belongs to the app-level claim).
+          bootstrap?: bool
           // Required (following webservice pattern)
           // realtime-platform is INFRA (not scaffolded) — the processor ksvc uses
           // the SHARED ACR realtime image, not a per-instance docker.io image (the

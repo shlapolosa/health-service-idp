@@ -75,7 +75,7 @@ spec:
                         # same tools the old Job ran via `apk add` (git curl jq + bash).
                         # OPS: build+push mscv:v1.0.0 to ACR BEFORE this change
                         # reaches the cluster (else ImagePullBackOff) \u2014 see image README.
-                        image: healthidpuaeacr.azurecr.io/mscv:v1.0.0
+                        image: healthidpuaeacr.azurecr.io/mscv:v1.0.1
                         command:
                         - /scripts/entrypoint.sh
                         env:
