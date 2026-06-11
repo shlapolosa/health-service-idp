@@ -69,6 +69,16 @@ spec:
                   - webservice
                   - realtime
                 default: webservice
+              # RT-2: realtime role — selects which realtime main.py the mscv
+              # scaffold emits. Only meaningful with serviceFlavor=realtime.
+              serviceRole:
+                type: string
+                description: Realtime role (gateway=consume->ws | ingest=POST->produce | processor=consume->transform->produce).
+                enum:
+                  - gateway
+                  - ingest
+                  - processor
+                default: gateway
               hasFrontend:
                 type: boolean
                 description: Whether the application includes a frontend component

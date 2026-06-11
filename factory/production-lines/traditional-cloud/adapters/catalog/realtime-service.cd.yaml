@@ -46,6 +46,12 @@ spec:
               if parameter.realtime != _|_ {
                 "realtime.platform.example.org/integration": parameter.realtime
               }
+              // RT-2: role annotation — read by the contract-test sensor
+              // (CHECK_ROLE) and any operator tooling. Gateway is the default
+              // RT-1 shape (consume->/ws).
+              if parameter.role != _|_ {
+                "realtime-service.oam.dev/role": parameter.role
+              }
             }
           }
           spec: {
@@ -94,6 +100,11 @@ spec:
                     {
                       name: "REALTIME_INTEGRATION_ENABLED"
                       value: "true"
+                    },
+                    {
+                      // RT-2: runtime role hint (gateway|ingest|processor).
+                      name: "REALTIME_ROLE"
+                      value: [if parameter.role != _|_ {parameter.role}, "gateway"][0]
                     },
                   ] + [
                     // CONSUME_TOPICS / PRODUCE_TOPICS as comma-joined would need a
@@ -305,6 +316,10 @@ spec:
           language?: "python"
           // Realtime platform binding (required for a useful realtime-service).
           realtime?: string
+          // RT-2: realtime role — gateway (consume->/ws, RT-1 default) |
+          // ingest (POST /ingest -> produce) | processor (consume->transform->produce).
+          // Drives the scaffolded main.py variant + the contract-test CHECK_ROLE.
+          role?: "gateway" | "ingest" | "processor"
           // #175: opt-in standalone scaffold claim (single-component OAMs only).
           bootstrap?: bool
           // Topics this service reads / writes (must be declared on the platform).

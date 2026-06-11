@@ -212,3 +212,42 @@ def test_submit_wait_carries_requirements():
 
 def _normalized() -> str:
     return requirements_spec.normalize(_VALID_REQS)
+
+
+# --- RT-2 (#176): realtime role travels through services[] -------------------
+
+def _mk_app(components):
+    return {"spec": {"components": components}}
+
+
+def test_realtime_role_default_gateway():
+    from src.application.submit_use_case import SubmitUseCase
+    app = _mk_app([{"name": "gw", "type": "realtime-service",
+                    "properties": {"language": "python"}}])
+    services = SubmitUseCase._webservice_services(app)
+    assert services[0]["flavor"] == "realtime"
+    assert services[0]["role"] == "gateway"
+
+
+def test_realtime_role_explicit_processor():
+    from src.application.submit_use_case import SubmitUseCase
+    app = _mk_app([{"name": "proc", "type": "realtime-service",
+                    "properties": {"language": "python", "role": "processor"}}])
+    services = SubmitUseCase._webservice_services(app)
+    assert services[0]["role"] == "processor"
+
+
+def test_realtime_role_invalid_falls_back_to_gateway():
+    from src.application.submit_use_case import SubmitUseCase
+    app = _mk_app([{"name": "x", "type": "realtime-service",
+                    "properties": {"language": "python", "role": "bogus"}}])
+    services = SubmitUseCase._webservice_services(app)
+    assert services[0]["role"] == "gateway"
+
+
+def test_webservice_has_no_role():
+    from src.application.submit_use_case import SubmitUseCase
+    app = _mk_app([{"name": "web", "type": "webservice",
+                    "properties": {"language": "python"}}])
+    services = SubmitUseCase._webservice_services(app)
+    assert "role" not in services[0]

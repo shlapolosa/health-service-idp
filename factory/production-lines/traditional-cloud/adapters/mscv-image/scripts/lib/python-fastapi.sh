@@ -1,40 +1,72 @@
 #!/usr/bin/env bash
-# HARD-1 (#168): python/fastapi scaffold incl. RT-1 realtime flavor
-# (agent_common vendoring + pyproject dep injection) — heredoc lines 40-111 verbatim.
+# HARD-1 (#168): python/fastapi scaffold incl. realtime flavor.
+# RT-2 (#176): realtime flavor is ROLE-BRANCHED (gateway|ingest|processor) and
+# consumes the versioned realtime-transport WHEEL instead of git-clone vendoring
+# agent_common source (HARD-2 #169 — no drift, provenance via release tag).
 mscv_scaffold_python_fastapi() {
   # Copy onion architecture template
   cp -r $TEMPLATE_DIR/* microservices/$SERVICE_NAME/
   cd microservices/$SERVICE_NAME
-  
+
   # Customize template for the specific service
   sed -i "s/template-service/$SERVICE_NAME/g" pyproject.toml README.md
   sed -i "s/Template Service/$SERVICE_NAME Service/g" README.md
-  
+
   # Update any hardcoded references
   find . -name "*.py" -exec sed -i "s/template_service/$SERVICE_NAME/g" {} \;
   find . -name "*.md" -exec sed -i "s/template-service/$SERVICE_NAME/g" {} \;
-  
-  # RT-1 (#156): realtime flavor — overwrite src/main.py with a websocket variant
-  # wired to agent_common.realtime_fastapi (create_realtime_agent_app) and add
-  # aiokafka+websockets deps. Smallest delta that yields a bootable ws service
-  # consuming/producing the declared topics from the <realtime>-conn env.
+
   if [ "${SERVICE_FLAVOR:-webservice}" = "realtime" ]; then
-    echo "📡 Applying realtime flavor (websocket + aiokafka) to $SERVICE_NAME"
+    ROLE="${SERVICE_ROLE:-gateway}"
+    case "$ROLE" in gateway|ingest|processor) ;; *) ROLE="gateway" ;; esac
+    echo "📡 Applying realtime flavor (role=$ROLE) to $SERVICE_NAME"
     mkdir -p src
-    cat > src/main.py << 'RTMAIN'
-"""RT-1 realtime-service entrypoint (generated). Websocket + Kafka over
-agent_common.realtime_fastapi. Topics discovered from CONSUME_*/PRODUCE_*/TOPIC_*
-env injected by the realtime-service CD + <realtime>-conn secret."""
+
+    # --- the developer logic slot (dev-agent edit surface) -------------------
+    # Created ONLY if absent: re-scaffolds must never clobber implemented logic
+    # (#175 no-clobber also guards the whole dir; this is belt-and-braces).
+    if [ ! -f src/handlers.py ]; then
+      cat > src/handlers.py << 'RTHANDLERS'
+"""Developer logic slot (RT-2). The platform owns transport (Kafka, /ws, HTTP);
+this module owns what the bytes MEAN. Implement per REQUIREMENTS.md; the
+post-deploy contract test is the acceptance gate.
+
+- to_message(body)  : ingest    — map an HTTP POST body to the produced event.
+- transform(message): processor — map a consumed event to the produced event
+                                  (return None to drop).
+Defaults are passthrough/identity so the service boots before logic lands.
+"""
+from typing import Any, Dict, Optional
+
+
+def to_message(body: Dict[str, Any]) -> Dict[str, Any]:
+    return body
+
+
+def transform(message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    return message
+RTHANDLERS
+      echo "✅ src/handlers.py logic slot created"
+    else
+      echo "src/handlers.py exists - preserved (no-clobber)"
+    fi
+
+    # --- role-branched entrypoint --------------------------------------------
+    case "$ROLE" in
+      gateway)
+        cat > src/main.py << 'RTMAIN'
+"""Realtime GATEWAY (generated, RT-2). Consumes the declared topics and streams
+to websocket clients on /ws. Transport via realtime-transport; topics/bindings
+from CONSUME_*/PRODUCE_* + <realtime>-conn env (realtime-service CD)."""
 import os
-from agent_common.realtime_fastapi import create_realtime_agent_app
-from agent_common.realtime_agent import GenericRealtimeAgent
+from realtime_transport import create_realtime_agent_app, GenericRealtimeAgent
 
 SERVICE_NAME = os.getenv("WEBSERVICE_NAME", os.getenv("REALTIME_PLATFORM_NAME", "realtime-service"))
 
 app = create_realtime_agent_app(
     agent_class=GenericRealtimeAgent,
     service_name=SERVICE_NAME,
-    description="RT-1 realtime websocket+kafka service",
+    description="Realtime websocket gateway (consume -> /ws)",
     endpoints=[],
     websocket_endpoints=[{"path": "/ws", "description": "realtime stream"}],
 )
@@ -43,34 +75,58 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8080")))
 RTMAIN
-    # RT-1 (#167) DURABLE FIX: the realtime main.py imports the agent_common
-    # package, but the onion scaffold image never contained it (-> ModuleNotFound
-    # -> pod never Ready). Mechanism A (vendor): copy the agent_common package
-    # SOURCE (single source of truth = health-service-idp) into src/agent_common/
-    # so PYTHONPATH=/app/src (set by the onion Dockerfile) resolves the import,
-    # and the Dockerfile's `COPY src/ src/` bundles it at build time. No wheel
-    # (the committed 0.1.0 wheel is stale: missing realtime_*.py), no index.
-    echo "📦 Vendoring agent_common package source into src/agent_common"
-    AC_SRC="/tmp/agent-common-src-$SERVICE_NAME"
-    rm -rf $AC_SRC
-    git clone --depth 1 https://$GITHUB_TOKEN@github.com/$GITHUB_USER/health-service-idp.git $AC_SRC
-    if [ -d "$AC_SRC/microservices/shared-libs/agent-common/src/agent_common" ]; then
-      rm -rf src/agent_common
-      cp -r $AC_SRC/microservices/shared-libs/agent-common/src/agent_common src/agent_common
-      find src/agent_common -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
-      echo "✅ vendored agent_common ($(ls src/agent_common/*.py | wc -l) modules)"
-    else
-      echo "❌ agent_common source not found in health-service-idp clone"; exit 1
-    fi
-    rm -rf $AC_SRC
-    # Add agent_common's runtime deps to the fastapi scaffold pyproject so
-    # `poetry install --only=main` brings them into the image (idempotent).
-    # Mirrors agent-common/pyproject.toml: aiokafka, websockets, aioredis,
-    # httpx (+ asyncio-mqtt) on top of the onion base (fastapi/pydantic present).
+        ;;
+      ingest)
+        cat > src/main.py << 'RTMAIN'
+"""Realtime INGEST (generated, RT-2). POST /ingest -> handlers.to_message ->
+produce to the declared PRODUCE_* topic. Transport via realtime-transport."""
+import os
+from realtime_transport import create_realtime_ingest_app
+from src.handlers import to_message
+
+SERVICE_NAME = os.getenv("WEBSERVICE_NAME", os.getenv("REALTIME_PLATFORM_NAME", "realtime-ingest"))
+
+app = create_realtime_ingest_app(
+    service_name=SERVICE_NAME,
+    to_message=to_message,
+)
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8080")))
+RTMAIN
+        ;;
+      processor)
+        cat > src/main.py << 'RTMAIN'
+"""Realtime PROCESSOR (generated, RT-2). Consume declared CONSUME_* topics ->
+handlers.transform -> produce to the declared PRODUCE_* topic. Transport via
+realtime-transport."""
+import os
+from realtime_transport import create_realtime_processor_app
+from src.handlers import transform
+
+SERVICE_NAME = os.getenv("WEBSERVICE_NAME", os.getenv("REALTIME_PLATFORM_NAME", "realtime-processor"))
+
+app = create_realtime_processor_app(
+    service_name=SERVICE_NAME,
+    transform=transform,
+)
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8080")))
+RTMAIN
+        ;;
+    esac
+
+    # --- dependency: the versioned realtime-transport wheel ------------------
+    # HARD-2 (#169): pinned release-asset URL replaces git-clone vendoring of
+    # agent_common source. The wheel declares fastapi/pydantic/aiokafka/websockets
+    # so poetry resolves transport deps transitively. Idempotent.
     if [ -f pyproject.toml ]; then
-      grep -q '^aiokafka' pyproject.toml || sed -i '/\[tool.poetry.dependencies\]/a aiokafka = "^0.10.0"\nwebsockets = "^12.0"\naioredis = "^2.0.0"\nhttpx = "^0.25.0"\n"asyncio-mqtt" = "^0.16.0"' pyproject.toml
+      grep -q '^realtime-transport' pyproject.toml || sed -i '/\[tool.poetry.dependencies\]/a realtime-transport = {url = "https://github.com/shlapolosa/health-service-idp/releases/download/realtime-transport-v0.1.0/realtime_transport-0.1.0-py3-none-any.whl"}' pyproject.toml
     fi
-    echo "✅ realtime flavor applied"
+    echo "✅ realtime flavor applied (role=$ROLE, realtime-transport wheel)"
   fi
 
   echo "✅ Successfully created onion architecture microservice from template"

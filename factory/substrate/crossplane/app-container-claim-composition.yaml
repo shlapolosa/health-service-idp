@@ -621,6 +621,8 @@ spec:
                   framework: {{ $svcFw }}
                   {{- /* RT-1 (#156): pass scaffold flavor through to ApplicationClaim. */}}
                   serviceFlavor: {{ $svc.flavor | default "webservice" }}
+                  {{- /* RT-2: realtime role -> scaffold main.py variant (gateway|ingest|processor). */}}
+                  serviceRole: {{ $svc.role | default "gateway" }}
                   database: {{ $spec.database | default "none" }}
                   cache: {{ $spec.cache | default "none" }}
                   exposeApi: false

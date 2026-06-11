@@ -119,6 +119,14 @@ spec:
                       description: Scaffold flavor (webservice|realtime) for this service.
                       enum: [webservice, realtime]
                       default: webservice
+                    # RT-2: realtime role — selects which realtime main.py the
+                    # scaffold emits (gateway=consume->ws, ingest=POST->produce,
+                    # processor=consume->transform->produce). Gateway = RT-1 shape.
+                    role:
+                      type: string
+                      description: Realtime role (gateway|ingest|processor); only meaningful with flavor=realtime.
+                      enum: [gateway, ingest, processor]
+                      default: gateway
                   required:
                   - name
               database:

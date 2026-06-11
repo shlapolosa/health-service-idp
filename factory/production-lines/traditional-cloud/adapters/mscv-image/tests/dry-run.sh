@@ -230,63 +230,92 @@ run_entrypoint() {
     LANGUAGE="python" \
     FRAMEWORK="fastapi" \
     SERVICE_FLAVOR="realtime" \
+    SERVICE_ROLE="${SERVICE_ROLE:-}" \
     GITHUB_TOKEN="x" \
     GITHUB_USER="dryuser" \
     bash "$ENTRYPOINT"
 }
 
 echo "=== Scenario 1: python/fastapi + realtime happy path ==="
-# The entrypoint clones the AppContainer into /tmp/app-container-$APP_CONTAINER.
+# RT-2 (#176): gateway is the default role; assertions now target the
+# realtime-transport WHEEL (no vendoring) + the handlers.py logic slot.
 rm -rf "/tmp/app-container-dryrun-app" "/tmp/template-dryrun-rt-svc" || true
 mkdir -p "$ROOT/home"
 GIT_PUSH_MODE=ok run_entrypoint > "$ROOT/run1.log" 2>&1 || { echo "entrypoint failed:"; cat "$ROOT/run1.log"; exit 1; }
 
 SVC_DIR="/tmp/app-container-dryrun-app/microservices/dryrun-rt-svc"
 
-# Assertion 1: main.py with GenericRealtimeAgent
-if grep -q "GenericRealtimeAgent" "$SVC_DIR/src/main.py" && grep -q "create_realtime_agent_app" "$SVC_DIR/src/main.py"; then
-  ok "src/main.py written with GenericRealtimeAgent"
+if grep -q "from realtime_transport import create_realtime_agent_app" "$SVC_DIR/src/main.py" \
+   && grep -q "GenericRealtimeAgent" "$SVC_DIR/src/main.py"; then
+  ok "gateway main.py imports realtime_transport (create_realtime_agent_app)"
 else
-  bad "src/main.py missing GenericRealtimeAgent"
+  bad "gateway main.py wrong imports"
+fi
+if [ ! -d "$SVC_DIR/src/agent_common" ]; then
+  ok "no agent_common vendoring (wheel replaces it)"
+else
+  bad "agent_common still vendored"
+fi
+if grep -q '^realtime-transport = {url = "https://github.com/shlapolosa/health-service-idp/releases/download/realtime-transport-v' "$SVC_DIR/pyproject.toml"; then
+  ok "pyproject pins the realtime-transport wheel"
+else
+  bad "wheel dep missing from pyproject"
+fi
+if grep -q "def to_message" "$SVC_DIR/src/handlers.py" && grep -q "def transform" "$SVC_DIR/src/handlers.py"; then
+  ok "handlers.py logic slot created"
+else
+  bad "handlers.py missing"
 fi
 
-# Assertion 2: agent_common vendored
-if [ -f "$SVC_DIR/src/agent_common/realtime_fastapi.py" ] && [ -f "$SVC_DIR/src/agent_common/realtime_agent.py" ]; then
-  ok "agent_common vendored into src/agent_common/"
+echo "=== Scenario 2: ingest role ==="
+rm -rf "/tmp/app-container-dryrun-app" "/tmp/template-dryrun-rt-svc" || true
+GIT_PUSH_MODE=ok SERVICE_ROLE=ingest run_entrypoint > "$ROOT/run2.log" 2>&1 || { echo "ingest run failed:"; cat "$ROOT/run2.log"; exit 1; }
+if grep -q "create_realtime_ingest_app" "$SVC_DIR/src/main.py" \
+   && grep -q "from src.handlers import to_message" "$SVC_DIR/src/main.py"; then
+  ok "ingest main.py wired to handlers.to_message"
 else
-  bad "agent_common not vendored"
+  bad "ingest main.py wrong"
 fi
 
-# Assertion 3a: pyproject deps appended
-COUNT_AIOKAFKA=$(grep -c '^aiokafka' "$SVC_DIR/pyproject.toml" || true)
-if [ "$COUNT_AIOKAFKA" -ge 1 ]; then
-  ok "pyproject deps appended (aiokafka present)"
+echo "=== Scenario 3: processor role ==="
+rm -rf "/tmp/app-container-dryrun-app" "/tmp/template-dryrun-rt-svc" || true
+GIT_PUSH_MODE=ok SERVICE_ROLE=processor run_entrypoint > "$ROOT/run3.log" 2>&1 || { echo "processor run failed:"; cat "$ROOT/run3.log"; exit 1; }
+if grep -q "create_realtime_processor_app" "$SVC_DIR/src/main.py" \
+   && grep -q "from src.handlers import transform" "$SVC_DIR/src/main.py"; then
+  ok "processor main.py wired to handlers.transform"
 else
-  bad "pyproject deps not appended"
+  bad "processor main.py wrong"
 fi
 
-echo "=== Scenario 2: re-run is idempotent (no duplicate deps) ==="
-# Re-run against the already-scaffolded repo (the grep -q guard should no-op).
-GIT_PUSH_MODE=ok run_entrypoint > "$ROOT/run2.log" 2>&1 || { echo "rerun failed:"; cat "$ROOT/run2.log"; exit 1; }
-COUNT_AIOKAFKA2=$(grep -c '^aiokafka' "$SVC_DIR/pyproject.toml" || true)
-if [ "$COUNT_AIOKAFKA2" = "1" ]; then
-  ok "pyproject dep injection idempotent (aiokafka count=1 after re-run)"
+echo "=== Scenario 4: re-run no-clobber preserves edited handlers ==="
+# #175: a re-run against an already-scaffolded service must exit 0 WITHOUT
+# touching anything — simulate a dev-agent edit and assert it survives.
+echo "# DEV-AGENT-EDIT" >> "$SVC_DIR/src/handlers.py"
+GIT_PUSH_MODE=ok SERVICE_ROLE=processor run_entrypoint > "$ROOT/run4.log" 2>&1 || { echo "no-clobber rerun failed:"; cat "$ROOT/run4.log"; exit 1; }
+if grep -q "DEV-AGENT-EDIT" "$SVC_DIR/src/handlers.py" && grep -q "skipping re-scaffold (no-clobber)" "$ROOT/run4.log"; then
+  ok "no-clobber: edited handlers.py preserved on re-run"
 else
-  bad "pyproject dep injection NOT idempotent (aiokafka count=$COUNT_AIOKAFKA2)"
+  bad "no-clobber failed (edit lost or guard silent)"
+fi
+WHEEL_COUNT=$(grep -c '^realtime-transport' "$SVC_DIR/pyproject.toml" || true)
+if [ "$WHEEL_COUNT" = "1" ]; then
+  ok "wheel dep not duplicated (count=1)"
+else
+  bad "wheel dep duplicated (count=$WHEEL_COUNT)"
 fi
 
-echo "=== Scenario 3: push-retry respects max attempts ==="
+echo "=== Scenario 5: push-retry respects max attempts ==="
 rm -rf "/tmp/app-container-dryrun-app" "/tmp/template-dryrun-rt-svc" || true
 set +e
-GIT_PUSH_MODE=reject run_entrypoint > "$ROOT/run3.log" 2>&1
+GIT_PUSH_MODE=reject run_entrypoint > "$ROOT/run5.log" 2>&1
 RC=$?
 set -e
-ATTEMPTS=$(grep -c "push rejected (attempt" "$ROOT/run3.log" || true)
-if [ "$RC" != "0" ] && [ "$ATTEMPTS" = "10" ] && grep -q "failed to push .* after 10 attempts" "$ROOT/run3.log"; then
+ATTEMPTS=$(grep -c "push rejected (attempt" "$ROOT/run5.log" || true)
+if [ "$RC" != "0" ] && [ "$ATTEMPTS" = "10" ] && grep -q "failed to push .* after 10 attempts" "$ROOT/run5.log"; then
   ok "push-retry bounded to 10 attempts then exit 1 (rc=$RC, attempts=$ATTEMPTS)"
 else
   bad "push-retry bound wrong (rc=$RC, attempts=$ATTEMPTS)"
-  echo "----- run3.log tail -----"; tail -15 "$ROOT/run3.log"
+  echo "----- run5.log tail -----"; tail -15 "$ROOT/run5.log"
 fi
 
 echo

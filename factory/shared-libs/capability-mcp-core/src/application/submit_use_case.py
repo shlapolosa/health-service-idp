@@ -570,8 +570,15 @@ class SubmitUseCase:
             # RT-1 (#156): realtime-service carries flavor:realtime so the
             # AppContainerClaim composition sets ApplicationClaim.serviceFlavor
             # and the mscv Job seeds the websocket+aiokafka fastapi variant.
+            # RT-2: role selects WHICH realtime main.py the scaffold emits —
+            # gateway (consume->ws), ingest (POST->produce), or processor
+            # (consume->transform->produce). Defaults to gateway (RT-1 shape).
             if ctype == "realtime-service":
                 entry["flavor"] = "realtime"
+                role = str(props.get("role", "gateway")).strip() or "gateway"
+                if role not in ("gateway", "ingest", "processor"):
+                    role = "gateway"
+                entry["role"] = role
             services.append(entry)
         return services
 
