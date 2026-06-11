@@ -38,3 +38,8 @@ class SubmitResult:
     commit_sha: Optional[str] = None     # gitops commit (the gate)
     workflow_name: Optional[str] = None  # oam-apply workflow triggered
     message: str = ""
+    # SPEC-1 (#173, dev-agent W1): deterministic hash of the normalized
+    # REQUIREMENTS.md this submit committed, when `requirements` was supplied.
+    # The dev-agent trigger (W3) keys re-fires on this value. None when no
+    # requirements travelled with the submission (exactly today's behaviour).
+    spec_hash: Optional[str] = None

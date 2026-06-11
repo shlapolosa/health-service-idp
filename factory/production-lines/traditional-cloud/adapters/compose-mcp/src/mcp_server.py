@@ -147,14 +147,23 @@ def catalog_connectivity_recipes(
 
 @mcp.tool(name="app.submit",
           description="OAM-first provisioning for MFG-TC: validate -> commit OAM to gitops -> "
-                      "trigger the oam-driven-contract workflow. Never a raw apply.")
-def app_submit(oam_yaml: str) -> dict[str, Any]:
-    r = deps.get_submit().submit(oam_yaml)
+                      "trigger the oam-driven-contract workflow. Never a raw apply. "
+                      "Optionally pass `requirements`: a REQUIREMENTS.md (markdown text, or "
+                      "base64 of it) authored alongside the OAM — use-case summary, per-component "
+                      "responsibilities, and a '## Acceptance Criteria' section phrased as "
+                      "externally-verifiable contract checks, plus Non-Goals. When supplied it is "
+                      "committed next to the OAM in the central ledger and at the app monorepo "
+                      "root as REQUIREMENTS.md, and a deterministic `spec_hash` is returned (the "
+                      "dev-agent keys its implementation re-fires on it). Omit it for the exact "
+                      "legacy behaviour.")
+def app_submit(oam_yaml: str, requirements: str | None = None) -> dict[str, Any]:
+    r = deps.get_submit().submit(oam_yaml, requirements=requirements)
     return {
         "ok": r.ok,
         "commit_sha": r.commit_sha,
         "workflow_name": r.workflow_name,
         "message": r.message,
+        "spec_hash": r.spec_hash,
     }
 
 
@@ -169,14 +178,16 @@ def app_status(name: str) -> dict[str, Any]:
 @mcp.tool(name="app.submit_wait",
           description="Deferred OAM provisioning for MFG-TC consumers whose OAM references CDs "
                       "not yet present. Commits to gitops + fires oam-apply-wait. "
-                      "Returns same shape as app.submit.")
-def app_submit_wait(oam_yaml: str) -> dict[str, Any]:
-    r = deps.get_submit().submit_wait(oam_yaml)
+                      "Returns same shape as app.submit. Accepts the same optional "
+                      "`requirements` (REQUIREMENTS.md markdown/base64) as app.submit.")
+def app_submit_wait(oam_yaml: str, requirements: str | None = None) -> dict[str, Any]:
+    r = deps.get_submit().submit_wait(oam_yaml, requirements=requirements)
     return {
         "ok": r.ok,
         "commit_sha": r.commit_sha,
         "workflow_name": r.workflow_name,
         "message": r.message,
+        "spec_hash": r.spec_hash,
     }
 
 
@@ -196,16 +207,18 @@ async def _api_submit(request):
     try:
         body = await request.json()
         oam_yaml = body.get("oam_yaml", "")
+        requirements = body.get("requirements")  # SPEC-1: optional, additive
         if not oam_yaml:
             return JSONResponse({"ok": False, "message": "oam_yaml required"}, status_code=400)
     except Exception:  # noqa: BLE001
         return JSONResponse({"ok": False, "message": "invalid JSON body"}, status_code=400)
-    r = deps.get_submit().submit(oam_yaml)
+    r = deps.get_submit().submit(oam_yaml, requirements=requirements)
     return JSONResponse({
         "ok": r.ok,
         "commit_sha": r.commit_sha,
         "workflow_name": r.workflow_name,
         "message": r.message,
+        "spec_hash": r.spec_hash,
     }, status_code=200 if r.ok else 422)
 
 
