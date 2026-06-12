@@ -1,0 +1,49 @@
+# Substrate-services GitOps (#163 SUBSTRATE-GITOPS, 2026-06-12).
+#
+# Until now the factory's own long-lived Knative services (capability-mcp-mfg-tc,
+# capability-mcp-factory, slack-api-server) were `kubectl apply`d by hand after
+# every image rebuild — the same drift vector platform-definitions closed for
+# definitions on 2026-06-07. This Application makes ArgoCD the reconciler for
+# factory/substrate/services/: edit the immutable image tag in git, push, ArgoCD
+# syncs. selfHeal reverts out-of-band mutation.
+#
+# Deliberate choices (mirrors platform-definitions-app.yaml):
+# - prune: false — path refactors must never cascade-delete live services;
+#   removals are explicit.
+# - ServerSideApply — Knative rejects client-side updates that touch the
+#   serving.knative.dev/creator annotation; SSA respects controller-owned fields.
+# - Adoption is a no-op only while git tags == live tags (capability-mcp-mfg-tc
+#   pinned at rt2-04ae27e/rev 00019 at adoption time). Before the FIRST apply of
+#   this Application, diff each manifest against the live ksvc image.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: substrate-services
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/shlapolosa/health-service-idp.git
+    targetRevision: main
+    path: factory/substrate/services
+    directory:
+      recurse: true
+      include: '*.yaml'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+    - ServerSideApply=true
+    - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

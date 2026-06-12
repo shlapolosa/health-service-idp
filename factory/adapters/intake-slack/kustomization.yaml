@@ -1,11 +1,15 @@
+# DEPRECATED (#163 SUBSTRATE-GITOPS): knative-service.yaml moved to
+# factory/substrate/services/slack-api-server/ and is synced by the ArgoCD
+# Application "substrate-services". This kustomization no longer builds
+# (kustomize cannot reference parent paths); kept only as a record of the
+# old multi-registry image-override pattern.
 # Kustomization for Slack API Server with multi-registry support
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 namespace: default
 
-resources:
-- knative-service.yaml
+resources: []
 
 # Comment/uncomment based on target registry
 # For Docker Hub deployment:

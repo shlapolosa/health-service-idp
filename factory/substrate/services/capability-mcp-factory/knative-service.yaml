@@ -1,3 +1,4 @@
+# GitOps-owned (#163 SUBSTRATE-GITOPS): synced by ArgoCD Application "substrate-services" — edit image tag here + git push; never kubectl apply by hand.
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:

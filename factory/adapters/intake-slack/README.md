@@ -200,10 +200,10 @@ Shows available microservice commands and usage examples.
    ./deploy.sh
    ```
 
-2. **Manual deployment**:
-   ```bash
-   kubectl apply -f knative-service.yaml
-   ```
+2. **GitOps deployment (#163 SUBSTRATE-GITOPS)** — the ksvc manifest moved to
+   `factory/substrate/services/slack-api-server/knative-service.yaml`, synced
+   by the ArgoCD Application `substrate-services`. Build a new immutable image
+   tag, edit it there, git push; do not `kubectl apply` by hand.
 
 ### Resource Requirements
 

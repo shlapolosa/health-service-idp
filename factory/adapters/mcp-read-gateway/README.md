@@ -51,14 +51,19 @@ former monolith by construction.
 Build context is still **repo root**; only the `COPY` source paths
 moved. The Dockerfile path is now under `factory/adapters/mcp-read-gateway/`.
 
-```bash
-# Build from repo root
-docker build -f factory/adapters/mcp-read-gateway/Dockerfile \
-  -t healthidpuaeacr.azurecr.io/capability-mcp-factory:v0.1 .
+The Knative Service manifest is GitOps-owned (#163 SUBSTRATE-GITOPS): it lives
+in `factory/substrate/services/capability-mcp-factory/knative-service.yaml`
+and is synced by the ArgoCD Application `substrate-services` — **do not
+`kubectl apply` by hand**.
 
-az acr login --name healthidpuaeacr
-docker push healthidpuaeacr.azurecr.io/capability-mcp-factory:v0.1
-kubectl apply -f factory/adapters/mcp-read-gateway/knative-service.yaml
+```bash
+# Build from repo root with a NEW immutable tag
+az acr build --registry healthidpuaeacr \
+  --image capability-mcp-factory:<new-immutable-tag> \
+  --platform linux/amd64 \
+  -f factory/adapters/mcp-read-gateway/Dockerfile .
+# then: edit image tag in factory/substrate/services/capability-mcp-factory/knative-service.yaml,
+# git commit + push to main — ArgoCD rolls the new revision.
 ```
 
 The image name (`capability-mcp-factory`) and the Knative service name are

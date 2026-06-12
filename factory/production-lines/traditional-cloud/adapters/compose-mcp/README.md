@@ -54,16 +54,21 @@ as `capability_mcp_core` at image build time). The shared core is the
 same library used by every per-line compose-mcp adapter, ensuring
 identical use-case behaviour across manufacturers.
 
-## Deployment
+## Deployment (GitOps — #163 SUBSTRATE-GITOPS)
+
+The Knative Service + RBAC manifests live in
+`factory/substrate/services/capability-mcp-mfg-tc/` and are synced by the
+ArgoCD Application `substrate-services` — **do not `kubectl apply` by hand**.
 
 Build context is always the repo root.
 
 ```bash
-docker build -f factory/production-lines/traditional-cloud/adapters/compose-mcp/Dockerfile \
-  -t healthidpuaeacr.azurecr.io/capability-mcp-mfg-tc:v0.2 .
-az acr login --name healthidpuaeacr
-docker push healthidpuaeacr.azurecr.io/capability-mcp-mfg-tc:v0.2
-kubectl apply -f factory/production-lines/traditional-cloud/adapters/compose-mcp/knative-service.yaml
+az acr build --registry healthidpuaeacr \
+  --image capability-mcp-mfg-tc:<new-immutable-tag> \
+  --platform linux/amd64 \
+  -f factory/production-lines/traditional-cloud/adapters/compose-mcp/Dockerfile .
+# then: edit image tag in factory/substrate/services/capability-mcp-mfg-tc/knative-service.yaml,
+# git commit + push to main — ArgoCD rolls the new revision.
 ```
 
 The image name `capability-mcp-mfg-tc` is intentionally preserved to
