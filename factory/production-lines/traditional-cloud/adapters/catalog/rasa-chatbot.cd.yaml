@@ -1,6 +1,21 @@
 ---
 # Rasa Chatbot ComponentDefinition
 # Architecturally follows realtime-platform pattern: OAM Component → Dual Knative Services + Optional Infrastructure
+#
+# RASA-CONTAINER (#178): invariant container + variant repo.
+#   - INVARIANT (rasa-plus runtime, python deps, server settings, endpoints/
+#     credentials plumbing, train-cache entrypoint) is prebaked into
+#     healthidpuaeacr.azurecr.io/rasa-base:vX.Y.Z
+#     (factory/production-lines/traditional-cloud/adapters/rasa-base-image/).
+#   - VARIANT (domain.yml, config.yml, data/, actions/actions.py — the
+#     developer/dev-agent edit surface) is scaffolded create-if-absent into
+#     the generated app monorepo by mscv (scripts/lib/rasa.sh), with THIN
+#     Dockerfiles (FROM rasa-base + COPY) at the CI-watched paths
+#     docker/rasa/Dockerfile and docker/rasa-actions/Dockerfile.
+#   This CD is unchanged on purpose: rasaImage/actionsImage stay REQUIRED
+#   version-pinned strings supplied by the app spec (HARD-3: no :latest
+#   defaults; the `version` parameter below is a label, not an image tag).
+#   The speedup comes from the thin CI layer build, not from the render.
 apiVersion: core.oam.dev/v1beta1
 kind: ComponentDefinition
 metadata:
