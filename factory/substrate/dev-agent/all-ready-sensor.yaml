@@ -1,0 +1,239 @@
+---
+# DEV-AGENT W3: ksvc-Ready -> dev-agent Job trigger.
+#
+# DESIGN — mirrors HARD-4 (factory/substrate/argo-events/contract-test-sensor.yaml)
+# EXACTLY: same resource EventSource on serving.knative.dev/services UPDATE,
+# same gjson Ready==True filter, same parameterised k8s `create` Job trigger,
+# its OWN SA (dev-agent-event-sa) so no existing sensor is touched.
+#
+# THE "ALL-READY" GATE LIVES IN THE ENTRYPOINT, NOT HERE. Argo Events cannot
+# join "every component of app X is Ready" across resources, so the sensor
+# fires per-ksvc-Ready and the dev-agent entrypoint:
+#   1. lists all ksvcs labelled app.oam.dev/name=<app>; any not Ready -> exit 0
+#      quietly (the laggard's own Ready event re-fires us later);
+#   2. requires a REQUIREMENTS.md (source root -> gitops root -> central
+#      ledger); absent -> exit 0 quietly;
+#   3. checks the repo's .dev-agent/spec-hash marker; already implemented for
+#      this spec -> exit 0 quietly.
+#
+# IDEMPOTENCY (two layers):
+#   * Job name: dev-agent-<app>-<spec-hash-8>. spec-hash = first 8 chars of the
+#     ksvc's dev-agent.cafe.io/spec-hash annotation (stamped from the OAM app's
+#     REQUIREMENTS hash when SPEC-1 lands); absent -> g<ksvc generation>.
+#     Same hash => `create` of an existing name is rejected => no re-run.
+#     Changed REQUIREMENTS => new hash => new name => re-fire.
+#   * Entrypoint .dev-agent/spec-hash marker: the agent's OWN push bumps the
+#     ksvc generation (new name with the generation fallback!), so the marker
+#     is what actually breaks the self-trigger loop. Both layers are needed.
+#
+# SCOPE: opt-in via label dev-agent.cafe.io/enabled="true" on the ksvc (CD
+# change owned elsewhere stamps it). No labelled ksvcs today => sensor inert =>
+# strictly additive, zero behaviour change.
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: dev-agent-watcher
+  namespace: argo-events
+spec:
+  template:
+    serviceAccountName: dev-agent-event-sa
+  resource:
+    dev-agent-ksvc:
+      namespace: default
+      group: serving.knative.dev
+      version: v1
+      resource: services
+      eventTypes:
+        - UPDATE
+      filter:
+        labels:
+          - key: dev-agent.cafe.io/enabled
+            operation: "=="
+            value: "true"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: dev-agent-on-ready
+  namespace: argo-events
+spec:
+  template:
+    serviceAccountName: dev-agent-event-sa
+  dependencies:
+    - name: dev-agent-dep
+      eventSourceName: dev-agent-watcher
+      eventName: dev-agent-ksvc
+      # Same gjson array-filter idiom as HARD-4/EVENT-2: Ready must be True.
+      filters:
+        dataLogicalOperator: "and"
+        data:
+          - path: 'body.status.conditions.#(type=="Ready").status'
+            type: string
+            value:
+              - "True"
+  triggers:
+    - template:
+        name: dev-agent-trigger
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: batch/v1
+              kind: Job
+              metadata:
+                # Overridden per-event below to dev-agent-<app>-<spec-hash-8>.
+                name: dev-agent-PLACEHOLDER
+                namespace: dev-agent-system
+                labels:
+                  app.kubernetes.io/name: dev-agent
+                  app.kubernetes.io/managed-by: argo-events
+              spec:
+                ttlSecondsAfterFinished: 3600
+                backoffLimit: 0          # one shot per spec-hash; iteration is INSIDE the agent
+                activeDeadlineSeconds: 3600
+                template:
+                  metadata:
+                    labels:
+                      # Must match the NetworkPolicy podSelector (egress lockdown).
+                      app.kubernetes.io/name: dev-agent
+                  spec:
+                    serviceAccountName: dev-agent-sa
+                    restartPolicy: Never
+                    securityContext:
+                      runAsNonRoot: true
+                      runAsUser: 1000
+                    containers:
+                      - name: dev-agent
+                        # Pinned tag (HARD-3: never :latest). Bump on az acr build.
+                        image: healthidpuaeacr.azurecr.io/dev-agent:v0.1.0
+                        # GITHUB_TOKEN + ANTHROPIC_API_KEY from Key Vault via ESO
+                        # (factory/substrate/dev-agent/externalsecret.yaml).
+                        envFrom:
+                          - secretRef:
+                              name: dev-agent-secrets
+                        env:
+                          # env 0/1 overridden per-event below.
+                          - name: APP_NAME
+                            value: "PLACEHOLDER_APP"
+                          - name: SPEC_HASH
+                            value: ""
+                          - name: NAMESPACE
+                            value: default
+                          - name: MAX_ITERATIONS
+                            value: "3"
+                        resources:
+                          requests:
+                            cpu: "1"
+                            memory: 2Gi
+                          limits:
+                            cpu: "2"
+                            memory: 4Gi
+          parameters:
+            # --- idempotent Job name: dev-agent-<app>-<spec-hash-8> ---
+            # 1) base = app.oam.dev/name label (KubeVela-stamped on every ksvc)
+            - src:
+                dependencyName: dev-agent-dep
+                dataKey: body.metadata.labels.app\.oam\.dev/name
+                value: "unknown-app"
+              dest: metadata.name
+              operation: overwrite
+            # 2) prefix
+            - src:
+                dependencyName: dev-agent-dep
+                value: "dev-agent-"
+              dest: metadata.name
+              operation: prepend
+            # 3) suffix "-" separator
+            - src:
+                dependencyName: dev-agent-dep
+                value: "-"
+              dest: metadata.name
+              operation: append
+            # 4) suffix = spec-hash annotation (first 8) if present, else
+            #    g<generation>. dataTemplate (sprig) because parameters cannot
+            #    fall back from one dataKey to another.
+            - src:
+                dependencyName: dev-agent-dep
+                dataTemplate: |-
+                  {{- $ann := .Input.body.metadata.annotations -}}
+                  {{- $h := "" -}}
+                  {{- if $ann -}}{{- $h = index $ann "dev-agent.cafe.io/spec-hash" | default "" -}}{{- end -}}
+                  {{- if $h -}}{{- printf "%.8s" $h -}}{{- else -}}g{{- .Input.body.metadata.generation -}}{{- end -}}
+                value: "g0"
+              dest: metadata.name
+              operation: append
+            # APP_NAME (env 0) <- app.oam.dev/name label
+            - src:
+                dependencyName: dev-agent-dep
+                dataKey: body.metadata.labels.app\.oam\.dev/name
+                value: ""
+              dest: spec.template.spec.containers.0.env.0.value
+            # SPEC_HASH (env 1) <- annotation if present (informational for logs)
+            - src:
+                dependencyName: dev-agent-dep
+                dataKey: body.metadata.annotations.dev-agent\.cafe\.io/spec-hash
+                value: ""
+              dest: spec.template.spec.containers.0.env.1.value
+          retryStrategy:
+            steps: 3
+            duration: "3s"
+            factor: 2
+---
+# SA for the EventSource (watch ksvc) + Sensor (create the dev-agent Job).
+# Independent of contract-test-event-sa / apim-publish-event-sa.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dev-agent-event-sa
+  namespace: argo-events
+---
+# EventSource side: watch Knative Services + emit Events.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dev-agent-event-role
+rules:
+  - apiGroups: ["serving.knative.dev"]
+    resources: ["services"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dev-agent-event-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: dev-agent-event-role
+subjects:
+  - kind: ServiceAccount
+    name: dev-agent-event-sa
+    namespace: argo-events
+---
+# Sensor side, namespaced to dev-agent-system: create the dev-agent Job ONLY.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dev-agent-job-creator
+  namespace: dev-agent-system
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dev-agent-job-creator-binding
+  namespace: dev-agent-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dev-agent-job-creator
+subjects:
+  - kind: ServiceAccount
+    name: dev-agent-event-sa
+    namespace: argo-events

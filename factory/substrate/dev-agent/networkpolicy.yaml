@@ -1,0 +1,41 @@
+# DEV-AGENT W2: egress lockdown for the dev-agent Job pods.
+#
+# INTENT: egress ONLY to github.com (clone/push), api.anthropic.com (Claude),
+# the kube-apiserver (verify-loop reads), and DNS.
+#
+# REALITY with vanilla AKS NetworkPolicy (no FQDN support): we can only scope
+# by port. FQDN-scoped egress (github.com / api.anthropic.com literal) needs
+# Cilium (CiliumNetworkPolicy toFQDNs) or Calico DNS policy — adopt one of
+# those to tighten this from "any 443" to the two hostnames. Until then this
+# still blocks: all non-443 egress, all in-cluster lateral movement on app
+# ports, SMTP exfil, etc. The pod also has NO ingress at all.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dev-agent-egress
+  namespace: dev-agent-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: dev-agent
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []   # nothing talks TO the agent
+  egress:
+    # DNS (kube-dns / CoreDNS)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # HTTPS: github.com + api.anthropic.com + the AKS apiserver (all 443).
+    # See header — tighten to FQDNs once Cilium/Calico DNS policy is available.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443
