@@ -22,7 +22,8 @@ require_kubectl_context "${EXPECTED_KUBE_CONTEXT:-}"
 
 # ───── 1. intake-slack (Slack command receiver) ─────
 info "intake-slack adapter"
-apply_file "$REPO_ROOT/factory/adapters/intake-slack/knative-service.yaml"
+# ksvc is GitOps-owned (#163): factory/substrate/services/slack-api-server/ (bootstrap-applies once; ArgoCD owns steady-state)
+apply_file "$REPO_ROOT/factory/substrate/services/slack-api-server/knative-service.yaml"
 # Apply additional manifests if present (istio, rbac, etc.)
 for f in "$REPO_ROOT"/factory/adapters/intake-slack/*.yaml; do
     [[ -f "$f" && "$(basename "$f")" != "knative-service.yaml" ]] && apply_file "$f"
@@ -30,8 +31,8 @@ done
 
 # ───── 2. mcp-read-gateway (factory MCP) ─────
 info "mcp-read-gateway adapter"
-apply_file "$REPO_ROOT/factory/adapters/mcp-read-gateway/knative-service.yaml"
-apply_file "$REPO_ROOT/factory/adapters/mcp-read-gateway/rbac.yaml" 2>/dev/null || true
+# ksvc is GitOps-owned (#163): factory/substrate/services/capability-mcp-factory/ (bootstrap-applies once; ArgoCD owns steady-state)
+apply_file "$REPO_ROOT/factory/substrate/services/capability-mcp-factory/knative-service.yaml"
 
 # ───── 3. mcp-write-gateway (factory.propose PR opener) ─────
 info "mcp-write-gateway adapter"

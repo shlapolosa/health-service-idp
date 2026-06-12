@@ -31,11 +31,12 @@ declare -A SERVICES=(
 )
 
 declare -A KSVC_FILES=(
-    ["capability-mcp-factory"]="factory/adapters/mcp-read-gateway/knative-service.yaml"
+    # GitOps-owned ksvcs live under factory/substrate/services/ (#163 SUBSTRATE-GITOPS)
+    ["capability-mcp-factory"]="factory/substrate/services/capability-mcp-factory/knative-service.yaml"
     ["capability-factory-mcp"]="factory/adapters/mcp-write-gateway/knative-service.yaml"
     ["capability-web-mcp"]="factory/adapters/mcp-web-gateway/knative-service.yaml"
-    ["capability-mcp-mfg-tc"]="factory/production-lines/traditional-cloud/adapters/compose-mcp/knative-service.yaml"
-    ["slack-api-server"]="factory/adapters/intake-slack/knative-service.yaml"
+    ["capability-mcp-mfg-tc"]="factory/substrate/services/capability-mcp-mfg-tc/knative-service.yaml"
+    ["slack-api-server"]="factory/substrate/services/slack-api-server/knative-service.yaml"
 )
 
 # Discover tag from knative-service.yaml — single source of truth

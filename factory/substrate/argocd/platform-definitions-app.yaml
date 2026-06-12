@@ -45,11 +45,17 @@ spec:
     path: factory/substrate/crossplane
     directory:
       recurse: false
-      # Spine files only: the dir still holds ~11 stale pre-Crossplane-v2
-      # compositions (legacy spec.resources) + duplicate XRDs that predate
-      # PR3 — they broke the app with ComparisonError/RepeatedResource.
-      # Widen back to *.yaml after the crossplane-dir cleanup task.
-      include: '{app-container-claim-*.yaml,application-claim-xrd.yaml,realtime-platform-claim-*.yaml,graphql-platform-claim-composition.yaml,graphql-platform-claim-xrd.yaml}'
+      # Widened after CLEAN-XP (#158, 2026-06-12): all stale pre-Crossplane-v2
+      # files (legacy spec.resources compositions, duplicate XRDs, EKS-era
+      # provider/secret config) moved to archive/ — see archive/README.md.
+      # recurse:false keeps subdirs out: archive/ (stale), templates/ (GitHub
+      # Actions workflows fetched by raw URL, not k8s manifests), xrds/,
+      # compositions/, realtime-platform/, examples/, rbac/, providers/.
+      include: '*.yaml'
+      # github-provider-config.yaml carries a Secret with a literal
+      # ${PERSONAL_ACCESS_TOKEN} placeholder (bootstrap-time envsubst);
+      # syncing it would clobber the live github-provider-secret.
+      exclude: 'github-provider-config.yaml'
   - repoURL: https://github.com/shlapolosa/health-service-idp.git
     targetRevision: main
     path: factory/substrate/argo-events

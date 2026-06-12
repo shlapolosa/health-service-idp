@@ -39,7 +39,9 @@ apply_dir_recursive "$LINE_DIR/adapters/execute/workflow-templates"
 
 # ───── 4. compose-mcp — per-line MCP gateway (Knative Service) ─────
 info "[$LINE_ID] compose-mcp (per-line MCP)"
-apply_file "$LINE_DIR/adapters/compose-mcp/knative-service.yaml"
+# ksvc is GitOps-owned (#163): factory/substrate/services/capability-mcp-mfg-tc/ (bootstrap-applies once; ArgoCD owns steady-state)
+apply_file "$REPO_ROOT/factory/substrate/services/capability-mcp-mfg-tc/knative-service.yaml"
+apply_file "$REPO_ROOT/factory/substrate/services/capability-mcp-mfg-tc/rbac.yaml"
 
 # ───── 5. compose (architect-v1) — Foundry agent, registered via setup-architect-agent.sh ─────
 info "[$LINE_ID] compose (architect-v1) — Foundry registration"

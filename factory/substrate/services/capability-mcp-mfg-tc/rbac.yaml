@@ -1,3 +1,4 @@
+# GitOps-owned (#163 SUBSTRATE-GITOPS): synced by ArgoCD Application "substrate-services".
 # RBAC for capability-mcp-mfg-tc (SA: capability-mcp-server, ns: default).
 # Declarative-spine W4: app.submit creates AppContainerClaims directly
 # (day-0 scaffold) instead of POSTing the Argo REST API. The SA's existing
