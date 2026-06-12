@@ -1,0 +1,7 @@
+# RASA-CONTAINER (#178): invariant endpoints fallback, baked into rasa-base.
+# Env-driven (12-factor): the rasa-chatbot ComponentDefinition already injects
+# RASA_ACTION_ENDPOINT pointing at the <name>-actions ksvc; docker-entrypoint.sh
+# defaults it to localhost for local runs. A bot may override this whole file
+# by shipping its own endpoints.yml in /app/bot/.
+action_endpoint:
+  url: ${RASA_ACTION_ENDPOINT}

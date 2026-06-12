@@ -10,6 +10,9 @@
 #   3. pyproject deps appended, and idempotent on a second run (no duplicates)
 #   4. push-retry loop respects the max-attempt bound (10) and exits 1 on
 #      persistent rejection
+#   5. RASA-CONTAINER (#178): rasa/chatbot scaffold is variant-only (bot files
+#      + thin Dockerfiles FROM the pinned rasa-base image, no :latest), and
+#      re-runs no-clobber the dev-agent's actions.py edits
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -95,6 +98,8 @@ case "\$1" in
     case "\$url" in
       *health-service-idp.git) src="\$HSI_FIXTURE";;
       *onion-architecture-template.git) src="\$TEMPLATE_FIXTURE";;
+      *chat-template.git) src="\$TEMPLATE_FIXTURE";;  # RASA-CONTAINER #178: base-image scaffold ignores the template; any dir works
+      *graphql-federation-gateway-template.git) src="\$TEMPLATE_FIXTURE";;
       *) src="\$APPCONTAINER_FIXTURE";;   # the AppContainer repo
     esac
     mkdir -p "\$dest"
@@ -324,6 +329,97 @@ if [ "$RC" != "0" ] && [ "$ATTEMPTS" = "10" ] && grep -q "failed to push .* afte
 else
   bad "push-retry bound wrong (rc=$RC, attempts=$ATTEMPTS)"
   echo "----- run5.log tail -----"; tail -15 "$ROOT/run5.log"
+fi
+
+run_entrypoint_rasa() {
+  # RASA-CONTAINER (#178): rasa/chatbot leg of the harness.
+  env -i \
+    PATH="$STUB_DIR:/usr/bin:/bin:/usr/sbin:/sbin:$PYTHON_BIN_DIR" \
+    HOME="$ROOT/home" \
+    APPCONTAINER_FIXTURE="$APPCONTAINER_FIXTURE" \
+    TEMPLATE_FIXTURE="$TEMPLATE_FIXTURE" \
+    HSI_FIXTURE="$HSI_FIXTURE" \
+    GIT_PUSH_MODE="${GIT_PUSH_MODE:-ok}" \
+    SERVICE_NAME="dryrun-chat-svc" \
+    APP_CONTAINER="dryrun-app" \
+    LANGUAGE="rasa" \
+    FRAMEWORK="chatbot" \
+    SERVICE_FLAVOR="" \
+    SERVICE_ROLE="" \
+    GITHUB_TOKEN="x" \
+    GITHUB_USER="dryuser" \
+    bash "$ENTRYPOINT"
+}
+
+echo "=== Scenario 6: rasa/chatbot variant-only scaffold (RASA-CONTAINER #178) ==="
+rm -rf "/tmp/app-container-dryrun-app" "/tmp/template-dryrun-chat-svc" || true
+GIT_PUSH_MODE=ok run_entrypoint_rasa > "$ROOT/run6.log" 2>&1 || { echo "rasa entrypoint failed:"; cat "$ROOT/run6.log"; exit 1; }
+
+CHAT_DIR="/tmp/app-container-dryrun-app/microservices/dryrun-chat-svc"
+
+MISSING=""
+for f in domain.yml config.yml data/nlu.yml data/stories.yml data/rules.yml \
+         actions/__init__.py actions/actions.py \
+         docker/rasa/Dockerfile docker/rasa-actions/Dockerfile; do
+  [ -f "$CHAT_DIR/$f" ] || MISSING="$MISSING $f"
+done
+if [ -z "$MISSING" ]; then
+  ok "variant bot files + thin Dockerfiles all present"
+else
+  bad "missing variant files:$MISSING"
+fi
+
+# Variant-only: NOTHING invariant vendored into the repo.
+VENDORED=""
+for f in pyproject.toml requirements.txt endpoints.yml credentials.yml docker-compose.yml; do
+  [ ! -f "$CHAT_DIR/$f" ] || VENDORED="$VENDORED $f"
+done
+if [ -z "$VENDORED" ]; then
+  ok "no invariant files vendored (runtime config lives in rasa-base)"
+else
+  bad "invariant files leaked into the repo:$VENDORED"
+fi
+
+# Thin layer: pinned rasa-base FROM, no dep install, and (HARD-3) no :latest
+# anywhere in the generated service dir.
+if grep -q '^FROM healthidpuaeacr\.azurecr\.io/rasa-base:v1\.0\.0$' "$CHAT_DIR/docker/rasa/Dockerfile" \
+   && grep -q '^FROM healthidpuaeacr\.azurecr\.io/rasa-base:v1\.0\.0$' "$CHAT_DIR/docker/rasa-actions/Dockerfile"; then
+  ok "both Dockerfiles FROM the pinned rasa-base image"
+else
+  bad "Dockerfile FROM lines wrong"
+fi
+if ! grep -rqE 'pip install|poetry install|rasa train ' "$CHAT_DIR/docker/" ; then
+  ok "thin layers: no dependency install / inline train in generated Dockerfiles"
+else
+  bad "generated Dockerfiles still install deps or train inline"
+fi
+if ! grep -rq ':latest' "$CHAT_DIR"; then
+  ok "no :latest reference anywhere in the generated service (HARD-3)"
+else
+  bad ":latest leaked into the generated service"
+fi
+if grep -q 'RUN train-if-needed.sh' "$CHAT_DIR/docker/rasa/Dockerfile" \
+   && grep -q 'CMD \["actions"\]' "$CHAT_DIR/docker/rasa-actions/Dockerfile"; then
+  ok "rasa image bakes the model at build; actions image runs actions mode"
+else
+  bad "train-bake / actions-mode wiring wrong"
+fi
+if grep -q "dryrun-chat-svc Support Bot" "$CHAT_DIR/domain.yml" \
+   && grep -q "action_health_check" "$CHAT_DIR/actions/actions.py"; then
+  ok "minimal working bot personalised (domain + passthrough action)"
+else
+  bad "bot personalisation missing"
+fi
+
+echo "=== Scenario 7: rasa re-run no-clobber preserves edited actions.py ==="
+# #175/#178: domain.yml is now a guard artifact in entrypoint.sh — a re-run
+# must exit 0 without touching the dev-agent's bot edits.
+echo "# DEV-AGENT-EDIT" >> "$CHAT_DIR/actions/actions.py"
+GIT_PUSH_MODE=ok run_entrypoint_rasa > "$ROOT/run7.log" 2>&1 || { echo "rasa no-clobber rerun failed:"; cat "$ROOT/run7.log"; exit 1; }
+if grep -q "DEV-AGENT-EDIT" "$CHAT_DIR/actions/actions.py" && grep -q "skipping re-scaffold (no-clobber)" "$ROOT/run7.log"; then
+  ok "no-clobber: edited actions.py preserved on re-run"
+else
+  bad "rasa no-clobber failed (edit lost or guard silent)"
 fi
 
 echo
