@@ -61,9 +61,13 @@ git clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/$APP_CONTAINER.git .
 # fresh template (exactly how rtdemo commit 8885dca regressed the gateway image).
 # If the service dir already has an entrypoint artifact, scaffolding already
 # happened — exit 0 (idempotent success; the composition only needs the Job green).
+# RASA-CONTAINER (#178): domain.yml is the rasa entrypoint artifact — without
+# it a claim-recreation re-run would re-scaffold and clobber the dev-agent's
+# bot edits (domain/data/actions), the exact #175 failure mode.
 if [ -f "microservices/$SERVICE_NAME/src/main.py" ] \
    || [ -f "microservices/$SERVICE_NAME/package.json" ] \
-   || [ -f "microservices/$SERVICE_NAME/pom.xml" ]; then
+   || [ -f "microservices/$SERVICE_NAME/pom.xml" ] \
+   || [ -f "microservices/$SERVICE_NAME/domain.yml" ]; then
   echo "microservices/$SERVICE_NAME already scaffolded (entrypoint artifact present) - skipping re-scaffold (no-clobber)"
   exit 0
 fi
