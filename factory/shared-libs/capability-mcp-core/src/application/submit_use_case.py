@@ -674,6 +674,21 @@ class SubmitUseCase:
                 added = self.claims.reconcile_services(name=app_name, services=services)
                 if added:
                     reconcile_msg = f"; scaffolded new service(s): {', '.join(added)}"
+            # Stale-snapshot guard (2026-06-12): also refresh the claim's
+            # spec.oamApplication with the OAM just committed. The gitops-setup
+            # Job seeds from that snapshot; left at day-0 it clobbered these
+            # update-path commits whenever the Job re-ran (rtdemo2). Best-effort
+            # like reconcile_services — never fails the submit (the repo commit
+            # above is already the durable truth).
+            if self.claims is not None:
+                try:
+                    self.claims.update_oam_application(
+                        name=app_name,
+                        oam_application_b64=base64.b64encode(oam_yaml.encode()).decode(),
+                    )
+                except Exception as e:  # noqa: BLE001
+                    logger.warning("oamApplication snapshot refresh failed for %s "
+                                   "(non-fatal): %s", app_name, e)
             # SPEC-1: the monorepo exists on the update path — land REQUIREMENTS.md
             # at its root (idempotent; the github client no-ops an unchanged blob).
             spec_msg = self._commit_monorepo_requirements(svc_repo, spec)
