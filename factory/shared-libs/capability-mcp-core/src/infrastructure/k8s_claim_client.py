@@ -151,6 +151,35 @@ class K8sClaimClient:
         logger.info("✅ AppContainerClaim %s services reconciled (+%s)", name, ", ".join(added))
         return added
 
+    def update_oam_application(self, name: str, oam_application_b64: str) -> bool:
+        """Stale-snapshot guard (2026-06-12). Refresh spec.oamApplication on the
+        existing AppContainerClaim `name` so the claim's snapshot tracks the OAM
+        that app.submit just committed to the per-service gitops repo.
+
+        Why: the gitops-setup Job seeds oam/applications/application.yaml from
+        this snapshot. It was day-0 write-once, so any Job re-run (composition
+        change / Crossplane Object retry) re-seeded a STALE OAM over update-path
+        commits (lost rtdemo2 env nudges + publishVersion, 2026-06-12). Keeping
+        the snapshot in lockstep makes a re-seed a no-op; the Job-side guard
+        additionally preserves diverged files.
+
+        Best-effort sibling of reconcile_services: absent claim / RBAC error →
+        False, never raises to the caller's happy path.
+        """
+        if not oam_application_b64:
+            return False
+        patch = {"spec": {"oamApplication": oam_application_b64}}
+        try:
+            self._custom_api().patch_namespaced_custom_object(
+                group=_GROUP, version=_VERSION, namespace=self.namespace,
+                plural=_PLURAL, name=name, body=patch,
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.info("update_oam_application: patch of %s skipped/failed (%s)", name, e)
+            return False
+        logger.info("✅ AppContainerClaim %s spec.oamApplication refreshed", name)
+        return True
+
     def get_claim_status(self, name: str) -> Optional[dict[str, Any]]:
         """Return the claim's .status (or None). Used by app.status (W5)."""
         try:

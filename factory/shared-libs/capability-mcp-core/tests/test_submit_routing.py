@@ -469,6 +469,47 @@ def test_realtime_service_auto_exposed_websocket():
     assert t and t[0]["properties"]["apiType"] == "websocket"
 
 
+def test_realtime_processor_role_not_auto_exposed():
+    # BIND-3 role-awareness (2026-06-12): processor realtime-services are
+    # internal (consume->transform->produce) — no expose-api auto-attach.
+    app = {"spec": {"components": [
+        {"name": "auth", "type": "auth0-idp", "properties": {}},
+        {"name": "proc", "type": "realtime-service",
+         "properties": {"name": "proc", "role": "processor"}},
+    ]}}
+    out = SubmitUseCase._auto_expose_external_components(app, "orig")
+    assert out == "orig"  # unchanged — no re-dump
+    assert not app["spec"]["components"][1].get("traits")
+
+
+def test_realtime_gateway_and_ingest_roles_still_auto_exposed():
+    for role in ("gateway", "ingest"):
+        app = {"spec": {"components": [
+            {"name": "auth", "type": "auth0-idp", "properties": {}},
+            {"name": "rt", "type": "realtime-service",
+             "properties": {"name": "rt", "role": role}},
+        ]}}
+        SubmitUseCase._auto_expose_external_components(app, "orig")
+        t = [t for t in app["spec"]["components"][1]["traits"]
+             if t["type"] == "expose-api"]
+        assert t and t[0]["properties"]["apiType"] == "websocket", role
+
+
+def test_realtime_processor_explicit_expose_trait_respected():
+    # Consumer explicitly opted a processor in — leave the trait untouched
+    # (and add nothing).
+    trait = {"type": "expose-api", "properties": {"identity": "auth"}}
+    app = {"spec": {"components": [
+        {"name": "auth", "type": "auth0-idp", "properties": {}},
+        {"name": "proc", "type": "realtime-service",
+         "properties": {"name": "proc", "role": "processor"},
+         "traits": [dict(trait)]},
+    ]}}
+    out = SubmitUseCase._auto_expose_external_components(app, "orig")
+    assert out == "orig"
+    assert app["spec"]["components"][1]["traits"] == [trait]
+
+
 def test_explicit_expose_trait_untouched():
     app = {"spec": {"components": [
         {"name": "gw", "type": "graphql-gateway", "properties": {},

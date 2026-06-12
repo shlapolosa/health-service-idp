@@ -1420,6 +1420,88 @@ spec:
           apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
+            name: '{{ $name }}-realtime-topic-reconcile-cronjob'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: realtime-topic-reconcile-cronjob
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: batch/v1
+                kind: CronJob
+                metadata:
+                  name: '{{ $name }}-topic-reconcile'
+                  namespace: '{{ $name }}-realtime'
+                  labels:
+                    app.kubernetes.io/name: topic-reconcile
+                    app.kubernetes.io/component: setup
+                spec:
+                  # Topics-vanish-on-restart fix (2026-06-12): demo-kafka is
+                  # fast-data-dev with NO persistence, and the topic-provisioning
+                  # Job above is day-0 only -- a cluster/pod restart loses every
+                  # declared topic until the claim is recreated. Option chosen:
+                  # (b) idempotent reconcile CronJob (kafka-topics --create
+                  # --if-not-exists, every 10m). Least invasive for cost/shape:
+                  # (a) init/sidecar needs surgery on the supervisord
+                  # fast-data-dev pod (initContainers run BEFORE the broker
+                  # exists, a sidecar duplicates this loop with pod-lifecycle
+                  # coupling); (c) PVC-backing fast-data-dev is unsupported by
+                  # the image and adds storage cost.
+                  schedule: '*/10 * * * *'
+                  concurrencyPolicy: Forbid
+                  successfulJobsHistoryLimit: 1
+                  failedJobsHistoryLimit: 1
+                  jobTemplate:
+                    spec:
+                      backoffLimit: 0
+                      template:
+                        metadata:
+                          annotations:
+                            sidecar.istio.io/inject: 'false'
+                        spec:
+                          restartPolicy: Never
+                          containers:
+                          - name: topic-reconciler
+                            image: bitnami/kafka:3.6
+                            command:
+                            - sh
+                            - -c
+                            - |
+                              set -u
+                              BS="demo-kafka:9092"
+                              if ! kafka-topics.sh --bootstrap-server "$BS" --list >/dev/null 2>&1; then
+                                echo "Kafka broker not reachable - next scheduled run will retry"
+                                exit 0
+                              fi
+                              create_topic() {
+                                NAME="$1"; PARTS="${2:-3}"; RET="${3:-604800000}"
+                                kafka-topics.sh --bootstrap-server "$BS" --create --if-not-exists \
+                                  --topic "$NAME" --partitions "$PARTS" --replication-factor 1 \
+                                  --config retention.ms="$RET" --config cleanup.policy=delete \
+                                  || echo "$NAME create skipped"
+                              }
+                              {{- if $spec.topics }}
+                              {{- range $t := $spec.topics }}
+                              create_topic "{{ $t.name }}" "{{ $t.partitions | default 3 }}" "{{ $t.retention | default 604800000 }}"
+                              {{- end }}
+                              {{- else }}
+                              for T in device_data blood_pressure_device_topic heart_rate_device_topic oxygen_saturation_device_topic temperature_device_topic health_alerts_topic; do
+                                create_topic "$T" 3 604800000
+                              done
+                              {{- end }}
+                              echo "Topic reconcile complete"
+                            resources:
+                              requests:
+                                memory: 64Mi
+                                cpu: 50m
+                              limits:
+                                memory: 128Mi
+                                cpu: 100m
+            providerConfigRef:
+              name: kubernetes-provider
+          ---
+          apiVersion: kubernetes.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
             name: '{{ $name }}-multi-env-secret-sync'
             annotations:
               gotemplating.fn.crossplane.io/composition-resource-name: multi-env-secret-sync-cronjob
