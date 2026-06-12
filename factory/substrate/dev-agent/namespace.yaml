@@ -1,0 +1,9 @@
+# DEV-AGENT W2: dedicated namespace for the ephemeral dev-agent Jobs.
+# Everything the agent CREATES lives here; it only READS (ksvc/jobs/pods/logs)
+# in the app namespace (default) via the Role in rbac.yaml.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev-agent-system
+  labels:
+    app.kubernetes.io/part-of: dev-agent

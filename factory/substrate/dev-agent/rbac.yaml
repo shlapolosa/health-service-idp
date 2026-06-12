@@ -1,0 +1,47 @@
+# DEV-AGENT W2: ServiceAccount + minimal RBAC for the dev-agent Job.
+#
+# Least privilege, stated explicitly:
+#   * READ-ONLY in `default`: ksvcs (all-Ready gate + revision polling),
+#     batch Jobs + pod logs (ct-<revision> contract-test verdicts).
+#   * NOTHING created outside dev-agent-system (the Job itself is created by
+#     the sensor's separate dev-agent-event-sa — see all-ready-sensor.yaml).
+#   * No secrets access: creds arrive via envFrom on the Job spec, resolved by
+#     kubelet, not by this SA.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dev-agent-sa
+  namespace: dev-agent-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dev-agent-reader
+  namespace: default
+rules:
+  - apiGroups: ["serving.knative.dev"]
+    resources: ["services"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dev-agent-reader-binding
+  namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dev-agent-reader
+subjects:
+  - kind: ServiceAccount
+    name: dev-agent-sa
+    namespace: dev-agent-system

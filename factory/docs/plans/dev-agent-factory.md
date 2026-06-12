@@ -181,3 +181,54 @@ W0 n8n absorption (independent, small) — anytime
 ## Effort
 W0: 2-3h · W1: 4-6h · W2: 6-8h · W3: 3-4h · W4: 4-5h · W5: 2-3h · W6: 3-4h — ~24-33h.
 Sequenced after #169/#168/#171 + RT-2 W1-W4 (the interfaces it builds on).
+
+## W2-W4 implementation notes (2026-06-12)
+
+Shipped (all additive; sensor inert until a ksvc carries `dev-agent.cafe.io/enabled=true`):
+- `factory/production-lines/traditional-cloud/adapters/dev-agent/` — image (node22-slim +
+  git + python3 + pinned kubectl v1.31.4 + pinned `@anthropic-ai/claude-code`),
+  `scripts/entrypoint.sh`, `scripts/verify-loop.sh`, `prompts/implement.md`,
+  `tests/dry-run.sh` (PATH-shim harness, 16 assertions, macOS-safe — scripts use
+  python3 for all parsing, no sed/jq).
+- `factory/substrate/dev-agent/` — namespace, SA + least-privilege RBAC (read-only
+  ksvc/jobs/pods/logs in `default`; creates nothing outside `dev-agent-system`),
+  NetworkPolicy (egress 443 + DNS only; FQDN-tightening needs Cilium),
+  ExternalSecret SKELETON (no values), `all-ready-sensor.yaml` (W3).
+
+Decisions taken:
+1. **All-Ready gate lives in the entrypoint**, not the sensor — Argo Events can't join
+   across resources. Sensor fires per ksvc-Ready (mirrors HARD-4 contract-test-sensor
+   exactly: resource EventSource UPDATE + gjson Ready filter + parameterised Job create);
+   the entrypoint lists `app.oam.dev/name=<app>` ksvcs and exits 0 quietly if any is
+   unready (the laggard's own Ready event re-fires).
+2. **Two-layer idempotency.** Job name `dev-agent-<app>-<spec-hash-8>` (annotation
+   `dev-agent.cafe.io/spec-hash` via sprig dataTemplate, fallback `g<generation>`) stops
+   Ready-flap stacking; the repo marker `.dev-agent/spec-hash` (committed with the
+   implementation) is what actually breaks the self-trigger loop, because the agent's own
+   push bumps the generation. Changed REQUIREMENTS => new hash => re-fire.
+3. **REQUIREMENTS.md 3-location fallback**: source-repo root → `<app>-gitops` root →
+   ledger `health-service-idp-gitops/oam/applications/<app>-REQUIREMENTS.md` (matches
+   where SPEC-1 lands it today; survives the planned move to the monorepo root).
+4. **W4 verdict plumbing**: after push, verify-loop waits per CHANGED service for a NEW
+   `latestCreatedRevisionName`, then for Job `ct-<revision>` completion, parses the
+   one-line `{"component","type","check","pass","detail"}` verdict from its logs;
+   `pass:false` details are injected verbatim into the next iteration's prompt.
+   Timeouts produce synthetic fail verdicts so feedback is never empty.
+5. **Cost/safety bounds**: MAX_ITERATIONS=3, CLAUDE_MAX_TURNS=50,
+   `--permission-mode acceptEdits` (not skip-permissions) + NetworkPolicy sandbox +
+   forbidden-path revert + pre-push secret scan (public repos). task-master decomposition
+   deferred — the prompt drives implementation directly in v1.
+
+Rollout order (operator):
+1. Key Vault: create `dev-agent-github-token` + `dev-agent-anthropic-key` in
+   kv-socrates-6706; wire the ExternalSecret (or `kubectl create secret` interim).
+2. `az acr build --registry healthidpuaeacr --image dev-agent:v0.1.0 factory/production-lines/traditional-cloud/adapters/dev-agent/`
+3. `kubectl apply -f factory/substrate/dev-agent/namespace.yaml -f rbac.yaml -f networkpolicy.yaml -f externalsecret.yaml` then `all-ready-sensor.yaml`.
+4. Opt in one app: CD/annotation change stamps `dev-agent.cafe.io/enabled="true"`
+   (+ optional `dev-agent.cafe.io/spec-hash`) on its ksvcs — owned by the CD workstream.
+
+Open questions: (a) ksvc namespace is assumed `default` (NAMESPACE env exists but the
+sensor hardcodes the watch ns); (b) generation-fallback Job names re-fire on every CI
+deploy until the spec-hash annotation is stamped — harmless (marker exits 0) but noisy,
+so stamping the annotation should land with the CD opt-in; (c) Slack escalation on
+exhausted iterations is a log line today — wire to the existing notification path.
