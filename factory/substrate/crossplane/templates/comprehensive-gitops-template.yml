@@ -439,6 +439,11 @@ jobs:
     if: needs.detect-changes.outputs.changed-services != '' && needs.detect-changes.outputs.should-deploy == 'true' && needs.semantic-versioning.result == 'success'
     runs-on: ubuntu-latest
     steps:
+      # RASA-CONTAINER: checkout needed to detect rasa scaffolds
+      # (docker/rasa/Dockerfile) when building the dispatch payload below.
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Trigger GitOps repository update
         run: |
           echo "🚀 Triggering GitOps repository update via dispatch event..."
@@ -475,12 +480,23 @@ jobs:
 
           DEPLOYMENTS=""
           for service in "${SERVICE_ARRAY[@]}"; do
-            NEW_IMAGE="${IMAGE_BASE}/$service:$COMMIT_SHA"
-            
-            if [ -z "$DEPLOYMENTS" ]; then
-              DEPLOYMENTS="\"$service\": {\"image\": \"$NEW_IMAGE\", \"commit\": \"$COMMIT_SHA\"}"
+            # RASA-CONTAINER: rasa scaffolds ship TWO images. Carry
+            # rasaImage/actionsImage in the payload so the gitops
+            # deployment-update can yq-SET properties.rasaImage/actionsImage
+            # (the rasa-chatbot CD consumes those, not properties.image).
+            if [ -f "microservices/$service/docker/rasa/Dockerfile" ]; then
+              RASA_IMAGE="${IMAGE_BASE}/${service}-rasa:$COMMIT_SHA"
+              ACTIONS_IMAGE="${IMAGE_BASE}/${service}-actions:$COMMIT_SHA"
+              ENTRY="\"$service\": {\"image\": \"$RASA_IMAGE\", \"rasaImage\": \"$RASA_IMAGE\", \"actionsImage\": \"$ACTIONS_IMAGE\", \"commit\": \"$COMMIT_SHA\"}"
             else
-              DEPLOYMENTS="$DEPLOYMENTS, \"$service\": {\"image\": \"$NEW_IMAGE\", \"commit\": \"$COMMIT_SHA\"}"
+              NEW_IMAGE="${IMAGE_BASE}/$service:$COMMIT_SHA"
+              ENTRY="\"$service\": {\"image\": \"$NEW_IMAGE\", \"commit\": \"$COMMIT_SHA\"}"
+            fi
+
+            if [ -z "$DEPLOYMENTS" ]; then
+              DEPLOYMENTS="$ENTRY"
+            else
+              DEPLOYMENTS="$DEPLOYMENTS, $ENTRY"
             fi
           done
           
