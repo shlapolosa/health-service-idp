@@ -216,12 +216,13 @@ def test_realtime_ingest_offset_advance_pass():
         calls["n"] += 1
         return 5 if calls["n"] == 1 else 6  # before=5, after=6
 
-    async def http_get(cfg, path):
+    async def http_post_json(cfg, path, body):
         assert path == "/ingest"
+        assert "marker_id" in body  # the check must POST a marker payload
         return 202
 
     cfg = _cfg(ctype="realtime-service", role="ingest", produce_topics=["sensor_raw"], timeout=2.0)
-    v = _await(r.check_realtime_ingest(cfg, r.Deps(end_offsets=end_offsets, http_get=http_get)))
+    v = _await(r.check_realtime_ingest(cfg, r.Deps(end_offsets=end_offsets, http_post_json=http_post_json)))
     assert v.passed is True and "5->6" in v.detail
 
 
@@ -229,12 +230,29 @@ def test_realtime_ingest_fail_when_no_advance():
     async def end_offsets(cfg, topic):
         return 7
 
-    async def http_get(cfg, path):
+    async def http_post_json(cfg, path, body):
         return 202
 
     cfg = _cfg(ctype="realtime-service", role="ingest", produce_topics=["sensor_raw"], timeout=2.0)
-    v = _await(r.check_realtime_ingest(cfg, r.Deps(end_offsets=end_offsets, http_get=http_get)))
+    v = _await(r.check_realtime_ingest(cfg, r.Deps(end_offsets=end_offsets, http_post_json=http_post_json)))
     assert v.passed is False
+
+
+def test_realtime_ingest_fail_on_non_2xx_even_if_offsets_advance():
+    """Live finding (rtdemo2): a 405 from the service must FAIL the check even
+    when a concurrent test's produce advanced the topic (cross-talk false-pass)."""
+    calls = {"n": 0}
+
+    async def end_offsets(cfg, topic):
+        calls["n"] += 1
+        return 5 if calls["n"] == 1 else 6
+
+    async def http_post_json(cfg, path, body):
+        return 405
+
+    cfg = _cfg(ctype="realtime-service", role="ingest", produce_topics=["sensor_raw"], timeout=2.0)
+    v = _await(r.check_realtime_ingest(cfg, r.Deps(end_offsets=end_offsets, http_post_json=http_post_json)))
+    assert v.passed is False and "405" in v.detail
 
 
 def test_realtime_processor_transform_pass():

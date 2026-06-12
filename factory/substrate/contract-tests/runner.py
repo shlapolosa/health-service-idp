@@ -41,6 +41,7 @@ so a `kubectl logs` (or the W4 lifecycle.state follow-up) can scrape a single li
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import sys
@@ -241,7 +242,12 @@ async def _end_offsets_sum(cfg: Config, topic: str) -> int:
         end = await cons.end_offsets(tps)
         return sum(end.values())
     finally:
-        await cons.stop()
+        # Shield + suppress: when the surrounding wait_for() times out it
+        # CANCELS this coroutine mid-stop; aiokafka's coordinator close then
+        # re-raises CancelledError, which previously crashed the whole runner
+        # with a traceback instead of a fail verdict (live finding, rtdemo2).
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await asyncio.shield(cons.stop())
 
 
 # --------------------------------------------------------------------------- #
@@ -260,6 +266,8 @@ class Deps:
         kafka_consume_match: Optional[Callable[[Config, str, str], Awaitable[bool]]] = None,
         http_get: Optional[Callable[[Config, str], Awaitable[int]]] = None,
         http_post_graphql: Optional[Callable[[Config, str], Awaitable[bool]]] = None,
+        http_post_json: Optional[
+            Callable[[Config, str, Dict[str, object]], Awaitable[int]]] = None,
     ):
         self.ws_recv = ws_recv or _default_ws_recv
         self.kafka_produce = kafka_produce or _produce_to_kafka
@@ -267,6 +275,7 @@ class Deps:
         self.kafka_consume_match = kafka_consume_match or _default_kafka_consume_match
         self.http_get = http_get or _default_http_get
         self.http_post_graphql = http_post_graphql or _default_http_post_graphql
+        self.http_post_json = http_post_json or _default_http_post_json
 
 
 async def _default_ws_recv(cfg: Config, marker: Dict[str, object]) -> bool:
@@ -329,6 +338,18 @@ async def _default_http_get(cfg: Config, path: str) -> int:
         headers["Ocp-Apim-Subscription-Key"] = cfg.apim_subscription_key
     async with httpx.AsyncClient(timeout=cfg.timeout) as c:
         r = await c.get(cfg.ksvc_url + path, headers=headers)
+        return r.status_code
+
+
+async def _default_http_post_json(cfg: Config, path: str,
+                                  body: Dict[str, object]) -> int:
+    import httpx  # type: ignore
+
+    headers = {"Content-Type": "application/json"}
+    if cfg.apim_mode and cfg.apim_subscription_key:
+        headers["Ocp-Apim-Subscription-Key"] = cfg.apim_subscription_key
+    async with httpx.AsyncClient(timeout=cfg.timeout) as c:
+        r = await c.post(cfg.ksvc_url + path, json=body, headers=headers)
         return r.status_code
 
 
@@ -397,16 +418,25 @@ async def check_realtime_ingest(cfg: Config, deps: Deps) -> Verdict:
         return Verdict(cfg.component, cfg.ctype, "rt-ingest-offset-advance", False,
                        "no PRODUCE_* topic in env")
     topic = cfg.produce_topics[0]
+    # Live findings (rtdemo2, second fire):
+    #   1. This check used http_get -> FastAPI's POST-only /ingest answered 405
+    #      while the verdict string claimed "POST". Use a real POST with a
+    #      marker body.
+    #   2. `after > before` alone false-passed when a CONCURRENT component's
+    #      check produced to the same topic (cross-talk). Require BOTH a 2xx
+    #      from the service AND the offset advance.
+    marker = _marker(cfg.component)
     try:
         before = await asyncio.wait_for(deps.end_offsets(cfg, topic), timeout=cfg.timeout)
-        status = await asyncio.wait_for(deps.http_get(cfg, "/ingest"), timeout=cfg.timeout)
+        status = await asyncio.wait_for(
+            deps.http_post_json(cfg, "/ingest", marker), timeout=cfg.timeout)
         # Give the produce a moment, then re-read.
         await asyncio.sleep(2.0)
         after = await asyncio.wait_for(deps.end_offsets(cfg, topic), timeout=cfg.timeout)
     except asyncio.TimeoutError:
         return Verdict(cfg.component, cfg.ctype, "rt-ingest-offset-advance", False,
                        "timeout probing ingest/{} within {}s".format(topic, cfg.timeout))
-    ok = after > before
+    ok = (200 <= status < 300) and after > before
     return Verdict(cfg.component, cfg.ctype, "rt-ingest-offset-advance", ok,
                    "POST /ingest={} topic {} offsets {}->{}".format(status, topic, before, after))
 
