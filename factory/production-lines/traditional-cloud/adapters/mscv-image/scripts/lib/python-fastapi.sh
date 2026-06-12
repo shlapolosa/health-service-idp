@@ -124,7 +124,7 @@ RTMAIN
     # agent_common source. The wheel declares fastapi/pydantic/aiokafka/websockets
     # so poetry resolves transport deps transitively. Idempotent.
     if [ -f pyproject.toml ]; then
-      grep -q '^realtime-transport' pyproject.toml || sed -i '/\[tool.poetry.dependencies\]/a realtime-transport = {url = "https://github.com/shlapolosa/health-service-idp/releases/download/realtime-transport-v0.1.0/realtime_transport-0.1.0-py3-none-any.whl"}' pyproject.toml
+      grep -q '^realtime-transport' pyproject.toml || sed -i '/\[tool.poetry.dependencies\]/a realtime-transport = {url = "https://github.com/shlapolosa/health-service-idp/releases/download/realtime-transport-v0.1.1/realtime_transport-0.1.1-py3-none-any.whl"}' pyproject.toml
       # Align template pins with the wheel's requirements (caught live on rtdemo2:
       # wheel needs fastapi >=0.115.14,<0.116.0 but the onion template pins
       # ^0.104.0 -> poetry solver hard-fails the docker build). pydantic ^2.0.0

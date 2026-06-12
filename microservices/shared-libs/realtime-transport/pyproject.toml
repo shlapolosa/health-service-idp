@@ -1,6 +1,6 @@
 [project]
 name = "realtime-transport"
-version = "0.1.0"
+version = "0.1.1"
 description = "Role-aware realtime transport (ingest / processor / gateway) extracted from agent_common, without AI-agent identity baggage"
 authors = [
     {name = "shlapolosa",email = "socrates.hlapolosa@gmail.com"}
@@ -11,6 +11,7 @@ dependencies = [
     "fastapi (>=0.115.14,<0.116.0)",
     "pydantic (>=2.11.7,<3.0.0)",
     "aiokafka (>=0.8.0,<0.9.0)",
+    "kafka-python (==2.0.2)",
     "websockets (>=11.0,<12.0)"
 ]
 
