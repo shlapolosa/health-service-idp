@@ -21,4 +21,21 @@ spec:
     - destination:
         host: argocd-server.argocd.svc.cluster.local
         port:
-          number: 80
+          number: 443
+---
+# TLS-originate to argocd-server's self-signed cert (server redirects plain
+# HTTP with 307, which GitHub webhook delivery does not follow).
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: argocd-webhook-tls
+  namespace: argocd
+spec:
+  host: argocd-server.argocd.svc.cluster.local
+  trafficPolicy:
+    portLevelSettings:
+    - port:
+        number: 443
+      tls:
+        mode: SIMPLE
+        insecureSkipVerify: true
