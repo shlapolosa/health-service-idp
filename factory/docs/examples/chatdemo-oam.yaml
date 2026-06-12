@@ -1,0 +1,16 @@
+# RASA-CONTAINER (#178) runtime e2e: first rasa-chatbot instantiation on the
+# prebaked rasa-base image + variant-only repo. Images are the names the chat
+# CI builds (<svc>-rasa / <svc>-actions); day-0 placeholders resolve after CI.
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: chatdemo
+  namespace: default
+spec:
+  components:
+  - name: chatdemo-bot
+    type: rasa-chatbot
+    properties:
+      name: chatdemo-bot
+      rasaImage: docker.io/socrates12345/chatdemo-bot-rasa:latest
+      actionsImage: docker.io/socrates12345/chatdemo-bot-actions:latest

@@ -510,6 +510,10 @@ class SubmitUseCase:
                 # (nodejs/Mesh) - consumers declare intent, default it instead
                 # of skipping (caught patient7: gateway not scaffolded).
                 lang = "nodejs"
+            if not lang and comp.get("type") == "rasa-chatbot":
+                # RASA-CONTAINER (#178): bot implementation language is a
+                # platform detail — consumers declare intent only.
+                lang = "rasa"
             if not lang:
                 continue
             # Image must be the auto-default (or absent) — if consumer set a non-default
@@ -525,7 +529,12 @@ class SubmitUseCase:
     # RT-1 (#156): component types that trigger source-code scaffolding.
     # realtime-service is a fastapi variant (websocket+aiokafka) — it scaffolds
     # exactly like webservice but carries flavor:realtime (see _webservice_services).
-    _SCAFFOLD_TYPES = ("webservice", "graphql-gateway", "realtime-service")
+    # RASA-CONTAINER (#178): rasa-chatbot scaffolds variant-only bot files
+    # (domain/data/config/actions) into the monorepo on the prebaked rasa-base
+    # image — routed through the claim path like every other scaffold type.
+    # (Caught live: it previously fell through to the legacy oam-apply path.)
+    _SCAFFOLD_TYPES = ("webservice", "graphql-gateway", "realtime-service",
+                       "rasa-chatbot")
 
     _FW_FOR_LANG = {"python": "fastapi", "java": "springboot",
                     "rasa": "chatbot", "nodejs": "graphql-gateway"}
@@ -568,6 +577,10 @@ class SubmitUseCase:
                 # (nodejs/Mesh) - consumers declare intent, default it instead
                 # of skipping (caught patient7: gateway not scaffolded).
                 lang = "nodejs"
+            if not lang and comp.get("type") == "rasa-chatbot":
+                # RASA-CONTAINER (#178): bot implementation language is a
+                # platform detail — consumers declare intent only.
+                lang = "rasa"
             if not lang:
                 continue
             img = props.get("image", "")

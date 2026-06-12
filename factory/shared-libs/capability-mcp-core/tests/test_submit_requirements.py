@@ -251,3 +251,29 @@ def test_webservice_has_no_role():
                     "properties": {"language": "python"}}])
     services = SubmitUseCase._webservice_services(app)
     assert "role" not in services[0]
+
+
+def test_rasa_chatbot_routes_to_scaffold_path():
+    """RASA-CONTAINER (#178): rasa-chatbot components must take the claim path
+    (monorepo scaffold), not legacy oam-apply (caught live: 401 argo-token)."""
+    from src.application.submit_use_case import SubmitUseCase
+    app = {"spec": {"components": [{
+        "name": "chatdemo-bot", "type": "rasa-chatbot",
+        "properties": {"name": "chatdemo-bot",
+                       "rasaImage": "docker.io/x/chatdemo-bot-rasa:latest",
+                       "actionsImage": "docker.io/x/chatdemo-bot-actions:latest"}}]}}
+    svcs = SubmitUseCase._webservice_services(app)
+    assert svcs == [{"name": "chatdemo-bot", "language": "rasa",
+                     "framework": "chatbot"}]
+
+
+def test_rasa_chatbot_needs_scaffold():
+    from src.application.submit_use_case import SubmitUseCase
+    uc = SubmitUseCase.__new__(SubmitUseCase)
+    app = {"spec": {"components": [{
+        "name": "chatdemo-bot", "type": "rasa-chatbot",
+        "properties": {"name": "chatdemo-bot",
+                       "rasaImage": "docker.io/x/r:latest",
+                       "actionsImage": "docker.io/x/a:latest"}}]}}
+    comp = uc._needs_scaffold(app)
+    assert comp is not None and comp["name"] == "chatdemo-bot"
