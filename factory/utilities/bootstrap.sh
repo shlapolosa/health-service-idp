@@ -88,8 +88,9 @@ cmd_down() {
 
     # Reverse-order delete
     log "removing per-line services + manifests"
-    kubectl delete -f "$REPO_ROOT/production-lines/traditional-cloud/adapters/compose-mcp/knative-service.yaml" \
-        --ignore-not-found=true || true
+    # ksvcs are GitOps-owned (#163): factory/substrate/services/
+    kubectl delete -f "$REPO_ROOT/factory/substrate/services/" \
+        --recursive --ignore-not-found=true || true
     kubectl delete -f "$REPO_ROOT/production-lines/traditional-cloud/adapters/catalog/" \
         --recursive --ignore-not-found=true || true
     kubectl delete -f "$REPO_ROOT/production-lines/traditional-cloud/adapters/execute/" \
