@@ -48,7 +48,11 @@ jobs:
           
           for service in "${SERVICE_ARRAY[@]}"; do
             echo "🔄 Updating $service manifest..."
-            
+            # RASA-CONTAINER: per-service rasa image refs (set only for rasa
+            # scaffolds by the source CI dispatch payload).
+            RASA_IMAGE=""
+            ACTIONS_IMAGE=""
+
             if [ "${{ github.event.action }}" = "simple-update" ]; then
               # Simple update: construct image from registry and commit
               NEW_IMAGE="${REGISTRY}/$service:$COMMIT_SHA"
@@ -66,7 +70,9 @@ jobs:
               
               NEW_IMAGE=$(echo "$DEPLOYMENTS_PARSED" | jq -r ".\"$service\".image // empty")
               COMMIT_SHA=$(echo "$DEPLOYMENTS_PARSED" | jq -r ".\"$service\".commit // empty")
-              
+              RASA_IMAGE=$(echo "$DEPLOYMENTS_PARSED" | jq -r ".\"$service\".rasaImage // empty")
+              ACTIONS_IMAGE=$(echo "$DEPLOYMENTS_PARSED" | jq -r ".\"$service\".actionsImage // empty")
+
               echo "Extracted - Image: $NEW_IMAGE, Commit: $COMMIT_SHA"
               
               if [ -z "$NEW_IMAGE" ] || [ "$NEW_IMAGE" = "null" ]; then
@@ -88,7 +94,32 @@ jobs:
             
             if [ -f "$OAM_FILE" ]; then
               echo "📄 Updating manifest: $OAM_FILE"
-              
+
+              # RASA-CONTAINER (2026-06-12): rasa services carry
+              # rasaImage/actionsImage in the payload — the rasa-chatbot CD
+              # renders <svc>-rasa/<svc>-actions ksvcs from
+              # properties.rasaImage/actionsImage, NOT properties.image, so
+              # yq-SET both and skip the generic image pin (adding
+              # properties.image to a rasa-chatbot component is dead config).
+              if [ -n "$RASA_IMAGE" ] && [ "$RASA_IMAGE" != "null" ]; then
+                case "$RASA_IMAGE" in *:latest) echo "❌ Refusing to pin rasaImage to :latest ($RASA_IMAGE)" >&2; exit 1 ;; esac
+                case "$ACTIONS_IMAGE" in *:latest) echo "❌ Refusing to pin actionsImage to :latest ($ACTIONS_IMAGE)" >&2; exit 1 ;; esac
+                if command -v yq >/dev/null 2>&1; then
+                  SVC_NAME="$service" PIN_IMAGE="$RASA_IMAGE" yq -i '(.spec.components[] | select(.name == strenv(SVC_NAME)) | .properties.rasaImage) = strenv(PIN_IMAGE)' "$OAM_FILE"
+                  SVC_NAME="$service" PIN_IMAGE="$ACTIONS_IMAGE" yq -i '(.spec.components[] | select(.name == strenv(SVC_NAME)) | .properties.actionsImage) = strenv(PIN_IMAGE)' "$OAM_FILE"
+                  echo "✅ Pinned rasaImage=$RASA_IMAGE actionsImage=$ACTIONS_IMAGE via yq"
+                else
+                  echo "❌ yq unavailable - cannot pin rasa images for $service" >&2
+                  exit 1
+                fi
+                # Update version labels if they exist
+                if [ ! -z "$COMMIT_SHA" ]; then
+                  sed -i "s|version: .*|version: $COMMIT_SHA|g" "$OAM_FILE"
+                fi
+                echo "✅ Updated $service (rasa) manifest successfully"
+                continue
+              fi
+
               # Update the image in the OAM file
               sed -i "s|image: .*/$service:.*|image: $NEW_IMAGE|g" "$OAM_FILE"
 
