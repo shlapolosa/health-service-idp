@@ -152,7 +152,15 @@ class SubmitUseCase:
         the expose-api trait auto-attached (identity = the OAM's singleton
         auth0-idp; apiType websocket for realtime-service). Explicit traits are
         left untouched; OAMs without an identity component will then fail the
-        exposure=>identity invariant with its existing actionable message."""
+        exposure=>identity invariant with its existing actionable message.
+
+        Role-aware since 2026-06-12 (rtdemo2): RT-2 realtime-service roles are
+        gateway (consume->/ws, external), ingest (POST->produce, external) and
+        processor (consume->transform->produce, INTERNAL — no HTTP surface to
+        publish). Auto-attaching expose-api to a processor put a phantom
+        websocket API into APIM, so processors are skipped; an explicit
+        consumer-supplied expose-api trait on a processor is still respected
+        (this function only ever ADDS traits, never removes them)."""
         comps = app.get("spec", {}).get("components", []) or []
         identity = next((c.get("name") for c in comps if c.get("type") == "auth0-idp"), None)
         changed = False
@@ -160,6 +168,10 @@ class SubmitUseCase:
             ctype = comp.get("type")
             if ctype not in ("graphql-gateway", "realtime-service"):
                 continue
+            if ctype == "realtime-service":
+                role = str((comp.get("properties") or {}).get("role", "gateway")).strip()
+                if role == "processor":
+                    continue  # internal role: never auto-expose
             traits = comp.setdefault("traits", [])
             if any(t.get("type") == "expose-api" for t in traits):
                 continue
