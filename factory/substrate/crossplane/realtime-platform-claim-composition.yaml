@@ -1365,12 +1365,12 @@ spec:
                       # lives behind the Agent). kafka-topics against the broker is
                       # version-independent and robust.
                       - name: wait-for-kafka
-                        image: bitnami/kafka:3.6
+                        image: lensesio/fast-data-dev:3.9.0
                         command:
                         - sh
                         - -c
                         - |
-                          until kafka-topics.sh --bootstrap-server demo-kafka:9092 --list >/dev/null 2>&1; do
+                          until kafka-topics --bootstrap-server demo-kafka:9092 --list >/dev/null 2>&1; do
                             echo "Waiting for Kafka broker..."; sleep 10
                           done
                           echo "Kafka broker ready"
@@ -1379,7 +1379,7 @@ spec:
                         # #166: kafka CLI image (was curl/HQ-REST). Creates topics
                         # directly on the broker — same spec.topics[] loop, per-topic
                         # partitions + retention.ms, idempotent (--if-not-exists).
-                        image: bitnami/kafka:3.6
+                        image: lensesio/fast-data-dev:3.9.0
                         command:
                         - sh
                         - -c
@@ -1389,7 +1389,7 @@ spec:
                           create_topic() {
                             NAME="$1"; PARTS="${2:-3}"; RET="${3:-604800000}"
                             echo "Creating topic $NAME (partitions=$PARTS retention.ms=$RET)"
-                            kafka-topics.sh --bootstrap-server "$BS" --create --if-not-exists \
+                            kafka-topics --bootstrap-server "$BS" --create --if-not-exists \
                               --topic "$NAME" --partitions "$PARTS" --replication-factor 1 \
                               --config retention.ms="$RET" --config cleanup.policy=delete \
                               || echo "$NAME may already exist"
@@ -1405,7 +1405,7 @@ spec:
                           done
                           {{- end }}
                           echo "Topics now present:"
-                          kafka-topics.sh --bootstrap-server "$BS" --list
+                          kafka-topics --bootstrap-server "$BS" --list
                           echo "Topic provisioning complete"
                         resources:
                           requests:
@@ -1461,20 +1461,20 @@ spec:
                           restartPolicy: Never
                           containers:
                           - name: topic-reconciler
-                            image: bitnami/kafka:3.6
+                            image: lensesio/fast-data-dev:3.9.0
                             command:
                             - sh
                             - -c
                             - |
                               set -u
                               BS="demo-kafka:9092"
-                              if ! kafka-topics.sh --bootstrap-server "$BS" --list >/dev/null 2>&1; then
+                              if ! kafka-topics --bootstrap-server "$BS" --list >/dev/null 2>&1; then
                                 echo "Kafka broker not reachable - next scheduled run will retry"
                                 exit 0
                               fi
                               create_topic() {
                                 NAME="$1"; PARTS="${2:-3}"; RET="${3:-604800000}"
-                                kafka-topics.sh --bootstrap-server "$BS" --create --if-not-exists \
+                                kafka-topics --bootstrap-server "$BS" --create --if-not-exists \
                                   --topic "$NAME" --partitions "$PARTS" --replication-factor 1 \
                                   --config retention.ms="$RET" --config cleanup.policy=delete \
                                   || echo "$NAME create skipped"
