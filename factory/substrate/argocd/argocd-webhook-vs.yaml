@@ -1,0 +1,24 @@
+# LATENCY (2026-06-12): GitHub -> ArgoCD push webhooks. Exposes ONLY ArgoCD's
+# /api/webhook endpoint (host-scoped) so git pushes trigger an immediate refresh
+# instead of waiting for the poll interval (timeout.reconciliation, now 60s).
+# The endpoint validates payloads against webhook.github.secret in argocd-secret;
+# no other ArgoCD route is reachable externally.
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: argocd-webhook
+  namespace: argocd
+spec:
+  hosts:
+  - argocd-webhook.20.233.105.82.nip.io
+  gateways:
+  - default/capability-mcp-gateway
+  http:
+  - match:
+    - uri:
+        exact: /api/webhook
+    route:
+    - destination:
+        host: argocd-server.argocd.svc.cluster.local
+        port:
+          number: 80
