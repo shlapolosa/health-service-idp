@@ -232,3 +232,94 @@ sensor hardcodes the watch ns); (b) generation-fallback Job names re-fire on eve
 deploy until the spec-hash annotation is stamped — harmless (marker exits 0) but noisy,
 so stamping the annotation should land with the CD opt-in; (c) Slack escalation on
 exhausted iterations is a log line today — wire to the existing notification path.
+
+## ENGINE SWAP: claude-code → opencode / GPT-5.4-via-APIM (2026-06-13)
+
+Swapped the dev-agent coding engine from `@anthropic-ai/claude-code` to
+[opencode](https://opencode.ai) running **GPT-5.4 through the Azure APIM gateway**
+(no Anthropic key, no shim). Assessed + recommended; all changes additive/reversible.
+
+**What changed (image `dev-agent:v0.2.0`, was v0.1.0):**
+- `Dockerfile`: dropped `npm i -g @anthropic-ai/claude-code`; installs pinned
+  `opencode-ai@1.17.4` (amd64; `npm install -g`, the platform binary ships in the
+  npm package). Bakes `/app/opencode.json`; sets `OPENCODE_CONFIG` +
+  `OPENCODE_DISABLE_CLAUDE_CODE=1` (stops opencode auto-reading `~/.claude`).
+  uid 1000, git, python3 unchanged.
+- `opencode.json` (NEW): provider `apim-gpt` (`@ai-sdk/openai-compatible`) →
+  `baseURL=https://aigw-apim-dev-w4x7ibwk4e2is.azure-api.net/openai/deployments/gpt-5.4?api-version=2024-12-01-preview`,
+  `apiKey`+header `Ocp-Apim-Subscription-Key` = `{env:APIM_SUBSCRIPTION_KEY}`,
+  model `gpt-5.4` with `limit.output` (gpt-5.4 needs `max_completion_tokens`, which
+  the openai-compatible AI-SDK emits). NO secret baked.
+- `entrypoint.sh`: the implement step is now
+  `opencode run "<prompt>" --dir "$SRC_DIR" -m apim-gpt/gpt-5.4 --dangerously-skip-permissions --format json`
+  (prompt is POSITIONAL — in opencode `-p`==`--password`). Everything else preserved:
+  3-location REQUIREMENTS.md fallback, clone, per-service loop, all-Ready gate,
+  spec-hash idempotency, forbidden-path revert, secret scan, commit
+  `feat(dev-agent): …`, rebase-push retry, W4 verify-loop handoff. git status (not
+  exit code) still decides "did it change files → commit". `CLAUDE_MAX_TURNS`
+  removed (opencode `run` has no turn cap; `MAX_ITERATIONS` is the bound).
+- `verify-loop.sh`: unchanged — engine-agnostic (parses ksvc revisions + ct-* Job
+  verdicts only). Confirmed, left alone.
+- `prompts/implement.md`: added rule 8 — "ACT, do not narrate: persist edits to disk"
+  (GPT-5.4 is likelier than claude-code to print code instead of writing it).
+- `tests/dry-run.sh`: PATH-shim now stubs `opencode` (not `claude`); asserts the
+  positional prompt carries REQUIREMENTS content + flags `--dir`/`-m apim-gpt/gpt-5.4`/
+  `--dangerously-skip-permissions`, commit+push only on change, 3-location fallback,
+  MAX_ITERATIONS bound, all-Ready gate. **17/17 green, macOS/BSD-safe.**
+- `factory/substrate/dev-agent/externalsecret.yaml`: `dev-agent-secrets` now carries
+  `APIM_SUBSCRIPTION_KEY` (Key Vault `dev-agent-apim-subscription-key`) instead of
+  `ANTHROPIC_API_KEY`; `GITHUB_TOKEN` unchanged. Skeleton/comments only, no values.
+- `factory/substrate/dev-agent/networkpolicy.yaml` (SECURITY-CRITICAL egress swap):
+  intended allowlist DROPS `api.anthropic.com`, ADDS
+  `aigw-apim-dev-w4x7ibwk4e2is.azure-api.net:443`; github.com + apiserver + DNS kept.
+  Vanilla AKS NP is still port-only (any-443+DNS); a commented `CiliumNetworkPolicy`
+  companion encodes the exact FQDN allowlist (anthropic absent ⇒ denied) for when
+  Cilium is adopted.
+
+**Why APIM subscription key (not the SP JWT):** the JWT is 1h; the dev-agent runs
+unattended on Ready events. The long-lived APIM subscription key in
+`Ocp-Apim-Subscription-Key` is the correct unattended auth. Direct-to-Foundry is
+401 — all model traffic MUST traverse APIM.
+
+### Engine-swap smoke-test gate (run BEFORE any pilot app)
+
+GPT-5.4 edit fidelity through opencode is **unproven** vs claude-code on this slot
+shape. Gate before labelling a pilot:
+```
+# in dev-agent-system, one-shot Job/pod from dev-agent:v0.2.0 against a fixture repo
+# carrying a real microservices/<svc>/src/handlers.py slot + REQUIREMENTS.md:
+opencode run "<rendered implement.md prompt>" --dir /work/src -m apim-gpt/gpt-5.4 \
+  --dangerously-skip-permissions --format json
+# PASS gate: git status shows handlers.py changed AND the service's contract test
+# (factory/substrate/contract-tests/runner.py) goes pass:true on the new revision.
+```
+Only after a green smoke-test do you stamp `dev-agent.cafe.io/enabled="true"` on a
+pilot app's ksvcs.
+
+### Operator rollout (engine swap)
+
+1. Key Vault `kv-socrates-6706`: create `dev-agent-apim-subscription-key`
+   (long-lived APIM gateway subscription key). Interim manual secret:
+   `kubectl -n dev-agent-system create secret generic dev-agent-secrets \
+     --from-literal=GITHUB_TOKEN=… --from-literal=APIM_SUBSCRIPTION_KEY=…`
+   (drop the old `ANTHROPIC_API_KEY` key).
+2. `az acr build --registry healthidpuaeacr --image dev-agent:v0.2.0 \
+     factory/production-lines/traditional-cloud/adapters/dev-agent/`
+3. `kubectl apply -f factory/substrate/dev-agent/networkpolicy.yaml \
+     -f factory/substrate/dev-agent/externalsecret.yaml`
+   (egress now allows APIM, drops Anthropic).
+4. Point `all-ready-sensor.yaml` at `dev-agent:v0.2.0`.
+5. Run the smoke-test gate (above). Only then opt in a pilot app.
+
+### Risks / rollback
+
+- **GPT-5.4 edit fidelity (primary risk):** GPT models more often emit code in chat
+  rather than writing files; mitigated by implement.md rule 8 + the smoke-test gate +
+  the existing "no on-disk change ⇒ no commit, exit quietly" guard (a non-implementing
+  run is a safe no-op, not a bad push). If fidelity is poor, the loop simply never
+  goes green and escalates after MAX_ITERATIONS — no corruption.
+- **APIM dependency:** all model traffic via one gateway; key rotation / APIM outage
+  stalls the agent (fails safe — Jobs error, nothing bad pushed).
+- **Rollback = one commit:** `git revert <engine-swap-commit>` restores claude-code
+  (Dockerfile npm pin, `claude -p` invocation, `ANTHROPIC_API_KEY`, anthropic egress)
+  and `dev-agent:v0.1.0`.
