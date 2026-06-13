@@ -1,0 +1,51 @@
+# OBS-A: ArgoCD UI as the platform deployment-visibility surface (2026-06-13).
+#
+# Exposes the FULL argocd-server (UI + API + gRPC) at argocd.20.233.105.82.nip.io
+# through the shared default/capability-mcp-gateway (HTTP:80), so the Applications
+# list — the canonical deployed-inventory + live-vs-git drift view — is reachable.
+#
+# argocd-server serves ONLY HTTPS (no --insecure flag; server.dex.server etc. in
+# argocd-cmd-params-cm, no insecure key). Plain HTTP to it gets a 307 redirect to
+# HTTPS. So, exactly like the proven argocd-webhook route, we TLS-originate from
+# the mesh to argocd-server:443 with a DestinationRule (SIMPLE + insecureSkipVerify
+# for the self-signed serving cert). The gateway terminates client HTTP at :80;
+# the hop ingress->argocd-server is re-encrypted to 443.
+#
+# ArgoCD's OWN auth stays ON — this only adds a network route. Login still requires
+# the admin credential in secret `argocd-initial-admin-secret` (or SSO via dex).
+#
+# Managed by the substrate-services ArgoCD Application (recurses
+# factory/substrate/services/*.yaml). Resources pin namespace: argocd explicitly
+# (the app's destination namespace is `default`; ArgoCD honours per-manifest ns).
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: argocd-ui
+  namespace: argocd
+spec:
+  hosts:
+  - argocd.20.233.105.82.nip.io
+  gateways:
+  - default/capability-mcp-gateway
+  http:
+  - route:
+    - destination:
+        host: argocd-server.argocd.svc.cluster.local
+        port:
+          number: 443
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: argocd-ui-tls
+  namespace: argocd
+spec:
+  host: argocd-server.argocd.svc.cluster.local
+  trafficPolicy:
+    portLevelSettings:
+    - port:
+        number: 443
+      tls:
+        mode: SIMPLE
+        insecureSkipVerify: true
