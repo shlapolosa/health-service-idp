@@ -22,8 +22,11 @@ spec:
           secretName: argo-token
       containers:
       - name: capability-mcp-factory
-        image: healthidpuaeacr.azurecr.io/capability-mcp-factory:user1000
-        imagePullPolicy: Always
+        # HARD-3: pinned by digest (no mutable tag). Built from factory/adapters/mcp-read-gateway
+        # at source SHA 60aa3c1 (tag factory-tools-60aa3c1) — first build that includes
+        # factory.route + factory.list_manufacturers (the :user1000 image predated them).
+        image: healthidpuaeacr.azurecr.io/capability-mcp-factory@sha256:aeb757ad8717aa06cc49e00ac7f8f9691829bc3cba96c2b6a7b74b899a6a9345
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
         env:
