@@ -375,61 +375,133 @@ spec:
                       securityContext:
                         runAsNonRoot: true
                         runAsUser: 1000
-                      containers:
-                      # BUG-A FIX (2026-06-13): the old mint used `svix-server jwt
-                      # generate`, which signs with the secret the CLI *defaults to*
-                      # — NOT the random SVIX_JWT_SECRET we then injected into the
-                      # server Deployment. The server therefore verified incoming
-                      # tokens against a DIFFERENT key and returned 401 "Invalid
-                      # token". Fix: mint the admin JWT DETERMINISTICALLY in-shell,
-                      # HMAC-SHA256 over the EXACT minted SVIX_JWT_SECRET, matching
-                      # svix-server's verifier:
-                      #   HS256Key::from_bytes(SVIX_JWT_SECRET.as_bytes())   (raw utf-8,
-                      #   NOT base64-decoded — verified against core/security.rs @ main).
-                      #   claims: sub = default org id (org_23rb8YdGqMT0qIzpgGwdXfHirMu),
-                      #   iss = "svix-server", exp = +10y. Org-level token => admin.
-                      # openssl + base64 ship in alpine/k8s, so one container does it all.
-                      - name: mint-and-apply
+                      # BUG-A FIX (2026-06-13): the previous in-shell HMAC mint
+                      # (openssl over a hand-built {"iss","sub","iat","exp"} payload)
+                      # produced a token the server rejected with 401
+                      # "Invalid token". ROOT CAUSE (verified against svix-server
+                      # @ v1.69.0 src/core/security.rs + src/main.rs): svix-server
+                      # signs/verifies with the `jwt_simple` crate, whose Claims
+                      # ALSO carry auto-generated `nbf`, `iat`, `exp` AND a `jti`
+                      # nonce, serialized in jwt_simple's own canonical form.
+                      # verify_token() is strict — a naive shell-built payload can
+                      # NEVER reproduce the exact signed bytes, so the HMAC never
+                      # matches. The ONLY by-construction-valid mint is the server's
+                      # OWN `svix-server jwt generate` CLI, run with the SAME
+                      # SVIX_JWT_SECRET. cfg::load() builds jwt_signing_config from
+                      # SVIX_JWT_SECRET via HS256Key::from_bytes(secret.as_bytes())
+                      # (raw utf-8). The CLI loads cfg but `jwt generate` calls only
+                      # generate_org_token() — it never opens DB/Redis, and
+                      # config.default.toml supplies a default db_dsn, so no backing
+                      # service is needed; we also leave SVIX_CACHE_TYPE/QUEUE_TYPE
+                      # unset so they default to memory (no redis_dsn required).
+                      #
+                      # initContainers run IN ORDER before the main container:
+                      #   1. seed-secrets (alpine/k8s): random JWT + MAIN secrets ->
+                      #      shared emptyDir. (svix image lacks openssl; generate
+                      #      the secrets here.) Skips re-gen entirely if the live
+                      #      Secret already exists (idempotent — never rotate).
+                      #   2. mint-token (svix image): `svix-server jwt generate`
+                      #      reads SVIX_JWT_SECRET=$(cat /seed/jwt_secret) and prints
+                      #      "Token (Bearer): <jwt>" -> we strip the prefix into
+                      #      /seed/admin_token. Token + server now agree by
+                      #      construction.
+                      #   3. main (alpine/k8s): kubectl create the credentials Secret
+                      #      from the seeded files (idempotent: skip if it exists).
+                      initContainers:
+                      - name: seed-secrets
                         image: alpine/k8s:1.28.4
                         command:
                         - sh
                         - -c
                         - |
                           set -e
-                          # Idempotent: never rotate a live token.
+                          # Idempotent: if the live Secret already exists, leave the
+                          # seed dir EMPTY of fresh secrets and instead re-seed from
+                          # the existing Secret so we never rotate a live key/token.
                           if kubectl get secret "$SECRET_NAME" -n "$NS" >/dev/null 2>&1; then
-                            echo "$SECRET_NAME already exists — leaving live credentials untouched"
+                            echo "$SECRET_NAME exists — re-seeding from live Secret (no rotation)"
+                            kubectl get secret "$SECRET_NAME" -n "$NS" \
+                              -o jsonpath='{.data.SVIX_JWT_SECRET}'  | base64 -d > /seed/jwt_secret
+                            kubectl get secret "$SECRET_NAME" -n "$NS" \
+                              -o jsonpath='{.data.SVIX_MAIN_SECRET}' | base64 -d > /seed/main_secret
+                            kubectl get secret "$SECRET_NAME" -n "$NS" \
+                              -o jsonpath='{.data.SVIX_ADMIN_TOKEN}' | base64 -d > /seed/admin_token
+                            touch /seed/existed
                             exit 0
                           fi
-                          JWT_SECRET=$(head -c 32 /dev/urandom | base64 | tr -d '/+=' | head -c 40)
-                          MAIN_SECRET=$(head -c 32 /dev/urandom | base64 | tr -d '/+=' | head -c 40)
-
-                          # --- deterministic HS256 admin JWT over $JWT_SECRET ---------
-                          b64url() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
-                          HEADER='{"alg":"HS256","typ":"JWT"}'
-                          # exp ~10y out; iat now. sub = svix default org id => org admin.
-                          NOW=$(date +%s); EXP=$((NOW + 315360000))
-                          PAYLOAD="{\"iss\":\"svix-server\",\"sub\":\"$ORG_ID\",\"iat\":$NOW,\"exp\":$EXP}"
-                          H=$(printf '%s' "$HEADER"  | b64url)
-                          P=$(printf '%s' "$PAYLOAD" | b64url)
-                          SIG=$(printf '%s' "$H.$P" \
-                                | openssl dgst -binary -sha256 -hmac "$JWT_SECRET" \
-                                | b64url)
-                          ADMIN_TOKEN="$H.$P.$SIG"
-
-                          kubectl create secret generic "$SECRET_NAME" -n "$NS" \
-                            --from-literal=SVIX_JWT_SECRET="$JWT_SECRET" \
-                            --from-literal=SVIX_MAIN_SECRET="$MAIN_SECRET" \
-                            --from-literal=SVIX_ADMIN_TOKEN="$ADMIN_TOKEN"
-                          echo "created $SECRET_NAME (admin JWT signed with the live SVIX_JWT_SECRET)"
+                          head -c 32 /dev/urandom | base64 | tr -d '/+=' | head -c 40 > /seed/jwt_secret
+                          head -c 32 /dev/urandom | base64 | tr -d '/+=' | head -c 40 > /seed/main_secret
+                          echo "seeded fresh SVIX_JWT_SECRET + SVIX_MAIN_SECRET"
                         env:
                         - name: SECRET_NAME
                           value: '{{ $name }}-svix-credentials'
                         - name: NS
                           value: '{{ $ns }}'
-                        # Svix's default org id (core/security.rs default_org_id()).
+                        volumeMounts:
+                        - name: seed
+                          mountPath: /seed
+                      - name: mint-token
+                        image: '{{ $engineImage }}'   # svix/svix-server:v1.69.0 — pinned (HARD-3)
+                        command:
+                        - sh
+                        - -c
+                        - |
+                          set -e
+                          # If step 1 re-seeded a live token, do NOT re-mint (no rotation).
+                          if [ -f /seed/existed ]; then
+                            echo "live admin token preserved — skipping mint"
+                            exit 0
+                          fi
+                          # `svix-server jwt generate` signs with this exact secret,
+                          # so the server (same secret) verifies it. Output line is
+                          # literally "Token (Bearer): <jwt>"; strip the prefix.
+                          export SVIX_JWT_SECRET="$(cat /seed/jwt_secret)"
+                          OUT="$(svix-server jwt generate "$ORG_ID")"
+                          # Strip the "Token (Bearer): " prefix; printf (no trailing
+                          # newline) so the Secret value is the EXACT token bytes.
+                          TOKEN="$(echo "$OUT" | sed -n 's/^Token (Bearer): //p' | head -1)"
+                          [ -n "$TOKEN" ]
+                          printf '%s' "$TOKEN" > /seed/admin_token
+                          test -s /seed/admin_token
+                          echo "minted admin JWT via svix-server jwt generate"
+                        env:
+                        # Svix default org id (security.rs default_org_id()); org-level
+                        # token => admin. Passed explicitly for determinism.
                         - name: ORG_ID
                           value: 'org_23rb8YdGqMT0qIzpgGwdXfHirMu'
+                        volumeMounts:
+                        - name: seed
+                          mountPath: /seed
+                      containers:
+                      - name: apply
+                        image: alpine/k8s:1.28.4
+                        command:
+                        - sh
+                        - -c
+                        - |
+                          set -e
+                          # Idempotent: never overwrite a live Secret.
+                          if kubectl get secret "$SECRET_NAME" -n "$NS" >/dev/null 2>&1; then
+                            echo "$SECRET_NAME already exists — leaving live credentials untouched"
+                            exit 0
+                          fi
+                          kubectl create secret generic "$SECRET_NAME" -n "$NS" \
+                            --from-file=SVIX_JWT_SECRET=/seed/jwt_secret \
+                            --from-file=SVIX_MAIN_SECRET=/seed/main_secret \
+                            --from-file=SVIX_ADMIN_TOKEN=/seed/admin_token
+                          echo "created $SECRET_NAME (admin JWT minted by svix-server jwt generate)"
+                        env:
+                        - name: SECRET_NAME
+                          value: '{{ $name }}-svix-credentials'
+                        - name: NS
+                          value: '{{ $ns }}'
+                        volumeMounts:
+                        - name: seed
+                          mountPath: /seed
+                      volumes:
+                      # Shared scratch across init + main containers; never persisted.
+                      - name: seed
+                        emptyDir: {}
             providerConfigRef:
               name: kubernetes-provider
           ---
