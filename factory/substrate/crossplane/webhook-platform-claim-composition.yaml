@@ -1,0 +1,277 @@
+# WebhookPlatformClaim Composition — SKELETON (#WH-1).
+#
+# Creates an outbound-webhook delivery platform in the <name>-webhook namespace:
+#   - svix-server  (engine; svix/svix-server:v1.69.0, MIT) Deployment + Service
+#   - Postgres     (svix metadata + delivery logs)         Deployment + Service + PVC
+#   - Redis        (svix queue/retry backoff)              Deployment + Service
+#   - <name>-svix-credentials Secret (SVIX_JWT_SECRET + minted SVIX_ADMIN_TOKEN)
+#   - App-Portal Gateway + VirtualService  <-- EXTERNALLY EXPOSED self-service UI
+#   - event-type reconcile Job (registers spec.eventTypes[] in Svix via REST)
+#
+# This is the SAME shape + the SAME provider-kubernetes Object wrapping as
+# factory/substrate/crossplane/realtime-platform-claim-composition.yaml. Per the
+# RT-COMPOSITION-V2 (#165) lesson recorded there, every composed resource MUST be a
+# CLUSTER-SCOPED kubernetes.crossplane.io/v1alpha1 Object with
+# providerConfigRef.name: kubernetes-provider, and EACH manifest must carry its own
+# `namespace: {{ $name }}-webhook` (the XRD is LegacyCluster / cluster-scoped, so the
+# XR cannot supply a namespace to a namespaced .m. Object — that path 0/N-fails with
+# "empty namespace may not be set").
+#
+# STATUS: skeleton. The two load-bearing pieces are fully specified below (the engine
+# Deployment + the EXTERNALLY-EXPOSED App-Portal Gateway/VirtualService). Postgres,
+# Redis, the credentials Secret, and the event-type reconcile Job are stubbed with
+# TODO markers — copy the postgres/redis/secret/Job blocks verbatim from
+# realtime-platform-claim-composition.yaml (same provider, same go-template idiom) and
+# retarget names to svix-postgres / svix-redis.
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: webhook-platform-claim-composition
+  labels:
+    platform.example.org/composition: webhook-platform
+spec:
+  compositeTypeRef:
+    apiVersion: platform.example.org/v1alpha1
+    kind: XWebhookPlatformClaim
+  mode: Pipeline
+  pipeline:
+    - step: render-webhook-platform
+      functionRef:
+        name: function-go-templating
+      input:
+        apiVersion: gotemplating.fn.crossplane.io/v1beta1
+        kind: GoTemplate
+        source: Inline
+        inline:
+          template: |
+            {{- $name := .observed.composite.resource.spec.name }}
+            {{- $ns := printf "%s-webhook" $name }}
+            {{- $engineImage := .observed.composite.resource.spec.engineImage | default "svix/svix-server:v1.69.0" }}
+            {{- /* External host for the App Portal — shared LB nip.io host. */}}
+            {{- $portalHost := .observed.composite.resource.spec.portalHost | default (printf "%s-webhook-portal.20.233.105.82.nip.io" $name) }}
+            ---
+            # --- Namespace -------------------------------------------------------
+            apiVersion: kubernetes.crossplane.io/v1alpha1
+            kind: Object
+            metadata:
+              name: '{{ $name }}-webhook-namespace'
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: webhook-namespace
+            spec:
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: Namespace
+                  metadata:
+                    name: '{{ $ns }}'
+                    labels:
+                      app.kubernetes.io/part-of: webhook-platform
+                      istio-injection: enabled
+              providerConfigRef:
+                name: kubernetes-provider
+            ---
+            # --- Svix engine Deployment -----------------------------------------
+            apiVersion: kubernetes.crossplane.io/v1alpha1
+            kind: Object
+            metadata:
+              name: '{{ $name }}-webhook-svix'
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: webhook-svix
+            spec:
+              forProvider:
+                manifest:
+                  apiVersion: apps/v1
+                  kind: Deployment
+                  metadata:
+                    name: '{{ $name }}-svix'
+                    namespace: '{{ $ns }}'
+                    labels:
+                      app.kubernetes.io/name: svix-server
+                  spec:
+                    replicas: 1
+                    selector:
+                      matchLabels:
+                        app.kubernetes.io/name: svix-server
+                    template:
+                      metadata:
+                        labels:
+                          app.kubernetes.io/name: svix-server
+                      spec:
+                        containers:
+                          - name: svix-server
+                            image: '{{ $engineImage }}'   # HARD-3: pinned, never :latest
+                            ports:
+                              - containerPort: 8071
+                            env:
+                              # Svix env prefix is SVIX_. DB/Redis DSNs point at the
+                              # composition's own postgres/redis services.
+                              - name: SVIX_DB_DSN
+                                value: 'postgresql://svix:svix@{{ $name }}-svix-postgres.{{ $ns }}.svc.cluster.local:5432/svix'
+                              - name: SVIX_REDIS_DSN
+                                value: 'redis://{{ $name }}-svix-redis.{{ $ns }}.svc.cluster.local:6379'
+                              - name: SVIX_QUEUE_TYPE
+                                value: redis
+                              - name: SVIX_CACHE_TYPE
+                                value: redis
+                              - name: SVIX_JWT_SECRET
+                                valueFrom:
+                                  secretKeyRef:
+                                    name: '{{ $name }}-svix-credentials'
+                                    key: SVIX_JWT_SECRET
+                              - name: SVIX_LISTEN_ADDRESS
+                                value: '0.0.0.0:8071'
+                              # App Portal must be enabled + told its public URL so the
+                              # magic-link iframe loads from the external host.
+                              - name: SVIX_WHITELABEL_SETTINGS
+                                value: 'true'
+              providerConfigRef:
+                name: kubernetes-provider
+            ---
+            # --- Svix engine Service --------------------------------------------
+            apiVersion: kubernetes.crossplane.io/v1alpha1
+            kind: Object
+            metadata:
+              name: '{{ $name }}-webhook-svix-svc'
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: webhook-svix-svc
+            spec:
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: Service
+                  metadata:
+                    name: '{{ $name }}-svix'
+                    namespace: '{{ $ns }}'
+                  spec:
+                    selector:
+                      app.kubernetes.io/name: svix-server
+                    ports:
+                      - name: http
+                        port: 8071
+                        targetPort: 8071
+              providerConfigRef:
+                name: kubernetes-provider
+            ---
+            # === EXTERNALLY-EXPOSED self-service App Portal =====================
+            # Istio Gateway on the shared ingressgateway, bound to the external
+            # nip.io host. This is what makes endpoint/key self-management reachable
+            # by third parties WITHOUT platform-team involvement. Mirrors the
+            # lenses-hq Gateway/VirtualService in the realtime composition.
+            apiVersion: kubernetes.crossplane.io/v1alpha1
+            kind: Object
+            metadata:
+              name: '{{ $name }}-webhook-portal-gateway'
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: webhook-portal-gateway
+            spec:
+              forProvider:
+                manifest:
+                  apiVersion: networking.istio.io/v1beta1
+                  kind: Gateway
+                  metadata:
+                    name: webhook-portal-gateway
+                    namespace: '{{ $ns }}'
+                  spec:
+                    selector:
+                      istio: ingressgateway
+                    servers:
+                      - port:
+                          number: 80
+                          name: http
+                          protocol: HTTP
+                        hosts:
+                          - '{{ $portalHost }}'
+              providerConfigRef:
+                name: kubernetes-provider
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha1
+            kind: Object
+            metadata:
+              name: '{{ $name }}-webhook-portal-virtualservice'
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: webhook-portal-virtualservice
+            spec:
+              forProvider:
+                manifest:
+                  apiVersion: networking.istio.io/v1beta1
+                  kind: VirtualService
+                  metadata:
+                    name: webhook-portal-virtualservice
+                    namespace: '{{ $ns }}'
+                  spec:
+                    hosts:
+                      - '{{ $portalHost }}'
+                    gateways:
+                      - webhook-portal-gateway
+                    http:
+                      # The Svix server serves BOTH the REST API (/api) and the
+                      # App-Portal SPA + magic-link session endpoints (/app-portal,
+                      # /login) on the same port. One external host fronts both:
+                      #  - external consumers hit the portal (magic-link UI)
+                      #  - the registration/ingest REST API is the same origin and
+                      #    can ALSO be published through APIM (expose-api) for
+                      #    programmatic registration (see plan §APIM).
+                      - route:
+                          - destination:
+                              host: '{{ $name }}-svix.{{ $ns }}.svc.cluster.local'
+                              port:
+                                number: 8071
+              providerConfigRef:
+                name: kubernetes-provider
+            ---
+            # TODO(skeleton): copy verbatim from realtime-platform-claim-composition.yaml,
+            # retargeting names, as cluster-scoped v1alpha1 Objects in {{ $ns }}:
+            #   1. {{ $name }}-svix-postgres   Deployment + Service + PVC  (DB svix/svix)
+            #   2. {{ $name }}-svix-redis      Deployment + Service        (queue/backoff)
+            #   3. {{ $name }}-svix-credentials Secret:
+            #        SVIX_JWT_SECRET     = <generated at apply time / sealed-secret>
+            #        SVIX_ADMIN_TOKEN    = output of `svix-server jwt generate` (init Job)
+            #      NEVER commit real values — generate in an init Job or sealed-secret.
+            #   4. event-type reconcile Job: ranges spec.eventTypes[] and POSTs each to
+            #      {{ $name }}-svix:8071/api/v1/event-type (bearer SVIX_ADMIN_TOKEN),
+            #      idempotent — mirrors the realtime topic-provisioning Job.
+    - step: ready
+      functionRef:
+        name: function-auto-ready
+---
+# XRD (skeleton) — cluster-scoped LegacyCluster, mirroring RealtimePlatformClaim.
+# Full field schema TODO; the load-bearing fields are name / engineImage / portalHost
+# / eventTypes / retentionDays / appContainer (all consumed by the template above).
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xwebhookplatformclaims.platform.example.org
+spec:
+  scope: LegacyCluster
+  group: platform.example.org
+  names:
+    kind: XWebhookPlatformClaim
+    plural: xwebhookplatformclaims
+  claimNames:
+    kind: WebhookPlatformClaim
+    plural: webhookplatformclaims
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                name:          { type: string }
+                appContainer:  { type: string }
+                engineImage:   { type: string }
+                portalHost:    { type: string }
+                retentionDays: { type: integer }
+                eventTypes:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:        { type: string }
+                      description: { type: string }
+                    required: [name]
+              required: [name]
