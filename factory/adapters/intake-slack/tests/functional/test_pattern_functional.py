@@ -205,7 +205,9 @@ class TestPatternFunctional:
                 # Check that Pattern 3 workflows are called first
                 pattern3_workflows = ["pattern3-infrastructure-workflow", "pattern3-provider-workflow", 
                                      "pattern3-platform-workflow", "realtime-platform-workflow"]
-                pattern2_workflows = ["pattern2-compositional-workflow", "identity-service-generator", 
+                # RETIRE-WFT-3 (#154): pattern2-compositional-workflow WFT retired,
+                # replaced by the AppContainerClaim ("application-claim") path.
+                pattern2_workflows = ["application-claim", "identity-service-generator",
                                      "orchestration-workflow"]
                 pattern1_workflows = ["microservice-standard-contract"]
                 

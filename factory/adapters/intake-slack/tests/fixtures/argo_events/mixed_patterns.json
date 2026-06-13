@@ -18,7 +18,7 @@
         "pattern3-infrastructure-workflow",
         "pattern3-infrastructure-workflow", 
         "pattern3-infrastructure-workflow",
-        "pattern2-compositional-workflow",
+        "application-claim",
         "identity-service-generator",
         "microservice-standard-contract",
         "microservice-standard-contract",
