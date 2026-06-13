@@ -121,11 +121,12 @@ spec:
                       default: webservice
                     # RT-2: realtime role — selects which realtime main.py the
                     # scaffold emits (gateway=consume->ws, ingest=POST->produce,
-                    # processor=consume->transform->produce). Gateway = RT-1 shape.
+                    # processor=consume->transform->produce, webhook=consume->Svix /msg
+                    # bridge, WH-1). Gateway = RT-1 shape.
                     role:
                       type: string
-                      description: Realtime role (gateway|ingest|processor); only meaningful with flavor=realtime.
-                      enum: [gateway, ingest, processor]
+                      description: Realtime role (gateway|ingest|processor|webhook); only meaningful with flavor=realtime.
+                      enum: [gateway, ingest, processor, webhook]
                       default: gateway
                   required:
                   - name
