@@ -25,6 +25,13 @@
 #
 # Auth model: this only PUTs the product->api LINK. It does NOT touch the API's
 # validate-jwt policy (owned by the expose-api trait) nor add any sub-key requirement.
+#
+# APIM-PRODUCT-2 (#164): after the link, this Job also REPUBLISHES the APIM Developer
+# Portal (PUT portalRevisions/{rev} isCurrent=true). APIM does not auto-publish the
+# portal when products/APIs change, so a newly imported+linked API reconciles in the
+# data plane but stays invisible to consumers until a manual republish. Doing it here
+# (rather than in EVENT-2) keeps the publish AFTER both the spec import and the product
+# link, and makes it a per-OAM/product concern. It is idempotent in effect and non-fatal.
 apiVersion: argoproj.io/v1alpha1
 kind: EventSource
 metadata:
@@ -140,7 +147,38 @@ spec:
                             if az rest --method PUT --url "$B/products/$APP/apis/$SVC_NAME?api-version=2022-08-01" 2>/tmp/err; then
                               echo "linked api $SVC_NAME into product $APP"
                             else
-                              echo "link skipped (product or api not ready):"; cat /tmp/err; exit 0
+                              echo "link skipped (product or api not ready):"; cat /tmp/err
+                            fi
+
+                            # APIM-PRODUCT-2 (#164): republish the Developer Portal so the
+                            # product/API just (re)imported+linked actually appears to
+                            # consumers. APIM does NOT auto-publish the portal on product/API
+                            # changes — without this, a new svc/<name> API + its product link
+                            # reconcile in the data plane but stay invisible in the portal
+                            # until a manual "Publish" in the Azure portal. This runs on EVERY
+                            # expose-api reconcile (level-triggered by ksvc Ready), AFTER the
+                            # import (EVENT-2) and the product link above.
+                            #
+                            # Mechanism: create a NEW portal revision with isCurrent=true. This
+                            # snapshots the current portal content (incl. the just-added API)
+                            # and publishes it. It is the same operation the Azure portal's
+                            # "Publish" button performs. It is idempotent in effect: republishing
+                            # when nothing changed simply produces an identical published
+                            # snapshot — harmless. The PUT is an async LRO; az rest returns once
+                            # accepted and the revision converges to current within ~20-30s.
+                            #
+                            # Failure is non-fatal (exit 0): the link/import above are the
+                            # contract-critical steps; a portal-publish hiccup must not fail the
+                            # Job (and the next ksvc-Ready event, or app.submit, will re-publish).
+                            REV=$(date -u +%Y%m%d%H%M%S)
+                            echo "republishing APIM developer portal (revision $REV) so product $APP / api $SVC_NAME is visible"
+                            if az rest --method PUT \
+                                 --url "$B/portalRevisions/$REV?api-version=2022-08-01" \
+                                 --body "{\"properties\":{\"description\":\"auto-republish on expose-api reconcile ($APP/$SVC_NAME)\",\"isCurrent\":true}}" \
+                                 2>/tmp/pubErr; then
+                              echo "developer portal republished: revision $REV is now current"
+                            else
+                              echo "portal republish skipped (non-fatal):"; cat /tmp/pubErr
                             fi
           parameters:
             # service name -> SVC_NAME (api-id)
