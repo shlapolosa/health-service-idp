@@ -1,0 +1,699 @@
+# WebhookPlatformClaim Composition (#WH-1).
+#
+# Creates an outbound-webhook delivery platform in the <name>-webhook namespace:
+#   - svix-server  (engine; svix/svix-server:v1.69.0, MIT) Deployment + Service
+#   - Postgres     (svix metadata + delivery logs)         Deployment + Service + PVC + Secret
+#   - Redis        (svix queue/retry backoff + cache)       Deployment + Service
+#   - <name>-svix-credentials Secret  (SVIX_JWT_SECRET + SVIX_MAIN_SECRET + SVIX_ADMIN_TOKEN,
+#                                      all MINTED at apply-time by the creds-init Job — never in git)
+#   - App-Portal Gateway + VirtualService  <-- EXTERNALLY EXPOSED self-service UI + ingest API
+#   - event-type reconcile Job (registers spec.eventTypes[] in Svix via REST, idempotent)
+#
+# SHAPE: identical provider-kubernetes Object wrapping as
+# factory/substrate/crossplane/realtime-platform-claim-composition.yaml. Per the
+# RT-COMPOSITION-V2 (#165) lesson, every composed resource is a CLUSTER-SCOPED
+# kubernetes.crossplane.io/v1alpha1 Object with providerConfigRef.name: kubernetes-provider,
+# and EACH manifest carries its own `namespace: <name>-webhook` (the XR is LegacyCluster /
+# cluster-scoped, so it cannot supply a namespace to a namespaced .m. Object — that path
+# 0/N-fails with "empty namespace may not be set"). Single `render` step only — no
+# function-auto-ready (not installed; realtime uses one step too).
+#
+# SVIX ENV CONTRACT (verified against svix-server config.default.toml @ main, 2026-06-13):
+#   Convention: every TOML key `foo` is settable as env var SVIX_FOO.
+#   VERIFIED keys used below: SVIX_DB_DSN, SVIX_REDIS_DSN, SVIX_QUEUE_TYPE=redis,
+#     SVIX_CACHE_TYPE=redis, SVIX_JWT_SECRET, SVIX_MAIN_SECRET, SVIX_LISTEN_ADDRESS.
+#   NOT A SERVER ENV (left out, see comment at the engine block): the App-Portal public
+#     base URL is a CLIENT concern (passed when minting a portal magic-link via the API),
+#     NOT a svix-server env var. The earlier skeleton's SVIX_WHITELABEL_SETTINGS does not
+#     exist in the config and was removed.
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: webhook-platform-claim
+  labels:
+    crossplane.io/xrd: xwebhookplatformclaims.platform.example.org
+    platform.example.org/composition: webhook-platform
+spec:
+  writeConnectionSecretsToNamespace: crossplane-system
+  compositeTypeRef:
+    apiVersion: platform.example.org/v1alpha1
+    kind: XWebhookPlatformClaim
+  mode: Pipeline
+  pipeline:
+  - step: render
+    functionRef:
+      name: function-go-templating
+    input:
+      apiVersion: gotemplating.fn.crossplane.io/v1beta1
+      kind: GoTemplate
+      source: Inline
+      inline:
+        template: |
+          {{- $spec := .observed.composite.resource.spec }}
+          {{- $name := $spec.name }}
+          {{- $ns := printf "%s-webhook" $name }}
+          {{- $engineImage := $spec.engineImage | default "svix/svix-server:v1.69.0" }}
+          {{- /* External host for the App Portal + ingest API — shared LB nip.io host. */}}
+          {{- $portalHost := $spec.portalHost | default (printf "%s-webhook-portal.20.233.105.82.nip.io" $name) }}
+          ---
+          # --- Namespace ------------------------------------------------------
+          apiVersion: kubernetes.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-webhook-namespace'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: webhook-namespace
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: v1
+                kind: Namespace
+                metadata:
+                  name: '{{ $ns }}'
+                  labels:
+                    app.kubernetes.io/part-of: webhook-platform
+                    istio-injection: enabled
+            providerConfigRef:
+              name: kubernetes-provider
+          ---
+          # --- Postgres storage (PVC) -----------------------------------------
+          apiVersion: kubernetes.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-webhook-postgres-storage'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: webhook-postgres-storage
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: v1
+                kind: PersistentVolumeClaim
+                metadata:
+                  name: svix-postgres-storage
+                  namespace: '{{ $ns }}'
+                spec:
+                  accessModes:
+                  - ReadWriteOnce
+                  storageClassName: default
+                  resources:
+                    requests:
+                      storage: 5Gi
+            providerConfigRef:
+              name: kubernetes-provider
+          ---
+          # --- Postgres credentials Secret (svix/svix/svix; base64) -----------
+          apiVersion: kubernetes.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-webhook-postgres-secret'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: webhook-postgres-secret
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: v1
+                kind: Secret
+                metadata:
+                  name: svix-postgres-secret
+                  namespace: '{{ $ns }}'
+                type: Opaque
+                stringData:
+                  POSTGRES_DB: svix
+                  POSTGRES_USER: svix
+                  POSTGRES_PASSWORD: svix
+            providerConfigRef:
+              name: kubernetes-provider
+          ---
+          # --- Postgres Deployment --------------------------------------------
+          apiVersion: kubernetes.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-webhook-postgres'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: webhook-postgres
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: apps/v1
+                kind: Deployment
+                metadata:
+                  name: '{{ $name }}-svix-postgres'
+                  namespace: '{{ $ns }}'
+                spec:
+                  replicas: 1
+                  selector:
+                    matchLabels:
+                      app.kubernetes.io/name: svix-postgres
+                  template:
+                    metadata:
+                      labels:
+                        app.kubernetes.io/name: svix-postgres
+                    spec:
+                      securityContext:
+                        runAsNonRoot: true
+                        runAsUser: 999
+                        fsGroup: 999
+                      containers:
+                      - name: postgres
+                        image: postgres:16
+                        ports:
+                        - containerPort: 5432
+                          name: postgres
+                        env:
+                        - name: POSTGRES_DB
+                          value: svix
+                        - name: POSTGRES_USER
+                          value: svix
+                        - name: POSTGRES_PASSWORD
+                          value: svix
+                        - name: PGDATA
+                          value: /var/lib/postgresql/data/pgdata
+                        volumeMounts:
+                        - name: postgres-storage
+                          mountPath: /var/lib/postgresql/data
+                      volumes:
+                      - name: postgres-storage
+                        persistentVolumeClaim:
+                          claimName: svix-postgres-storage
+            providerConfigRef:
+              name: kubernetes-provider
+          ---
+          # --- Postgres Service -----------------------------------------------
+          apiVersion: kubernetes.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-webhook-postgres-service'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: webhook-postgres-service
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: v1
+                kind: Service
+                metadata:
+                  name: '{{ $name }}-svix-postgres'
+                  namespace: '{{ $ns }}'
+                spec:
+                  selector:
+                    app.kubernetes.io/name: svix-postgres
+                  ports:
+                  - port: 5432
+                    targetPort: 5432
+                    name: postgres
+            providerConfigRef:
+              name: kubernetes-provider
+          ---
+          # --- Redis Deployment (queue/backoff + cache) -----------------------
+          apiVersion: kubernetes.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-webhook-redis'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: webhook-redis
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: apps/v1
+                kind: Deployment
+                metadata:
+                  name: '{{ $name }}-svix-redis'
+                  namespace: '{{ $ns }}'
+                spec:
+                  replicas: 1
+                  selector:
+                    matchLabels:
+                      app.kubernetes.io/name: svix-redis
+                  template:
+                    metadata:
+                      labels:
+                        app.kubernetes.io/name: svix-redis
+                    spec:
+                      securityContext:
+                        runAsNonRoot: true
+                        runAsUser: 999
+                        fsGroup: 999
+                      containers:
+                      - name: redis
+                        image: redis:7-alpine
+                        # Persistence on so a restart doesn't wipe the in-flight
+                        # delivery queue (svix recommends persistent redis).
+                        args: ['redis-server', '--appendonly', 'yes']
+                        ports:
+                        - containerPort: 6379
+                          name: redis
+                        volumeMounts:
+                        - name: redis-data
+                          mountPath: /data
+                      volumes:
+                      - name: redis-data
+                        emptyDir: {}
+            providerConfigRef:
+              name: kubernetes-provider
+          ---
+          # --- Redis Service --------------------------------------------------
+          apiVersion: kubernetes.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-webhook-redis-service'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: webhook-redis-service
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: v1
+                kind: Service
+                metadata:
+                  name: '{{ $name }}-svix-redis'
+                  namespace: '{{ $ns }}'
+                spec:
+                  selector:
+                    app.kubernetes.io/name: svix-redis
+                  ports:
+                  - port: 6379
+                    targetPort: 6379
+                    name: redis
+            providerConfigRef:
+              name: kubernetes-provider
+          ---
+          # === creds-init Job =================================================
+          # Mints SVIX_JWT_SECRET + SVIX_MAIN_SECRET (random) and an admin JWT
+          # (via `svix-server jwt generate`) into <name>-svix-credentials.
+          # IDEMPOTENT: exits early if the Secret already carries the keys, so a
+          # re-reconcile / pod restart never rotates a live token. NO secret values
+          # in git — they are generated here at apply-time. Uses an in-cluster
+          # ServiceAccount (svix-creds-init) bound to a Role that can read/create
+          # the one Secret in this namespace.
+          apiVersion: kubernetes.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-webhook-creds-sa'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: webhook-creds-sa
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: v1
+                kind: ServiceAccount
+                metadata:
+                  name: svix-creds-init
+                  namespace: '{{ $ns }}'
+            providerConfigRef:
+              name: kubernetes-provider
+          ---
+          apiVersion: kubernetes.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-webhook-creds-role'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: webhook-creds-role
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: rbac.authorization.k8s.io/v1
+                kind: Role
+                metadata:
+                  name: svix-creds-init
+                  namespace: '{{ $ns }}'
+                rules:
+                - apiGroups: ['']
+                  resources: ['secrets']
+                  verbs: ['get', 'create', 'update', 'patch']
+            providerConfigRef:
+              name: kubernetes-provider
+          ---
+          apiVersion: kubernetes.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-webhook-creds-rolebinding'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: webhook-creds-rolebinding
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: rbac.authorization.k8s.io/v1
+                kind: RoleBinding
+                metadata:
+                  name: svix-creds-init
+                  namespace: '{{ $ns }}'
+                subjects:
+                - kind: ServiceAccount
+                  name: svix-creds-init
+                  namespace: '{{ $ns }}'
+                roleRef:
+                  kind: Role
+                  name: svix-creds-init
+                  apiGroup: rbac.authorization.k8s.io
+            providerConfigRef:
+              name: kubernetes-provider
+          ---
+          apiVersion: kubernetes.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-webhook-creds-job'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: webhook-creds-job
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: batch/v1
+                kind: Job
+                metadata:
+                  name: '{{ $name }}-svix-creds-init'
+                  namespace: '{{ $ns }}'
+                  labels:
+                    app.kubernetes.io/name: svix-creds-init
+                    app.kubernetes.io/component: setup
+                spec:
+                  backoffLimit: 3
+                  template:
+                    metadata:
+                      annotations:
+                        sidecar.istio.io/inject: 'false'
+                    spec:
+                      serviceAccountName: svix-creds-init
+                      restartPolicy: OnFailure
+                      securityContext:
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                      initContainers:
+                      # 1) Mint the random secrets + admin JWT using the svix-server
+                      #    binary (the image ships `svix-server jwt generate`). Write
+                      #    to a shared emptyDir for the kubectl container to apply.
+                      - name: mint
+                        image: '{{ $engineImage }}'
+                        command:
+                        - sh
+                        - -c
+                        - |
+                          set -e
+                          OUT=/shared
+                          # Idempotency probe handled by the kubectl step; always
+                          # generate fresh material here, but only APPLY if absent.
+                          JWT_SECRET=$(head -c 32 /dev/urandom | base64 | tr -d '/+=' | head -c 40)
+                          MAIN_SECRET=$(head -c 32 /dev/urandom | base64 | tr -d '/+=' | head -c 40)
+                          # Admin JWT signed with the freshly-minted jwt secret.
+                          export SVIX_JWT_SECRET="$JWT_SECRET"
+                          ADMIN_TOKEN=$(svix-server jwt generate 2>/dev/null || true)
+                          if [ -z "$ADMIN_TOKEN" ]; then
+                            # Older/newer CLIs print "Token: <jwt>"; strip a label if present.
+                            ADMIN_TOKEN=$(svix-server jwt generate org_admin 2>/dev/null | awk '{print $NF}')
+                          fi
+                          printf '%s' "$JWT_SECRET"  > "$OUT/SVIX_JWT_SECRET"
+                          printf '%s' "$MAIN_SECRET" > "$OUT/SVIX_MAIN_SECRET"
+                          printf '%s' "$ADMIN_TOKEN" > "$OUT/SVIX_ADMIN_TOKEN"
+                          echo "minted credential material"
+                        volumeMounts:
+                        - name: shared
+                          mountPath: /shared
+                      containers:
+                      # 2) Create <name>-svix-credentials ONLY if it does not already
+                      #    exist (idempotent — never rotates a live token).
+                      - name: apply
+                        image: alpine/k8s:1.28.4
+                        command:
+                        - sh
+                        - -c
+                        - |
+                          set -e
+                          if kubectl get secret "$SECRET_NAME" -n "$NS" >/dev/null 2>&1; then
+                            echo "$SECRET_NAME already exists — leaving live credentials untouched"
+                            exit 0
+                          fi
+                          kubectl create secret generic "$SECRET_NAME" -n "$NS" \
+                            --from-file=SVIX_JWT_SECRET=/shared/SVIX_JWT_SECRET \
+                            --from-file=SVIX_MAIN_SECRET=/shared/SVIX_MAIN_SECRET \
+                            --from-file=SVIX_ADMIN_TOKEN=/shared/SVIX_ADMIN_TOKEN
+                          echo "created $SECRET_NAME"
+                        env:
+                        - name: SECRET_NAME
+                          value: '{{ $name }}-svix-credentials'
+                        - name: NS
+                          value: '{{ $ns }}'
+                        volumeMounts:
+                        - name: shared
+                          mountPath: /shared
+                      volumes:
+                      - name: shared
+                        emptyDir: {}
+            providerConfigRef:
+              name: kubernetes-provider
+          ---
+          # --- Svix engine Deployment -----------------------------------------
+          apiVersion: kubernetes.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-webhook-svix'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: webhook-svix
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: apps/v1
+                kind: Deployment
+                metadata:
+                  name: '{{ $name }}-svix'
+                  namespace: '{{ $ns }}'
+                  labels:
+                    app.kubernetes.io/name: svix-server
+                    # Data-plane proof hook: a contract-test can exercise the live
+                    # engine (create app+endpoint, send msg, assert delivery).
+                    contract-test.cafe.io/enabled: 'true'
+                spec:
+                  replicas: 1
+                  selector:
+                    matchLabels:
+                      app.kubernetes.io/name: svix-server
+                  template:
+                    metadata:
+                      labels:
+                        app.kubernetes.io/name: svix-server
+                    spec:
+                      securityContext:
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                      # Wait for postgres + the creds secret before booting svix.
+                      initContainers:
+                      - name: wait-postgres
+                        image: postgres:16
+                        command:
+                        - sh
+                        - -c
+                        - |
+                          until pg_isready -h {{ $name }}-svix-postgres -U svix; do
+                            echo "waiting for postgres..."; sleep 3
+                          done
+                      containers:
+                      - name: svix-server
+                        image: '{{ $engineImage }}'   # HARD-3: pinned, never :latest
+                        ports:
+                        - containerPort: 8071
+                        env:
+                        # DB/Redis DSNs point at this composition's own services.
+                        - name: SVIX_DB_DSN
+                          value: 'postgresql://svix:svix@{{ $name }}-svix-postgres.{{ $ns }}.svc.cluster.local:5432/svix'
+                        - name: SVIX_REDIS_DSN
+                          value: 'redis://{{ $name }}-svix-redis.{{ $ns }}.svc.cluster.local:6379'
+                        - name: SVIX_QUEUE_TYPE
+                          value: redis
+                        - name: SVIX_CACHE_TYPE
+                          value: redis
+                        - name: SVIX_LISTEN_ADDRESS
+                          value: '0.0.0.0:8071'
+                        # Secrets minted by the creds-init Job (never in git).
+                        - name: SVIX_JWT_SECRET
+                          valueFrom:
+                            secretKeyRef:
+                              name: '{{ $name }}-svix-credentials'
+                              key: SVIX_JWT_SECRET
+                        - name: SVIX_MAIN_SECRET
+                          valueFrom:
+                            secretKeyRef:
+                              name: '{{ $name }}-svix-credentials'
+                              key: SVIX_MAIN_SECRET
+                        # NOTE (open question, verified): svix-server has NO env var
+                        # for the App-Portal PUBLIC base URL. The portal URL is supplied
+                        # by the CLIENT when minting a magic-link via POST /api/v1/app/
+                        # {app}/dashboard (the bridge / portal-launcher passes
+                        # WEBHOOK_PORTAL_URL from the <name>-conn secret). The external
+                        # host is fronted by the Istio Gateway/VirtualService below.
+                        resources:
+                          requests:
+                            memory: 128Mi
+                            cpu: 100m
+                          limits:
+                            memory: 512Mi
+                            cpu: 500m
+            providerConfigRef:
+              name: kubernetes-provider
+          ---
+          # --- Svix engine Service --------------------------------------------
+          apiVersion: kubernetes.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-webhook-svix-svc'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: webhook-svix-svc
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: v1
+                kind: Service
+                metadata:
+                  name: '{{ $name }}-svix'
+                  namespace: '{{ $ns }}'
+                spec:
+                  selector:
+                    app.kubernetes.io/name: svix-server
+                  ports:
+                  - name: http
+                    port: 8071
+                    targetPort: 8071
+            providerConfigRef:
+              name: kubernetes-provider
+          ---
+          # === EXTERNALLY-EXPOSED self-service App Portal =====================
+          # Istio Gateway on the shared ingressgateway, bound to the external nip.io
+          # host. This makes endpoint/key self-management reachable by third parties
+          # WITHOUT platform-team involvement. Mirrors the realtime mqtt/lenses
+          # Gateway/VirtualService (shared `istio: ingressgateway` selector).
+          apiVersion: kubernetes.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-webhook-portal-gateway'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: webhook-portal-gateway
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: networking.istio.io/v1beta1
+                kind: Gateway
+                metadata:
+                  name: webhook-portal-gateway
+                  namespace: '{{ $ns }}'
+                spec:
+                  selector:
+                    istio: ingressgateway
+                  servers:
+                  - port:
+                      number: 80
+                      name: http
+                      protocol: HTTP
+                    hosts:
+                    - '{{ $portalHost }}'
+            providerConfigRef:
+              name: kubernetes-provider
+          ---
+          apiVersion: kubernetes.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-webhook-portal-virtualservice'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: webhook-portal-virtualservice
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: networking.istio.io/v1beta1
+                kind: VirtualService
+                metadata:
+                  name: webhook-portal-virtualservice
+                  namespace: '{{ $ns }}'
+                spec:
+                  hosts:
+                  - '{{ $portalHost }}'
+                  gateways:
+                  - webhook-portal-gateway
+                  http:
+                  # The Svix server serves BOTH the REST API (/api) and the App-Portal
+                  # SPA + magic-link session endpoints on the same port. One external
+                  # host fronts both:
+                  #  - external consumers hit the portal (magic-link UI) to self-manage
+                  #    their endpoints + signing keys
+                  #  - the registration/ingest REST API is the same origin and can ALSO
+                  #    be published through APIM (expose-api) for programmatic
+                  #    registration (see plan §APIM).
+                  - route:
+                    - destination:
+                        host: '{{ $name }}-svix.{{ $ns }}.svc.cluster.local'
+                        port:
+                          number: 8071
+            providerConfigRef:
+              name: kubernetes-provider
+          ---
+          # === event-type reconcile Job ======================================
+          # Registers spec.eventTypes[] in Svix via REST (POST /api/v1/event-type),
+          # bearer SVIX_ADMIN_TOKEN from <name>-svix-credentials. Idempotent: PUTs
+          # by name so re-runs are no-ops. Skipped entirely when no eventTypes are
+          # declared (backward compatible — bridge can create types on demand).
+          {{- if $spec.eventTypes }}
+          apiVersion: kubernetes.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-webhook-eventtype-reconcile'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: webhook-eventtype-reconcile
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: batch/v1
+                kind: Job
+                metadata:
+                  name: '{{ $name }}-svix-eventtype-reconcile'
+                  namespace: '{{ $ns }}'
+                  labels:
+                    app.kubernetes.io/name: svix-eventtype-reconcile
+                    app.kubernetes.io/component: setup
+                spec:
+                  backoffLimit: 5
+                  template:
+                    metadata:
+                      annotations:
+                        sidecar.istio.io/inject: 'false'
+                    spec:
+                      restartPolicy: OnFailure
+                      containers:
+                      - name: reconcile
+                        image: curlimages/curl:8.5.0
+                        env:
+                        - name: SVIX_ADMIN_TOKEN
+                          valueFrom:
+                            secretKeyRef:
+                              name: '{{ $name }}-svix-credentials'
+                              key: SVIX_ADMIN_TOKEN
+                        - name: API
+                          value: 'http://{{ $name }}-svix.{{ $ns }}.svc.cluster.local:8071/api/v1'
+                        command:
+                        - sh
+                        - -c
+                        - |
+                          set -e
+                          echo "waiting for svix api..."
+                          until curl -fsS "$API/health/" >/dev/null 2>&1 || curl -fsS "$API/../health" >/dev/null 2>&1; do
+                            sleep 3
+                          done
+                          reg() {
+                            NAME="$1"; DESC="$2"
+                            # PUT is idempotent (create-or-update by name).
+                            curl -fsS -X PUT "$API/event-type/$NAME/" \
+                              -H "Authorization: Bearer $SVIX_ADMIN_TOKEN" \
+                              -H 'Content-Type: application/json' \
+                              -d "{\"name\":\"$NAME\",\"description\":\"$DESC\"}" \
+                              || curl -fsS -X POST "$API/event-type/" \
+                                   -H "Authorization: Bearer $SVIX_ADMIN_TOKEN" \
+                                   -H 'Content-Type: application/json' \
+                                   -d "{\"name\":\"$NAME\",\"description\":\"$DESC\"}" \
+                              || echo "register $NAME skipped"
+                          }
+                          {{- range $e := $spec.eventTypes }}
+                          reg "{{ $e.name }}" "{{ $e.description | default $e.name }}"
+                          {{- end }}
+                          echo "event-type reconcile complete"
+                        resources:
+                          requests:
+                            memory: 32Mi
+                            cpu: 50m
+                          limits:
+                            memory: 64Mi
+                            cpu: 100m
+            providerConfigRef:
+              name: kubernetes-provider
+          {{- end }}
