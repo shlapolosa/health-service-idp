@@ -106,6 +106,19 @@ spec:
                       name: "REALTIME_ROLE"
                       value: [if parameter.role != _|_ {parameter.role}, "gateway"][0]
                     },
+                    // WH-1: a webhook sink is a FAN-OUT consumer — it must independently
+                    // drain its CONSUME topics, not load-balance them against the platform's
+                    // other consumers. The wheel derives the Kafka group from
+                    // REALTIME_PLATFORM_NAME by default, so every service on a platform
+                    // shares ONE group and only one member gets each partition. Give the
+                    // webhook bridge its OWN group (its component name) so it receives every
+                    // message. (User MAY override via environment.STREAMING_CONSUMER_GROUP.)
+                    if ([if parameter.role != _|_ {parameter.role}, "gateway"][0]) == "webhook" {
+                      {
+                        name:  "STREAMING_CONSUMER_GROUP"
+                        value: context.name
+                      }
+                    },
                   ] + [
                     // CONSUME_TOPICS / PRODUCE_TOPICS as comma-joined would need a
                     // CUE import; instead emit one CONSUME_<name>/PRODUCE_<name>=name
