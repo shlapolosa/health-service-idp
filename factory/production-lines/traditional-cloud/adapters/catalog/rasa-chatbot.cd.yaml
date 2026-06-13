@@ -330,9 +330,12 @@ spec:
           version: *"latest" | string
           
           // Resource Management (Rasa Server)
+          // memory 2Gi (was 1Gi): rasa loads its model into the server process
+          // AND the train-cache safety net may run `rasa train` at boot — both
+          // OOMKill (exit 137) at 1Gi (caught live on chatdemo 2026-06-13).
           resources: *{
             cpu: "500m"
-            memory: "1Gi"
+            memory: "2Gi"
           } | {
             cpu?: string
             memory?: string
