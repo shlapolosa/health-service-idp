@@ -1,0 +1,167 @@
+@startuml
+title <size:24>Container View: Internal Developer Platform</size>
+
+set separator none
+top to bottom direction
+
+<style>
+  root {
+    BackgroundColor: #ffffff
+    FontColor: #444444
+  }
+</style>
+
+!include <C4/C4>
+!include <C4/C4_Context>
+!include <C4/C4_Container>
+
+Person(EndUser, "End User", $descr="Chats, opens GraphQL/UI, receives realtime streams.", $tags="", $link="")
+System(IoTTelemetrySource, "IoT / Telemetry Source", $descr="Pushes sensor data to ingest.", $tags="", $link="")
+System(ExternalWebhookReceiver, "External Webhook Receiver", $descr="3rd-party HTTPS endpoint.", $tags="", $link="")
+System(Auth0, "Auth0", $descr="Hosted identity provider (OIDC/JWT).", $tags="", $link="")
+System(AzureAPIM, "Azure APIM", $descr="API gateway - dual auth (JWT OR sub-key).", $tags="", $link="")
+System(AzureKeyVault, "Azure Key Vault", $descr="Secret store (Auth0 creds).", $tags="", $link="")
+
+System_Boundary("InternalDeveloperPlatform_boundary", "Internal Developer Platform", $tags="") {
+  AddBoundaryTag("Data stores (standalone CDs)", $borderColor="#cccccc", $fontColor="#cccccc", $borderStyle="dashed")
+  Boundary(group_1, "Data stores (standalone CDs)", $tags="Data stores (standalone CDs)") {
+    Container(InternalDeveloperPlatform.postgresql, "postgresql", $techn="Helm / Postgres", $descr="Relational DB (Crossplane Helm).", $tags="", $link="")
+    Container(InternalDeveloperPlatform.neonpostgres, "neon-postgres", $techn="Neon API", $descr="Serverless Postgres (autoscale/branching).", $tags="", $link="")
+    Container(InternalDeveloperPlatform.redis, "redis", $techn="Helm / Redis", $descr="Cache / queue.", $tags="", $link="")
+    Container(InternalDeveloperPlatform.kafka, "kafka", $techn="Strimzi", $descr="Standalone event streaming.", $tags="", $link="")
+  }
+
+  AddBoundaryTag("Edge", $borderColor="#cccccc", $fontColor="#cccccc", $borderStyle="dashed")
+  Boundary(group_2, "Edge", $tags="Edge") {
+    Container(InternalDeveloperPlatform.IstioIngressGateway, "Istio Ingress Gateway", $techn="Istio 1.27", $descr="Single LB entrypoint (*.nip.io); mTLS mesh.", $tags="", $link="")
+  }
+
+  AddBoundaryTag("Identity", $borderColor="#cccccc", $fontColor="#cccccc", $borderStyle="dashed")
+  Boundary(group_3, "Identity", $tags="Identity") {
+    Container(InternalDeveloperPlatform.auth0idp, "auth0-idp", $techn="ExternalSecret", $descr="ESO pulls Auth0 creds from Key Vault → <name>-conn for JWT verify.", $tags="", $link="")
+  }
+
+  AddBoundaryTag("Platform plane (shared)", $borderColor="#cccccc", $fontColor="#cccccc", $borderStyle="dashed")
+  Boundary(group_4, "Platform plane (shared)", $tags="Platform plane (shared)") {
+    Container(InternalDeveloperPlatform.KubeVela, "KubeVela", $techn="vela-core", $descr="Renders OAM → workloads + claims.", $tags="", $link="")
+    Container(InternalDeveloperPlatform.Crossplane, "Crossplane", $techn="v2.3", $descr="Reconciles backing-infra claims.", $tags="", $link="")
+    Container(InternalDeveloperPlatform.ArgoCD, "ArgoCD", $techn="v3.4", $descr="GitOps sync per-service repos.", $tags="", $link="")
+    Container(InternalDeveloperPlatform.KnativeServing, "Knative Serving", $techn="v1.22", $descr="Scale-to-zero runtime.", $tags="", $link="")
+  }
+
+  AddBoundaryTag("camunda-orchestrator (app + bundled deps)", $borderColor="#cccccc", $fontColor="#cccccc", $borderStyle="dashed")
+  Boundary(group_5, "camunda-orchestrator (app + bundled deps)", $tags="camunda-orchestrator (app + bundled deps)") {
+    Container(InternalDeveloperPlatform.Zeebebroker, "Zeebe broker", $techn="Camunda 8 / Zeebe", $descr="BPMN workflow engine.", $tags="", $link="")
+    Container(InternalDeveloperPlatform.Operate, "Operate", $techn="Camunda 8", $descr="Process monitoring UI.", $tags="", $link="")
+    Container(InternalDeveloperPlatform.Tasklist, "Tasklist", $techn="Camunda 8", $descr="Human task UI.", $tags="", $link="")
+    Container(InternalDeveloperPlatform.Optimize, "Optimize", $techn="Camunda 8", $descr="Process analytics.", $tags="", $link="")
+    Container(InternalDeveloperPlatform.Elasticsearch, "Elasticsearch", $techn="Elasticsearch", $descr="Operate/Tasklist/Optimize datastore.", $tags="", $link="")
+    Container(InternalDeveloperPlatform.zeebeworkerksvc, "zeebe-worker ksvc", $techn="Knative / FastAPI", $descr="Job workers (handlers.py).", $tags="", $link="")
+  }
+
+  AddBoundaryTag("graphql (gateway + platform)", $borderColor="#cccccc", $fontColor="#cccccc", $borderStyle="dashed")
+  Boundary(group_6, "graphql (gateway + platform)", $tags="graphql (gateway + platform)") {
+    Container(InternalDeveloperPlatform.HiveGateway, "Hive Gateway", $techn="Knative / Hive", $descr="Auto-federates sibling GraphQL subgraphs; JWT-enforced.", $tags="", $link="")
+    Container(InternalDeveloperPlatform.graphqlplatformRedis, "graphql-platform Redis", $techn="Helm / Redis", $descr="Gateway cache + config (ConfigMap).", $tags="", $link="")
+    Container(InternalDeveloperPlatform.subgraphaksvc, "subgraph-a ksvc", $techn="Knative", $descr="Federated GraphQL subgraph.", $tags="", $link="")
+    Container(InternalDeveloperPlatform.subgraphbksvc, "subgraph-b ksvc", $techn="Knative", $descr="Federated GraphQL subgraph.", $tags="", $link="")
+  }
+
+  AddBoundaryTag("identity-service (app)", $borderColor="#cccccc", $fontColor="#cccccc", $borderStyle="dashed")
+  Boundary(group_7, "identity-service (app)", $tags="identity-service (app)") {
+    Container(InternalDeveloperPlatform.identityserviceksvc, "identity-service ksvc", $techn="Knative / Spring Boot", $descr="Domain IAM service; issues/validates tokens.", $tags="", $link="")
+  }
+
+  AddBoundaryTag("rasa-chatbot (app)", $borderColor="#cccccc", $fontColor="#cccccc", $borderStyle="dashed")
+  Boundary(group_8, "rasa-chatbot (app)", $tags="rasa-chatbot (app)") {
+    Container(InternalDeveloperPlatform.Rasaserver, "Rasa server", $techn="Knative / Rasa", $descr="NLU + dialogue (prebaked model).", $tags="", $link="")
+    Container(InternalDeveloperPlatform.Rasaactions, "Rasa actions", $techn="Knative / Rasa SDK", $descr="Custom action server.", $tags="", $link="")
+  }
+
+  AddBoundaryTag("realtime-platform (app + bundled deps)", $borderColor="#cccccc", $fontColor="#cccccc", $borderStyle="dashed")
+  Boundary(group_9, "realtime-platform (app + bundled deps)", $tags="realtime-platform (app + bundled deps)") {
+    Container(InternalDeveloperPlatform.Kafkabroker, "Kafka broker", $techn="Strimzi / Kafka", $descr="Topics: sensor_raw, sensor_agg, ...", $tags="", $link="")
+    Container(InternalDeveloperPlatform.LensesHQ, "Lenses HQ", $techn="Lenses CE 6.2", $descr="Stream-SQL console + management UI.", $tags="", $link="")
+    Container(InternalDeveloperPlatform.LensesAgent, "Lenses Agent", $techn="Lenses CE", $descr="Connects HQ to the Kafka cluster.", $tags="", $link="")
+    Container(InternalDeveloperPlatform.Metabase, "Metabase", $techn="Metabase", $descr="Analytics / dashboards over stream data.", $tags="", $link="")
+    Container(InternalDeveloperPlatform.MQTTbroker, "MQTT broker", $techn="Mosquitto", $descr="IoT ingest transport.", $tags="", $link="")
+    Container(InternalDeveloperPlatform.Postgresrtmeta, "Postgres (rt-meta)", $techn="Postgres", $descr="Lenses + Metabase metadata.", $tags="", $link="")
+    Container(InternalDeveloperPlatform.realtimeserviceingest, "realtime-service: ingest", $techn="Knative / FastAPI", $descr="HTTP /ingest → produces sensor_raw.", $tags="", $link="")
+    Container(InternalDeveloperPlatform.realtimeserviceprocessor, "realtime-service: processor", $techn="Knative / FastAPI", $descr="Consumes sensor_raw → aggregates → sensor_agg.", $tags="", $link="")
+    Container(InternalDeveloperPlatform.realtimeservicegateway, "realtime-service: gateway", $techn="Knative / FastAPI", $descr="Consumes sensor_agg → WebSocket /ws.", $tags="", $link="")
+  }
+
+  AddBoundaryTag("webhook-platform (app + bundled deps)", $borderColor="#cccccc", $fontColor="#cccccc", $borderStyle="dashed")
+  Boundary(group_10, "webhook-platform (app + bundled deps)", $tags="webhook-platform (app + bundled deps)") {
+    Container(InternalDeveloperPlatform.Svixengine, "Svix engine", $techn="svix-server v1.69", $descr="Outbound webhook delivery (HMAC sign, retry).", $tags="", $link="")
+    Container(InternalDeveloperPlatform.Postgressvix, "Postgres (svix)", $techn="Postgres", $descr="Delivery metadata + logs.", $tags="", $link="")
+    Container(InternalDeveloperPlatform.Redissvix, "Redis (svix)", $techn="Redis", $descr="Queue + retry backoff + cache.", $tags="", $link="")
+    Container(InternalDeveloperPlatform.AppPortal, "App Portal", $techn="Istio VS", $descr="Externally-exposed self-service endpoint UI.", $tags="", $link="")
+    Container(InternalDeveloperPlatform.realtimeservicewebhookbridge, "realtime-service: webhook bridge", $techn="Knative / FastAPI + realtime-transport", $descr="Consumes sensor_agg → POST Svix /msg.", $tags="", $link="")
+  }
+
+  AddBoundaryTag("webservice (app)", $borderColor="#cccccc", $fontColor="#cccccc", $borderStyle="dashed")
+  Boundary(group_11, "webservice (app)", $tags="webservice (app)") {
+    Container(InternalDeveloperPlatform.webserviceksvc, "webservice ksvc", $techn="Knative / python|node|go|java", $descr="Onion-arch HTTP API; binds db/cache/identity; exposed via APIM.", $tags="", $link="")
+    Container(InternalDeveloperPlatform.webserviceshape, "webservice-shape", $techn="Knative", $descr="Shape-only ksvc primitive the webservice CD renders from.", $tags="", $link="")
+  }
+
+}
+
+Rel(InternalDeveloperPlatform.Tasklist, InternalDeveloperPlatform.Elasticsearch, "reads", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.Optimize, InternalDeveloperPlatform.Elasticsearch, "reads", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.Rasaserver, InternalDeveloperPlatform.Rasaactions, "custom actions", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.auth0idp, AzureKeyVault, "pulls Auth0 creds (ESO)", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.auth0idp, Auth0, "tenant", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.KubeVela, InternalDeveloperPlatform.Crossplane, "emits claims", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.KubeVela, InternalDeveloperPlatform.KnativeServing, "renders ksvc", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.ArgoCD, InternalDeveloperPlatform.KnativeServing, "syncs workloads", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.Crossplane, InternalDeveloperPlatform.postgresql, "provisions", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.Crossplane, InternalDeveloperPlatform.Kafkabroker, "provisions", $techn="", $tags="", $link="")
+Rel(EndUser, InternalDeveloperPlatform.IstioIngressGateway, "HTTP / WS / chat", $techn="", $tags="", $link="")
+Rel(IoTTelemetrySource, InternalDeveloperPlatform.MQTTbroker, "Telemetry (MQTT)", $techn="Async", $tags="", $link="")
+Rel(IoTTelemetrySource, InternalDeveloperPlatform.realtimeserviceingest, "Telemetry (HTTP /ingest)", $techn="", $tags="", $link="")
+Rel(AzureAPIM, InternalDeveloperPlatform.webserviceksvc, "expose-api route", $techn="", $tags="", $link="")
+Rel(AzureAPIM, InternalDeveloperPlatform.HiveGateway, "federated GraphQL", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.IstioIngressGateway, InternalDeveloperPlatform.realtimeserviceingest, "/ingest", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.IstioIngressGateway, InternalDeveloperPlatform.realtimeservicegateway, "/ws", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.IstioIngressGateway, InternalDeveloperPlatform.Operate, "Operate UI", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.IstioIngressGateway, InternalDeveloperPlatform.Tasklist, "Tasklist UI", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.IstioIngressGateway, InternalDeveloperPlatform.Rasaserver, "chat", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.IstioIngressGateway, InternalDeveloperPlatform.identityserviceksvc, "token endpoints", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.IstioIngressGateway, InternalDeveloperPlatform.AppPortal, "self-service portal", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.webserviceksvc, InternalDeveloperPlatform.postgresql, "binds db", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.webserviceksvc, InternalDeveloperPlatform.redis, "binds cache", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.webserviceksvc, InternalDeveloperPlatform.neonpostgres, "binds (serverless pg alt)", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.webserviceksvc, InternalDeveloperPlatform.auth0idp, "binds identity", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.webserviceksvc, InternalDeveloperPlatform.webserviceshape, "rendered from", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.webserviceksvc, Auth0, "validates JWT", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.identityserviceksvc, InternalDeveloperPlatform.postgresql, "user store", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.realtimeserviceingest, InternalDeveloperPlatform.Kafkabroker, "produce sensor_raw", $techn="Async", $tags="", $link="")
+Rel(InternalDeveloperPlatform.Kafkabroker, InternalDeveloperPlatform.realtimeserviceprocessor, "consume sensor_raw", $techn="Async", $tags="", $link="")
+Rel(InternalDeveloperPlatform.realtimeserviceprocessor, InternalDeveloperPlatform.Kafkabroker, "produce sensor_agg", $techn="Async", $tags="", $link="")
+Rel(InternalDeveloperPlatform.Kafkabroker, InternalDeveloperPlatform.realtimeservicegateway, "consume sensor_agg", $techn="Async", $tags="", $link="")
+Rel(InternalDeveloperPlatform.realtimeservicegateway, EndUser, "WebSocket stream", $techn="Async", $tags="", $link="")
+Rel(InternalDeveloperPlatform.LensesAgent, InternalDeveloperPlatform.Kafkabroker, "manages", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.LensesHQ, InternalDeveloperPlatform.LensesAgent, "controls", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.Metabase, InternalDeveloperPlatform.Postgresrtmeta, "queries", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.LensesHQ, InternalDeveloperPlatform.Postgresrtmeta, "metadata", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.MQTTbroker, InternalDeveloperPlatform.Kafkabroker, "bridges to topics", $techn="Async", $tags="", $link="")
+Rel(InternalDeveloperPlatform.Kafkabroker, InternalDeveloperPlatform.realtimeservicewebhookbridge, "consume sensor_agg", $techn="Async", $tags="", $link="")
+Rel(InternalDeveloperPlatform.realtimeservicewebhookbridge, InternalDeveloperPlatform.Svixengine, "POST /app/.../msg", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.Svixengine, InternalDeveloperPlatform.Postgressvix, "store messages", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.Svixengine, InternalDeveloperPlatform.Redissvix, "queue + retry", $techn="Async", $tags="", $link="")
+Rel(InternalDeveloperPlatform.Svixengine, InternalDeveloperPlatform.AppPortal, "serves", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.Svixengine, ExternalWebhookReceiver, "HMAC-signed delivery", $techn="Async", $tags="", $link="")
+Rel(ExternalWebhookReceiver, InternalDeveloperPlatform.AppPortal, "self-registers endpoint", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.HiveGateway, InternalDeveloperPlatform.subgraphaksvc, "federates", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.HiveGateway, InternalDeveloperPlatform.subgraphbksvc, "federates", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.HiveGateway, InternalDeveloperPlatform.graphqlplatformRedis, "cache/config", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.HiveGateway, InternalDeveloperPlatform.webserviceksvc, "can federate webservice subgraph", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform.zeebeworkerksvc, InternalDeveloperPlatform.Zeebebroker, "activates jobs", $techn="Async", $tags="", $link="")
+Rel(InternalDeveloperPlatform.Zeebebroker, InternalDeveloperPlatform.Elasticsearch, "exports records", $techn="Async", $tags="", $link="")
+Rel(InternalDeveloperPlatform.Operate, InternalDeveloperPlatform.Elasticsearch, "reads", $techn="", $tags="", $link="")
+
+SHOW_LEGEND(true)
+hide stereotypes
+@enduml

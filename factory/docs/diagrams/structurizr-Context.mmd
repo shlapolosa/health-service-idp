@@ -1,0 +1,35 @@
+graph LR
+  linkStyle default fill:#ffffff
+
+  subgraph diagram ["System Context View: Internal Developer Platform"]
+    style diagram fill:#ffffff,stroke:#ffffff
+
+    1["<div style='font-weight: bold'>Developer / API Consumer</div><div style='font-size: 70%; margin-top: 0px'>[Person]</div><div style='font-size: 80%; margin-top:10px'>Submits OAM apps; calls<br />exposed APIs.</div>"]
+    style 1 fill:#08427b,stroke:#052e56,color:#ffffff
+    2["<div style='font-weight: bold'>End User</div><div style='font-size: 70%; margin-top: 0px'>[Person]</div><div style='font-size: 80%; margin-top:10px'>Chats, opens GraphQL/UI,<br />receives realtime streams.</div>"]
+    style 2 fill:#08427b,stroke:#052e56,color:#ffffff
+    3["<div style='font-weight: bold'>IoT / Telemetry Source</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Pushes sensor data to ingest.</div>"]
+    style 3 fill:#c0392b,stroke:#86271e,color:#ffffff
+    4["<div style='font-weight: bold'>External Webhook Receiver</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>3rd-party HTTPS endpoint.</div>"]
+    style 4 fill:#c0392b,stroke:#86271e,color:#ffffff
+    5["<div style='font-weight: bold'>Auth0</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Hosted identity provider<br />(OIDC/JWT).</div>"]
+    style 5 fill:#c0392b,stroke:#86271e,color:#ffffff
+    6["<div style='font-weight: bold'>Azure APIM</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>API gateway - dual auth (JWT<br />OR sub-key).</div>"]
+    style 6 fill:#c0392b,stroke:#86271e,color:#ffffff
+    7["<div style='font-weight: bold'>Azure Key Vault</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Secret store (Auth0 creds).</div>"]
+    style 7 fill:#2471a3,stroke:#194f72,color:#ffffff
+    8["<div style='font-weight: bold'>Internal Developer Platform</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>OAM/GitOps IDP on AKS.</div>"]
+    style 8 fill:#1168bd,stroke:#0b4884,color:#ffffff
+
+    8-- "<div>pulls Auth0 creds (ESO)</div><div style='font-size: 70%'></div>" -->7
+    1-- "<div>Calls exposed APIs</div><div style='font-size: 70%'></div>" -->6
+    1-- "<div>Submits OAM apps (Slack / MCP<br />/ architect)</div><div style='font-size: 70%'></div>" -->8
+    2-- "<div>HTTP / WS / chat</div><div style='font-size: 70%'></div>" -->8
+    3-- "<div>Telemetry (MQTT)</div><div style='font-size: 70%'>[Async]</div>" -->8
+    6-- "<div>expose-api route</div><div style='font-size: 70%'></div>" -->8
+    8-- "<div>validates JWT</div><div style='font-size: 70%'></div>" -->5
+    8-- "<div>WebSocket stream</div><div style='font-size: 70%'>[Async]</div>" -->2
+    8-- "<div>HMAC-signed delivery</div><div style='font-size: 70%'>[Async]</div>" -->4
+    4-- "<div>self-registers endpoint</div><div style='font-size: 70%'></div>" -->8
+
+  end

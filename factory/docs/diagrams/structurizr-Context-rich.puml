@@ -1,0 +1,43 @@
+@startuml
+!pragma layout smetana
+title <size:24>System Context View: Internal Developer Platform</size>
+
+set separator none
+left to right direction
+
+<style>
+  root {
+    BackgroundColor: #ffffff
+    FontColor: #444444
+  }
+</style>
+
+!include <C4/C4>
+!include <C4/C4_Context>
+
+Person(DeveloperAPIConsumer, "Developer / API Consumer", $descr="Submits OAM apps; calls exposed APIs.", $tags="", $link="")
+Person(EndUser, "End User", $descr="Chats, opens GraphQL/UI, receives realtime streams.", $tags="", $link="")
+System(IoTTelemetrySource, "IoT / Telemetry Source", $descr="Pushes sensor data to ingest.", $tags="", $link="", $sprite="satellite_dish")
+System(ExternalWebhookReceiver, "External Webhook Receiver", $descr="3rd-party HTTPS endpoint.", $tags="", $link="", $sprite="cloud")
+System(Auth0, "Auth0", $descr="Hosted identity provider (OIDC/JWT).", $tags="", $link="", $sprite="auth0-icon")
+System(AzureAPIM, "Azure APIM", $descr="API gateway - dual auth (JWT OR sub-key).", $tags="", $link="", $sprite="azure")
+System(AzureKeyVault, "Azure Key Vault", $descr="Secret store (Auth0 creds).", $tags="", $link="", $sprite="key")
+System(InternalDeveloperPlatform, "Internal Developer Platform", $descr="OAM/GitOps IDP on AKS.", $tags="", $link="")
+
+Rel(InternalDeveloperPlatform, AzureKeyVault, "pulls Auth0 creds (ESO)", $techn="", $tags="", $link="")
+Rel(DeveloperAPIConsumer, AzureAPIM, "Calls exposed APIs", $techn="", $tags="", $link="")
+Rel(DeveloperAPIConsumer, InternalDeveloperPlatform, "Submits OAM apps (Slack / MCP / architect)", $techn="", $tags="", $link="")
+Rel(EndUser, InternalDeveloperPlatform, "HTTP / WS / chat", $techn="", $tags="", $link="")
+Rel(IoTTelemetrySource, InternalDeveloperPlatform, "Telemetry (MQTT) «async»", $techn="event/stream", $tags="async", $link="")
+
+Rel(AzureAPIM, InternalDeveloperPlatform, "expose-api route", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform, Auth0, "validates JWT", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform, EndUser, "WebSocket stream «async»", $techn="event/stream", $tags="async", $link="")
+
+Rel(InternalDeveloperPlatform, ExternalWebhookReceiver, "HMAC-signed delivery «async»", $techn="event/stream", $tags="async", $link="")
+
+Rel(ExternalWebhookReceiver, InternalDeveloperPlatform, "self-registers endpoint", $techn="", $tags="", $link="")
+
+hide stereotypes
+caption <b>Trust zones:</b> <color:#e67e22><b>EDGE/DMZ</b></color> (Istio mTLS terminate)  |  <color:#27ae60><b>INTERNAL/mesh</b></color> (mTLS + JWT)  |  <color:#2471a3><b>DATA/secrets</b></color> (pg/redis/kafka/KV, at-rest)  |  <color:#c0392b><b>EXTERNAL/untrusted</b></color> (Auth0/APIM/IoT/webhook)        <b>Edges:</b> <color:#707070>solid</color> = sync (HTTP/REST/WS)  ,  <color:#8e44ad>dashed</color> = async (Kafka/queue/webhook)
+@enduml

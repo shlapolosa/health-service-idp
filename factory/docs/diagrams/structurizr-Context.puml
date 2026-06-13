@@ -1,0 +1,39 @@
+@startuml
+title <size:24>System Context View: Internal Developer Platform</size>
+
+set separator none
+left to right direction
+
+<style>
+  root {
+    BackgroundColor: #ffffff
+    FontColor: #444444
+  }
+</style>
+
+!include <C4/C4>
+!include <C4/C4_Context>
+
+Person(DeveloperAPIConsumer, "Developer / API Consumer", $descr="Submits OAM apps; calls exposed APIs.", $tags="", $link="")
+Person(EndUser, "End User", $descr="Chats, opens GraphQL/UI, receives realtime streams.", $tags="", $link="")
+System(IoTTelemetrySource, "IoT / Telemetry Source", $descr="Pushes sensor data to ingest.", $tags="", $link="")
+System(ExternalWebhookReceiver, "External Webhook Receiver", $descr="3rd-party HTTPS endpoint.", $tags="", $link="")
+System(Auth0, "Auth0", $descr="Hosted identity provider (OIDC/JWT).", $tags="", $link="")
+System(AzureAPIM, "Azure APIM", $descr="API gateway - dual auth (JWT OR sub-key).", $tags="", $link="")
+System(AzureKeyVault, "Azure Key Vault", $descr="Secret store (Auth0 creds).", $tags="", $link="")
+System(InternalDeveloperPlatform, "Internal Developer Platform", $descr="OAM/GitOps IDP on AKS.", $tags="", $link="")
+
+Rel(InternalDeveloperPlatform, AzureKeyVault, "pulls Auth0 creds (ESO)", $techn="", $tags="", $link="")
+Rel(DeveloperAPIConsumer, AzureAPIM, "Calls exposed APIs", $techn="", $tags="", $link="")
+Rel(DeveloperAPIConsumer, InternalDeveloperPlatform, "Submits OAM apps (Slack / MCP / architect)", $techn="", $tags="", $link="")
+Rel(EndUser, InternalDeveloperPlatform, "HTTP / WS / chat", $techn="", $tags="", $link="")
+Rel(IoTTelemetrySource, InternalDeveloperPlatform, "Telemetry (MQTT)", $techn="Async", $tags="", $link="")
+Rel(AzureAPIM, InternalDeveloperPlatform, "expose-api route", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform, Auth0, "validates JWT", $techn="", $tags="", $link="")
+Rel(InternalDeveloperPlatform, EndUser, "WebSocket stream", $techn="Async", $tags="", $link="")
+Rel(InternalDeveloperPlatform, ExternalWebhookReceiver, "HMAC-signed delivery", $techn="Async", $tags="", $link="")
+Rel(ExternalWebhookReceiver, InternalDeveloperPlatform, "self-registers endpoint", $techn="", $tags="", $link="")
+
+SHOW_LEGEND(true)
+hide stereotypes
+@enduml
