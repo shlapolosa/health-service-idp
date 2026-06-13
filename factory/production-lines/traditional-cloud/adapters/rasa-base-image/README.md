@@ -12,7 +12,7 @@ HARD-2):
 The generated repo's Dockerfiles shrink to a thin layer:
 
 ```dockerfile
-FROM healthidpuaeacr.azurecr.io/rasa-base:v1.0.0
+FROM healthidpuaeacr.azurecr.io/rasa-base:v1.1.0
 COPY --chown=1001:1001 . /app/bot/
 RUN train-if-needed.sh          # bakes the model at build time (content-hash cache)
 ```
@@ -43,7 +43,7 @@ fails on pull.
 ```bash
 az acr build \
   --registry healthidpuaeacr \
-  --image rasa-base:v1.0.0 \
+  --image rasa-base:v1.1.0 \
   --platform linux/amd64 \
   factory/production-lines/traditional-cloud/adapters/rasa-base-image/
 ```
