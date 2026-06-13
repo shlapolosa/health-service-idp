@@ -22,10 +22,10 @@ spec:
           secretName: argo-token
       containers:
       - name: capability-mcp-factory
-        # HARD-3: pinned by digest (no mutable tag). Built from factory/adapters/mcp-read-gateway
-        # at source SHA 60aa3c1 (tag factory-tools-60aa3c1) — first build that includes
-        # factory.route + factory.list_manufacturers (the :user1000 image predated them).
-        image: healthidpuaeacr.azurecr.io/capability-mcp-factory@sha256:aeb757ad8717aa06cc49e00ac7f8f9691829bc3cba96c2b6a7b74b899a6a9345
+        # HARD-3: pinned by digest (no mutable tag). OBS-B build — adds platform.inventory
+        # ON TOP OF factory.route + factory.list_manufacturers (rebuilt from rebased source
+        # so it includes main's tool baseline + the new inventory aggregator).
+        image: healthidpuaeacr.azurecr.io/capability-mcp-factory@sha256:4c61ebb83985568ca6ba2737c5c34268d754a0ceed5b039ea2690d9945103494
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080

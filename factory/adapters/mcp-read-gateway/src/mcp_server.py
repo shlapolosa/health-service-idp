@@ -42,6 +42,7 @@ from capability_mcp_core.interface.auth import EntraJWTMiddleware  # type: ignor
 
 # Factory-local use cases (defined in this service, not in the monolith).
 from .audit_sink_client import AuditSinkClient
+from .inventory_query_use_case import InventoryQueryUseCase
 from .lifecycle_query_use_case import LifecycleQueryUseCase
 
 logger = logging.getLogger(__name__)
@@ -190,6 +191,28 @@ def _lifecycle_query() -> LifecycleQueryUseCase:
 )
 def lifecycle_state(use_case_id: str) -> dict[str, Any]:
     return _lifecycle_query().state_of(use_case_id)
+
+
+# ---- Platform inventory: "what's actually deployed" (OBS-B) ----
+_inventory = InventoryQueryUseCase()
+
+
+@mcp.tool(
+    name="platform.inventory",
+    description="Aggregate live deployment state across the platform, per OAM Application. "
+                "READ-ONLY. Joins desired-vs-live truth: OAM components/health, ArgoCD "
+                "sync/health/DRIFT (OutOfSync==drift), Knative ksvc image@digest + ready "
+                "revision, Crossplane claim readiness, and the latest HARD-4 contract-test "
+                "verdict per component. Optionally filter by `app` name and/or `namespace` "
+                "(default namespace=default). Returns "
+                "{ok, count, apps: [{name, namespace, oamPhase, oamHealth, "
+                "argocd:{sync,health,drift,apps[]}, components:[{name,type,image,digest,"
+                "revision,ready,contractTest}], claims:[{kind,name,ready,synced}]}]}. "
+                "Answers 'what is running right now and is it drifted?' for humans "
+                "(Slack/CLI/APIM) and the architect/operator agents.",
+)
+def platform_inventory(app: str | None = None, namespace: str | None = None) -> dict[str, Any]:
+    return _inventory.inventory(app=app, namespace=namespace)
 
 
 # ============================================================
