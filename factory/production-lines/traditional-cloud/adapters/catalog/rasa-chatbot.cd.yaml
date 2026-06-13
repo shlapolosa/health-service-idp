@@ -134,6 +134,20 @@ spec:
                     envFrom: parameter.envFrom
                   }
                   // Health checks for robust deployment
+                  // Rasa loads its trained model into the server process at boot,
+                  // which takes ~2-3 min. Without a startupProbe the liveness probe
+                  // (initialDelay 30 + 3×10s) KILLS the pod at ~60s -> crashloop ->
+                  // RevisionMissing (caught live on chatdemo 2026-06-13). The startup
+                  // probe gates liveness/readiness until the model is loaded (up to
+                  // 5 min: 30 × 10s).
+                  startupProbe: {
+                    httpGet: {
+                      path: "/api/status"
+                      port: 5005
+                    }
+                    periodSeconds: 10
+                    failureThreshold: 30
+                  }
                   livenessProbe: {
                     httpGet: {
                       path: "/api/status"
