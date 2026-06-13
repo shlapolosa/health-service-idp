@@ -39,6 +39,8 @@ LIB_DIR="$SCRIPT_DIR/lib"
 . "$LIB_DIR/python-fastapi.sh"
 # shellcheck source=lib/rasa.sh
 . "$LIB_DIR/rasa.sh"
+# shellcheck source=lib/camunda.sh
+. "$LIB_DIR/camunda.sh"
 # shellcheck source=lib/nodejs-graphql.sh
 . "$LIB_DIR/nodejs-graphql.sh"
 # shellcheck source=lib/java-springboot.sh
@@ -64,10 +66,15 @@ git clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/$APP_CONTAINER.git .
 # RASA-CONTAINER (#178): domain.yml is the rasa entrypoint artifact — without
 # it a claim-recreation re-run would re-scaffold and clobber the dev-agent's
 # bot edits (domain/data/actions), the exact #175 failure mode.
+# CAMUNDA-WORKFLOW: processes/ is the camunda entrypoint artifact — without it a
+# claim-recreation re-run would re-scaffold and clobber the dev-agent's
+# processes/*.bpmn + workers/ edits (the same #175 failure mode as rasa's
+# domain.yml). Its presence means scaffolding already happened.
 if [ -f "microservices/$SERVICE_NAME/src/main.py" ] \
    || [ -f "microservices/$SERVICE_NAME/package.json" ] \
    || [ -f "microservices/$SERVICE_NAME/pom.xml" ] \
-   || [ -f "microservices/$SERVICE_NAME/domain.yml" ]; then
+   || [ -f "microservices/$SERVICE_NAME/domain.yml" ] \
+   || [ -d "microservices/$SERVICE_NAME/processes" ]; then
   echo "microservices/$SERVICE_NAME already scaffolded (entrypoint artifact present) - skipping re-scaffold (no-clobber)"
   exit 0
 fi
@@ -91,6 +98,8 @@ elif [ "$LANGUAGE" = "nodejs" ] && [ "$FRAMEWORK" = "graphql-gateway" ]; then
   mscv_scaffold_nodejs_graphql
 elif [ "$LANGUAGE" = "java" ] && [ "$FRAMEWORK" = "springboot" ]; then
   mscv_scaffold_java_springboot
+elif [ "$LANGUAGE" = "camunda" ] && [ "$FRAMEWORK" = "zeebe-worker" ]; then
+  mscv_scaffold_camunda
 fi
 
 # Create service README
