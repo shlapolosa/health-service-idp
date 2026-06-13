@@ -1,14 +1,26 @@
 # DEV-AGENT W2: egress lockdown for the dev-agent Job pods.
 #
-# INTENT: egress ONLY to github.com (clone/push), api.anthropic.com (Claude),
-# the kube-apiserver (verify-loop reads), and DNS.
+# ENGINE SWAP (security-critical): the coding engine is opencode (GPT-5.4 via the
+# Azure APIM gateway). The LLM egress target is therefore the APIM host, NOT
+# Anthropic. api.anthropic.com is DROPPED from the intended allowlist; the APIM
+# gateway host is ADDED. Direct-to-Foundry is blocked anyway (401) — all model
+# traffic MUST go through APIM.
 #
-# REALITY with vanilla AKS NetworkPolicy (no FQDN support): we can only scope
-# by port. FQDN-scoped egress (github.com / api.anthropic.com literal) needs
-# Cilium (CiliumNetworkPolicy toFQDNs) or Calico DNS policy — adopt one of
-# those to tighten this from "any 443" to the two hostnames. Until then this
-# still blocks: all non-443 egress, all in-cluster lateral movement on app
-# ports, SMTP exfil, etc. The pod also has NO ingress at all.
+# INTENT (the allowlist this policy approximates):
+#   ALLOW  github.com                                  (clone / push)
+#   ALLOW  aigw-apim-dev-w4x7ibwk4e2is.azure-api.net   (GPT-5.4 via APIM, 443)
+#   ALLOW  kube-apiserver                              (verify-loop reads)
+#   ALLOW  DNS (kube-dns / CoreDNS)
+#   DROP   api.anthropic.com                           (engine no longer Anthropic)
+#   DROP   everything else (all non-443 egress, all in-cluster lateral movement)
+#
+# REALITY with vanilla AKS NetworkPolicy (no FQDN support): we can only scope by
+# port, so the L3/L4 rule below is "any 443 + DNS". FQDN-scoped egress (the exact
+# github.com + APIM-host allowlist, with api.anthropic.com DENIED) needs Cilium
+# (CiliumNetworkPolicy toFQDNs) or Calico DNS policy — see the commented
+# CiliumNetworkPolicy companion at the bottom; adopt it to make the
+# anthropic-drop / apim-add an enforced L7 control rather than documented intent.
+# The pod also has NO ingress at all.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -31,11 +43,51 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-    # HTTPS: github.com + api.anthropic.com + the AKS apiserver (all 443).
-    # See header — tighten to FQDNs once Cilium/Calico DNS policy is available.
+    # HTTPS: github.com + the APIM gateway host + the AKS apiserver (all 443).
+    # api.anthropic.com is intentionally NOT part of the intended allowlist any
+    # more (engine swapped to opencode/GPT-5.4-via-APIM). Tighten to the explicit
+    # FQDNs (and an explicit anthropic DENY) via the Cilium policy below once
+    # Cilium/Calico DNS policy is available.
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
       ports:
         - protocol: TCP
           port: 443
+---
+# OPTIONAL L7 tightening (enforced FQDN allowlist) — requires Cilium CNI.
+# Uncomment to make the anthropic-drop / apim-add a real enforced control.
+# apiVersion: cilium.io/v2
+# kind: CiliumNetworkPolicy
+# metadata:
+#   name: dev-agent-egress-fqdn
+#   namespace: dev-agent-system
+# spec:
+#   endpointSelector:
+#     matchLabels:
+#       app.kubernetes.io/name: dev-agent
+#   egress:
+#     # DNS must be allowed first so toFQDNs can resolve.
+#     - toEndpoints:
+#         - matchLabels:
+#             k8s:io.kubernetes.pod.namespace: kube-system
+#             k8s-app: kube-dns
+#       toPorts:
+#         - ports:
+#             - port: "53"
+#               protocol: ANY
+#           rules:
+#             dns:
+#               - matchPattern: "*"
+#     # The ONLY external FQDNs the agent may reach. api.anthropic.com absent => denied.
+#     - toFQDNs:
+#         - matchName: github.com
+#         - matchPattern: "*.github.com"
+#         - matchName: aigw-apim-dev-w4x7ibwk4e2is.azure-api.net
+#       toPorts:
+#         - ports:
+#             - port: "443"
+#               protocol: TCP
+#     # kube-apiserver (verify-loop reads).
+#     - toEntities:
+#         - kube-apiserver
