@@ -57,6 +57,23 @@ cd $TEMP_DIR
 # Clone the AppContainer repository using GitHub token
 git clone https://$GITHUB_TOKEN@github.com/$GITHUB_USER/$APP_CONTAINER.git .
 
+# UNIFY-PUSH-RACE (#162): the per-OAM monorepo is scaffolded by N concurrent mscv
+# Jobs (one per service in services[]). Each service's OWN files live under a
+# disjoint path (microservices/$SERVICE_NAME/...) so they rebase conflict-free.
+# But every Job ALSO appends one line to the SHARED list file
+# `microservices/README.md` (see the sed below). Two concurrent Jobs editing the
+# same line of that shared file produce a genuine rebase CONTENT CONFLICT, which
+# the push-retry loop used to `rebase --abort` on -> the loser re-pushed an
+# un-rebased HEAD, looped all 10 attempts, and the Job FAILED (this is exactly
+# why the full-platform test had to scaffold sequentially).
+#
+# FIX: register git's built-in `union` merge driver for the shared list file via
+# the clone-local .git/info/attributes (no repo commit required, no clobber of
+# sibling content). During rebase, `union` keeps BOTH sides' lines, so every
+# service's README entry survives and the rebase is always conflict-free.
+mkdir -p .git/info
+printf '%s\n' 'microservices/README.md merge=union' >> .git/info/attributes
+
 # RECREATE-STORM (#175): NO-CLOBBER. A Crossplane reconcile / claim recreation can
 # re-run this Job long after the service was scaffolded AND HAND-EDITED (or
 # dev-agent-edited). Re-scaffolding overwrites src/main.py + vendored deps with a
@@ -172,8 +189,9 @@ fi
 # .github/workflows/comprehensive-gitops.yml exists in the remote. By the time
 # this Job runs the workflow file is guaranteed present, so no poll is needed.
 # We keep the rebase below to land cleanly on top of the workflow-file commit
-# and any sibling-service commits.
-git pull --rebase origin HEAD || true
+# and any sibling-service commits. (microservices/README.md is merge=union per the
+# .git/info/attributes set after clone, so sibling README edits auto-merge.)
+git pull --rebase origin "$(git rev-parse --abbrev-ref HEAD)" || true
 
 # Commit and push
 git config user.name "ApplicationClaim"
