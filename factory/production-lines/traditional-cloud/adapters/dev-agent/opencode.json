@@ -8,7 +8,8 @@
         "baseURL": "https://aigw-apim-dev-w4x7ibwk4e2is.azure-api.net/openai/deployments/gpt-5.4?api-version=2024-12-01-preview",
         "apiKey": "{env:APIM_SUBSCRIPTION_KEY}",
         "headers": {
-          "Ocp-Apim-Subscription-Key": "{env:APIM_SUBSCRIPTION_KEY}"
+          "Ocp-Apim-Subscription-Key": "{env:APIM_SUBSCRIPTION_KEY}",
+          "Authorization": ""
         }
       },
       "models": {
