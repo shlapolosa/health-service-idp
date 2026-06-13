@@ -11,6 +11,12 @@ mscv_git_push_retry() {
 # rebase is conflict-free against sibling services) and push again. Bounded so a
 # genuinely broken remote fails the Job instead of looping forever. Jittered sleep
 # spreads out simultaneous retriers.
+# UNIFY-PUSH-RACE (#162): resolve the branch explicitly (the previous
+# `git pull --rebase origin HEAD` relied on the ambiguous `HEAD` refspec) and
+# rebase onto `origin/$BRANCH`. The shared list file microservices/README.md is
+# registered as merge=union in .git/info/attributes (set in entrypoint.sh) so the
+# rebase auto-keeps every service's README line and never conflicts.
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 PUSH_OK=0
 for attempt in $(seq 1 10); do
   if git push origin HEAD; then
@@ -19,8 +25,13 @@ for attempt in $(seq 1 10); do
     break
   fi
   echo "push rejected (attempt $attempt/10) - likely a concurrent sibling mscv push; fetching, rebasing, retrying"
-  git fetch origin || true
-  git pull --rebase origin HEAD || { echo "unexpected rebase conflict (services should be disjoint); aborting rebase"; git rebase --abort || true; }
+  git fetch origin "$BRANCH" || git fetch origin || true
+  if ! git rebase "origin/$BRANCH"; then
+    # Disjoint service files + union-merged README should make this unreachable.
+    # Defensive: never leave a half-rebased tree that would re-push a non-ff HEAD.
+    echo "rebase conflict (unexpected: services should be disjoint, README is merge=union); aborting and retrying"
+    git rebase --abort || true
+  fi
   sleep $(( (RANDOM % 5) + 1 ))
 done
 if [ "$PUSH_OK" != "1" ]; then
