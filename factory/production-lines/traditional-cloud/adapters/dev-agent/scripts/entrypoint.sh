@@ -1,27 +1,33 @@
 #!/usr/bin/env bash
 # DEV-AGENT W2 entrypoint: clone monorepo -> read REQUIREMENTS.md -> implement
-# logic slots via headless Claude Code -> push -> W4 verify-loop against the
-# HARD-4 contract tests -> iterate (bounded) until green.
+# logic slots via headless opencode (GPT-5.4 via APIM) -> push -> W4 verify-loop
+# against the HARD-4 contract tests -> iterate (bounded) until green.
+#
+# ENGINE: opencode run, provider `apim-gpt` -> model gpt-5.4 (Azure APIM gateway,
+# openai-compatible). NO Anthropic key. Engine was swapped claude-code ->
+# opencode; rollback = revert the engine-swap commit.
 #
 # Env contract (the sensor Job sets these; secrets via envFrom dev-agent-secrets):
-#   APP_NAME           - OAM app name == source monorepo name        (required)
-#   GITHUB_USER        - GitHub org/user (default shlapolosa)
-#   SOURCE_REPO        - default https://github.com/$GITHUB_USER/$APP_NAME.git
-#   GITOPS_REPO        - default https://github.com/$GITHUB_USER/$APP_NAME-gitops.git
-#   CENTRAL_GITOPS_REPO- default https://github.com/$GITHUB_USER/health-service-idp-gitops.git
-#   GITHUB_TOKEN       - PAT / App installation token (SECRET, required)
-#   ANTHROPIC_API_KEY  - Claude Code key (SECRET, required unless DRY-stubbed)
-#   MAX_ITERATIONS     - implement->push->verify attempts (default 3)
-#   NAMESPACE          - where the app's ksvcs live (default default)
-#   SPEC_HASH          - optional, stamped by the sensor from the OAM annotation
-#   CLAUDE_MAX_TURNS   - per-claude-run turn budget (default 50, cost guard)
+#   APP_NAME              - OAM app name == source monorepo name     (required)
+#   GITHUB_USER           - GitHub org/user (default shlapolosa)
+#   SOURCE_REPO           - default https://github.com/$GITHUB_USER/$APP_NAME.git
+#   GITOPS_REPO           - default https://github.com/$GITHUB_USER/$APP_NAME-gitops.git
+#   CENTRAL_GITOPS_REPO   - default https://github.com/$GITHUB_USER/health-service-idp-gitops.git
+#   GITHUB_TOKEN          - PAT / App installation token (SECRET, required)
+#   APIM_SUBSCRIPTION_KEY - APIM gateway subscription key, header
+#                           Ocp-Apim-Subscription-Key (SECRET, required unless
+#                           DRY-stubbed). Consumed by opencode.json {env:...}.
+#   OPENCODE_MODEL        - provider/model (default apim-gpt/gpt-5.4)
+#   MAX_ITERATIONS        - implement->push->verify attempts (default 3)
+#   NAMESPACE             - where the app's ksvcs live (default default)
+#   SPEC_HASH             - optional, stamped by the sensor from the OAM annotation
 #   VERIFY_TIMEOUT/POLL_INTERVAL - passed to verify-loop.sh
 #
 # EXIT SEMANTICS (the W3 "all-Ready gate" lives HERE, not in the sensor —
 # Argo Events can't join across resources):
 #   exit 0 quietly when: a sibling component is not Ready yet (a later Ready
 #     event re-fires us), no REQUIREMENTS.md anywhere, spec-hash already
-#     implemented, no logic slots, or claude produced no changes on attempt 1.
+#     implemented, no logic slots, or opencode produced no changes on attempt 1.
 #   exit 1 (escalate) when: iterations exhausted red, push permanently rejected,
 #     or a secret pattern is detected in the diff.
 set -euo pipefail
@@ -34,7 +40,7 @@ CENTRAL_GITOPS_REPO="${CENTRAL_GITOPS_REPO:-https://github.com/${GITHUB_USER}/he
 GITHUB_TOKEN="${GITHUB_TOKEN:?GITHUB_TOKEN required}"
 MAX_ITERATIONS="${MAX_ITERATIONS:-3}"
 NAMESPACE="${NAMESPACE:-default}"
-CLAUDE_MAX_TURNS="${CLAUDE_MAX_TURNS:-50}"
+OPENCODE_MODEL="${OPENCODE_MODEL:-apim-gpt/gpt-5.4}"
 MAX_PUSH_ATTEMPTS="${MAX_PUSH_ATTEMPTS:-5}"
 WORK_DIR="${WORK_DIR:-/tmp/dev-agent}"
 
@@ -214,20 +220,27 @@ for (( n=1; n<=MAX_ITERATIONS; n++ )); do
   for svc in "${SERVICES[@]}"; do
     PROMPT_OUT="$WORK_DIR/prompt-$n-$svc.txt"
     render_prompt "$svc" "$n" "$FEEDBACK_FILE" "$PROMPT_OUT"
-    echo "--- claude implement: $svc (iteration $n) ---"
+    echo "--- opencode implement: $svc (iteration $n, model $OPENCODE_MODEL) ---"
+    # opencode run: prompt is POSITIONAL (NOT -p; -p is --password in opencode).
+    # --dir scopes the working tree; -m selects provider/model;
+    # --dangerously-skip-permissions == acceptEdits-equivalent (egress is sandboxed
+    # by NetworkPolicy); --format json keeps stdout machine-parseable. git state
+    # (below) is the source of truth for "did it change files", not the exit code.
     ( cd "$SRC_DIR" && \
-      claude -p "$(cat "$PROMPT_OUT")" \
-        --permission-mode acceptEdits \
-        --max-turns "$CLAUDE_MAX_TURNS" ) || echo "claude run for $svc exited non-zero (continuing; git state decides)"
+      opencode run "$(cat "$PROMPT_OUT")" \
+        --dir "$SRC_DIR" \
+        -m "$OPENCODE_MODEL" \
+        --dangerously-skip-permissions \
+        --format json ) || echo "opencode run for $svc exited non-zero (continuing; git state decides)"
   done
 
   CHANGED="$(cd "$SRC_DIR" && git status --porcelain)"
   if [ -z "$CHANGED" ]; then
     if [ "$n" -eq 1 ]; then
-      echo "claude produced no changes on first attempt — nothing to implement; exiting quietly"
+      echo "opencode produced no changes on first attempt — nothing to implement; exiting quietly"
       exit 0
     fi
-    echo "claude produced no changes while contract tests are red — escalating" >&2
+    echo "opencode produced no changes while contract tests are red — escalating" >&2
     exit 1
   fi
 

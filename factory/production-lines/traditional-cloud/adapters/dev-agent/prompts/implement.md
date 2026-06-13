@@ -44,6 +44,11 @@ __EDIT_SURFACE__
 7. Keep changes minimal and deterministic: no new dependencies, no framework
    rewrites, no speculative features beyond the acceptance criteria.
 
+8. ACT, do not narrate: actually write the file edits to disk now using your
+   editing tools — do not merely describe or print the code you "would" write.
+   Edits that are not persisted to the working tree are invisible to the
+   platform (the harness commits whatever changed on disk, nothing else).
+
 When you are confident the acceptance criteria for `__SERVICE_NAME__` are met,
 stop. The platform will build, deploy, and contract-test your change; if it
 fails you will be re-invoked with the verdict above.
