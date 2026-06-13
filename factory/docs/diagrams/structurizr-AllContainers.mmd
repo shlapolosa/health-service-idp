@@ -1,0 +1,212 @@
+graph TB
+  linkStyle default fill:#ffffff
+
+  subgraph diagram ["Container View: Internal Developer Platform"]
+    style diagram fill:#ffffff,stroke:#ffffff
+
+    2["<div style='font-weight: bold'>End User</div><div style='font-size: 70%; margin-top: 0px'>[Person]</div><div style='font-size: 80%; margin-top:10px'>Chats, opens GraphQL/UI,<br />receives realtime streams.</div>"]
+    style 2 fill:#08427b,stroke:#052e56,color:#ffffff
+    3["<div style='font-weight: bold'>IoT / Telemetry Source</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Pushes sensor data to ingest.</div>"]
+    style 3 fill:#c0392b,stroke:#86271e,color:#ffffff
+    4["<div style='font-weight: bold'>External Webhook Receiver</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>3rd-party HTTPS endpoint.</div>"]
+    style 4 fill:#c0392b,stroke:#86271e,color:#ffffff
+    5["<div style='font-weight: bold'>Auth0</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Hosted identity provider<br />(OIDC/JWT).</div>"]
+    style 5 fill:#c0392b,stroke:#86271e,color:#ffffff
+    6["<div style='font-weight: bold'>Azure APIM</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>API gateway - dual auth (JWT<br />OR sub-key).</div>"]
+    style 6 fill:#c0392b,stroke:#86271e,color:#ffffff
+    7["<div style='font-weight: bold'>Azure Key Vault</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Secret store (Auth0 creds).</div>"]
+    style 7 fill:#2471a3,stroke:#194f72,color:#ffffff
+
+    subgraph 8 ["Internal Developer Platform"]
+      style 8 fill:#ffffff,stroke:#0b4884,color:#0b4884
+
+      subgraph group1 ["Data stores (standalone CDs)"]
+        style group1 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+
+        40["<div style='font-weight: bold'>postgresql</div><div style='font-size: 70%; margin-top: 0px'>[Container: Helm / Postgres]</div><div style='font-size: 80%; margin-top:10px'>Relational DB (Crossplane<br />Helm).</div>"]
+        style 40 fill:#2471a3,stroke:#194f72,color:#ffffff
+        41["<div style='font-weight: bold'>neon-postgres</div><div style='font-size: 70%; margin-top: 0px'>[Container: Neon API]</div><div style='font-size: 80%; margin-top:10px'>Serverless Postgres<br />(autoscale/branching).</div>"]
+        style 41 fill:#2471a3,stroke:#194f72,color:#ffffff
+        42["<div style='font-weight: bold'>redis</div><div style='font-size: 70%; margin-top: 0px'>[Container: Helm / Redis]</div><div style='font-size: 80%; margin-top:10px'>Cache / queue.</div>"]
+        style 42 fill:#2471a3,stroke:#194f72,color:#ffffff
+        43["<div style='font-weight: bold'>kafka</div><div style='font-size: 70%; margin-top: 0px'>[Container: Strimzi]</div><div style='font-size: 80%; margin-top:10px'>Standalone event streaming.</div>"]
+        style 43 fill:#2471a3,stroke:#194f72,color:#ffffff
+      end
+
+      subgraph group2 ["Edge"]
+        style group2 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+
+        9["<div style='font-weight: bold'>Istio Ingress Gateway</div><div style='font-size: 70%; margin-top: 0px'>[Container: Istio 1.27]</div><div style='font-size: 80%; margin-top:10px'>Single LB entrypoint<br />(*.nip.io); mTLS mesh.</div>"]
+        style 9 fill:#e67e22,stroke:#a15817,color:#ffffff
+      end
+
+      subgraph group3 ["Identity"]
+        style group3 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+
+        39["<div style='font-weight: bold'>auth0-idp</div><div style='font-size: 70%; margin-top: 0px'>[Container: ExternalSecret]</div><div style='font-size: 80%; margin-top:10px'>ESO pulls Auth0 creds from<br />Key Vault → <name>-conn for<br />JWT verify.</div>"]
+        style 39 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      end
+
+      subgraph group4 ["Platform plane (shared)"]
+        style group4 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+
+        44["<div style='font-weight: bold'>KubeVela</div><div style='font-size: 70%; margin-top: 0px'>[Container: vela-core]</div><div style='font-size: 80%; margin-top:10px'>Renders OAM → workloads +<br />claims.</div>"]
+        style 44 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        45["<div style='font-weight: bold'>Crossplane</div><div style='font-size: 70%; margin-top: 0px'>[Container: v2.3]</div><div style='font-size: 80%; margin-top:10px'>Reconciles backing-infra<br />claims.</div>"]
+        style 45 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        46["<div style='font-weight: bold'>ArgoCD</div><div style='font-size: 70%; margin-top: 0px'>[Container: v3.4]</div><div style='font-size: 80%; margin-top:10px'>GitOps sync per-service<br />repos.</div>"]
+        style 46 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        47["<div style='font-weight: bold'>Knative Serving</div><div style='font-size: 70%; margin-top: 0px'>[Container: v1.22]</div><div style='font-size: 80%; margin-top:10px'>Scale-to-zero runtime.</div>"]
+        style 47 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      end
+
+      subgraph group5 ["camunda-orchestrator (app + bundled deps)"]
+        style group5 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+
+        31["<div style='font-weight: bold'>Zeebe broker</div><div style='font-size: 70%; margin-top: 0px'>[Container: Camunda 8 / Zeebe]</div><div style='font-size: 80%; margin-top:10px'>BPMN workflow engine.</div>"]
+        style 31 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        32["<div style='font-weight: bold'>Operate</div><div style='font-size: 70%; margin-top: 0px'>[Container: Camunda 8]</div><div style='font-size: 80%; margin-top:10px'>Process monitoring UI.</div>"]
+        style 32 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        33["<div style='font-weight: bold'>Tasklist</div><div style='font-size: 70%; margin-top: 0px'>[Container: Camunda 8]</div><div style='font-size: 80%; margin-top:10px'>Human task UI.</div>"]
+        style 33 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        34["<div style='font-weight: bold'>Optimize</div><div style='font-size: 70%; margin-top: 0px'>[Container: Camunda 8]</div><div style='font-size: 80%; margin-top:10px'>Process analytics.</div>"]
+        style 34 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        35["<div style='font-weight: bold'>Elasticsearch</div><div style='font-size: 70%; margin-top: 0px'>[Container: Elasticsearch]</div><div style='font-size: 80%; margin-top:10px'>Operate/Tasklist/Optimize<br />datastore.</div>"]
+        style 35 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        36["<div style='font-weight: bold'>zeebe-worker ksvc</div><div style='font-size: 70%; margin-top: 0px'>[Container: Knative / FastAPI]</div><div style='font-size: 80%; margin-top:10px'>Job workers (handlers.py).</div>"]
+        style 36 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      end
+
+      subgraph group6 ["graphql (gateway + platform)"]
+        style group6 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+
+        27["<div style='font-weight: bold'>Hive Gateway</div><div style='font-size: 70%; margin-top: 0px'>[Container: Knative / Hive]</div><div style='font-size: 80%; margin-top:10px'>Auto-federates sibling<br />GraphQL subgraphs;<br />JWT-enforced.</div>"]
+        style 27 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        28["<div style='font-weight: bold'>graphql-platform Redis</div><div style='font-size: 70%; margin-top: 0px'>[Container: Helm / Redis]</div><div style='font-size: 80%; margin-top:10px'>Gateway cache + config<br />(ConfigMap).</div>"]
+        style 28 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        29["<div style='font-weight: bold'>subgraph-a ksvc</div><div style='font-size: 70%; margin-top: 0px'>[Container: Knative]</div><div style='font-size: 80%; margin-top:10px'>Federated GraphQL subgraph.</div>"]
+        style 29 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        30["<div style='font-weight: bold'>subgraph-b ksvc</div><div style='font-size: 70%; margin-top: 0px'>[Container: Knative]</div><div style='font-size: 80%; margin-top:10px'>Federated GraphQL subgraph.</div>"]
+        style 30 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      end
+
+      subgraph group7 ["identity-service (app)"]
+        style group7 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+
+        12["<div style='font-weight: bold'>identity-service ksvc</div><div style='font-size: 70%; margin-top: 0px'>[Container: Knative / Spring Boot]</div><div style='font-size: 80%; margin-top:10px'>Domain IAM service;<br />issues/validates tokens.</div>"]
+        style 12 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      end
+
+      subgraph group8 ["rasa-chatbot (app)"]
+        style group8 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+
+        37["<div style='font-weight: bold'>Rasa server</div><div style='font-size: 70%; margin-top: 0px'>[Container: Knative / Rasa]</div><div style='font-size: 80%; margin-top:10px'>NLU + dialogue (prebaked<br />model).</div>"]
+        style 37 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        38["<div style='font-weight: bold'>Rasa actions</div><div style='font-size: 70%; margin-top: 0px'>[Container: Knative / Rasa SDK]</div><div style='font-size: 80%; margin-top:10px'>Custom action server.</div>"]
+        style 38 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      end
+
+      subgraph group9 ["realtime-platform (app + bundled deps)"]
+        style group9 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+
+        13["<div style='font-weight: bold'>Kafka broker</div><div style='font-size: 70%; margin-top: 0px'>[Container: Strimzi / Kafka]</div><div style='font-size: 80%; margin-top:10px'>Topics: sensor_raw,<br />sensor_agg, ...</div>"]
+        style 13 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        14["<div style='font-weight: bold'>Lenses HQ</div><div style='font-size: 70%; margin-top: 0px'>[Container: Lenses CE 6.2]</div><div style='font-size: 80%; margin-top:10px'>Stream-SQL console +<br />management UI.</div>"]
+        style 14 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        15["<div style='font-weight: bold'>Lenses Agent</div><div style='font-size: 70%; margin-top: 0px'>[Container: Lenses CE]</div><div style='font-size: 80%; margin-top:10px'>Connects HQ to the Kafka<br />cluster.</div>"]
+        style 15 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        16["<div style='font-weight: bold'>Metabase</div><div style='font-size: 70%; margin-top: 0px'>[Container: Metabase]</div><div style='font-size: 80%; margin-top:10px'>Analytics / dashboards over<br />stream data.</div>"]
+        style 16 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        17["<div style='font-weight: bold'>MQTT broker</div><div style='font-size: 70%; margin-top: 0px'>[Container: Mosquitto]</div><div style='font-size: 80%; margin-top:10px'>IoT ingest transport.</div>"]
+        style 17 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        18["<div style='font-weight: bold'>Postgres (rt-meta)</div><div style='font-size: 70%; margin-top: 0px'>[Container: Postgres]</div><div style='font-size: 80%; margin-top:10px'>Lenses + Metabase metadata.</div>"]
+        style 18 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        19["<div style='font-weight: bold'>realtime-service: ingest</div><div style='font-size: 70%; margin-top: 0px'>[Container: Knative / FastAPI]</div><div style='font-size: 80%; margin-top:10px'>HTTP /ingest → produces<br />sensor_raw.</div>"]
+        style 19 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        20["<div style='font-weight: bold'>realtime-service: processor</div><div style='font-size: 70%; margin-top: 0px'>[Container: Knative / FastAPI]</div><div style='font-size: 80%; margin-top:10px'>Consumes sensor_raw →<br />aggregates → sensor_agg.</div>"]
+        style 20 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        21["<div style='font-weight: bold'>realtime-service: gateway</div><div style='font-size: 70%; margin-top: 0px'>[Container: Knative / FastAPI]</div><div style='font-size: 80%; margin-top:10px'>Consumes sensor_agg →<br />WebSocket /ws.</div>"]
+        style 21 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      end
+
+      subgraph group10 ["webhook-platform (app + bundled deps)"]
+        style group10 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+
+        22["<div style='font-weight: bold'>Svix engine</div><div style='font-size: 70%; margin-top: 0px'>[Container: svix-server v1.69]</div><div style='font-size: 80%; margin-top:10px'>Outbound webhook delivery<br />(HMAC sign, retry).</div>"]
+        style 22 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        23["<div style='font-weight: bold'>Postgres (svix)</div><div style='font-size: 70%; margin-top: 0px'>[Container: Postgres]</div><div style='font-size: 80%; margin-top:10px'>Delivery metadata + logs.</div>"]
+        style 23 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        24["<div style='font-weight: bold'>Redis (svix)</div><div style='font-size: 70%; margin-top: 0px'>[Container: Redis]</div><div style='font-size: 80%; margin-top:10px'>Queue + retry backoff +<br />cache.</div>"]
+        style 24 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        25["<div style='font-weight: bold'>App Portal</div><div style='font-size: 70%; margin-top: 0px'>[Container: Istio VS]</div><div style='font-size: 80%; margin-top:10px'>Externally-exposed<br />self-service endpoint UI.</div>"]
+        style 25 fill:#c0392b,stroke:#86271e,color:#ffffff
+        26["<div style='font-weight: bold'>realtime-service: webhook bridge</div><div style='font-size: 70%; margin-top: 0px'>[Container: Knative / FastAPI + realtime-transport]</div><div style='font-size: 80%; margin-top:10px'>Consumes sensor_agg → POST<br />Svix /msg.</div>"]
+        style 26 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      end
+
+      subgraph group11 ["webservice (app)"]
+        style group11 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+
+        10["<div style='font-weight: bold'>webservice ksvc</div><div style='font-size: 70%; margin-top: 0px'>[Container: Knative / python|node|go|java]</div><div style='font-size: 80%; margin-top:10px'>Onion-arch HTTP API; binds<br />db/cache/identity; exposed<br />via APIM.</div>"]
+        style 10 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        11["<div style='font-weight: bold'>webservice-shape</div><div style='font-size: 70%; margin-top: 0px'>[Container: Knative]</div><div style='font-size: 80%; margin-top:10px'>Shape-only ksvc primitive the<br />webservice CD renders from.</div>"]
+        style 11 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      end
+
+    end
+
+    33-- "<div>reads</div><div style='font-size: 70%'></div>" -->35
+    34-- "<div>reads</div><div style='font-size: 70%'></div>" -->35
+    37-- "<div>custom actions</div><div style='font-size: 70%'></div>" -->38
+    39-- "<div>pulls Auth0 creds (ESO)</div><div style='font-size: 70%'></div>" -->7
+    39-- "<div>tenant</div><div style='font-size: 70%'></div>" -->5
+    44-- "<div>emits claims</div><div style='font-size: 70%'></div>" -->45
+    44-- "<div>renders ksvc</div><div style='font-size: 70%'></div>" -->47
+    46-- "<div>syncs workloads</div><div style='font-size: 70%'></div>" -->47
+    45-- "<div>provisions</div><div style='font-size: 70%'></div>" -->40
+    45-- "<div>provisions</div><div style='font-size: 70%'></div>" -->13
+    2-- "<div>HTTP / WS / chat</div><div style='font-size: 70%'></div>" -->9
+    3-- "<div>Telemetry (MQTT)</div><div style='font-size: 70%'>[Async]</div>" -->17
+    3-- "<div>Telemetry (HTTP /ingest)</div><div style='font-size: 70%'></div>" -->19
+    6-- "<div>expose-api route</div><div style='font-size: 70%'></div>" -->10
+    6-- "<div>federated GraphQL</div><div style='font-size: 70%'></div>" -->27
+    9-- "<div>/ingest</div><div style='font-size: 70%'></div>" -->19
+    9-- "<div>/ws</div><div style='font-size: 70%'></div>" -->21
+    9-- "<div>Operate UI</div><div style='font-size: 70%'></div>" -->32
+    9-- "<div>Tasklist UI</div><div style='font-size: 70%'></div>" -->33
+    9-- "<div>chat</div><div style='font-size: 70%'></div>" -->37
+    9-- "<div>token endpoints</div><div style='font-size: 70%'></div>" -->12
+    9-- "<div>self-service portal</div><div style='font-size: 70%'></div>" -->25
+    10-- "<div>binds db</div><div style='font-size: 70%'></div>" -->40
+    10-- "<div>binds cache</div><div style='font-size: 70%'></div>" -->42
+    10-- "<div>binds (serverless pg alt)</div><div style='font-size: 70%'></div>" -->41
+    10-- "<div>binds identity</div><div style='font-size: 70%'></div>" -->39
+    10-- "<div>rendered from</div><div style='font-size: 70%'></div>" -->11
+    10-- "<div>validates JWT</div><div style='font-size: 70%'></div>" -->5
+    12-- "<div>user store</div><div style='font-size: 70%'></div>" -->40
+    19-- "<div>produce sensor_raw</div><div style='font-size: 70%'>[Async]</div>" -->13
+    13-- "<div>consume sensor_raw</div><div style='font-size: 70%'>[Async]</div>" -->20
+    20-- "<div>produce sensor_agg</div><div style='font-size: 70%'>[Async]</div>" -->13
+    13-- "<div>consume sensor_agg</div><div style='font-size: 70%'>[Async]</div>" -->21
+    21-- "<div>WebSocket stream</div><div style='font-size: 70%'>[Async]</div>" -->2
+    15-- "<div>manages</div><div style='font-size: 70%'></div>" -->13
+    14-- "<div>controls</div><div style='font-size: 70%'></div>" -->15
+    16-- "<div>queries</div><div style='font-size: 70%'></div>" -->18
+    14-- "<div>metadata</div><div style='font-size: 70%'></div>" -->18
+    17-- "<div>bridges to topics</div><div style='font-size: 70%'>[Async]</div>" -->13
+    13-- "<div>consume sensor_agg</div><div style='font-size: 70%'>[Async]</div>" -->26
+    26-- "<div>POST /app/.../msg</div><div style='font-size: 70%'></div>" -->22
+    22-- "<div>store messages</div><div style='font-size: 70%'></div>" -->23
+    22-- "<div>queue + retry</div><div style='font-size: 70%'>[Async]</div>" -->24
+    22-- "<div>serves</div><div style='font-size: 70%'></div>" -->25
+    22-- "<div>HMAC-signed delivery</div><div style='font-size: 70%'>[Async]</div>" -->4
+    4-- "<div>self-registers endpoint</div><div style='font-size: 70%'></div>" -->25
+    27-- "<div>federates</div><div style='font-size: 70%'></div>" -->29
+    27-- "<div>federates</div><div style='font-size: 70%'></div>" -->30
+    27-- "<div>cache/config</div><div style='font-size: 70%'></div>" -->28
+    27-- "<div>can federate webservice<br />subgraph</div><div style='font-size: 70%'></div>" -->10
+    36-- "<div>activates jobs</div><div style='font-size: 70%'>[Async]</div>" -->31
+    31-- "<div>exports records</div><div style='font-size: 70%'>[Async]</div>" -->35
+    32-- "<div>reads</div><div style='font-size: 70%'></div>" -->35
+
+  end
