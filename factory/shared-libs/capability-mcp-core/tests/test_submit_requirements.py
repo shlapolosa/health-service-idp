@@ -277,3 +277,36 @@ def test_rasa_chatbot_needs_scaffold():
                        "actionsImage": "docker.io/x/a:latest"}}]}}
     comp = uc._needs_scaffold(app)
     assert comp is not None and comp["name"] == "chatdemo-bot"
+
+
+def test_camunda_orchestrator_routes_to_scaffold_path():
+    """CAMUNDA-WORKFLOW: camunda-orchestrator components scaffold a variant repo
+    (processes/*.bpmn + workers/) via the claim path — language defaults to the
+    camunda flavor, framework to zeebe-worker (consumers declare intent only)."""
+    from src.application.submit_use_case import SubmitUseCase
+    app = {"spec": {"components": [{
+        "name": "workflowdemo-orchestrator", "type": "camunda-orchestrator",
+        "properties": {"realtimePlatform": "workflowdemo-events"}}]}}
+    svcs = SubmitUseCase._webservice_services(app)
+    assert svcs == [{"name": "workflowdemo-orchestrator", "language": "camunda",
+                     "framework": "zeebe-worker"}]
+
+
+def test_camunda_orchestrator_needs_scaffold():
+    from src.application.submit_use_case import SubmitUseCase
+    uc = SubmitUseCase.__new__(SubmitUseCase)
+    app = {"spec": {"components": [{
+        "name": "workflowdemo-orchestrator", "type": "camunda-orchestrator",
+        "properties": {"realtimePlatform": "workflowdemo-events"}}]}}
+    comp = uc._needs_scaffold(app)
+    assert comp is not None and comp["name"] == "workflowdemo-orchestrator"
+
+
+def test_camunda_orchestrator_in_scaffold_types_and_fw_map():
+    """The component type is registered for scaffolding and camunda maps to the
+    zeebe-worker framework (single source of truth for the variant flavor)."""
+    from src.application.submit_use_case import SubmitUseCase
+    assert "camunda-orchestrator" in SubmitUseCase._SCAFFOLD_TYPES
+    assert SubmitUseCase._FW_FOR_LANG["camunda"] == "zeebe-worker"
+    assert SubmitUseCase._derive_framework("camunda", None) == "zeebe-worker"
+    assert SubmitUseCase._derive_framework("camunda", "auto") == "zeebe-worker"
