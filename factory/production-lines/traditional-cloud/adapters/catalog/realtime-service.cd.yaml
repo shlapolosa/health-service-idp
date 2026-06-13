@@ -289,12 +289,6 @@ spec:
                   language:  "python"
                   framework: "fastapi"
                   flavor:    "realtime"
-                  // RT-2/WH-1: propagate the realtime ROLE into the scaffold claim so
-                  // the AppContainerClaim composition sets serviceRole -> SERVICE_ROLE ->
-                  // mscv generates the correct main.py variant (webhook => Svix sink, not
-                  // the default /ws gateway). Without this the bridge silently ran the
-                  // gateway app and never forwarded to the webhook engine.
-                  role: [if parameter.role != _|_ {parameter.role}, "gateway"][0]
                 }]
               }
             }
