@@ -99,6 +99,7 @@ case "\$1" in
       *health-service-idp.git) src="\$HSI_FIXTURE";;
       *onion-architecture-template.git) src="\$TEMPLATE_FIXTURE";;
       *chat-template.git) src="\$TEMPLATE_FIXTURE";;  # RASA-CONTAINER #178: base-image scaffold ignores the template; any dir works
+      *camunda-workflow-template.git) src="\$TEMPLATE_FIXTURE";;  # CAMUNDA-WORKFLOW: variant scaffold ignores the template clone; any dir works
       *graphql-federation-gateway-template.git) src="\$TEMPLATE_FIXTURE";;
       *) src="\$APPCONTAINER_FIXTURE";;   # the AppContainer repo
     esac
@@ -420,6 +421,91 @@ if grep -q "DEV-AGENT-EDIT" "$CHAT_DIR/actions/actions.py" && grep -q "skipping 
   ok "no-clobber: edited actions.py preserved on re-run"
 else
   bad "rasa no-clobber failed (edit lost or guard silent)"
+fi
+
+run_entrypoint_camunda() {
+  # CAMUNDA-WORKFLOW: camunda/zeebe-worker leg of the harness.
+  env -i \
+    PATH="$STUB_DIR:/usr/bin:/bin:/usr/sbin:/sbin:$PYTHON_BIN_DIR" \
+    HOME="$ROOT/home" \
+    APPCONTAINER_FIXTURE="$APPCONTAINER_FIXTURE" \
+    TEMPLATE_FIXTURE="$TEMPLATE_FIXTURE" \
+    HSI_FIXTURE="$HSI_FIXTURE" \
+    GIT_PUSH_MODE="${GIT_PUSH_MODE:-ok}" \
+    SERVICE_NAME="dryrun-wf-svc" \
+    APP_CONTAINER="dryrun-app" \
+    LANGUAGE="camunda" \
+    FRAMEWORK="zeebe-worker" \
+    SERVICE_FLAVOR="" \
+    SERVICE_ROLE="" \
+    GITHUB_TOKEN="x" \
+    GITHUB_USER="dryuser" \
+    bash "$ENTRYPOINT"
+}
+
+echo "=== Scenario 8: camunda/zeebe-worker variant-only scaffold (CAMUNDA-WORKFLOW) ==="
+rm -rf "/tmp/template-dryrun-wf-svc" || true
+# Reuse the dryrun-app container; the no-clobber guard keys per-service-dir, so
+# a fresh service name (dryrun-wf-svc) scaffolds cleanly alongside the rasa one.
+GIT_PUSH_MODE=ok run_entrypoint_camunda > "$ROOT/run8.log" 2>&1 || { echo "camunda entrypoint failed:"; cat "$ROOT/run8.log"; exit 1; }
+
+WF_DIR="/tmp/app-container-dryrun-app/microservices/dryrun-wf-svc"
+
+MISSING=""
+for f in processes/approval.bpmn workers/__init__.py workers/handlers.py \
+         deploy/deploy.py docker/worker/Dockerfile; do
+  [ -f "$WF_DIR/$f" ] || MISSING="$MISSING $f"
+done
+if [ -z "$MISSING" ]; then
+  ok "variant workflow files (bpmn + workers + deploy + thin Dockerfile) all present"
+else
+  bad "missing variant files:$MISSING"
+fi
+
+# Variant-only: NOTHING invariant (pyzeebe runtime / deps) vendored.
+VENDORED=""
+for f in pyproject.toml requirements.txt zeebe_worker_base.py; do
+  [ ! -f "$WF_DIR/$f" ] || VENDORED="$VENDORED $f"
+done
+if [ -z "$VENDORED" ]; then
+  ok "no invariant files vendored (runtime lives in zeebe-worker-base)"
+else
+  bad "invariant files leaked into the repo:$VENDORED"
+fi
+
+# Thin layer: pinned zeebe-worker-base FROM, no dep install, no :latest (HARD-3).
+if grep -q '^FROM healthidpuaeacr\.azurecr\.io/zeebe-worker-base:v1\.0\.0$' "$WF_DIR/docker/worker/Dockerfile"; then
+  ok "worker Dockerfile FROM the pinned zeebe-worker-base image"
+else
+  bad "worker Dockerfile FROM line wrong"
+fi
+if ! grep -rqE 'pip install|poetry install' "$WF_DIR/docker/" ; then
+  ok "thin layer: no dependency install in generated Dockerfile"
+else
+  bad "generated Dockerfile still installs deps"
+fi
+if ! grep -rq ':latest' "$WF_DIR"; then
+  ok "no :latest reference anywhere in the generated service (HARD-3)"
+else
+  bad ":latest leaked into the generated service"
+fi
+# Minimal WORKING process: a service task wired to a registered worker handler.
+if grep -q 'zeebe:taskDefinition type="review-request"' "$WF_DIR/processes/approval.bpmn" \
+   && grep -q '@register("review-request")' "$WF_DIR/workers/handlers.py"; then
+  ok "minimal working process (review-request task) wired to a worker handler"
+else
+  bad "process<->worker wiring missing"
+fi
+
+echo "=== Scenario 9: camunda re-run no-clobber preserves edited handlers.py ==="
+# processes/ is the camunda guard artifact in entrypoint.sh — a re-run must exit
+# 0 without touching the dev-agent's workflow/worker edits.
+echo "# DEV-AGENT-EDIT" >> "$WF_DIR/workers/handlers.py"
+GIT_PUSH_MODE=ok run_entrypoint_camunda > "$ROOT/run9.log" 2>&1 || { echo "camunda no-clobber rerun failed:"; cat "$ROOT/run9.log"; exit 1; }
+if grep -q "DEV-AGENT-EDIT" "$WF_DIR/workers/handlers.py" && grep -q "skipping re-scaffold (no-clobber)" "$ROOT/run9.log"; then
+  ok "no-clobber: edited handlers.py preserved on re-run"
+else
+  bad "camunda no-clobber failed (edit lost or guard silent)"
 fi
 
 echo

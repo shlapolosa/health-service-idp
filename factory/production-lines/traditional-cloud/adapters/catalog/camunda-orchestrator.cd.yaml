@@ -32,6 +32,13 @@ spec:
               "app.kubernetes.io/part-of": "orchestration-platform"
               "orchestration.platform/type": "camunda"
               "camunda.io/component": "zeebe"
+              // HARD-4 (#171): opt the Zeebe gateway ksvc into the post-deploy
+              // contract-test gate. The sensor watches this label and fires the
+              // contract-test runner (CHECK_TYPE=camunda-orchestrator) which
+              // deploys a trivial BPMN to Zeebe and starts an instance to prove
+              // the data-plane (the workflow engine accepts + runs a process),
+              // not merely that the pod is Ready.
+              "contract-test.cafe.io/enabled": "true"
             }
             annotations: {
               if parameter.targetEnvironment != _|_ {
@@ -211,13 +218,54 @@ spec:
               }
             }
           }
+
+          // Binding contract (mirrors realtime-platform / postgresql / redis):
+          // normalized <name>-conn Secret so sibling webservices and job-workers
+          // can connect to the Camunda stack with `envFrom: <name>-conn` (the
+          // webservice CD wires it automatically when a component references this
+          // orchestrator). Service DNS is deterministic (the Zeebe gateway ksvc is
+          // context.name; the Operate/Tasklist ksvcs are context.name-operate /
+          // -tasklist), so every value is computed in pure CUE — public-repo safe,
+          // no secrets baked in.
+          "conn-secret": {
+            apiVersion: "v1"
+            kind:       "Secret"
+            metadata: {
+              name:      context.name + "-conn"
+              namespace: context.namespace
+              labels: {
+                "binding.cafe.io/category": "orchestration"
+                "app.oam.dev/component":    context.name
+              }
+            }
+            type: "Opaque"
+            stringData: {
+              // Zeebe gateway gRPC address (job-workers + clients connect here).
+              ZEEBE_ADDRESS:        context.name + "." + context.namespace + ".svc.cluster.local:80"
+              ZEEBE_GRPC_ADDRESS:   context.name + "." + context.namespace + ".svc.cluster.local:80"
+              // Plaintext for self-managed in-cluster (no TLS on the mesh hop).
+              ZEEBE_INSECURE:       "true"
+              ZEEBE_CLIENT_SECURITY_PLAINTEXT: "true"
+              // Monitoring + human-task surfaces (the externally-exposed UIs).
+              OPERATE_URL:          "http://" + context.name + "-operate." + context.namespace + ".svc.cluster.local"
+              TASKLIST_URL:         "http://" + context.name + "-tasklist." + context.namespace + ".svc.cluster.local"
+              CAMUNDA_PLATFORM_NAME: context.name
+              CAMUNDA_INTEGRATION_ENABLED: "true"
+              // Event-streaming bridge (Camunda<->realtime-platform) discovery.
+              if parameter.enableEventStreaming {
+                KAFKA_TOPICS_PREFIX: parameter.topicsPrefix
+              }
+            }
+          }
         }
-        
+
         // Conditional outputs based on UI enablement
         if parameter.enableUI != _|_ && parameter.enableUI == true {
           outputs: {
             // Always include infrastructure
             "orchestration-infrastructure": outputs["orchestration-infrastructure"]
+            // Binding contract: keep the <name>-conn secret in every conditional branch.
+            "conn-secret": outputs["conn-secret"]
             
             // Camunda Operate - Process Monitoring UI
             "camunda-operate": {
@@ -414,6 +462,8 @@ spec:
           outputs: {
             // Include all previous outputs
             "orchestration-infrastructure": outputs["orchestration-infrastructure"]
+            // Binding contract: keep the <name>-conn secret in every conditional branch.
+            "conn-secret": outputs["conn-secret"]
             "camunda-operate": outputs["camunda-operate"]
             "camunda-tasklist": outputs["camunda-tasklist"]
             
@@ -483,6 +533,8 @@ spec:
           outputs: {
             // Include all previous outputs
             "orchestration-infrastructure": outputs["orchestration-infrastructure"]
+            // Binding contract: keep the <name>-conn secret in every conditional branch.
+            "conn-secret": outputs["conn-secret"]
             if parameter.enableUI {
               "camunda-operate": outputs["camunda-operate"]
               "camunda-tasklist": outputs["camunda-tasklist"]
@@ -503,6 +555,7 @@ spec:
                 }
               }
               spec: {
+                // Shared cluster ingress (same selector rasa/realtime UIs use).
                 selector: {
                   istio: "ingressgateway"
                 }
@@ -512,11 +565,28 @@ spec:
                     name: "http"
                     protocol: "HTTP"
                   }
-                  hosts: [(*parameter.gatewayHost | context.name + ".orchestration.local")]
+                  // Externally-exposed workflow UIs on DISTINCT nip.io hosts
+                  // (matches the rasa/realtime convention: one host per UI on the
+                  // shared *.20.233.105.82.nip.io ingress IP). The old single
+                  // path-prefixed *.orchestration.local host is retained too so any
+                  // existing consumer that set `gatewayHost` keeps working.
+                  hosts: [
+                    context.name + "-zeebe." + (*parameter.nipHost | "20.233.105.82.nip.io"),
+                    if parameter.enableUI {
+                      context.name + "-operate." + (*parameter.nipHost | "20.233.105.82.nip.io")
+                    },
+                    if parameter.enableUI {
+                      context.name + "-tasklist." + (*parameter.nipHost | "20.233.105.82.nip.io")
+                    },
+                    if parameter.enableOptimize {
+                      context.name + "-optimize." + (*parameter.nipHost | "20.233.105.82.nip.io")
+                    },
+                    (*parameter.gatewayHost | context.name + ".orchestration.local"),
+                  ]
                 }]
               }
             }
-            
+
             "istio-virtualservice": {
               apiVersion: "networking.istio.io/v1beta1"
               kind: "VirtualService"
@@ -529,10 +599,79 @@ spec:
                 }
               }
               spec: {
-                hosts: [(*parameter.gatewayHost | context.name + ".orchestration.local")]
+                // VS binds every host the gateway serves; host-based routing sends
+                // each distinct nip.io host to its own ksvc. The legacy
+                // *.orchestration.local host keeps the path-prefix routes.
+                hosts: [
+                  context.name + "-zeebe." + (*parameter.nipHost | "20.233.105.82.nip.io"),
+                  if parameter.enableUI {
+                    context.name + "-operate." + (*parameter.nipHost | "20.233.105.82.nip.io")
+                  },
+                  if parameter.enableUI {
+                    context.name + "-tasklist." + (*parameter.nipHost | "20.233.105.82.nip.io")
+                  },
+                  if parameter.enableOptimize {
+                    context.name + "-optimize." + (*parameter.nipHost | "20.233.105.82.nip.io")
+                  },
+                  (*parameter.gatewayHost | context.name + ".orchestration.local"),
+                ]
                 gateways: [context.name + "-gateway"]
                 http: [
-                  // Zeebe API route
+                  // Host-based: <name>-operate.<nip> -> Operate ksvc.
+                  if parameter.enableUI {
+                    {
+                      match: [{
+                        authority: {
+                          prefix: context.name + "-operate."
+                        }
+                      }]
+                      route: [{
+                        destination: {
+                          host: context.name + "-operate." + context.namespace + ".svc.cluster.local"
+                          port: {
+                            number: 80
+                          }
+                        }
+                      }]
+                    }
+                  },
+                  // Host-based: <name>-tasklist.<nip> -> Tasklist ksvc.
+                  if parameter.enableUI {
+                    {
+                      match: [{
+                        authority: {
+                          prefix: context.name + "-tasklist."
+                        }
+                      }]
+                      route: [{
+                        destination: {
+                          host: context.name + "-tasklist." + context.namespace + ".svc.cluster.local"
+                          port: {
+                            number: 80
+                          }
+                        }
+                      }]
+                    }
+                  },
+                  // Host-based: <name>-optimize.<nip> -> Optimize ksvc.
+                  if parameter.enableOptimize && parameter.enableUI {
+                    {
+                      match: [{
+                        authority: {
+                          prefix: context.name + "-optimize."
+                        }
+                      }]
+                      route: [{
+                        destination: {
+                          host: context.name + "-optimize." + context.namespace + ".svc.cluster.local"
+                          port: {
+                            number: 80
+                          }
+                        }
+                      }]
+                    }
+                  },
+                  // Legacy path-prefix routes (the *.orchestration.local host).
                   {
                     match: [{
                       uri: {
@@ -551,7 +690,6 @@ spec:
                       }
                     }]
                   },
-                  // Operate UI route
                   if parameter.enableUI {
                     {
                       match: [{
@@ -572,7 +710,6 @@ spec:
                       }]
                     }
                   },
-                  // Tasklist UI route
                   if parameter.enableUI {
                     {
                       match: [{
@@ -593,7 +730,6 @@ spec:
                       }]
                     }
                   },
-                  // Optimize UI route
                   if parameter.enableOptimize && parameter.enableUI {
                     {
                       match: [{
@@ -614,7 +750,7 @@ spec:
                       }]
                     }
                   },
-                  // Default route
+                  // Default route -> Zeebe gateway (also serves <name>-zeebe.<nip>).
                   {
                     match: [{
                       uri: {
@@ -641,6 +777,8 @@ spec:
           outputs: {
             // Include all previous outputs
             "orchestration-infrastructure": outputs["orchestration-infrastructure"]
+            // Binding contract: keep the <name>-conn secret in every conditional branch.
+            "conn-secret": outputs["conn-secret"]
             if parameter.enableUI {
               "camunda-operate": outputs["camunda-operate"]
               "camunda-tasklist": outputs["camunda-tasklist"]
@@ -684,11 +822,17 @@ spec:
                 description:    "OAM-driven Camunda orchestrator via ComponentDefinition (declarative spine)"
                 gitHubOrg:      "shlapolosa"
                 dockerRegistry: "healthidpuaeacr.azurecr.io"
-                // Map language onto the ApplicationClaim XRD enum [python, java, rasa, nodejs].
-                // First-match-default: pass through supported values, else default python.
-                language: [if parameter.language == "java" {"java"}, if parameter.language == "nodejs" {"nodejs"}, "python"][0]
-                // Framework derived from chosen language: java->springboot, nodejs->graphql-gateway, else fastapi.
-                framework: [if parameter.language == "java" {"springboot"}, if parameter.language == "nodejs" {"graphql-gateway"}, "fastapi"][0]
+                // CAMUNDA-WORKFLOW: the variant repo holds processes/*.bpmn +
+                // workers/ (job-worker handlers) — a NEW scaffold flavor whose
+                // language is "camunda" / framework "zeebe-worker" (mirrors the
+                // rasa "rasa"/"chatbot" flavor). java/nodejs are still honored if a
+                // consumer brings a Spring Zeebe / nodejs worker; otherwise default
+                // to the camunda variant flavor (NOT python — a python webservice
+                // would not get a worker scaffold). mscv's template-select maps
+                // camunda/zeebe-worker -> the bpmn+worker variant.
+                language: [if parameter.language == "java" {"java"}, if parameter.language == "nodejs" {"nodejs"}, "camunda"][0]
+                // Framework derived from chosen language.
+                framework: [if parameter.language == "java" {"springboot"}, if parameter.language == "nodejs" {"graphql-gateway"}, "zeebe-worker"][0]
                 // First-match-default: explicit targetEnvironment, else "host".
                 deliveryTarget: [if parameter.targetEnvironment != _|_ {parameter.targetEnvironment}, "host"][0]
               }
@@ -760,9 +904,13 @@ spec:
           // Multi-cluster support
           targetEnvironment?: string  // vCluster deployment target
           
-          // External access (optional)
-          enableIstioGateway?: bool
-          gatewayHost?: string
+          // External access. The workflow UIs (Operate/Tasklist) are
+          // externally-exposed by DEFAULT now (matches rasa/realtime UIs), each on
+          // its own nip.io host off the shared ingress. Set enableIstioGateway:false
+          // to keep them cluster-internal.
+          enableIstioGateway: *true | bool
+          gatewayHost?: string         // legacy single host (path-prefix routes)
+          nipHost?: string             // base nip.io domain for the per-UI hosts
           enableTLS?: bool
           
           // Configuration

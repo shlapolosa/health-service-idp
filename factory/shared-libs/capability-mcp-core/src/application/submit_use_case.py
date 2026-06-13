@@ -514,6 +514,11 @@ class SubmitUseCase:
                 # RASA-CONTAINER (#178): bot implementation language is a
                 # platform detail — consumers declare intent only.
                 lang = "rasa"
+            if not lang and comp.get("type") == "camunda-orchestrator":
+                # CAMUNDA-WORKFLOW: the workflow implementation (processes/*.bpmn +
+                # workers/) is a platform-shaped variant — consumers declare intent
+                # only; default the scaffold language to the camunda flavor.
+                lang = "camunda"
             if not lang:
                 continue
             # Image must be the auto-default (or absent) — if consumer set a non-default
@@ -533,11 +538,16 @@ class SubmitUseCase:
     # (domain/data/config/actions) into the monorepo on the prebaked rasa-base
     # image — routed through the claim path like every other scaffold type.
     # (Caught live: it previously fell through to the legacy oam-apply path.)
+    # CAMUNDA-WORKFLOW: camunda-orchestrator scaffolds a variant-only workflow
+    # repo (processes/*.bpmn + workers/ job-worker handlers) into the monorepo
+    # on the prebaked zeebe-worker base image — same claim path as every other
+    # scaffold type.
     _SCAFFOLD_TYPES = ("webservice", "graphql-gateway", "realtime-service",
-                       "rasa-chatbot")
+                       "rasa-chatbot", "camunda-orchestrator")
 
     _FW_FOR_LANG = {"python": "fastapi", "java": "springboot",
-                    "rasa": "chatbot", "nodejs": "graphql-gateway"}
+                    "rasa": "chatbot", "nodejs": "graphql-gateway",
+                    "camunda": "zeebe-worker"}
 
     @classmethod
     def _derive_framework(cls, lang: str, fw: str | None) -> str:
@@ -581,6 +591,10 @@ class SubmitUseCase:
                 # RASA-CONTAINER (#178): bot implementation language is a
                 # platform detail — consumers declare intent only.
                 lang = "rasa"
+            if not lang and comp.get("type") == "camunda-orchestrator":
+                # CAMUNDA-WORKFLOW: workflow (bpmn+workers) is a platform-shaped
+                # variant — consumers declare intent only.
+                lang = "camunda"
             if not lang:
                 continue
             img = props.get("image", "")

@@ -15,6 +15,13 @@ mscv_select_template() {
   elif [ "$LANGUAGE" = "java" ] && [ "$FRAMEWORK" = "springboot" ]; then
     TEMPLATE_REPO="identity-service-template"
     echo "Using identity-service template for Java/Spring Boot service"
+  elif [ "$LANGUAGE" = "camunda" ] && [ "$FRAMEWORK" = "zeebe-worker" ]; then
+    # CAMUNDA-WORKFLOW: variant-only scaffold (processes/*.bpmn + workers/) on the
+    # prebaked zeebe-worker base image — no template repo clone needed (the libs
+    # generate the files directly, mirroring rasa's base-image path). TEMPLATE_REPO
+    # is still set for contract parity / the clone step (a tiny seed repo).
+    TEMPLATE_REPO="camunda-workflow-template"
+    echo "Using camunda workflow variant scaffold for Camunda/Zeebe service"
   else
     echo "❌ Unsupported service type: $LANGUAGE/$FRAMEWORK"
     exit 1

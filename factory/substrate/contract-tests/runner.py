@@ -268,6 +268,7 @@ class Deps:
         http_post_graphql: Optional[Callable[[Config, str], Awaitable[bool]]] = None,
         http_post_json: Optional[
             Callable[[Config, str, Dict[str, object]], Awaitable[int]]] = None,
+        camunda_run: Optional[Callable[[Config], Awaitable[str]]] = None,
     ):
         self.ws_recv = ws_recv or _default_ws_recv
         self.kafka_produce = kafka_produce or _produce_to_kafka
@@ -276,6 +277,7 @@ class Deps:
         self.http_get = http_get or _default_http_get
         self.http_post_graphql = http_post_graphql or _default_http_post_graphql
         self.http_post_json = http_post_json or _default_http_post_json
+        self.camunda_run = camunda_run or _default_camunda_run
 
 
 async def _default_ws_recv(cfg: Config, marker: Dict[str, object]) -> bool:
@@ -368,6 +370,73 @@ async def _default_http_post_graphql(cfg: Config, query: str) -> bool:
         except Exception:
             return False
         return isinstance(body, dict) and "data" in body
+
+
+async def _default_camunda_run(cfg: Config) -> str:
+    """CAMUNDA data-plane proof: deploy a trivial BPMN to the Zeebe gateway and
+    START a process instance, returning the bpmnProcessId that was instantiated.
+
+    This is the camunda analogue of the realtime rt1-flow: a readiness probe only
+    proves the Zeebe pod accepts gRPC; this proves the ENGINE accepts a process
+    definition and creates a running instance from it (the workflow data-plane).
+
+    Connection is read at RUNTIME from env the sensor wires via envFrom the
+    orchestrator's <name>-conn secret: ZEEBE_ADDRESS (host:port of the gateway).
+    Nothing is baked into the image (public-repo safe). pyzeebe is imported lazily
+    so unit tests run without the grpc stack installed and a missing dep surfaces
+    as a clear failed verdict.
+
+    The trivial BPMN is a start-event -> end-event (NO service task) so the
+    instance completes WITHOUT needing a job worker — the proof is that the engine
+    deployed + instantiated it, decoupled from whether the variant's workers are up.
+    """
+    from pyzeebe import ZeebeClient, create_insecure_channel  # type: ignore
+
+    address = os.environ.get("ZEEBE_ADDRESS", "").strip()
+    if not address:
+        raise RuntimeError("no ZEEBE_ADDRESS in env (expected from <name>-conn)")
+    host, _, port = address.partition(":")
+    channel = create_insecure_channel(grpc_address="{}:{}".format(host, port or "26500"))
+    client = ZeebeClient(channel)
+
+    # A unique, self-completing process (no external task) so the instance reaches
+    # the end event purely on the engine. Unique id avoids cross-run collisions.
+    proc_id = "ct-{}".format(uuid.uuid4().hex[:10])
+    bpmn = _trivial_bpmn(proc_id)
+    await client.deploy_resource_from_bytes(bpmn.encode("utf-8"),
+                                            resource_name="{}.bpmn".format(proc_id))
+    # Start-and-await: the instance runs to the end event immediately.
+    await client.run_process_with_result(bpmn_process_id=proc_id,
+                                         variables={"contract_test": True})
+    return proc_id
+
+
+def _trivial_bpmn(proc_id: str) -> str:
+    """A minimal executable BPMN: start -> end, no service task (self-completing)."""
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" '
+        'xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" '
+        'id="Definitions_{pid}" targetNamespace="http://bpmn.io/schema/bpmn">'
+        '<bpmn:process id="{pid}" name="contract-test" isExecutable="true">'
+        '<bpmn:startEvent id="start"><bpmn:outgoing>f1</bpmn:outgoing></bpmn:startEvent>'
+        '<bpmn:endEvent id="end"><bpmn:incoming>f1</bpmn:incoming></bpmn:endEvent>'
+        '<bpmn:sequenceFlow id="f1" sourceRef="start" targetRef="end" />'
+        '</bpmn:process></bpmn:definitions>'
+    ).format(pid=proc_id)
+
+
+async def check_camunda(cfg: Config, deps: Deps) -> Verdict:
+    """camunda-orchestrator: deploy a trivial BPMN to Zeebe and start an instance,
+    asserting it completes. Proves the workflow ENGINE data-plane, not just that
+    the Zeebe pod is Ready."""
+    try:
+        proc_id = await asyncio.wait_for(deps.camunda_run(cfg), timeout=cfg.timeout)
+    except asyncio.TimeoutError:
+        return Verdict(cfg.component, cfg.ctype, "camunda-deploy-and-run", False,
+                       "deploy+start a process instance timed out after {}s".format(cfg.timeout))
+    return Verdict(cfg.component, cfg.ctype, "camunda-deploy-and-run", True,
+                   "deployed + completed process instance {} on the Zeebe gateway".format(proc_id))
 
 
 async def check_realtime_gateway(cfg: Config, deps: Deps) -> Verdict:
@@ -494,6 +563,8 @@ def select_check(cfg: Config) -> Callable[[Config, Deps], Awaitable[Verdict]]:
         return check_graphql_gateway
     if cfg.ctype == "webservice":
         return check_webservice
+    if cfg.ctype == "camunda-orchestrator":
+        return check_camunda
     if cfg.ctype == "realtime-service":
         return {
             "gateway": check_realtime_gateway,

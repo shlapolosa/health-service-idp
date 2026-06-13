@@ -342,3 +342,48 @@ def test_ws_marker_matches_nested_envelope():
                     "data": {"topic": "sensor_agg", "message": marker}},
     })
     assert marker["marker_id"] in str(envelope)
+
+
+# --------------------------------------------------------------------------- #
+# CAMUNDA-WORKFLOW: camunda-orchestrator data-plane check
+# --------------------------------------------------------------------------- #
+def test_select_check_dispatch_camunda():
+    assert r.select_check(_cfg(ctype="camunda-orchestrator")) is r.check_camunda
+
+
+def test_camunda_pass_when_instance_completes():
+    async def camunda_run(cfg):
+        return "ct-deadbeef01"
+    deps = r.Deps(camunda_run=camunda_run)
+    v = _await(r.check_camunda(_cfg(ctype="camunda-orchestrator"), deps))
+    assert v.passed is True
+    assert v.check == "camunda-deploy-and-run"
+    assert "ct-deadbeef01" in v.detail
+
+
+def test_camunda_timeout_is_failed_verdict():
+    async def camunda_run(cfg):
+        await asyncio.sleep(5)
+        return "never"
+    cfg = _cfg(ctype="camunda-orchestrator", timeout=0.1)
+    v = _await(r.check_camunda(cfg, r.Deps(camunda_run=camunda_run)))
+    assert v.passed is False and "timed out" in v.detail
+
+
+def test_camunda_run_wraps_client_error_as_failed_verdict():
+    async def camunda_run(cfg):
+        raise RuntimeError("no ZEEBE_ADDRESS in env (expected from <name>-conn)")
+    cfg = _cfg(ctype="camunda-orchestrator")
+    v = _await(r.run(cfg, r.Deps(camunda_run=camunda_run)))
+    assert v.passed is False
+    assert "ZEEBE_ADDRESS" in v.detail
+
+
+def test_trivial_bpmn_is_self_completing_and_unique():
+    a = r._trivial_bpmn("ct-aaa")
+    b = r._trivial_bpmn("ct-bbb")
+    # executable, has start+end, no service task (completes without a worker).
+    assert 'isExecutable="true"' in a
+    assert "startEvent" in a and "endEvent" in a
+    assert "serviceTask" not in a
+    assert 'id="ct-aaa"' in a and 'id="ct-bbb"' in b
