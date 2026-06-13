@@ -27,7 +27,10 @@
 # mscv_scaffold_rasa_legacy (RASA_SCAFFOLD_MODE=legacy) until the base image
 # is proven, then it can be deleted.
 
-RASA_BASE_IMAGE_DEFAULT="healthidpuaeacr.azurecr.io/rasa-base:v1.0.0"
+# v1.1.0: deterministic train-cache (#178) — boot reuses the CI-baked model
+# instead of re-training. The fingerprint + sidecar .bot-hash change boot
+# behavior, so the tag is bumped from v1.0.0. NEVER :latest (HARD-3).
+RASA_BASE_IMAGE_DEFAULT="healthidpuaeacr.azurecr.io/rasa-base:v1.1.0"
 
 mscv_scaffold_rasa() {
   if [ "${RASA_SCAFFOLD_MODE:-base-image}" = "legacy" ]; then

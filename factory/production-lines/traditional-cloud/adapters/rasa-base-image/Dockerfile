@@ -13,12 +13,19 @@
 # The VARIANT bot (domain.yml, config.yml, data/, actions/) is COPY'd to
 # /app/bot/ by a 3-line Dockerfile in the generated app repo:
 #
-#   FROM healthidpuaeacr.azurecr.io/rasa-base:v1.0.0
+#   FROM healthidpuaeacr.azurecr.io/rasa-base:v1.1.0
 #   COPY --chown=1001:1001 . /app/bot/
-#   RUN train-if-needed.sh        # bakes the model at CI build time
+#   RUN train-if-needed.sh        # bakes the model + .bot-hash at CI build time
 #
 # HARD-3 image-pin discipline: this image is ONLY ever referenced by an
-# explicit version tag (rasa-base:v1.0.0). NEVER :latest.
+# explicit version tag (rasa-base:v1.1.0). NEVER :latest.
+#
+# v1.1.0 (#178): deterministic train-cache. The fingerprint now lives in the
+# shared bot-hash.sh (sourced by train-if-needed.sh so build == boot) and is
+# hashed content-only over an explicit allowlist (domain.yml, config.yml,
+# data/**/*.y{a,}ml), immune to rasa's post-train filesystem junk. A .bot-hash
+# sidecar is baked next to the model; boot skips training iff the model exists
+# AND the sidecar matches. Pre-v1.1.0 boots re-trained on a fingerprint miss.
 #
 # Base mirrors the proven chat-template docker/Dockerfile build
 # (python:3.10-slim + build toolchain + poetry, virtualenvs disabled).
@@ -54,9 +61,10 @@ RUN poetry install --no-root --no-interaction --no-ansi \
 # credentials.yml in /app/bot/ to override — see docker-entrypoint.sh).
 COPY config/endpoints.yml config/credentials.yml /opt/rasa-base/config/
 
-# Entrypoint + content-hash train cache.
-COPY scripts/docker-entrypoint.sh scripts/train-if-needed.sh /usr/local/bin/
-RUN chmod 0755 /usr/local/bin/docker-entrypoint.sh /usr/local/bin/train-if-needed.sh \
+# Entrypoint + content-hash train cache. bot-hash.sh is the shared fingerprint
+# definition sourced by train-if-needed.sh (build == boot, see #178).
+COPY scripts/docker-entrypoint.sh scripts/train-if-needed.sh scripts/bot-hash.sh /usr/local/bin/
+RUN chmod 0755 /usr/local/bin/docker-entrypoint.sh /usr/local/bin/train-if-needed.sh /usr/local/bin/bot-hash.sh \
     && mkdir -p /app/bot /app/models \
     && chown -R 1001:1001 /app
 
