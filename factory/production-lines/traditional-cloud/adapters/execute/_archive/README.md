@@ -90,6 +90,57 @@ on the cluster. This git archival is therefore record-keeping only — do NOT
 delete the on-cluster oam-driven-contract WorkflowTemplate until pattern2 is
 migrated or retired (tracked as RETIRE-WFT-3).
 
+### RESOLVED by RETIRE-WFT-3 (#154, 2026-06-13)
+
+`pattern2-compositional-workflow` was the LAST live referencer of
+`oam-driven-contract` (its `route-component-handler` template carried
+`templateRef: oam-driven-contract` at the `create-appcontainer` step). It is now
+retired, which finishes the declarative-spine migration. Both WorkflowTemplate
+objects were deleted from the cluster (`kubectl delete workflowtemplate -n argo
+oam-driven-contract pattern2-compositional-workflow`).
+
+Proof nothing referenced them at retire time (empirical, 2026-06-13):
+- **No Argo Workflow run** referenced either WFT (`kubectl get workflows -n argo`
+  templateRef scan → none).
+- **No sensor / eventsource** referenced either. The live OAM-intake sensor
+  `oam-to-slack-api` (argo-events) POSTs to `slack-api-server/oam/webhook`; that
+  path runs `PatternOrchestrator → Pattern2CompositionalHandler`, but RETIRE-WFT-2
+  (#152) had already migrated all four compositional CDs (rasa-chatbot,
+  graphql-gateway, realtime-platform, camunda-orchestrator) to emit
+  `AppContainerClaim` directly at OAM-reconcile time, so the webhook no longer
+  reaches the WFT-submitting branch.
+- **No other WorkflowTemplate** referenced `pattern2-compositional-workflow`
+  (only `pattern2` referenced `oam-driven-contract`, and `oam-driven-contract`
+  referenced only itself).
+- **No non-archived YAML / CD / substrate include** referenced either WFT.
+
+Dead config removed in the same commit: the `pattern2-compositional-workflow`
+literals in `intake-slack/src/domain/strategies/pattern2_compositional.py`
+(`COMPOSITIONAL_TYPES[*].workflow` for rasa-chatbot/graphql-gateway and the
+`get_workflow_name` fallback) were repointed to the claim-based path they actually
+take (`handle_via_application_claim` already used `oam-driven-contract`→now the
+AppContainerClaim path is the real route; the WFT-submitting `super().handle()`
+branch is dead). The handler, orchestrator, and `/oam/webhook` route are
+otherwise unchanged and still serve the claims path.
+
+## pattern2-compositional-workflow.yaml (archived 2026-06-13)
+
+- **Archived + on-cluster WFT deleted:** 2026-06-13 (workstream RETIRE-WFT-3,
+  #154). See "RESOLVED by RETIRE-WFT-3" above for the full proof-of-no-dependency.
+- **What it was:** a 9-template Argo WorkflowTemplate that orchestrated multi-service
+  compositional OAM components (rasa-chatbot, graphql-gateway, graphql-platform,
+  identity-service) by routing to sub-workflows. Its `create-appcontainer` step
+  `templateRef`'d `oam-driven-contract`, making it the last live referencer of that
+  legacy WFT.
+- **Replaced by:** the declarative AppContainerClaim path (RETIRE-WFT-2 #152). The
+  compositional CDs emit `AppContainerClaim` directly at OAM-reconcile; the
+  intake-slack `Pattern2CompositionalHandler.handle_via_application_claim` routes
+  source-code components through the claim path, not this WFT.
+- **To resurrect:** `git mv` both this file and `oam-driven-contract.yaml` back to
+  `../`, re-add their substrate/ArgoCD includes, and revert the four CD
+  `scaffold-claim` outputs to `workflow-trigger` curl-Jobs (per the
+  oam-driven-contract resurrect note above).
+
 ## oam-webhook-registration.yaml (archived 2026-06-07)
 
 Legacy pre-spine admission machinery: a MutatingWebhookConfiguration

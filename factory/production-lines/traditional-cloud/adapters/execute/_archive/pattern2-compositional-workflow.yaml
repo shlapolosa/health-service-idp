@@ -2,11 +2,20 @@
 # Pattern 2: Compositional Services Workflow
 # Handles multi-service components (rasa-chatbot, graphql-gateway, graphql-platform, identity-service)
 # Orchestrates existing workflows based on component type
+#
+# ARCHIVED 2026-06-13 (RETIRE-WFT-3, #154). NOT applied to any cluster; the live
+# WorkflowTemplate object was deleted. This was the LAST live referencer of
+# oam-driven-contract (see the create-appcontainer step below). Superseded by the
+# declarative AppContainerClaim path (RETIRE-WFT-2 #152). See ./README.md.
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
   name: pattern2-compositional-workflow
   namespace: argo
+  annotations:
+    deprecated: "true"
+    retired-by: "RETIRE-WFT-3 (#154), 2026-06-13"
+    replaced-by: "AppContainerClaim path (RETIRE-WFT-2 #152)"
 spec:
   entrypoint: main
   arguments:

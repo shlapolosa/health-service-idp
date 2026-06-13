@@ -13,16 +13,22 @@ logger = logging.getLogger(__name__)
 class Pattern2CompositionalHandler(PatternHandler):
     """Handler for Pattern 2: Compositional components (multi-service, orchestration needed)."""
     
+    # RETIRE-WFT-3 (#154, 2026-06-13): the `pattern2-compositional-workflow` and
+    # `oam-driven-contract` WorkflowTemplates were retired (declarative-spine
+    # migration). Source-code compositional types route through
+    # handle_via_application_claim → the AppContainerClaim path, NOT a WFT. The
+    # legacy WFT-submitting branch (super().handle() / get_workflow_name) is dead;
+    # `workflow` here is descriptive metadata only.
     COMPOSITIONAL_TYPES = {
         "rasa-chatbot": {
-            "workflow": "pattern2-compositional-workflow",  # Uses the new workflow
+            "workflow": "application-claim",  # claim-based path (RETIRE-WFT-3)
             "template": "chat-template",
             "build_strategy": "multi-image",
             "image_count": 3,
             "requires_monorepo": True
         },
         "graphql-gateway": {
-            "workflow": "pattern2-compositional-workflow",
+            "workflow": "application-claim",  # claim-based path (RETIRE-WFT-3)
             "template": "graphql-federation-gateway-template",
             "build_strategy": "single-image",
             "image_count": 1,
@@ -187,7 +193,10 @@ class Pattern2CompositionalHandler(PatternHandler):
         """Get the appropriate workflow for the component type."""
         component_type = component.get("type")
         config = self.COMPOSITIONAL_TYPES.get(component_type, {})
-        return config.get("workflow", "pattern2-compositional-workflow")
+        # RETIRE-WFT-3 (#154): pattern2-compositional-workflow WFT retired; the
+        # real route for source-code types is handle_via_application_claim. This
+        # fallback is only hit by the dead super().handle() branch.
+        return config.get("workflow", "application-claim")
     
     def validate_prerequisites(self, component: Dict[str, Any], context: HandlerContext) -> HandlerResult:
         """Validate prerequisites for compositional components."""

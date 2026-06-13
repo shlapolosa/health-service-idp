@@ -163,7 +163,9 @@ class TestPattern2CompositionalHandler:
     def test_get_workflow_name(self):
         """Test workflow selection for compositional types."""
         component = {"type": "rasa-chatbot", "name": "test-chat"}
-        assert self.handler.get_workflow_name(component) == "pattern2-compositional-workflow"
+        # RETIRE-WFT-3 (#154): pattern2-compositional-workflow WFT retired; source-code
+        # compositional types route through the AppContainerClaim path.
+        assert self.handler.get_workflow_name(component) == "application-claim"
         
         component = {"type": "identity-service", "name": "test-identity"}
         assert self.handler.get_workflow_name(component) == "identity-service-generator"
