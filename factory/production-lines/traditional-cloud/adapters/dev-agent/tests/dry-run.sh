@@ -1,20 +1,24 @@
 #!/usr/bin/env bash
 # DEV-AGENT W2-W4: lightweight dry-run harness (mirrors mscv-image/tests/dry-run.sh).
 #
-# Exercises entrypoint.sh + verify-loop.sh with git/kubectl/claude stubbed via
-# PATH shims against tmpdir fixtures. No cluster, no network, no Anthropic key.
+# Exercises entrypoint.sh + verify-loop.sh with git/kubectl/opencode stubbed via
+# PATH shims against tmpdir fixtures. No cluster, no network, no APIM key.
 # macOS-safe: the agent scripts use python3 (not sed/jq) for all parsing.
+#
+# ENGINE: the coding engine is opencode (GPT-5.4 via APIM); the stub asserts the
+# exact `opencode run` invocation the entrypoint must emit.
 #
 # Assertions:
 #   1. REQUIREMENTS.md 3-location fallback ORDER: source root > gitops root >
 #      central ledger (oam/applications/<app>-REQUIREMENTS.md)
-#   2. claude is invoked with the prompt CONTAINING the REQUIREMENTS content
-#   3. commit+push happen ONLY when claude actually changed files
+#   2. opencode is invoked: prompt (positional) CONTAINS the REQUIREMENTS content,
+#      and the flags carry --dir, -m apim-gpt/gpt-5.4, --dangerously-skip-permissions
+#   3. commit+push happen ONLY when opencode actually changed files
 #   4. verify-loop parses pass/fail verdicts; red verdict detail is fed into
 #      the next iteration's prompt; bounded by MAX_ITERATIONS
 #   5. all-Ready gate exits 0 quietly when a sibling component is unready
 #   6. spec-hash marker short-circuits a re-run for an already-implemented spec
-#   7. no REQUIREMENTS.md anywhere -> quiet exit 0, claude never invoked
+#   7. no REQUIREMENTS.md anywhere -> quiet exit 0, opencode never invoked
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -31,8 +35,8 @@ trap 'rm -rf "$ROOT"' EXIT
 PYTHON_BIN_DIR="$(dirname "$(command -v python3)")"
 
 # ---------------------------------------------------------------------------
-# PATH shims: git / kubectl / claude. Behaviour driven by env knobs:
-#   GIT_PUSH_MODE=ok|reject   CLAUDE_MODE=edit|noop
+# PATH shims: git / kubectl / opencode. Behaviour driven by env knobs:
+#   GIT_PUSH_MODE=ok|reject   OPENCODE_MODE=edit|noop
 #   KSVC_READY_MODE=all|one-unready   CT_SEQUENCE="fail pass" (verdict per push)
 #   SOURCE_FIXTURE / GITOPS_FIXTURE / LEDGER_FIXTURE   DA_STATE (run state dir)
 # ---------------------------------------------------------------------------
@@ -146,20 +150,28 @@ esac
 STUBEOF
 chmod +x "$STUB_DIR/kubectl"
 
-cat > "$STUB_DIR/claude" <<'STUBEOF'
+cat > "$STUB_DIR/opencode" <<'STUBEOF'
 #!/usr/bin/env bash
-# claude -p "<prompt>" --permission-mode acceptEdits --max-turns N
+# opencode run "<prompt>" --dir <dir> -m <provider/model> \
+#               --dangerously-skip-permissions --format json
+sub="${1:-}"; shift || true
+if [ "$sub" != "run" ]; then exit 0; fi
 prompt=""
+flags=""
 while [ $# -gt 0 ]; do
   case "$1" in
-    -p) shift; prompt="${1:-}";;
+    --dir) flags="$flags --dir $2"; shift 2;;
+    -m|--model) flags="$flags -m $2"; shift 2;;
+    --dangerously-skip-permissions|--format) flags="$flags $1"; shift;;
+    --*) shift;;
+    *) [ -z "$prompt" ] && prompt="$1"; shift;;
   esac
-  shift || true
 done
-n="$(cat "$DA_STATE/claude-count" 2>/dev/null || echo 0)"; n=$((n+1))
-echo "$n" > "$DA_STATE/claude-count"
-printf '%s' "$prompt" > "$DA_STATE/claude-prompt-$n.txt"
-if [ "${CLAUDE_MODE:-edit}" = "edit" ]; then
+n="$(cat "$DA_STATE/opencode-count" 2>/dev/null || echo 0)"; n=$((n+1))
+echo "$n" > "$DA_STATE/opencode-count"
+printf '%s' "$prompt" > "$DA_STATE/opencode-prompt-$n.txt"
+printf '%s' "$flags"  > "$DA_STATE/opencode-flags-$n.txt"
+if [ "${OPENCODE_MODE:-edit}" = "edit" ]; then
   for f in microservices/*/src/handlers.py; do
     [ -f "$f" ] || continue
     echo "# implemented by stub run $n" >> "$f"
@@ -168,7 +180,7 @@ if [ "${CLAUDE_MODE:-edit}" = "edit" ]; then
 fi
 exit 0
 STUBEOF
-chmod +x "$STUB_DIR/claude"
+chmod +x "$STUB_DIR/opencode"
 
 # ---------------------------------------------------------------------------
 # Fixtures. make_fixtures <dir> with env flags:
@@ -218,16 +230,16 @@ run_entrypoint() {
     DA_STATE="$state" \
     SOURCE_FIXTURE="$fx/source" GITOPS_FIXTURE="$fx/gitops" LEDGER_FIXTURE="$fx/ledger" \
     FIXTURE_SERVICES="demo-svc" \
-    APP_NAME="$APP" GITHUB_TOKEN="x" ANTHROPIC_API_KEY="x" \
+    APP_NAME="$APP" GITHUB_TOKEN="x" APIM_SUBSCRIPTION_KEY="x" \
     WORK_DIR="$state/work" \
     POLL_INTERVAL="0" VERIFY_TIMEOUT="30" \
-    GIT_PUSH_MODE="ok" CLAUDE_MODE="edit" KSVC_READY_MODE="all" CT_SEQUENCE="pass" \
+    GIT_PUSH_MODE="ok" OPENCODE_MODE="edit" KSVC_READY_MODE="all" CT_SEQUENCE="pass" \
     "$@" \
     bash "$ENTRYPOINT"
 }
 
-claude_count() { cat "$1/claude-count" 2>/dev/null || echo 0; }
-push_count()   { cat "$1/push-count"   2>/dev/null || echo 0; }
+opencode_count() { cat "$1/opencode-count" 2>/dev/null || echo 0; }
+push_count()     { cat "$1/push-count"     2>/dev/null || echo 0; }
 
 echo "=== Scenario 1: happy path — source-root REQUIREMENTS, green first push ==="
 S="$ROOT/s1"; SRC_REQ=1 GITOPS_REQ=1 LEDGER_REQ=1 make_fixtures "$ROOT/fx1"
@@ -236,15 +248,23 @@ if run_entrypoint "$S" "$ROOT/fx1" > "$S.log" 2>&1; then
 else
   bad "entrypoint failed (rc=$?)"; tail -20 "$S.log"
 fi
-if grep -q "MARKER-SOURCE-REQ" "$S/claude-prompt-1.txt" 2>/dev/null; then
-  ok "claude prompt contains REQUIREMENTS content"
+if grep -q "MARKER-SOURCE-REQ" "$S/opencode-prompt-1.txt" 2>/dev/null; then
+  ok "opencode prompt contains REQUIREMENTS content"
 else
   bad "prompt missing REQUIREMENTS content"
 fi
-if ! grep -q "MARKER-GITOPS-REQ" "$S/claude-prompt-1.txt" 2>/dev/null; then
+if ! grep -q "MARKER-GITOPS-REQ" "$S/opencode-prompt-1.txt" 2>/dev/null; then
   ok "fallback order: source root wins over gitops/ledger copies"
 else
   bad "wrong REQUIREMENTS source used (gitops content in prompt)"
+fi
+FLAGS="$(cat "$S/opencode-flags-1.txt" 2>/dev/null || echo "")"
+if printf '%s' "$FLAGS" | grep -q -- "--dir" \
+   && printf '%s' "$FLAGS" | grep -q -- "-m apim-gpt/gpt-5.4" \
+   && printf '%s' "$FLAGS" | grep -q -- "--dangerously-skip-permissions"; then
+  ok "opencode invoked with --dir + -m apim-gpt/gpt-5.4 + --dangerously-skip-permissions"
+else
+  bad "opencode flags wrong: [$FLAGS]"
 fi
 [ "$(push_count "$S")" = "1" ] && ok "exactly one push" || bad "push count $(push_count "$S") != 1"
 if grep -q '"pass": true' "$S/work/verdicts-1.jsonl" 2>/dev/null; then
@@ -256,8 +276,8 @@ fi
 echo "=== Scenario 2: fallback to gitops-repo root ==="
 S="$ROOT/s2"; SRC_REQ=0 GITOPS_REQ=1 LEDGER_REQ=1 make_fixtures "$ROOT/fx2"
 run_entrypoint "$S" "$ROOT/fx2" > "$S.log" 2>&1 || { bad "s2 run failed"; tail -20 "$S.log"; }
-if grep -q "MARKER-GITOPS-REQ" "$S/claude-prompt-1.txt" 2>/dev/null \
-   && ! grep -q "MARKER-LEDGER-REQ" "$S/claude-prompt-1.txt" 2>/dev/null; then
+if grep -q "MARKER-GITOPS-REQ" "$S/opencode-prompt-1.txt" 2>/dev/null \
+   && ! grep -q "MARKER-LEDGER-REQ" "$S/opencode-prompt-1.txt" 2>/dev/null; then
   ok "fallback order: gitops root wins over ledger when source root absent"
 else
   bad "gitops fallback wrong"
@@ -266,16 +286,16 @@ fi
 echo "=== Scenario 3: fallback to central ledger ==="
 S="$ROOT/s3"; SRC_REQ=0 GITOPS_REQ=0 LEDGER_REQ=1 make_fixtures "$ROOT/fx3"
 run_entrypoint "$S" "$ROOT/fx3" > "$S.log" 2>&1 || { bad "s3 run failed"; tail -20 "$S.log"; }
-if grep -q "MARKER-LEDGER-REQ" "$S/claude-prompt-1.txt" 2>/dev/null; then
+if grep -q "MARKER-LEDGER-REQ" "$S/opencode-prompt-1.txt" 2>/dev/null; then
   ok "fallback order: central ledger used last"
 else
   bad "ledger fallback wrong"
 fi
 
-echo "=== Scenario 4: claude makes no changes -> no commit, no push, quiet exit 0 ==="
+echo "=== Scenario 4: opencode makes no changes -> no commit, no push, quiet exit 0 ==="
 S="$ROOT/s4"; SRC_REQ=1 make_fixtures "$ROOT/fx4"
 set +e
-run_entrypoint "$S" "$ROOT/fx4" CLAUDE_MODE=noop > "$S.log" 2>&1
+run_entrypoint "$S" "$ROOT/fx4" OPENCODE_MODE=noop > "$S.log" 2>&1
 RC=$?
 set -e
 if [ "$RC" = "0" ] && [ "$(push_count "$S")" = "0" ] && [ ! -f "$S/git-commits.log" ] \
@@ -292,10 +312,10 @@ if run_entrypoint "$S" "$ROOT/fx5" CT_SEQUENCE="fail pass" MAX_ITERATIONS=3 > "$
 else
   bad "fail->pass run did not recover (rc=$?)"; tail -20 "$S.log"
 fi
-[ "$(claude_count "$S")" = "2" ] && ok "claude invoked exactly twice" || bad "claude count $(claude_count "$S") != 2"
+[ "$(opencode_count "$S")" = "2" ] && ok "opencode invoked exactly twice" || bad "opencode count $(opencode_count "$S") != 2"
 [ "$(push_count "$S")" = "2" ]   && ok "two pushes (one per iteration)"   || bad "push count $(push_count "$S") != 2"
-if grep -q "stub-detail-push-1" "$S/claude-prompt-2.txt" 2>/dev/null \
-   && grep -q '"pass": false' "$S/claude-prompt-2.txt" 2>/dev/null; then
+if grep -q "stub-detail-push-1" "$S/opencode-prompt-2.txt" 2>/dev/null \
+   && grep -q '"pass": false' "$S/opencode-prompt-2.txt" 2>/dev/null; then
   ok "iteration-2 prompt carries the failed verdict detail"
 else
   bad "verdict feedback missing from iteration-2 prompt"
@@ -307,11 +327,11 @@ set +e
 run_entrypoint "$S" "$ROOT/fx6" CT_SEQUENCE="fail fail fail fail" MAX_ITERATIONS=2 > "$S.log" 2>&1
 RC=$?
 set -e
-if [ "$RC" != "0" ] && [ "$(claude_count "$S")" = "2" ] && [ "$(push_count "$S")" = "2" ] \
+if [ "$RC" != "0" ] && [ "$(opencode_count "$S")" = "2" ] && [ "$(push_count "$S")" = "2" ] \
    && grep -q "exhausted MAX_ITERATIONS=2" "$S.log"; then
   ok "all-red run bounded to MAX_ITERATIONS=2 then exit 1 (rc=$RC)"
 else
-  bad "iteration bound wrong (rc=$RC claude=$(claude_count "$S") pushes=$(push_count "$S"))"
+  bad "iteration bound wrong (rc=$RC opencode=$(opencode_count "$S") pushes=$(push_count "$S"))"
   tail -10 "$S.log"
 fi
 
@@ -321,11 +341,11 @@ set +e
 run_entrypoint "$S" "$ROOT/fx7" KSVC_READY_MODE=one-unready FIXTURE_SERVICES="demo-svc sibling-svc" > "$S.log" 2>&1
 RC=$?
 set -e
-if [ "$RC" = "0" ] && [ "$(claude_count "$S")" = "0" ] && grep -q "all-Ready gate" "$S.log" \
+if [ "$RC" = "0" ] && [ "$(opencode_count "$S")" = "0" ] && grep -q "all-Ready gate" "$S.log" \
    && grep -q "exiting quietly" "$S.log"; then
-  ok "gate exits 0 quietly when a sibling is unready; claude never invoked"
+  ok "gate exits 0 quietly when a sibling is unready; opencode never invoked"
 else
-  bad "all-Ready gate wrong (rc=$RC claude=$(claude_count "$S"))"; tail -5 "$S.log"
+  bad "all-Ready gate wrong (rc=$RC opencode=$(opencode_count "$S"))"; tail -5 "$S.log"
 fi
 
 echo "=== Scenario 8: spec-hash marker — already implemented -> quiet exit 0 ==="
@@ -336,19 +356,19 @@ set +e
 run_entrypoint "$S" "$ROOT/fx8" > "$S.log" 2>&1
 RC=$?
 set -e
-if [ "$RC" = "0" ] && [ "$(claude_count "$S")" = "0" ] && grep -q "already implemented" "$S.log"; then
+if [ "$RC" = "0" ] && [ "$(opencode_count "$S")" = "0" ] && grep -q "already implemented" "$S.log"; then
   ok "spec-hash marker short-circuits a re-run (idempotency)"
 else
-  bad "spec-hash marker wrong (rc=$RC claude=$(claude_count "$S"))"; tail -5 "$S.log"
+  bad "spec-hash marker wrong (rc=$RC opencode=$(opencode_count "$S"))"; tail -5 "$S.log"
 fi
 
-echo "=== Scenario 9: no REQUIREMENTS anywhere -> quiet exit 0, no claude ==="
+echo "=== Scenario 9: no REQUIREMENTS anywhere -> quiet exit 0, no opencode ==="
 S="$ROOT/s9"; SRC_REQ=0 GITOPS_REQ=0 LEDGER_REQ=0 make_fixtures "$ROOT/fx9"
 set +e
 run_entrypoint "$S" "$ROOT/fx9" > "$S.log" 2>&1
 RC=$?
 set -e
-if [ "$RC" = "0" ] && [ "$(claude_count "$S")" = "0" ] && grep -q "no REQUIREMENTS.md found" "$S.log"; then
+if [ "$RC" = "0" ] && [ "$(opencode_count "$S")" = "0" ] && grep -q "no REQUIREMENTS.md found" "$S.log"; then
   ok "missing spec everywhere: quiet no-op"
 else
   bad "missing-spec behaviour wrong (rc=$RC)"; tail -5 "$S.log"
