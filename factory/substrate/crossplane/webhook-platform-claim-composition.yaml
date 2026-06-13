@@ -375,66 +375,61 @@ spec:
                       securityContext:
                         runAsNonRoot: true
                         runAsUser: 1000
-                      initContainers:
-                      # 1) Mint the random secrets + admin JWT using the svix-server
-                      #    binary (the image ships `svix-server jwt generate`). Write
-                      #    to a shared emptyDir for the kubectl container to apply.
-                      - name: mint
-                        image: '{{ $engineImage }}'
-                        command:
-                        - sh
-                        - -c
-                        - |
-                          set -e
-                          OUT=/shared
-                          # Idempotency probe handled by the kubectl step; always
-                          # generate fresh material here, but only APPLY if absent.
-                          JWT_SECRET=$(head -c 32 /dev/urandom | base64 | tr -d '/+=' | head -c 40)
-                          MAIN_SECRET=$(head -c 32 /dev/urandom | base64 | tr -d '/+=' | head -c 40)
-                          # Admin JWT signed with the freshly-minted jwt secret.
-                          export SVIX_JWT_SECRET="$JWT_SECRET"
-                          ADMIN_TOKEN=$(svix-server jwt generate 2>/dev/null || true)
-                          if [ -z "$ADMIN_TOKEN" ]; then
-                            # Older/newer CLIs print "Token: <jwt>"; strip a label if present.
-                            ADMIN_TOKEN=$(svix-server jwt generate org_admin 2>/dev/null | awk '{print $NF}')
-                          fi
-                          printf '%s' "$JWT_SECRET"  > "$OUT/SVIX_JWT_SECRET"
-                          printf '%s' "$MAIN_SECRET" > "$OUT/SVIX_MAIN_SECRET"
-                          printf '%s' "$ADMIN_TOKEN" > "$OUT/SVIX_ADMIN_TOKEN"
-                          echo "minted credential material"
-                        volumeMounts:
-                        - name: shared
-                          mountPath: /shared
                       containers:
-                      # 2) Create <name>-svix-credentials ONLY if it does not already
-                      #    exist (idempotent — never rotates a live token).
-                      - name: apply
+                      # BUG-A FIX (2026-06-13): the old mint used `svix-server jwt
+                      # generate`, which signs with the secret the CLI *defaults to*
+                      # — NOT the random SVIX_JWT_SECRET we then injected into the
+                      # server Deployment. The server therefore verified incoming
+                      # tokens against a DIFFERENT key and returned 401 "Invalid
+                      # token". Fix: mint the admin JWT DETERMINISTICALLY in-shell,
+                      # HMAC-SHA256 over the EXACT minted SVIX_JWT_SECRET, matching
+                      # svix-server's verifier:
+                      #   HS256Key::from_bytes(SVIX_JWT_SECRET.as_bytes())   (raw utf-8,
+                      #   NOT base64-decoded — verified against core/security.rs @ main).
+                      #   claims: sub = default org id (org_23rb8YdGqMT0qIzpgGwdXfHirMu),
+                      #   iss = "svix-server", exp = +10y. Org-level token => admin.
+                      # openssl + base64 ship in alpine/k8s, so one container does it all.
+                      - name: mint-and-apply
                         image: alpine/k8s:1.28.4
                         command:
                         - sh
                         - -c
                         - |
                           set -e
+                          # Idempotent: never rotate a live token.
                           if kubectl get secret "$SECRET_NAME" -n "$NS" >/dev/null 2>&1; then
                             echo "$SECRET_NAME already exists — leaving live credentials untouched"
                             exit 0
                           fi
+                          JWT_SECRET=$(head -c 32 /dev/urandom | base64 | tr -d '/+=' | head -c 40)
+                          MAIN_SECRET=$(head -c 32 /dev/urandom | base64 | tr -d '/+=' | head -c 40)
+
+                          # --- deterministic HS256 admin JWT over $JWT_SECRET ---------
+                          b64url() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
+                          HEADER='{"alg":"HS256","typ":"JWT"}'
+                          # exp ~10y out; iat now. sub = svix default org id => org admin.
+                          NOW=$(date +%s); EXP=$((NOW + 315360000))
+                          PAYLOAD="{\"iss\":\"svix-server\",\"sub\":\"$ORG_ID\",\"iat\":$NOW,\"exp\":$EXP}"
+                          H=$(printf '%s' "$HEADER"  | b64url)
+                          P=$(printf '%s' "$PAYLOAD" | b64url)
+                          SIG=$(printf '%s' "$H.$P" \
+                                | openssl dgst -binary -sha256 -hmac "$JWT_SECRET" \
+                                | b64url)
+                          ADMIN_TOKEN="$H.$P.$SIG"
+
                           kubectl create secret generic "$SECRET_NAME" -n "$NS" \
-                            --from-file=SVIX_JWT_SECRET=/shared/SVIX_JWT_SECRET \
-                            --from-file=SVIX_MAIN_SECRET=/shared/SVIX_MAIN_SECRET \
-                            --from-file=SVIX_ADMIN_TOKEN=/shared/SVIX_ADMIN_TOKEN
-                          echo "created $SECRET_NAME"
+                            --from-literal=SVIX_JWT_SECRET="$JWT_SECRET" \
+                            --from-literal=SVIX_MAIN_SECRET="$MAIN_SECRET" \
+                            --from-literal=SVIX_ADMIN_TOKEN="$ADMIN_TOKEN"
+                          echo "created $SECRET_NAME (admin JWT signed with the live SVIX_JWT_SECRET)"
                         env:
                         - name: SECRET_NAME
                           value: '{{ $name }}-svix-credentials'
                         - name: NS
                           value: '{{ $ns }}'
-                        volumeMounts:
-                        - name: shared
-                          mountPath: /shared
-                      volumes:
-                      - name: shared
-                        emptyDir: {}
+                        # Svix's default org id (core/security.rs default_org_id()).
+                        - name: ORG_ID
+                          value: 'org_23rb8YdGqMT0qIzpgGwdXfHirMu'
             providerConfigRef:
               name: kubernetes-provider
           ---
@@ -619,28 +614,45 @@ spec:
             providerConfigRef:
               name: kubernetes-provider
           ---
-          # === event-type reconcile Job ======================================
-          # Registers spec.eventTypes[] in Svix via REST (POST /api/v1/event-type),
-          # bearer SVIX_ADMIN_TOKEN from <name>-svix-credentials. Idempotent: PUTs
-          # by name so re-runs are no-ops. Skipped entirely when no eventTypes are
-          # declared (backward compatible — bridge can create types on demand).
-          {{- if $spec.eventTypes }}
+          # === platform-bootstrap reconcile Job ==============================
+          # Runs AFTER the engine is up (it waits on /health). Three jobs in one,
+          # all idempotent, all with a token that actually validates (BUG-A fix):
+          #
+          #  1) SHARED APP (#5): create-or-get the platform Svix "application"
+          #     (uid `platform-events`). This is the ONE app the bridge posts to
+          #     and that external consumers register endpoints on (event-type-
+          #     filtered fan-out). POST /api/v1/app with a uid is create-or-return.
+          #
+          #  2) EVENT TYPES (BUG-B fix): the old reconcile used a PUT-then-POST that
+          #     never actually created the types (PUT-by-name 404s pre-create on this
+          #     Svix, and the `|| POST` was masked by `set -e`). Now we POST each
+          #     declared type and treat a 409 "already exists" as success, so the
+          #     types are really registered (had to be hand-created live before).
+          #
+          #  3) CONN PATCH (#5): write WEBHOOK_APP_ID + WEBHOOK_ADMIN_TOKEN +
+          #     WEBHOOK_ENGINE_API into BOTH <name>-svix-credentials AND <name>-conn,
+          #     so the bridge gets EVERYTHING from one `envFrom: <name>-conn`. The
+          #     <name>-conn secret is created by the CD (pure-CUE) with the static
+          #     URLs; here we add the runtime app-id + token (never in git).
+          #
+          # Always runs (even with no eventTypes) because the shared-app + conn-patch
+          # are required for the bridge regardless of declared types.
           apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
-            name: '{{ $name }}-webhook-eventtype-reconcile'
+            name: '{{ $name }}-webhook-bootstrap-reconcile'
             annotations:
-              gotemplating.fn.crossplane.io/composition-resource-name: webhook-eventtype-reconcile
+              gotemplating.fn.crossplane.io/composition-resource-name: webhook-bootstrap-reconcile
           spec:
             forProvider:
               manifest:
                 apiVersion: batch/v1
                 kind: Job
                 metadata:
-                  name: '{{ $name }}-svix-eventtype-reconcile'
+                  name: '{{ $name }}-svix-bootstrap-reconcile'
                   namespace: '{{ $ns }}'
                   labels:
-                    app.kubernetes.io/name: svix-eventtype-reconcile
+                    app.kubernetes.io/name: svix-bootstrap-reconcile
                     app.kubernetes.io/component: setup
                 spec:
                   backoffLimit: 5
@@ -649,10 +661,13 @@ spec:
                       annotations:
                         sidecar.istio.io/inject: 'false'
                     spec:
+                      # Reuse the creds-init SA (secrets get/create/update/patch in this ns).
+                      serviceAccountName: svix-creds-init
                       restartPolicy: OnFailure
                       containers:
                       - name: reconcile
-                        image: curlimages/curl:8.5.0
+                        # alpine/k8s ships BOTH kubectl (conn patch) and curl (Svix REST).
+                        image: alpine/k8s:1.28.4
                         env:
                         - name: SVIX_ADMIN_TOKEN
                           valueFrom:
@@ -661,39 +676,76 @@ spec:
                               key: SVIX_ADMIN_TOKEN
                         - name: API
                           value: 'http://{{ $name }}-svix.{{ $ns }}.svc.cluster.local:8071/api/v1'
+                        - name: ENGINE_API
+                          value: 'http://{{ $name }}-svix.{{ $ns }}.svc.cluster.local:8071/api/v1'
+                        - name: APP_UID
+                          value: 'platform-events'
+                        - name: NS
+                          value: '{{ $ns }}'
+                        - name: CONN_SECRET
+                          value: '{{ $name }}-conn'
+                        - name: CREDS_SECRET
+                          value: '{{ $name }}-svix-credentials'
                         command:
                         - sh
                         - -c
                         - |
                           set -e
+                          AUTH="Authorization: Bearer $SVIX_ADMIN_TOKEN"
+                          CT='Content-Type: application/json'
+
                           echo "waiting for svix api..."
-                          until curl -fsS "$API/health/" >/dev/null 2>&1 || curl -fsS "$API/../health" >/dev/null 2>&1; do
+                          until curl -fsS "$API/health/" >/dev/null 2>&1 || curl -fsS "${API%/api/v1}/health" >/dev/null 2>&1; do
                             sleep 3
                           done
+
+                          # 1) Shared app: POST with a uid is create-or-return on Svix.
+                          #    Capture the canonical app id from the response.
+                          APP_RESP=$(curl -fsS -X POST "$API/app/" -H "$AUTH" -H "$CT" \
+                            -d "{\"name\":\"platform-events\",\"uid\":\"$APP_UID\"}" 2>/dev/null || true)
+                          APP_ID=$(printf '%s' "$APP_RESP" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -1)
+                          # On a re-run the create may 409/return differently; fall back to GET by uid.
+                          if [ -z "$APP_ID" ]; then
+                            APP_RESP=$(curl -fsS "$API/app/$APP_UID/" -H "$AUTH" 2>/dev/null || true)
+                            APP_ID=$(printf '%s' "$APP_RESP" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -1)
+                          fi
+                          # The uid itself is a valid addressing key for /app/<uid>/msg,
+                          # so fall back to it if the id parse failed.
+                          [ -n "$APP_ID" ] || APP_ID="$APP_UID"
+                          echo "shared app ready: $APP_ID"
+
+                          # 2) Event types: POST each; 409 (exists) is success.
                           reg() {
                             NAME="$1"; DESC="$2"
-                            # PUT is idempotent (create-or-update by name).
-                            curl -fsS -X PUT "$API/event-type/$NAME/" \
-                              -H "Authorization: Bearer $SVIX_ADMIN_TOKEN" \
-                              -H 'Content-Type: application/json' \
-                              -d "{\"name\":\"$NAME\",\"description\":\"$DESC\"}" \
-                              || curl -fsS -X POST "$API/event-type/" \
-                                   -H "Authorization: Bearer $SVIX_ADMIN_TOKEN" \
-                                   -H 'Content-Type: application/json' \
-                                   -d "{\"name\":\"$NAME\",\"description\":\"$DESC\"}" \
-                              || echo "register $NAME skipped"
+                            code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API/event-type/" \
+                              -H "$AUTH" -H "$CT" \
+                              -d "{\"name\":\"$NAME\",\"description\":\"$DESC\"}")
+                            case "$code" in
+                              2*) echo "event-type $NAME created" ;;
+                              409) echo "event-type $NAME already exists" ;;
+                              *)   echo "event-type $NAME register HTTP $code (continuing)" ;;
+                            esac
                           }
                           {{- range $e := $spec.eventTypes }}
                           reg "{{ $e.name }}" "{{ $e.description | default $e.name }}"
                           {{- end }}
-                          echo "event-type reconcile complete"
+
+                          # 3) Publish runtime binding into BOTH secrets so the bridge
+                          #    envFroms ONE secret (<name>-conn) and gets everything.
+                          #    Build the merge-patch JSON inline (no heredoc — keeps the
+                          #    YAML literal-scalar indentation simple + unambiguous).
+                          PATCH="{\"stringData\":{\"WEBHOOK_APP_ID\":\"$APP_ID\",\"WEBHOOK_ADMIN_TOKEN\":\"$SVIX_ADMIN_TOKEN\",\"WEBHOOK_ENGINE_API\":\"$ENGINE_API\"}}"
+                          for S in "$CONN_SECRET" "$CREDS_SECRET"; do
+                            kubectl patch secret "$S" -n "$NS" --type merge -p "$PATCH"
+                            echo "patched $S with WEBHOOK_APP_ID/ADMIN_TOKEN/ENGINE_API"
+                          done
+                          echo "webhook bootstrap reconcile complete"
                         resources:
                           requests:
-                            memory: 32Mi
+                            memory: 64Mi
                             cpu: 50m
                           limits:
-                            memory: 64Mi
+                            memory: 128Mi
                             cpu: 100m
             providerConfigRef:
               name: kubernetes-provider
-          {{- end }}
