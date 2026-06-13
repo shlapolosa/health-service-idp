@@ -1,0 +1,91 @@
+# Hardening (tasks #113 + #100): durable, revision-proof RBAC for provider-kubernetes v1.2.1.
+#
+# ROOT CAUSE of intermittent Responsive=False / WatchCircuitOpen / no-auto-recreate:
+#   Crossplane mints a *revision-hashed* ServiceAccount for the provider
+#   (e.g. provider-kubernetes-f6665ef36536) on every package revision, because
+#   DeploymentRuntimeConfig/default has an empty spec (no serviceAccountTemplate).
+#   The cluster-admin ClusterRoleBinding that grants the provider its watch/get/
+#   list/create permissions (Jobs, Secrets, cross-namespace Objects) was bound to
+#   that hashed SA *manually* (ownerReferences: none -- NOT GitOps-owned), and the
+#   pre-existing GitOps RBAC files (provider-kubernetes-rbac.yaml /
+#   kubernetes-provider-rbac.yaml) bind STALE revision SAs from older revisions.
+#   => On the next provider revision a fresh hashed SA is created with NO admin
+#      binding => the controller loses watch permissions => watches error out =>
+#      provider-kubernetes opens its watch circuit breaker (WatchCircuitOpen) and
+#      stops reconciling until a human runs `kubectl annotate ... reconcile-nudge`.
+#
+# The conversion webhook is NOT the cause: Service `provider-kubernetes`
+# (crossplane-system:9443/convert) has healthy endpoints and storage version is
+# already v1alpha2, so no v1alpha1<->v1alpha2 conversion happens for live Objects.
+# (Supersedes the stale memory note about pinning v1alpha1 storage to dodge 502s.)
+#
+# SECOND ROOT CAUSE of "does not auto-recreate a deleted child until a manual
+# reconcile-nudge": the provider runs with NO args (empty DeploymentRuntimeConfig),
+# so the `EnableWatches` alpha feature is OFF. Objects that set `spec.watch: true`
+# are therefore silently ignored, and the provider only re-checks managed children
+# on its DEFAULT poll interval (~10m). An out-of-band child deletion is thus not
+# corrected for up to ~10m unless a human annotates `crossplane.io/reconcile-nudge`.
+# Enabling watches makes the provider react to child deletions in real time; a
+# shorter `--poll` interval is the durable fallback when a watch is not (yet)
+# established. Watches require the stable-SA cluster-admin binding above to be
+# RBAC-safe -- without it the watch errors out and trips WatchCircuitOpen.
+#
+# DURABLE FIX (additive, non-breaking):
+#   1. Pin a STABLE ServiceAccount name (`provider-kubernetes`) via the
+#      DeploymentRuntimeConfig so every future provider revision reuses the same SA.
+#   2. Turn ON `--enable-watches` and shorten `--poll` so out-of-band drift on
+#      managed children is corrected without a manual reconcile-nudge.
+#   3. Bind that stable SA to the existing cluster-wide admin ClusterRole in GitOps,
+#      so the binding survives all future revisions and ArgoCD owns it.
+#
+# This file is owned by the ArgoCD `platform-definitions` application.
+---
+# 1+2. Pin a stable ServiceAccount name AND enable real-time watches + a short
+#      poll fallback for the provider deployment. Empty spec previously =>
+#      Crossplane defaulted to revision-hashed SA names and watches-off.
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
+metadata:
+  name: default
+spec:
+  serviceAccountTemplate:
+    metadata:
+      name: provider-kubernetes
+  deploymentTemplate:
+    spec:
+      selector: {}
+      template:
+        spec:
+          containers:
+          - name: package-runtime
+            args:
+            - --enable-watches      # honor spec.watch:true -> real-time child reconcile
+            - --poll=1m             # fallback resync (default ~10m) so drift self-heals fast
+            - --max-reconcile-rate=20
+---
+# 2. ClusterRole granting the provider full cluster access (Jobs, Secrets,
+#    cross-namespace Objects, get/list/watch/create/...). Re-declared here
+#    (idempotent with provider-kubernetes-rbac.yaml) so this file is self-contained.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: crossplane-provider-kubernetes-admin
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["*"]
+---
+# 3. Bind the STABLE provider SA to the admin ClusterRole.
+#    Revision-proof: the SA name no longer changes on provider upgrade.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: crossplane-provider-kubernetes-stable-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: crossplane-provider-kubernetes-admin
+subjects:
+- kind: ServiceAccount
+  name: provider-kubernetes
+  namespace: crossplane-system
