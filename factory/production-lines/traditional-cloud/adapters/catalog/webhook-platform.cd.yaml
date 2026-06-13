@@ -1,0 +1,141 @@
+# WEBHOOK-PLATFORM (#WH-1): Outbound webhook delivery platform ComponentDefinition.
+#
+# Reuses the realtime-platform shape EXACTLY: one OAM Component -> a namespace of
+# Deployments/Services/Secrets/Gateways/VirtualServices, plus a <name>-conn Secret
+# carrying the engine API URL + admin token. The backing engine is Svix
+# (svix/svix-server, MIT) — webhook-sending-as-a-service: per-consumer
+# "applications" + "endpoints", HMAC-signed payloads, automatic retries with
+# exponential backoff, delivery logs, AND a prebuilt App Portal (magic-link iframe)
+# that IS the externally-exposed self-service registration UI. No enterprise gate on
+# portal/retries (confirmed MIT).
+#
+# Engine + Postgres + Redis are rendered by a Crossplane Composition
+# (WebhookPlatformClaim XRD) — like realtime-platform — because the multi-resource,
+# multi-namespace stack with provider-kubernetes Object wrapping is composition shaped,
+# not pure-CUE shaped. This CD renders:
+#   - the primary WebhookPlatformClaim (the real workload)
+#   - the <name>-conn Secret (binding-contract normalization, deterministic DNS)
+# The externally-exposed App-Portal VirtualService + Gateway are rendered by the
+# COMPOSITION (skeleton: webhook-platform-claim-composition.yaml), mirroring the
+# lenses-hq Gateway/VirtualService — host `<name>-webhook-portal.20.233.105.82.nip.io`.
+#
+# vela 1.10.3 constraints respected: NO imports, NO top-level context outside the
+# template, NO `&&` over optionals. HARD-3: engine image is PINNED (svix-server:v1.69.0),
+# never :latest.
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: webhook-platform
+  annotations:
+    definition.oam.dev/description: "Outbound webhook delivery platform (Svix engine + Postgres + Redis + externally-exposed self-service App Portal). Signed payloads, retries/backoff, delivery logs, per-consumer endpoint self-management via magic-link portal."
+    definition.oam.dev/requires-source-code: "false"
+    definition.oam.dev/shape: application-claim
+spec:
+  workload:
+    definition:
+      apiVersion: platform.example.org/v1alpha1
+      kind: WebhookPlatformClaim
+  schematic:
+    cue:
+      template: |
+        // Primary Output: WebhookPlatformClaim (the platform's real workload).
+        // The composition renders svix-server + Postgres + Redis + the App-Portal
+        // Gateway/VirtualService + a topic-reconcile init (registers known event
+        // types in Svix), all as provider-kubernetes Objects in <name>-webhook ns.
+        output: {
+          apiVersion: "platform.example.org/v1alpha1"
+          kind:       "WebhookPlatformClaim"
+          metadata: {
+            name:      context.name + "-infrastructure"
+            namespace: context.namespace
+            labels: {
+              "app.kubernetes.io/name":      context.name
+              "app.kubernetes.io/component": "webhook-infrastructure"
+              "app.kubernetes.io/part-of":   "webhook-platform"
+            }
+          }
+          spec: {
+            name:         context.name
+            appContainer: (*parameter.repository | context.name)
+            // The external host the App Portal + ingest API are published on.
+            // Composition defaults to <name>-webhook-portal.<lbHost> when absent.
+            if parameter.portalHost != _|_ {
+              portalHost: parameter.portalHost
+            }
+            // Engine image pin (HARD-3). Default below is a stable Svix tag;
+            // a consumer MAY override but MUST NOT pass a :latest tag.
+            engineImage: parameter.engineImage
+            // Retry policy knobs handed to the composition (Svix env / app config).
+            if parameter.retentionDays != _|_ {
+              retentionDays: parameter.retentionDays
+            }
+            // Event types this platform will fan out (Svix "event types"). The
+            // bridge produces messages of these types; the portal lets consumers
+            // subscribe endpoints to a subset. Backward compat: absent -> the
+            // composition seeds from the platform's known Kafka topics at runtime.
+            if parameter.eventTypes != _|_ {
+              eventTypes: parameter.eventTypes
+            }
+          }
+        }
+
+        // Secondary Output: aggregate <name>-conn Secret (binding-contract
+        // normalization, pure-CUE like realtime/postgresql/redis CDs). Service DNS
+        // is deterministic (<name>-svix.<name>-webhook.svc...), so URLs are computed
+        // here. The ADMIN TOKEN is NOT computed here — it is a runtime value the
+        // composition writes into <name>-svix-credentials (mounted by the bridge);
+        // this conn-secret references it by name so consumers envFrom one secret.
+        outputs: {
+          "conn-secret": {
+            apiVersion: "v1"
+            kind:       "Secret"
+            metadata: {
+              name:      context.name + "-conn"
+              namespace: context.namespace
+              labels: {
+                "binding.cafe.io/category": "webhook"
+                "app.oam.dev/component":    context.name
+              }
+            }
+            type: "Opaque"
+            stringData: {
+              // Engine REST API base (internal): the bridge POSTs /api/v1/app/.../msg
+              WEBHOOK_ENGINE_URL:  "http://" + context.name + "-svix." + context.name + "-webhook.svc.cluster.local:8071"
+              WEBHOOK_ENGINE_API:  "http://" + context.name + "-svix." + context.name + "-webhook.svc.cluster.local:8071/api/v1"
+              // Name of the runtime secret carrying SVIX_ADMIN_TOKEN (mint via
+              // `svix-server jwt generate`); composition creates it. Consumers
+              // reference via envFrom so the token never lands in git.
+              WEBHOOK_ADMIN_TOKEN_SECRET: context.name + "-svix-credentials"
+              WEBHOOK_PLATFORM_NAME:      context.name
+              WEBHOOK_INTEGRATION_ENABLED: "true"
+              if parameter.portalHost != _|_ {
+                WEBHOOK_PORTAL_URL: "https://" + parameter.portalHost
+              }
+              if parameter.eventTypes != _|_ {
+                for e in parameter.eventTypes {
+                  "EVENTTYPE_\(e.name)": e.name
+                }
+              }
+            }
+          }
+        }
+
+        parameter: {
+          // Optional unified-repo override (mirrors realtime-platform).
+          repository?: string
+          // Engine image (HARD-3 #170): PINNED Svix server. Do NOT default to
+          // :latest. Consumers may override to a newer pinned tag.
+          engineImage: *"svix/svix-server:v1.69.0" | string
+          // External host for the App Portal + ingest/registration API.
+          // e.g. "myhooks-webhook-portal.20.233.105.82.nip.io". Absent ->
+          // composition derives <name>-webhook-portal.<sharedLbHost>.
+          portalHost?: string
+          // Delivery-log / message retention (days).
+          retentionDays?: int
+          // Declared event types fanned out by this platform. `name` maps 1:1 to a
+          // Svix event type AND (by convention) to the Kafka topic the bridge reads.
+          eventTypes?: [...{
+            name:         string
+            description?: string
+          }]
+        }

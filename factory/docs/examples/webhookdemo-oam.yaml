@@ -1,0 +1,58 @@
+# Example OAM: webhookdemo — outbound webhook delivery of rtdemo2 aggregates.
+#
+# A third party registers an HTTPS endpoint in the externally-exposed App Portal
+# (https://webhookdemo-webhook-portal.20.233.105.82.nip.io) and starts receiving
+# SIGNED `sensor.agg` events whenever the rtdemo2 realtime-platform emits to the
+# Kafka topic `sensor_agg`.
+#
+# Wiring:
+#   webhook-platform (engine + portal + conn secret)
+#         ^                                   ^
+#         | bridge envFroms <name>-conn       | consumer registers endpoint in portal
+#   realtime-service role:webhook  --consumes sensor_agg--> Svix /msg --> signed POST
+#
+# PRE-REQ: an rtdemo2 realtime-platform already produces `sensor_agg` (RT-1/RT-2).
+# This OAM only adds the webhook fan-out leg.
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: webhookdemo
+  namespace: default
+spec:
+  components:
+    # 1) The webhook delivery platform: engine + postgres + redis + EXTERNALLY
+    #    EXPOSED self-service App Portal. Declares the event types it fans out.
+    - name: webhookdemo
+      type: webhook-platform
+      properties:
+        # Externally reachable self-service UI host (its own Istio host).
+        portalHost: webhookdemo-webhook-portal.20.233.105.82.nip.io
+        engineImage: svix/svix-server:v1.69.0   # HARD-3: pinned
+        retentionDays: 14
+        eventTypes:
+          - name: sensor.agg
+            description: "Aggregated sensor readings (mirrors Kafka topic sensor_agg)"
+
+    # 2) The Kafka->engine bridge: a realtime-service in role:webhook. It consumes
+    #    the declared CONSUME topic and forwards each message to the webhook engine's
+    #    "send event" API (envFrom webhookdemo-conn for WEBHOOK_ENGINE_API + the admin
+    #    token secret). Reuses microservices/shared-libs/realtime-transport (add a
+    #    webhook sink — see plan §transport follow-up). NO new framework.
+    - name: webhookdemo-bridge
+      type: realtime-service
+      properties:
+        role: webhook                      # NEW role (follow-up; see plan)
+        language: python                   # scaffold the bridge variant on first render
+        bootstrap: true
+        realtime: rtdemo2                  # source realtime-platform (envFrom rtdemo2-conn)
+        consumes:
+          - sensor_agg                     # the topic to fan out
+        # Bind the webhook platform's conn secret so the bridge knows the engine API
+        # URL + admin-token secret name. (envFrom is rendered by realtime-service.)
+        envFrom:
+          - secretRef:
+              name: webhookdemo-conn
+        environment:
+          # Map the consumed topic -> the Svix event type to send.
+          WEBHOOK_EVENTTYPE_sensor_agg: "sensor.agg"
+          WEBHOOK_SINK_ENABLED: "true"

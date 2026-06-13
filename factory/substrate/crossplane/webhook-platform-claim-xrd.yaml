@@ -1,0 +1,83 @@
+# WebhookPlatformClaim XRD (#WH-1).
+# Defines the API schema for outbound-webhook delivery platform claims.
+# Cluster-scoped XR + namespaced claim (scope omitted -> LegacyCluster default,
+# identical to RealtimePlatformClaim — the proven shape on THIS cluster). The fields
+# here are exactly those the webhook-platform CD's WebhookPlatformClaim output sets
+# and the composition template consumes.
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xwebhookplatformclaims.platform.example.org
+spec:
+  group: platform.example.org
+  names:
+    kind: XWebhookPlatformClaim
+    plural: xwebhookplatformclaims
+  claimNames:
+    kind: WebhookPlatformClaim
+    plural: webhookplatformclaims
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              name:
+                type: string
+                description: "Name of the webhook platform (used for all resources)"
+                pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+                maxLength: 63
+              appContainer:
+                type: string
+                description: "Name of the AppContainer this webhook platform belongs to"
+                pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+                maxLength: 63
+                default: "health-service-idp"
+              engineImage:
+                type: string
+                description: "Pinned Svix engine image (HARD-3: never :latest)"
+                default: "svix/svix-server:v1.69.0"
+              portalHost:
+                type: string
+                description: "External host for the App Portal + ingest API (nip.io). Absent -> composition derives <name>-webhook-portal.<sharedLbHost>"
+                maxLength: 253
+              retentionDays:
+                type: integer
+                description: "Delivery-log / message retention in days"
+                minimum: 1
+                default: 90
+              eventTypes:
+                type: array
+                description: "Event types fanned out by this platform; the reconcile Job registers each in Svix"
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                      pattern: '^[a-zA-Z0-9._-]+$'
+                      maxLength: 256
+                    description:
+                      type: string
+                  required: ["name"]
+            required: ["name"]
+          status:
+            type: object
+            properties:
+              ready:
+                type: boolean
+              message:
+                type: string
+              endpoints:
+                type: object
+                properties:
+                  portal:
+                    type: string
+                    description: "External App-Portal URL"
+                  engineApi:
+                    type: string
+                    description: "In-cluster Svix REST API base URL"
