@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # HARD-1 (#168): python/fastapi scaffold incl. realtime flavor.
-# RT-2 (#176): realtime flavor is ROLE-BRANCHED (gateway|ingest|processor) and
-# consumes the versioned realtime-transport WHEEL instead of git-clone vendoring
+# RT-2 (#176): realtime flavor is ROLE-BRANCHED (gateway|ingest|processor|webhook)
+# and consumes the versioned realtime-transport WHEEL instead of git-clone vendoring
 # agent_common source (HARD-2 #169 — no drift, provenance via release tag).
 mscv_scaffold_python_fastapi() {
   # Copy onion architecture template
@@ -18,7 +18,7 @@ mscv_scaffold_python_fastapi() {
 
   if [ "${SERVICE_FLAVOR:-webservice}" = "realtime" ]; then
     ROLE="${SERVICE_ROLE:-gateway}"
-    case "$ROLE" in gateway|ingest|processor) ;; *) ROLE="gateway" ;; esac
+    case "$ROLE" in gateway|ingest|processor|webhook) ;; *) ROLE="gateway" ;; esac
     echo "📡 Applying realtime flavor (role=$ROLE) to $SERVICE_NAME"
     mkdir -p src
 
@@ -34,6 +34,8 @@ post-deploy contract test is the acceptance gate.
 - to_message(body)  : ingest    — map an HTTP POST body to the produced event.
 - transform(message): processor — map a consumed event to the produced event
                                   (return None to drop).
+- to_event(message) : webhook   — map a consumed event to the webhook payload
+                                  POSTed to the engine (Svix). Default identity.
 Defaults are passthrough/identity so the service boots before logic lands.
 """
 from typing import Any, Dict, Optional
@@ -44,6 +46,10 @@ def to_message(body: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def transform(message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    return message
+
+
+def to_event(message: Dict[str, Any]) -> Dict[str, Any]:
     return message
 RTHANDLERS
       echo "✅ src/handlers.py logic slot created"
@@ -117,6 +123,32 @@ if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8080")))
 RTMAIN
         ;;
+      webhook)
+        cat > src/main.py << 'RTMAIN'
+"""Realtime WEBHOOK BRIDGE (generated, RT-2). Consume declared CONSUME_* topics ->
+handlers.to_event -> POST to the webhook engine (Svix) /app/<app>/msg, which fans
+out HMAC-signed deliveries to externally-registered endpoints. NO produce.
+
+Binding env (envFrom <webhook>-conn + <webhook>-svix-credentials):
+  WEBHOOK_ENGINE_API, WEBHOOK_ADMIN_TOKEN, WEBHOOK_APP_ID,
+  WEBHOOK_EVENTTYPE_<topic> (topic -> Svix event type).
+Transport + default Svix sink via realtime-transport."""
+import os
+from realtime_transport import create_realtime_webhook_app
+from src.handlers import to_event
+
+SERVICE_NAME = os.getenv("WEBSERVICE_NAME", os.getenv("REALTIME_PLATFORM_NAME", "realtime-webhook"))
+
+app = create_realtime_webhook_app(
+    service_name=SERVICE_NAME,
+    to_event=to_event,
+)
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8080")))
+RTMAIN
+        ;;
     esac
 
     # --- dependency: the versioned realtime-transport wheel ------------------
@@ -124,7 +156,7 @@ RTMAIN
     # agent_common source. The wheel declares fastapi/pydantic/aiokafka/websockets
     # so poetry resolves transport deps transitively. Idempotent.
     if [ -f pyproject.toml ]; then
-      grep -q '^realtime-transport' pyproject.toml || sed -i '/\[tool.poetry.dependencies\]/a realtime-transport = {url = "https://github.com/shlapolosa/health-service-idp/releases/download/realtime-transport-v0.1.1/realtime_transport-0.1.1-py3-none-any.whl"}' pyproject.toml
+      grep -q '^realtime-transport' pyproject.toml || sed -i '/\[tool.poetry.dependencies\]/a realtime-transport = {url = "https://github.com/shlapolosa/health-service-idp/releases/download/realtime-transport-v0.1.2/realtime_transport-0.1.2-py3-none-any.whl"}' pyproject.toml
       # Align template pins with the wheel's requirements (caught live on rtdemo2:
       # wheel needs fastapi >=0.115.14,<0.116.0 but the onion template pins
       # ^0.104.0 -> poetry solver hard-fails the docker build). pydantic ^2.0.0

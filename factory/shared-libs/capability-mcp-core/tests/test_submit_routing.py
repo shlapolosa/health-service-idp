@@ -482,6 +482,40 @@ def test_realtime_processor_role_not_auto_exposed():
     assert not app["spec"]["components"][1].get("traits")
 
 
+def test_realtime_webhook_role_not_auto_exposed():
+    # WH-1 (2026-06-13): webhook (Kafka->Svix bridge) realtime-services are
+    # internal (consume->webhook sink) — no expose-api auto-attach, like processor.
+    app = {"spec": {"components": [
+        {"name": "auth", "type": "auth0-idp", "properties": {}},
+        {"name": "bridge", "type": "realtime-service",
+         "properties": {"name": "bridge", "role": "webhook"}},
+    ]}}
+    out = SubmitUseCase._auto_expose_external_components(app, "orig")
+    assert out == "orig"  # unchanged — no re-dump
+    assert not app["spec"]["components"][1].get("traits")
+
+
+def test_realtime_webhook_role_scaffolds_as_realtime():
+    # WH-1: role:webhook is a valid realtime-service scaffold role (flavor:realtime,
+    # role passed through to the mscv scaffold which emits the webhook bridge main.py).
+    app = {"spec": {"components": [
+        {"name": "bridge", "type": "realtime-service",
+         "properties": {"name": "bridge", "language": "python", "role": "webhook"}},
+    ]}}
+    services = SubmitUseCase._webservice_services(app)
+    assert len(services) == 1
+    assert services[0]["flavor"] == "realtime"
+    assert services[0]["role"] == "webhook"
+
+
+def test_realtime_unknown_role_falls_back_to_gateway():
+    app = {"spec": {"components": [
+        {"name": "rt", "type": "realtime-service",
+         "properties": {"name": "rt", "language": "python", "role": "bogus"}},
+    ]}}
+    assert SubmitUseCase._webservice_services(app)[0]["role"] == "gateway"
+
+
 def test_realtime_gateway_and_ingest_roles_still_auto_exposed():
     for role in ("gateway", "ingest"):
         app = {"spec": {"components": [

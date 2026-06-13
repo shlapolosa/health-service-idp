@@ -102,12 +102,18 @@ spec:
               // Engine REST API base (internal): the bridge POSTs /api/v1/app/.../msg
               WEBHOOK_ENGINE_URL:  "http://" + context.name + "-svix." + context.name + "-webhook.svc.cluster.local:8071"
               WEBHOOK_ENGINE_API:  "http://" + context.name + "-svix." + context.name + "-webhook.svc.cluster.local:8071/api/v1"
-              // Name of the runtime secret carrying SVIX_ADMIN_TOKEN (mint via
-              // `svix-server jwt generate`); composition creates it. Consumers
-              // reference via envFrom so the token never lands in git.
+              // Name of the runtime secret carrying SVIX_ADMIN_TOKEN; the
+              // composition creates it. Consumers reference via envFrom so the
+              // token never lands in git.
               WEBHOOK_ADMIN_TOKEN_SECRET: context.name + "-svix-credentials"
               WEBHOOK_PLATFORM_NAME:      context.name
               WEBHOOK_INTEGRATION_ENABLED: "true"
+              // The SHARED Svix application the bridge POSTs to and external
+              // consumers register endpoints on (event-type-filtered fan-out, #5).
+              // Default placeholder; the composition's bootstrap Job patches this
+              // secret with the canonical app id + the runtime WEBHOOK_ADMIN_TOKEN
+              // at apply-time, so the bridge envFroms ONE secret for everything.
+              WEBHOOK_APP_ID: "platform-events"
               if parameter.portalHost != _|_ {
                 WEBHOOK_PORTAL_URL: "https://" + parameter.portalHost
               }

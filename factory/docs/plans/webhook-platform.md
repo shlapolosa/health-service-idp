@@ -153,3 +153,69 @@ def make_webhook_sink(
 
 Wire `role == "webhook"` in the realtime-service role dispatch to consume `CONSUME_*`
 and call this sink (no produce-back). Then bump+release the wheel in a SEPARATE PR.
+
+---
+
+## 9. BRIDGE — DELIVERED (Kafka→Svix), 2026-06-13 (RT-BRIDGE)
+
+The webhook role + bridge wiring is now built. The full repeatable pipeline:
+
+```
+POST /ingest (rtdemo2 ingest) -> produce sensor_raw
+  -> processor (sensor_raw -> sensor_agg)
+  -> BRIDGE realtime-service role:webhook (consume sensor_agg)
+       -> to_event(message) [default identity]
+       -> POST {WEBHOOK_ENGINE_API}/app/{WEBHOOK_APP_ID}/msg
+            { "eventType": WEBHOOK_EVENTTYPE_sensor_agg ("sensor.agg"),
+              "payload": <message> }
+            Authorization: Bearer {WEBHOOK_ADMIN_TOKEN}
+  -> Svix fans out HMAC-signed POST to every registered endpoint subscribed
+     to sensor.agg (exp-backoff retries, delivery logs).
+```
+
+### Bridge runtime contract (env it consumes)
+
+The bridge envFroms ONE secret — `<webhook>-conn` — which carries everything:
+
+| Env var                     | Source                              | Used for |
+|-----------------------------|-------------------------------------|----------|
+| `WEBHOOK_ENGINE_API`        | `<webhook>-conn` (CD, static URL)   | Svix REST base `http://<name>-svix.<ns>.svc:8071/api/v1` |
+| `WEBHOOK_APP_ID`            | `<webhook>-conn` (bootstrap Job patches; CD default `platform-events`) | the shared app to POST to |
+| `WEBHOOK_ADMIN_TOKEN`       | `<webhook>-conn` (bootstrap Job patches) | bearer for `/app/<app>/msg` |
+| `WEBHOOK_EVENTTYPE_<topic>` | OAM `environment` (CD passes through) | topic→Svix event-type map (default = dotted topic) |
+| `CONSUME_<topic>`           | realtime-service CD (`consumes:`)   | which Kafka topic(s) to bridge |
+| `KAFKA_BOOTSTRAP_SERVERS` + `<realtime>-conn` | rtdemo2 `<realtime>-conn` | the source Kafka |
+
+`role: webhook` is INTERNAL — `submit_use_case._auto_expose_external_components`
+skips it (like processor): no HTTP surface to publish to APIM.
+
+### Shared-app model (#5)
+
+The platform provisions ONE shared Svix application `uid=platform-events` at
+bootstrap. The bridge posts ALL events to it; external consumers register their
+endpoints on it via the App Portal and subscribe to a subset of event types
+(event-type-filtered fan-out). One app, many endpoints, server-side filtering.
+
+The bootstrap reconcile Job writes the app id + admin token + engine URL into
+BOTH `<name>-svix-credentials` and `<name>-conn`, so the bridge needs only the
+single `envFrom: [{secretRef: {name: <webhook>-conn}}]` the OAM already declares.
+
+### Two composition bug fixes (now correct)
+
+**BUG-A (401 "Invalid token"):** the old creds-init minted the admin token with
+`svix-server jwt generate`, which signs with the CLI's *default* secret — NOT the
+random `SVIX_JWT_SECRET` injected into the server Deployment. The server verified
+against a different key ⇒ 401. **Fix:** the admin JWT is now minted
+DETERMINISTICALLY in-shell — HS256 (openssl) over the EXACT minted
+`SVIX_JWT_SECRET` (raw utf-8 bytes, matching svix-server `HS256Key::from_bytes`),
+claims `sub=org_23rb8YdGqMT0qIzpgGwdXfHirMu` (Svix default org ⇒ org-admin),
+`iss=svix-server`, `exp=+10y`. Token and the server's verifying secret are now the
+same key by construction.
+
+**BUG-B (event types never created):** the old reconcile did `PUT /event-type/<n>/`
+then `|| POST`, but the PUT-by-name 404s pre-create on this Svix and the `|| POST`
+fallback was swallowed under `set -e` — so types like `sensor.agg` were never
+registered (had to be hand-created via API). **Fix:** the bootstrap Job now
+`POST /api/v1/event-type/` per declared type and treats `409 already-exists` as
+success; it ALSO create-or-gets the shared app and patches the conn secret. Always
+runs (even with no `eventTypes`) because the shared-app + conn-patch are required.

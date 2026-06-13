@@ -1,7 +1,7 @@
 [project]
 name = "realtime-transport"
-version = "0.1.1"
-description = "Role-aware realtime transport (ingest / processor / gateway) extracted from agent_common, without AI-agent identity baggage"
+version = "0.1.2"
+description = "Role-aware realtime transport (ingest / processor / gateway / webhook) extracted from agent_common, without AI-agent identity baggage"
 authors = [
     {name = "shlapolosa",email = "socrates.hlapolosa@gmail.com"}
 ]
@@ -12,7 +12,8 @@ dependencies = [
     "pydantic (>=2.11.7,<3.0.0)",
     "aiokafka (>=0.8.0,<0.9.0)",
     "kafka-python (==2.0.2)",
-    "websockets (>=11.0,<12.0)"
+    "websockets (>=11.0,<12.0)",
+    "httpx (>=0.25.0,<0.28.0)"
 ]
 
 [project.optional-dependencies]

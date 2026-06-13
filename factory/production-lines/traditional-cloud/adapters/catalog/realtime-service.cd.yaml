@@ -317,9 +317,11 @@ spec:
           // Realtime platform binding (required for a useful realtime-service).
           realtime?: string
           // RT-2: realtime role — gateway (consume->/ws, RT-1 default) |
-          // ingest (POST /ingest -> produce) | processor (consume->transform->produce).
+          // ingest (POST /ingest -> produce) | processor (consume->transform->produce) |
+          // webhook (WH-1: consume->Svix /msg bridge; envFrom <webhook>-conn +
+          // <webhook>-svix-credentials for WEBHOOK_ENGINE_API/APP_ID/ADMIN_TOKEN).
           // Drives the scaffolded main.py variant + the contract-test CHECK_ROLE.
-          role?: "gateway" | "ingest" | "processor"
+          role?: "gateway" | "ingest" | "processor" | "webhook"
           // #175: opt-in standalone scaffold claim (single-component OAMs only).
           bootstrap?: bool
           // Topics this service reads / writes (must be declared on the platform).

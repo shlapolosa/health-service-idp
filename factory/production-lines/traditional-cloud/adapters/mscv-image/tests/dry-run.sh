@@ -301,6 +301,26 @@ else
   bad "processor main.py wrong"
 fi
 
+echo "=== Scenario 3b: webhook role (Kafka->Svix bridge) ==="
+rm -rf "/tmp/app-container-dryrun-app" "/tmp/template-dryrun-rt-svc" || true
+GIT_PUSH_MODE=ok SERVICE_ROLE=webhook run_entrypoint > "$ROOT/run3b.log" 2>&1 || { echo "webhook run failed:"; cat "$ROOT/run3b.log"; exit 1; }
+if grep -q "create_realtime_webhook_app" "$SVC_DIR/src/main.py" \
+   && grep -q "from src.handlers import to_event" "$SVC_DIR/src/main.py"; then
+  ok "webhook main.py wired to handlers.to_event (Svix bridge)"
+else
+  bad "webhook main.py wrong"
+fi
+if grep -q "def to_event" "$SVC_DIR/src/handlers.py"; then
+  ok "handlers.py exposes the webhook to_event slot"
+else
+  bad "handlers.py missing to_event slot"
+fi
+if grep -q '^realtime-transport = {url = "https://github.com/shlapolosa/health-service-idp/releases/download/realtime-transport-v0.1.2/' "$SVC_DIR/pyproject.toml"; then
+  ok "pyproject pins the realtime-transport v0.1.2 wheel (webhook role)"
+else
+  bad "wheel pin not v0.1.2 ($(grep '^realtime-transport' "$SVC_DIR/pyproject.toml" || echo missing))"
+fi
+
 echo "=== Scenario 4: re-run no-clobber preserves edited handlers ==="
 # #175: a re-run against an already-scaffolded service must exit 0 WITHOUT
 # touching anything — simulate a dev-agent edit and assert it survives.

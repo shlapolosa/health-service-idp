@@ -375,6 +375,137 @@ def create_realtime_processor_app(
     return app
 
 
+# =====================================================================
+# Webhook role (bridge): consume -> webhook sink (Svix POST /msg)
+# =====================================================================
+
+def _topic_event_type_map_from_env() -> Dict[str, str]:
+    """Build the topic->Svix-event-type map from WEBHOOK_EVENTTYPE_<topic> env.
+
+    The realtime-service CD passes the OAM ``environment`` through verbatim, so a
+    bridge declares e.g. ``WEBHOOK_EVENTTYPE_sensor_agg: sensor.agg``. We strip the
+    prefix to recover the topic. Topics without an explicit mapping fall back to the
+    dotted topic name inside the sink itself.
+    """
+    prefix = "WEBHOOK_EVENTTYPE_"
+    return {
+        k[len(prefix):]: v
+        for k, v in os.environ.items()
+        if k.startswith(prefix) and v
+    }
+
+
+def create_realtime_webhook_app(
+    service_name: str = "realtime-webhook",
+    consume_topics: Optional[List[str]] = None,
+    sink: Optional[Callable[[str, Dict[str, Any]], Any]] = None,
+    to_event: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
+    description: str = "",
+    config: Optional[RealtimeConfig] = None,
+    agent_class: Type[RealtimeAgent] = GenericRealtimeAgent,
+) -> FastAPI:
+    """Webhook bridge: consume topic(s), forward each message to a webhook engine.
+
+    Processor-shaped (consume CONSUME_* topics, NO produce). Per consumed message
+    it calls ``sink(topic, event)`` where ``event = to_event(message)`` (default
+    identity). The sink defaults to a Svix sink (:func:`make_webhook_sink`) built
+    from the binding env injected by the webhook platform's ``<name>-conn`` secret:
+
+      * ``WEBHOOK_ENGINE_API``   — Svix REST base (in-cluster URL).
+      * ``WEBHOOK_ADMIN_TOKEN``  — bearer for ``POST /app/<app>/msg``.
+      * ``WEBHOOK_APP_ID``       — the shared platform Svix application id.
+      * ``WEBHOOK_EVENTTYPE_<topic>`` — per-topic Svix event-type mapping.
+
+    Non-fatal end to end: Kafka init is non-fatal (shared machinery) and the Svix
+    sink logs+drops transient errors, so neither a broker nor an engine blip takes
+    down the bridge. /health only.
+    """
+    agent: Optional[RealtimeAgent] = None
+    _to_event = to_event or _identity_to_message
+    _sink: Optional[Callable[[str, Dict[str, Any]], Any]] = sink
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        nonlocal agent, _sink
+        logger.info(f"Starting realtime webhook bridge {service_name}...")
+
+        cfg = config or get_realtime_config(service_name)
+        if consume_topics:
+            cfg.streaming_topics = list(consume_topics)
+
+        agent = await _build_and_init_agent(agent_class, service_name, description, cfg)
+
+        # Build the default Svix sink from binding env unless one was injected (tests
+        # / custom engines). Non-fatal: if the engine env is missing the bridge still
+        # boots and the consumer drains, but each message is logged as undeliverable.
+        if _sink is None:
+            from .webhook_sink import make_webhook_sink
+            engine_api = os.getenv("WEBHOOK_ENGINE_API")
+            admin_token = os.getenv("WEBHOOK_ADMIN_TOKEN", "")
+            app_id = os.getenv("WEBHOOK_APP_ID", "")
+            if engine_api and app_id:
+                _sink = make_webhook_sink(
+                    engine_api=engine_api,
+                    admin_token=admin_token,
+                    app_id=app_id,
+                    topic_to_event_type=_topic_event_type_map_from_env(),
+                )
+            else:
+                logger.warning(
+                    "webhook bridge missing WEBHOOK_ENGINE_API/WEBHOOK_APP_ID "
+                    "(envFrom <webhook>-conn) — messages will be dropped"
+                )
+
+        for topic in agent.config.streaming_topics:
+            # Bind a topic-aware handler so multi-topic bridges map each correctly.
+            agent.register_message_handler(topic, _make_topic_handler(topic, _to_event, lambda: _sink))
+        yield
+        if agent:
+            await agent.cleanup()
+
+    app = FastAPI(
+        title=f"{service_name} Realtime Webhook Bridge",
+        description=(description or service_name) + " (realtime webhook bridge)",
+        version="1.0.0", lifespan=lifespan,
+    )
+
+    @app.get("/health")
+    async def health_check():
+        base = {"status": "healthy", "service": service_name}
+        if agent:
+            st = agent.get_realtime_status()
+            base.update({"realtime_enabled": st.realtime_enabled,
+                         "message_count": st.message_count,
+                         "error_count": st.error_count})
+        return base
+
+    return app
+
+
+def _make_topic_handler(topic, to_event, sink_getter):
+    """Per-topic message handler for the webhook bridge.
+
+    Captures the exact topic so a multi-topic bridge maps each consumed message to
+    the right Svix event type. ``sink_getter`` defers reading the (possibly
+    late-bound) sink until call time.
+    """
+    async def handler(value):
+        try:
+            event = to_event(value)
+        except Exception as e:
+            logger.error(f"to_event failed for {topic}: {e}")
+            return
+        sink = sink_getter()
+        if sink is None:
+            logger.warning(f"webhook bridge has no sink; dropping {topic} message")
+            return
+        try:
+            await sink(topic, event)
+        except Exception as e:
+            logger.error(f"webhook sink failed for {topic}: {e}")
+    return handler
+
+
 async def _websocket_cleanup_task(manager: WebSocketConnectionManager):
     """Background task to clean up inactive WebSocket connections."""
     while True:

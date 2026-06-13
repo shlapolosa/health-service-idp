@@ -170,8 +170,8 @@ class SubmitUseCase:
                 continue
             if ctype == "realtime-service":
                 role = str((comp.get("properties") or {}).get("role", "gateway")).strip()
-                if role == "processor":
-                    continue  # internal role: never auto-expose
+                if role in ("processor", "webhook"):
+                    continue  # internal roles: no HTTP surface to publish
             traits = comp.setdefault("traits", [])
             if any(t.get("type") == "expose-api" for t in traits):
                 continue
@@ -610,12 +610,13 @@ class SubmitUseCase:
             # AppContainerClaim composition sets ApplicationClaim.serviceFlavor
             # and the mscv Job seeds the websocket+aiokafka fastapi variant.
             # RT-2: role selects WHICH realtime main.py the scaffold emits —
-            # gateway (consume->ws), ingest (POST->produce), or processor
-            # (consume->transform->produce). Defaults to gateway (RT-1 shape).
+            # gateway (consume->ws), ingest (POST->produce), processor
+            # (consume->transform->produce), or webhook (consume->Svix bridge,
+            # WH-1). Defaults to gateway (RT-1 shape).
             if ctype == "realtime-service":
                 entry["flavor"] = "realtime"
                 role = str(props.get("role", "gateway")).strip() or "gateway"
-                if role not in ("gateway", "ingest", "processor"):
+                if role not in ("gateway", "ingest", "processor", "webhook"):
                     role = "gateway"
                 entry["role"] = role
             services.append(entry)
