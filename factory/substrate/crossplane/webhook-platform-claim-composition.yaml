@@ -55,6 +55,12 @@ spec:
           {{- $engineImage := $spec.engineImage | default "svix/svix-server:v1.69.0" }}
           {{- /* External host for the App Portal + ingest API — shared LB nip.io host. */}}
           {{- $portalHost := $spec.portalHost | default (printf "%s-webhook-portal.20.233.105.82.nip.io" $name) }}
+          {{- /* App namespace = where the OAM Application (and the bridge that envFroms
+                 <name>-conn) lives. The CD writes <name>-conn into context.namespace, which
+                 Crossplane surfaces here as claimRef.namespace. Default "default" for the
+                 common case + first-render (claimRef populated post-bind). The reconcile Job
+                 patches <name>-conn THERE (not the engine ns) so the bridge sees the token. */}}
+          {{- $appNs := dig "claimRef" "namespace" "default" $spec }}
           ---
           # --- Namespace ------------------------------------------------------
           apiVersion: kubernetes.crossplane.io/v1alpha1
@@ -346,6 +352,55 @@ spec:
             providerConfigRef:
               name: kubernetes-provider
           ---
+          # Cross-namespace RBAC: the reconcile Job (SA svix-creds-init in the engine ns)
+          # must patch the <name>-conn secret in the APP ns ({{ $appNs }}) where the bridge
+          # envFroms it. Grant a Role THERE + a RoleBinding whose subject is the engine-ns SA.
+          apiVersion: kubernetes.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-webhook-conn-role'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: webhook-conn-role
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: rbac.authorization.k8s.io/v1
+                kind: Role
+                metadata:
+                  name: '{{ $name }}-svix-conn-patch'
+                  namespace: '{{ $appNs }}'
+                rules:
+                - apiGroups: ['']
+                  resources: ['secrets']
+                  verbs: ['get', 'patch', 'update']
+            providerConfigRef:
+              name: kubernetes-provider
+          ---
+          apiVersion: kubernetes.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-webhook-conn-rolebinding'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: webhook-conn-rolebinding
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: rbac.authorization.k8s.io/v1
+                kind: RoleBinding
+                metadata:
+                  name: '{{ $name }}-svix-conn-patch'
+                  namespace: '{{ $appNs }}'
+                subjects:
+                - kind: ServiceAccount
+                  name: svix-creds-init
+                  namespace: '{{ $ns }}'
+                roleRef:
+                  kind: Role
+                  name: '{{ $name }}-svix-conn-patch'
+                  apiGroup: rbac.authorization.k8s.io
+            providerConfigRef:
+              name: kubernetes-provider
+          ---
           apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
@@ -469,6 +524,15 @@ spec:
                         # token => admin. Passed explicitly for determinism.
                         - name: ORG_ID
                           value: 'org_23rb8YdGqMT0qIzpgGwdXfHirMu'
+                        # `jwt generate` validates the FULL config, not just jwt_secret:
+                        # the image defaults queue_type=redis + cache_type=redis, which
+                        # demand a redis_dsn we don't have at mint time. Force in-memory
+                        # so validation passes with only SVIX_JWT_SECRET. (Mint needs no
+                        # real queue/cache — it just HS256-signs an org token.)
+                        - name: SVIX_QUEUE_TYPE
+                          value: 'memory'
+                        - name: SVIX_CACHE_TYPE
+                          value: 'memory'
                         volumeMounts:
                         - name: seed
                           mountPath: /seed
@@ -756,6 +820,11 @@ spec:
                           value: '{{ $ns }}'
                         - name: CONN_SECRET
                           value: '{{ $name }}-conn'
+                        # The <name>-conn secret lives in the APP namespace (where the
+                        # bridge runs + envFroms it), NOT the engine ns. The CD writes it
+                        # into context.namespace == claimRef.namespace.
+                        - name: CONN_NS
+                          value: '{{ $appNs }}'
                         - name: CREDS_SECRET
                           value: '{{ $name }}-svix-credentials'
                         command:
@@ -807,10 +876,12 @@ spec:
                           #    Build the merge-patch JSON inline (no heredoc — keeps the
                           #    YAML literal-scalar indentation simple + unambiguous).
                           PATCH="{\"stringData\":{\"WEBHOOK_APP_ID\":\"$APP_ID\",\"WEBHOOK_ADMIN_TOKEN\":\"$SVIX_ADMIN_TOKEN\",\"WEBHOOK_ENGINE_API\":\"$ENGINE_API\"}}"
-                          for S in "$CONN_SECRET" "$CREDS_SECRET"; do
-                            kubectl patch secret "$S" -n "$NS" --type merge -p "$PATCH"
-                            echo "patched $S with WEBHOOK_APP_ID/ADMIN_TOKEN/ENGINE_API"
-                          done
+                          # CREDS secret lives in the engine ns; CONN secret lives in the
+                          # APP ns (bridge envFroms it there). Patch each in its own ns.
+                          kubectl patch secret "$CREDS_SECRET" -n "$NS" --type merge -p "$PATCH"
+                          echo "patched $CREDS_SECRET (-n $NS) with WEBHOOK_APP_ID/ADMIN_TOKEN/ENGINE_API"
+                          kubectl patch secret "$CONN_SECRET" -n "$CONN_NS" --type merge -p "$PATCH"
+                          echo "patched $CONN_SECRET (-n $CONN_NS) with WEBHOOK_APP_ID/ADMIN_TOKEN/ENGINE_API"
                           echo "webhook bootstrap reconcile complete"
                         resources:
                           requests:

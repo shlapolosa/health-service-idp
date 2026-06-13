@@ -44,7 +44,7 @@ spec:
         role: webhook                      # NEW role (follow-up; see plan)
         language: python                   # scaffold the bridge variant on first render
         bootstrap: true
-        realtime: rtdemo2                  # source realtime-platform (envFrom rtdemo2-conn)
+        realtime: rtdemo2-stream                  # realtime-platform COMPONENT name (envFrom rtdemo2-stream-conn)
         consumes:
           - sensor_agg                     # the topic to fan out
         # Bind the webhook platform's conn secret so the bridge knows the engine API
