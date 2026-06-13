@@ -1,0 +1,52 @@
+# CAMUNDA-WORKFLOW runtime e2e: first camunda-orchestrator instantiation on the
+# modernized CD + the bpmn+workers variant-only repo.
+#
+# What this OAM provisions:
+#   - camunda-orchestrator: the Camunda 8 stack (Zeebe engine + Operate + Tasklist),
+#     a <name>-conn secret (ZEEBE_ADDRESS/OPERATE_URL/TASKLIST_URL), the externally
+#     exposed Operate/Tasklist UIs on their own *.20.233.105.82.nip.io hosts, and a
+#     scaffold-claim that fans out the workflow variant repo (camunda/zeebe-worker).
+#   - approval-worker: a sibling webservice that SUBMITS workflow instances. It binds
+#     to the orchestrator's <name>-conn secret via `orchestrator:` (envFrom), so it
+#     gets ZEEBE_ADDRESS for free and can start the approval process.
+#
+# The dev-agent then implements (per REQUIREMENTS.md) the variant repo:
+#   processes/approval.bpmn  — the workflow definition (start -> review-request
+#                              service task -> human-task gateway -> end)
+#   workers/handlers.py      — the job-worker logic for the review-request task
+# CI builds the worker image + deploys the BPMN to Zeebe; a started instance runs,
+# human tasks appear in Tasklist, and the run is monitored in Operate.
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: workflowdemo
+  namespace: default
+  annotations:
+    description: "Sample approval workflow on Camunda 8 (orchestrator + worker + human task)"
+spec:
+  components:
+  # The Camunda 8 orchestrator platform (engine + UIs + conn secret + worker scaffold).
+  - name: workflowdemo-orchestrator
+    type: camunda-orchestrator
+    properties:
+      # Event-streaming bridge to a realtime-platform (Kafka) — required by the CD.
+      realtimePlatform: workflowdemo-events
+      enableUI: true            # Operate (monitor) + Tasklist (human tasks)
+      enableIstioGateway: true  # expose the UIs on distinct nip.io hosts
+      # language omitted on purpose: app.submit defaults it to the camunda flavor
+      # (language=camunda, framework=zeebe-worker) → scaffolds processes/ + workers/.
+
+  # A realtime-platform supplies the Kafka the orchestrator streams events to.
+  - name: workflowdemo-events
+    type: realtime-platform
+    properties:
+      name: workflowdemo-events
+
+  # A sibling webservice that starts workflow instances. It references the
+  # orchestrator so the webservice CD wires `envFrom: workflowdemo-orchestrator-conn`
+  # (ZEEBE_ADDRESS etc.) automatically — the binding contract.
+  - name: approval-worker
+    type: webservice
+    properties:
+      language: python
+      orchestrator: workflowdemo-orchestrator
