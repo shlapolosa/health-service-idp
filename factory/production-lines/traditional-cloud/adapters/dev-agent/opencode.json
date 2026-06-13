@@ -5,8 +5,11 @@
       "npm": "@ai-sdk/openai-compatible",
       "name": "Azure APIM GPT-5.4",
       "options": {
-        "baseURL": "https://aigw-apim-dev-w4x7ibwk4e2is.azure-api.net/openai/deployments/gpt-5.4?api-version=2024-12-01-preview",
+        "baseURL": "https://aigw-apim-dev-w4x7ibwk4e2is.azure-api.net/openai/deployments/gpt-5.4",
         "apiKey": "{env:APIM_SUBSCRIPTION_KEY}",
+        "queryParams": {
+          "api-version": "2024-12-01-preview"
+        },
         "headers": {
           "Ocp-Apim-Subscription-Key": "{env:APIM_SUBSCRIPTION_KEY}",
           "Authorization": ""
