@@ -196,16 +196,13 @@ def _build_connectors(oam: dict[str, Any], comps: list[dict[str, Any]],
                 # Emit only the post-image (the row's new state) — feature streams
                 # consume current state, not the full before/after envelope.
                 "after.state.only": "true",
-                # Debezium writes <prefix>.<schema>.<table> (cdc.public.orders);
-                # flatten to cdc.<table> so the names match the declared topics +
-                # the Snowflake sink's topics= list.
-                "transforms": "route",
-                "transforms.route.type": "org.apache.kafka.connect.transforms.RegexRouter",
-                # Use [.] (char class) not \\. — the connector-provisioning Job builds
-                # the config JSON via a shell heredoc that does not JSON-escape values,
-                # so a backslash would produce invalid JSON (connectorConfig=null NPE).
-                "transforms.route.regex": "cdc[.][^.]+[.]([^.]+)",
-                "transforms.route.replacement": "cdc.$1",
+                # NO RegexRouter: Debezium writes <prefix>.<schema>.<table> natively
+                # (cdc.public.orders), which is exactly what _cdc_topic() declares and
+                # the Snowflake sink's topics= list consumes. A RegexRouter to flatten
+                # to cdc.<table> would (a) break that alignment and (b) inject a "$1"
+                # replacement that the connector-provisioning Job's shell heredoc
+                # expands as an unset positional param under `set -u` (sh: 1: parameter
+                # not set) → empty body → PUT fails. Native naming needs no transform.
             },
             "secretRefs": [source_secret],
         })
