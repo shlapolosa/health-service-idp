@@ -16,6 +16,7 @@ spec:
       type: postgresql
       properties:
         name: sales-db
+        database: sales
 
     # 2. Analytics overlay — no `realtime` set, so submit-time auto-injects a
     #    realtime-platform. warehouse defaults to snowflake (snowflake-conn from
