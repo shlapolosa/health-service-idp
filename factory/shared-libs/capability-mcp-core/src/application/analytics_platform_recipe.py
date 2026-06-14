@@ -181,6 +181,10 @@ def _build_connectors(oam: dict[str, Any], comps: list[dict[str, Any]],
                 "database.sslmode": "prefer",
                 "plugin.name": "pgoutput",
                 "slot.name": _slot_name(app_name),
+                # filtered (not all_tables): CREATE PUBLICATION FOR ALL TABLES needs
+                # superuser; the bitnami app user is only the table owner, so create
+                # the publication for just the included tables.
+                "publication.autocreate.mode": "filtered",
                 "topic.prefix": _CDC_PREFIX,
                 # Debezium needs schema-qualified names; bare table -> public.<table>.
                 "table.include.list": ",".join(
