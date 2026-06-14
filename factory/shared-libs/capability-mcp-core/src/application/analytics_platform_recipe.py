@@ -157,18 +157,28 @@ def _build_connectors(oam: dict[str, Any], comps: list[dict[str, Any]],
     # existing realtime-service producers, so no source connector is generated.
     if mode == "cdc":
         source_name = ingestion.get("source")
+        # Zero-touch CDC: flag the source postgresql component so its CD enables
+        # wal_level=logical (Debezium pgoutput requires logical decoding).
+        if source_name:
+            for c in comps:
+                if c.get("name") == source_name and c.get("type") == "postgresql":
+                    c.setdefault("properties", {})["cdc"] = True
         source_secret = f"{source_name}-conn" if source_name else f"{app_name}-conn"
         connectors.append({
             "name": f"{app_name}-pg-source",
             "class": _DEBEZIUM_PG_CLASS,
             "config": {
                 "connector.class": _DEBEZIUM_PG_CLASS,
-                "database.hostname": "${PG_HOST}",
-                "database.port": "${PG_PORT|5432}",
-                "database.user": "${PG_USER}",
-                "database.password": "${PG_PASSWORD}",
-                "database.dbname": "${PG_DBNAME}",
-                "database.sslmode": "require",
+                # Keys match the postgresql/neon <name>-conn secret (binding contract):
+                # DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME.
+                "database.hostname": "${DB_HOST}",
+                "database.port": "${DB_PORT}",
+                "database.user": "${DB_USER}",
+                "database.password": "${DB_PASSWORD}",
+                "database.dbname": "${DB_NAME}",
+                # prefer (not require): in-cluster bitnami postgres has no TLS; Neon
+                # still negotiates TLS under prefer. Zero-touch for both backends.
+                "database.sslmode": "prefer",
                 "plugin.name": "pgoutput",
                 "slot.name": _slot_name(app_name),
                 "topic.prefix": _CDC_PREFIX,

@@ -56,6 +56,12 @@ spec:
                     size: parameter.storage
                     storageClass: parameter.storageClass
                   }
+                  // CDC source: Debezium pgoutput needs logical decoding. Opt-in
+                  // (set by the analytics-platform recipe on the ingestion source);
+                  // off by default so non-CDC databases keep wal_level=replica.
+                  if parameter.cdc {
+                    extendedConfiguration: "wal_level = logical\nmax_wal_senders = 10\nmax_replication_slots = 10\n"
+                  }
                   resources: {
                     requests: {
                       cpu: parameter.resources.cpu
@@ -135,9 +141,15 @@ spec:
             postgresPassword: *"adminpass" | string
           }
 
-          // Storage
+          // Storage. Default "default" = the AKS in-cluster default StorageClass
+          // (azure-disk). "gp2"/"gp3" are AWS EBS classes that never bind on AKS
+          // (PVC stuck Pending -> pod Pending forever) — same fix as RT-1 #156.
           storage: *"10Gi" | string
-          storageClass: *"gp2" | string
+          storageClass: *"default" | string
+
+          // CDC source flag — when true, enables wal_level=logical (Debezium).
+          // Set automatically by the analytics-platform submit-time recipe.
+          cdc: *false | bool
 
           // Resources
           resources: {

@@ -125,15 +125,15 @@ def test_cdc_source_connector_generated():
     assert src["secretRefs"] == ["ordersdb-conn"]
     cfg = src["config"]
     # ${VAR} placeholders, NO secret values
-    assert cfg["database.hostname"] == "${PG_HOST}"
-    assert cfg["database.port"] == "${PG_PORT|5432}"
-    assert cfg["database.user"] == "${PG_USER}"
-    assert cfg["database.password"] == "${PG_PASSWORD}"
-    assert cfg["database.dbname"] == "${PG_DBNAME}"
+    assert cfg["database.hostname"] == "${DB_HOST}"
+    assert cfg["database.port"] == "${DB_PORT}"
+    assert cfg["database.user"] == "${DB_USER}"
+    assert cfg["database.password"] == "${DB_PASSWORD}"
+    assert cfg["database.dbname"] == "${DB_NAME}"
     assert cfg["plugin.name"] == "pgoutput"
     assert cfg["slot.name"] == "orders"
     assert cfg["topic.prefix"] == "cdc"
-    assert cfg["database.sslmode"] == "require"
+    assert cfg["database.sslmode"] == "prefer"
     assert cfg["table.include.list"] == "public.orders,public.lineitems"
     assert cfg["after.state.only"] == "true"
     # no literal secret leaked anywhere

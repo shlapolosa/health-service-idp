@@ -1420,7 +1420,32 @@ spec:
                         sidecar.istio.io/inject: 'false'
                     spec:
                       restartPolicy: OnFailure
+                      # secret-copier SA can read default-ns secrets + write here.
+                      serviceAccountName: secret-copier
                       initContainers:
+                      # Zero-touch: copy each connector secretRef (e.g. <source>-conn,
+                      # snowflake-conn) from the default namespace into this realtime
+                      # namespace so the provisioner can envFrom it. Waits until each
+                      # secret exists in default (idempotent; ownerRefs/managedFields
+                      # stripped so the copy is standalone, not GC'd by ESO/Crossplane).
+                      - name: copy-connector-secrets
+                        image: alpine/k8s:1.28.4
+                        command:
+                        - sh
+                        - -c
+                        - |
+                          set -u
+                          TARGET={{ $name }}-realtime
+                          {{- $csecrets := dict }}
+                          {{- range $c := $spec.connectors }}{{- range $sr := $c.secretRefs }}{{- $csecrets = set $csecrets $sr true }}{{- end }}{{- end }}
+                          for S in {{ range $sname, $_ := $csecrets }}{{ $sname }} {{ end }}; do
+                            echo "Waiting for secret $S in default..."
+                            until kubectl get secret "$S" -n default >/dev/null 2>&1; do sleep 5; done
+                            kubectl get secret "$S" -n default -o json | \
+                              jq 'del(.metadata.namespace,.metadata.resourceVersion,.metadata.uid,.metadata.creationTimestamp,.metadata.ownerReferences,.metadata.managedFields,.metadata.annotations,.metadata.labels)' | \
+                              kubectl apply -n "$TARGET" -f -
+                            echo "copied $S -> $TARGET"
+                          done
                       # Wait until Kafka Connect REST API is up before provisioning.
                       - name: wait-for-connect
                         image: curlimages/curl:8.5.0
