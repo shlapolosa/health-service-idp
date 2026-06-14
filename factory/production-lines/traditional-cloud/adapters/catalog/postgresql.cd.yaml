@@ -61,6 +61,12 @@ spec:
                   // off by default so non-CDC databases keep wal_level=replica.
                   if parameter.cdc {
                     extendedConfiguration: "wal_level = logical\nmax_wal_senders = 10\nmax_replication_slots = 10\n"
+                    // Debezium needs the connection role to have REPLICATION + to
+                    // own the captured tables (so it can auto-create the publication).
+                    // initdb runs once on first boot, as superuser, after the user
+                    // is created.
+                    initdb: scripts: "00-cdc-replication.sql":
+                      "ALTER ROLE \"" + parameter.auth.username + "\" WITH REPLICATION;\n"
                   }
                   resources: {
                     requests: {

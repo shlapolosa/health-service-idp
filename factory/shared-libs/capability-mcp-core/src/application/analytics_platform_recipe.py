@@ -182,7 +182,9 @@ def _build_connectors(oam: dict[str, Any], comps: list[dict[str, Any]],
                 "plugin.name": "pgoutput",
                 "slot.name": _slot_name(app_name),
                 "topic.prefix": _CDC_PREFIX,
-                "table.include.list": ",".join(tables),
+                # Debezium needs schema-qualified names; bare table -> public.<table>.
+                "table.include.list": ",".join(
+                    t if "." in t else f"public.{t}" for t in tables),
                 "key.converter": "org.apache.kafka.connect.json.JsonConverter",
                 "value.converter": "org.apache.kafka.connect.json.JsonConverter",
                 "key.converter.schemas.enable": "false",
@@ -190,6 +192,13 @@ def _build_connectors(oam: dict[str, Any], comps: list[dict[str, Any]],
                 # Emit only the post-image (the row's new state) — feature streams
                 # consume current state, not the full before/after envelope.
                 "after.state.only": "true",
+                # Debezium writes <prefix>.<schema>.<table> (cdc.public.orders);
+                # flatten to cdc.<table> so the names match the declared topics +
+                # the Snowflake sink's topics= list.
+                "transforms": "route",
+                "transforms.route.type": "org.apache.kafka.connect.transforms.RegexRouter",
+                "transforms.route.regex": r"cdc\.[^.]+\.(.+)",
+                "transforms.route.replacement": "cdc.$1",
             },
             "secretRefs": [source_secret],
         })
