@@ -201,7 +201,10 @@ def _build_connectors(oam: dict[str, Any], comps: list[dict[str, Any]],
                 # the Snowflake sink's topics= list.
                 "transforms": "route",
                 "transforms.route.type": "org.apache.kafka.connect.transforms.RegexRouter",
-                "transforms.route.regex": r"cdc\.[^.]+\.(.+)",
+                # Use [.] (char class) not \\. — the connector-provisioning Job builds
+                # the config JSON via a shell heredoc that does not JSON-escape values,
+                # so a backslash would produce invalid JSON (connectorConfig=null NPE).
+                "transforms.route.regex": "cdc[.][^.]+[.]([^.]+)",
                 "transforms.route.replacement": "cdc.$1",
             },
             "secretRefs": [source_secret],
