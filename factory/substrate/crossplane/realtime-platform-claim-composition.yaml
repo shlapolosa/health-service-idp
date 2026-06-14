@@ -706,6 +706,53 @@ spec:
                             sleep 5
                           done
                           echo "Lenses HQ is ready"
+                      - name: register-hq-environment
+                        # Lenses 6.2: the agent key is a SHARED credential — HQ registers
+                        # the environment WITH a key, and the agent must present that SAME
+                        # key. The old "empty AGENT_KEY + self-register" model never
+                        # establishes a key HQ recognises (HQ disconnects: "unknown agent
+                        # key"). Create the 'demo' env (or renew-key if it already exists)
+                        # via the HQ API and write the returned agent_key to
+                        # /mnt/settings/HQ_AGENT_KEY, which create-agent-config bakes into
+                        # provisioning.yaml so the agent connects AND stays connected.
+                        image: python:3.12-alpine
+                        envFrom:
+                        - secretRef:
+                            name: lenses-credentials
+                        env:
+                        - name: LENSES_HQ_SERVICE
+                          value: lenses-hq
+                        command:
+                        - python3
+                        - -c
+                        - |
+                          import urllib.request, json, os
+                          from http.cookiejar import CookieJar
+                          cj=CookieJar(); op=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+                          b="http://%s:9991"%os.environ.get("LENSES_HQ_SERVICE","lenses-hq")
+                          op.open(urllib.request.Request(b+"/api/v1/login",
+                            data=json.dumps({"username":os.environ["HQ_USER"],"password":os.environ["HQ_PASSWORD"]}).encode(),
+                            headers={"Content-Type":"application/json"}),timeout=20)
+                          def post(path,data):
+                              req=urllib.request.Request(b+path,data=json.dumps(data).encode(),method="POST",
+                                headers={"Content-Type":"application/json"})
+                              try:
+                                  r=op.open(req,timeout=20); return r.status, json.loads(r.read().decode())
+                              except urllib.error.HTTPError as e:
+                                  return e.code, None
+                          # Create the environment; HQ returns the agent_key ONCE on 201.
+                          s,body=post("/api/v1/environments",{"name":"demo","tier":"development"})
+                          if s not in (200,201) or not body or "agent_key" not in body:
+                              # Already exists (409) — rotate the key so we have one HQ accepts.
+                              s,body=post("/api/v1/environments/demo/renew-key",{})
+                          if not body or "agent_key" not in body:
+                              raise SystemExit("failed to obtain agent_key from HQ (status=%s)"%s)
+                          with open("/mnt/settings/HQ_AGENT_KEY","w") as f:
+                              f.write(body["agent_key"])
+                          print("HQ env 'demo' registered; agent key provisioned")
+                        volumeMounts:
+                        - name: agent-settings
+                          mountPath: /mnt/settings
                       - name: create-agent-config
                         image: busybox
                         envFrom:
@@ -723,7 +770,7 @@ spec:
                         command:
                         - sh
                         - -c
-                        - "# Create agent key\necho \"$AGENT_KEY\" > /mnt/settings/DEMO_AGENTKEY\n\n# Create lenses.conf\ncat > /mnt/settings/lenses.conf << EOF\nlenses {\n  storage.postgres.host = \"postgres\"\n  storage.postgres.port = 5432\n  storage.postgres.database = \"agent1\"\n  storage.postgres.username = \"lenses\"\n  storage.postgres.password = \"lenses\"\n  provisioning.path = \"/mnt/settings\"\n  sql.state.dir = \"/data/lsql-state-dir\"\n  secret.file = \"/data/security.conf\"\n  storage.directory = \"/data/lenses\"\n  \n  connectors.info = [\n    {       \n      class.name    = \"com.snowflake.kafka.connector.SnowflakeSinkConnector\"\n      name          = \"Snowflake Kafka Connector\"\n      sink          = true\n      description   = \"Writes Kafka data into Snowflake for analytics.\"\n      docs          = \"https://docs.snowflake.com/en/user-guide/kafka-connector.html\"\n      author        = \"Snowflake\"\n    }\n  ]\n}\nEOF\n\n# Create provisioning.yaml with parameterized service names\ncat > /mnt/settings/provisioning.yaml << EOF\nlensesHq:\n  - configuration:\n      agentKey:\n        value: $AGENT_KEY\n      port:\n        value: 10000\n      server:\n        value: lenses-hq\n    name: lenses-hq\n    tags: ['hq']\n    version: 1\nkafka:\n  - name: kafka\n    version: 1\n    tags: ['kafka', 'dev']\n    configuration:\n      kafkaBootstrapServers:\n        value: [PLAINTEXT://$KAFKA_SERVICE.$NAMESPACE.svc.cluster.local:9092]\n      protocol:\n        value: PLAINTEXT\nconfluentSchemaRegistry:\n  - name: schema-registry\n    version: 1\n    tags: ['dev']\n    configuration:\n      schemaRegistryUrls:\n        value: [http://$KAFKA_SERVICE.$NAMESPACE.svc.cluster.local:8081]\nconnect:\n  - name: dev\n    version: 1\n    tags: ['dev']\n    configuration:\n      workers:\n        value: [http://$KAFKA_SERVICE.$NAMESPACE.svc.cluster.local:8083]\n      aes256Key:\n        value: 0123456789abcdef0123456789abcdef\nEOF\n"
+                        - "# Use the HQ-minted agent key (register-hq-environment init wrote it)\nAGENT_KEY=\"$(cat /mnt/settings/HQ_AGENT_KEY)\"\necho \"$AGENT_KEY\" > /mnt/settings/DEMO_AGENTKEY\n\n# Create lenses.conf\ncat > /mnt/settings/lenses.conf << EOF\nlenses {\n  storage.postgres.host = \"postgres\"\n  storage.postgres.port = 5432\n  storage.postgres.database = \"agent1\"\n  storage.postgres.username = \"lenses\"\n  storage.postgres.password = \"lenses\"\n  provisioning.path = \"/mnt/settings\"\n  sql.state.dir = \"/data/lsql-state-dir\"\n  secret.file = \"/data/security.conf\"\n  storage.directory = \"/data/lenses\"\n  \n  connectors.info = [\n    {       \n      class.name    = \"com.snowflake.kafka.connector.SnowflakeSinkConnector\"\n      name          = \"Snowflake Kafka Connector\"\n      sink          = true\n      description   = \"Writes Kafka data into Snowflake for analytics.\"\n      docs          = \"https://docs.snowflake.com/en/user-guide/kafka-connector.html\"\n      author        = \"Snowflake\"\n    }\n  ]\n}\nEOF\n\n# Create provisioning.yaml with parameterized service names\ncat > /mnt/settings/provisioning.yaml << EOF\nlensesHq:\n  - configuration:\n      agentKey:\n        value: \"$AGENT_KEY\"\n      port:\n        value: 10000\n      server:\n        value: lenses-hq\n    name: lenses-hq\n    tags: ['hq']\n    version: 1\nkafka:\n  - name: kafka\n    version: 1\n    tags: ['kafka', 'dev']\n    configuration:\n      kafkaBootstrapServers:\n        value: [PLAINTEXT://$KAFKA_SERVICE.$NAMESPACE.svc.cluster.local:9092]\n      protocol:\n        value: PLAINTEXT\nconfluentSchemaRegistry:\n  - name: schema-registry\n    version: 1\n    tags: ['dev']\n    configuration:\n      schemaRegistryUrls:\n        value: [http://$KAFKA_SERVICE.$NAMESPACE.svc.cluster.local:8081]\nconnect:\n  - name: dev\n    version: 1\n    tags: ['dev']\n    configuration:\n      workers:\n        value: [http://$KAFKA_SERVICE.$NAMESPACE.svc.cluster.local:8083]\n      aes256Key:\n        value: 0123456789abcdef0123456789abcdef\nEOF\n"
                         volumeMounts:
                         - name: agent-settings
                           mountPath: /mnt/settings
