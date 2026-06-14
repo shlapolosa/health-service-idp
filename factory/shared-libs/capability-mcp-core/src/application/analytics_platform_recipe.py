@@ -224,6 +224,13 @@ def _build_connectors(oam: dict[str, Any], comps: list[dict[str, Any]],
             # Json converter is schema-registry-free (v1). Avro
             # (SnowflakeAvroConverter + a registry) is the option for typed columns.
             "value.converter": "com.snowflake.kafka.connector.records.SnowflakeJsonConverter",
+            # The Connect worker default key.converter is JsonConverter with
+            # schemas.enable=true, which rejects Debezium's plain-JSON keys
+            # ("requires schema and payload fields" -> tolerance exceeded). Snowflake's
+            # documented sink config uses StringConverter for the key (it lands in
+            # RECORD_METADATA). Declare it explicitly so the sink is converter-correct
+            # regardless of the worker default.
+            "key.converter": "org.apache.kafka.connect.storage.StringConverter",
             "buffer.count.records": "1000000",
             "buffer.flush.time": "10",
             "buffer.size.bytes": "250000000",
