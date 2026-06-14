@@ -157,22 +157,38 @@ def _build_connectors(oam: dict[str, Any], comps: list[dict[str, Any]],
     # existing realtime-service producers, so no source connector is generated.
     if mode == "cdc":
         source_name = ingestion.get("source")
+        # Zero-touch CDC: flag the source postgresql component so its CD enables
+        # wal_level=logical (Debezium pgoutput requires logical decoding).
+        if source_name:
+            for c in comps:
+                if c.get("name") == source_name and c.get("type") == "postgresql":
+                    c.setdefault("properties", {})["cdc"] = True
         source_secret = f"{source_name}-conn" if source_name else f"{app_name}-conn"
         connectors.append({
             "name": f"{app_name}-pg-source",
             "class": _DEBEZIUM_PG_CLASS,
             "config": {
                 "connector.class": _DEBEZIUM_PG_CLASS,
-                "database.hostname": "${PG_HOST}",
-                "database.port": "${PG_PORT|5432}",
-                "database.user": "${PG_USER}",
-                "database.password": "${PG_PASSWORD}",
-                "database.dbname": "${PG_DBNAME}",
-                "database.sslmode": "require",
+                # Keys match the postgresql/neon <name>-conn secret (binding contract):
+                # DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME.
+                "database.hostname": "${DB_HOST}",
+                "database.port": "${DB_PORT}",
+                "database.user": "${DB_USER}",
+                "database.password": "${DB_PASSWORD}",
+                "database.dbname": "${DB_NAME}",
+                # prefer (not require): in-cluster bitnami postgres has no TLS; Neon
+                # still negotiates TLS under prefer. Zero-touch for both backends.
+                "database.sslmode": "prefer",
                 "plugin.name": "pgoutput",
                 "slot.name": _slot_name(app_name),
+                # filtered (not all_tables): CREATE PUBLICATION FOR ALL TABLES needs
+                # superuser; the bitnami app user is only the table owner, so create
+                # the publication for just the included tables.
+                "publication.autocreate.mode": "filtered",
                 "topic.prefix": _CDC_PREFIX,
-                "table.include.list": ",".join(tables),
+                # Debezium needs schema-qualified names; bare table -> public.<table>.
+                "table.include.list": ",".join(
+                    t if "." in t else f"public.{t}" for t in tables),
                 "key.converter": "org.apache.kafka.connect.json.JsonConverter",
                 "value.converter": "org.apache.kafka.connect.json.JsonConverter",
                 "key.converter.schemas.enable": "false",
@@ -180,6 +196,13 @@ def _build_connectors(oam: dict[str, Any], comps: list[dict[str, Any]],
                 # Emit only the post-image (the row's new state) — feature streams
                 # consume current state, not the full before/after envelope.
                 "after.state.only": "true",
+                # NO RegexRouter: Debezium writes <prefix>.<schema>.<table> natively
+                # (cdc.public.orders), which is exactly what _cdc_topic() declares and
+                # the Snowflake sink's topics= list consumes. A RegexRouter to flatten
+                # to cdc.<table> would (a) break that alignment and (b) inject a "$1"
+                # replacement that the connector-provisioning Job's shell heredoc
+                # expands as an unset positional param under `set -u` (sh: 1: parameter
+                # not set) → empty body → PUT fails. Native naming needs no transform.
             },
             "secretRefs": [source_secret],
         })
@@ -201,6 +224,13 @@ def _build_connectors(oam: dict[str, Any], comps: list[dict[str, Any]],
             # Json converter is schema-registry-free (v1). Avro
             # (SnowflakeAvroConverter + a registry) is the option for typed columns.
             "value.converter": "com.snowflake.kafka.connector.records.SnowflakeJsonConverter",
+            # The Connect worker default key.converter is JsonConverter with
+            # schemas.enable=true, which rejects Debezium's plain-JSON keys
+            # ("requires schema and payload fields" -> tolerance exceeded). Snowflake's
+            # documented sink config uses StringConverter for the key (it lands in
+            # RECORD_METADATA). Declare it explicitly so the sink is converter-correct
+            # regardless of the worker default.
+            "key.converter": "org.apache.kafka.connect.storage.StringConverter",
             "buffer.count.records": "1000000",
             "buffer.flush.time": "10",
             "buffer.size.bytes": "250000000",
