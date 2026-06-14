@@ -24,8 +24,13 @@ ARG DEBEZIUM_PG_VER
 ARG MQTT_STREAMREACTOR_VER
 
 # fast-data-dev scans /connectors (+ /usr/share/java/kafka-connect-*) for plugins.
-# Give each connector its own plugin dir.
+# Give each connector its own plugin dir. The base image (broker + supervisord +
+# connect-distributed) runs as root by design, so the final USER stays root.
+# hadolint ignore=DL3002
 USER root
+# DL3008 (pin apt versions): build-only fetch tooling (wget/unzip/tar) purged in the
+# same layer; pinning debian point-releases would break on base refresh.
+# hadolint ignore=DL3008,DL3015
 RUN set -eux; \
     apt-get update && apt-get install -y --no-install-recommends wget ca-certificates unzip tar; \
     mkdir -p /connectors/snowflake-kafka-connector \
