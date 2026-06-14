@@ -86,6 +86,29 @@ recipes:
       *-kafka-secret/*-lenses-secret envFrom). Best practice: graceful shutdown + dead-letter
       routing; configure consumer groups via the Lenses connection rather than raw bootstrap.
 
+  - id: analytics-platform-on-realtime
+    triggers:
+      composite:
+        contains: [analytics, warehouse]
+    emit:
+      - component:realtime-platform
+      - property:analytics-platform.realtime=<realtime-platform-component-name>
+    docs: |
+      ANALYTICS PIPELINE: an `analytics-platform` component declares DECLARATIVE intent
+      (CDC/streaming ingestion of tables into a warehouse + feature streams). It is not a
+      workload — app.submit's deterministic pre-processor (analytics_platform_recipe.py)
+      expands it BEFORE vela dry-run into a realtime-platform that carries the wiring:
+      (1) `connectors[]` — a Debezium Postgres SOURCE connector (only when
+      ingestion.mode==cdc; gateway mode ingests from existing realtime-service producers)
+      reading the `<source>-conn` secret via ${VAR} placeholders, plus a Snowflake SINK
+      connector reading the warehouse secret (default `snowflake-conn`); (2) `processors[]`
+      — one Lenses SQL stream processor per AP.features[] (+ an optional roundtrip
+      republish when AP.roundtrip.topic is set); (3) `topics[]` — every cdc.* / feature /
+      roundtrip / sink topic referenced, deduped. The realtime-platform is REUSED when one
+      already exists (singleton invariant) or INJECTED as `<app>-stream` otherwise. NO
+      secret values ever land in the OAM — only ${VAR} placeholders + `secretRefs:` naming
+      the `<comp>-conn` binding secrets. Exactly ONE analytics-platform per OAM.
+
   - id: secret-from-key-vault
     triggers:
       kb_profile:

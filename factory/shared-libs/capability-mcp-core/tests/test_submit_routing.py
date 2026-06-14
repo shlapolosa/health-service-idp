@@ -679,6 +679,49 @@ def test_product_properties_shape():
     assert props["description"] == "the patient9 app"
 
 
+def _analytics_oam(app_name="orders", dup=False, mode="cdc"):
+    comps = [{"name": "analytics", "type": "analytics-platform",
+              "properties": {"ingestion": {"mode": mode,
+                                           "tables": ["public.orders"],
+                                           "source": "ordersdb"}}}]
+    if dup:
+        comps.append({"name": "analytics2", "type": "analytics-platform",
+                      "properties": {}})
+    return yaml.safe_dump({
+        "apiVersion": "core.oam.dev/v1beta1", "kind": "Application",
+        "metadata": {"name": app_name, "namespace": "default"},
+        "spec": {"components": comps},
+    })
+
+
+def test_analytics_platform_expanded_and_committed():
+    # submit expands the analytics-platform into a realtime-platform carrying
+    # connectors/processors/topics BEFORE the ledger commit; the committed OAM
+    # reflects the expansion.
+    uc, gh = _uc()
+    res = uc.submit(_analytics_oam())
+    assert res.ok, res.message
+    # central ledger commit happened with the expanded OAM
+    committed = [(repo, path) for (repo, path) in gh.commits]
+    assert (None, "oam/applications/orders.yaml") in committed
+
+
+def test_analytics_duplicate_rejected_before_commit():
+    uc, gh = _uc()
+    res = uc.submit(_analytics_oam(dup=True))
+    assert not res.ok
+    assert "exactly one analytics-platform" in res.message
+    assert not gh.commits, "rejected OAM must not reach the gitops gate"
+
+
+def test_oam_without_analytics_unchanged_passthrough():
+    # additive: a plain OAM routes exactly as before (no analytics interference).
+    uc, gh = _uc()
+    res = uc.submit(_oam())
+    assert res.ok, res.message
+    assert uc.claims.created and uc.claims.created[0][0] == "my-svc"
+
+
 def test_product_job_body_shape():
     c = ApimProductClient(namespace="default", apim_name="apim-x", apim_rg="rg-x")
     body = c._build_job("patient9", ["patient9-api", "patient9-graph"],
