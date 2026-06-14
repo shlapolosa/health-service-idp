@@ -1434,16 +1434,22 @@ spec:
                         - sh
                         - -c
                         - |
-                          set -u
+                          set -eu
                           TARGET={{ $name }}-realtime
                           {{- $csecrets := dict }}
                           {{- range $c := $spec.connectors }}{{- range $sr := $c.secretRefs }}{{- $csecrets = set $csecrets $sr true }}{{- end }}{{- end }}
                           for S in {{ range $sname, $_ := $csecrets }}{{ $sname }} {{ end }}; do
                             echo "Waiting for secret $S in default..."
                             until kubectl get secret "$S" -n default >/dev/null 2>&1; do sleep 5; done
-                            kubectl get secret "$S" -n default -o json | \
+                            # retry the apply: the secret-copier ClusterRoleBinding may
+                            # not have propagated yet on the first reconcile (Forbidden).
+                            n=0
+                            until kubectl get secret "$S" -n default -o json | \
                               jq 'del(.metadata.namespace,.metadata.resourceVersion,.metadata.uid,.metadata.creationTimestamp,.metadata.ownerReferences,.metadata.managedFields,.metadata.annotations,.metadata.labels)' | \
-                              kubectl apply -n "$TARGET" -f -
+                              kubectl apply -n "$TARGET" -f -; do
+                              n=$((n+1)); [ "$n" -ge 12 ] && echo "give up copying $S" && exit 1
+                              echo "apply $S failed (RBAC not ready?) — retry $n"; sleep 5
+                            done
                             echo "copied $S -> $TARGET"
                           done
                       # Wait until Kafka Connect REST API is up before provisioning.
