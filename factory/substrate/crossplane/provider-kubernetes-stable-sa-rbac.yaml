@@ -38,15 +38,30 @@
 #   3. Bind that stable SA to the existing cluster-wide admin ClusterRole in GitOps,
 #      so the binding survives all future revisions and ArgoCD owns it.
 #
+# 2026-06-14 SCOPING FIX: this DRC was previously named `default`, which Crossplane
+# applies to EVERY runtime lacking its own runtimeConfigRef — i.e. it forced
+# `--enable-watches` + the provider-kubernetes SA onto the FUNCTIONS
+# (function-go-templating v0.10.0, function-patch-and-transform v0.7.0) and the
+# OTHER providers (aws v0.43, helm v0.16, upjet-github v0.18), NONE of which accept
+# `--enable-watches` (only provider-kubernetes v1.2.1 does). Result: all 5 ran into
+# CrashLoopBackOff ("unknown flag --enable-watches") and ALL composition rendering
+# was down for ~18h. The fix: name this DRC `provider-kubernetes-watches` and bind
+# it ONLY to the kubernetes provider via its Provider.spec.runtimeConfigRef. With no
+# `default` DRC, every other runtime falls back to Crossplane's vanilla defaults
+# (revision-hashed SAs, watches-off) — exactly as before, and they only ever needed
+# that. (The provider-kubernetes Provider object is bootstrap-installed, NOT
+# gitops-owned, so its runtimeConfigRef is set live; if it is ever re-bootstrapped,
+# re-set `spec.runtimeConfigRef.name: provider-kubernetes-watches`.)
+#
 # This file is owned by the ArgoCD `platform-definitions` application.
 ---
-# 1+2. Pin a stable ServiceAccount name AND enable real-time watches + a short
-#      poll fallback for the provider deployment. Empty spec previously =>
-#      Crossplane defaulted to revision-hashed SA names and watches-off.
+# 1+2. Pin a stable ServiceAccount name AND enable real-time watches + a short poll
+#      fallback — SCOPED to provider-kubernetes only (referenced via the provider's
+#      runtimeConfigRef), NOT named `default` (which would poison all runtimes).
 apiVersion: pkg.crossplane.io/v1beta1
 kind: DeploymentRuntimeConfig
 metadata:
-  name: default
+  name: provider-kubernetes-watches
 spec:
   serviceAccountTemplate:
     metadata:
