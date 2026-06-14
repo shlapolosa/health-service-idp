@@ -1,0 +1,34 @@
+# KB entry — analytics-platform: a THIN OVERLAY that attaches an OLAP warehouse
+# (Snowflake today; clickhouse later) to a realtime-platform for CDC/gateway
+# ingestion + inline roundtrip. Exactly ONE per app; submit-time auto-injects a
+# realtime-platform if none is declared.
+technology: analytics-platform
+category: analytics
+profile:
+  durability: strong
+  consistency: eventual          # CDC/streaming pipeline into the warehouse
+  queryModel: relational         # OLAP / SQL over the warehouse
+  readPattern: analytical
+  availabilityClass: managed-multizone
+  latencyP99Ms: 1000
+  footprint: overlay             # no long-running workload of its own
+  throughputClass: high
+  scalingModel: elastic
+  costClass: high
+version: { current: "current", tracked: "managed" }
+upstreamSource: composite        # overlay over realtime-platform + warehouse seam
+provisioning:
+  # composite: this CD renders the warehouse ExternalSecret + a discoverability
+  # <name>-conn; the connector configs (Kafka Connect → Lenses SQL → warehouse →
+  # Lenses stream-republish) are produced at submit-time by the recipe and
+  # executed by the realtime claim.
+  kind: composite
+  source: overlay:realtime-platform+warehouse
+  requires_cluster_permissions: false
+  notes: |
+    Pipeline: ingest (cdc Debezium-Postgres | gateway consume-existing-topics) → Kafka Connect →
+    Lenses SQL → warehouse (Snowflake) → Lenses stream-republish roundtrip. Attaches to a
+    realtime-platform via param `realtime`; exactly ONE per app; submit-time auto-injects a
+    realtime-platform if absent. Use ingestion.mode=cdc for Debezium Postgres CDC off a postgres/neon
+    component, or ingestion.mode=gateway to consume topics already on the realtime-platform.
+maturity: kb

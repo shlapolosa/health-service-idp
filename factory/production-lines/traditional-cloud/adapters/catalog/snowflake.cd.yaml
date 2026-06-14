@@ -1,0 +1,99 @@
+# ANALYTICS-PLATFORM: snowflake ComponentDefinition — the pluggable WAREHOUSE
+# seam. Models the backing-CD-emits-<name>-conn pattern of auth0-idp.cd.yaml:
+# renders an ESO ExternalSecret that pulls SNOWFLAKE_* from Azure Key Vault
+# kv-socrates-6706 (ClusterSecretStore azure-keyvault) and produces the
+# normalized <context.name>-conn Secret. A future `clickhouse` CD will emit the
+# SAME-shaped -conn so the analytics overlay stays warehouse-agnostic.
+#
+# Emitted <name>-conn keys:
+#   SNOWFLAKE_ACCOUNT      <- KV  <secretPrefix>-account
+#   SNOWFLAKE_USER         <- KV  <secretPrefix>-user
+#   SNOWFLAKE_PRIVATE_KEY  <- KV  <secretPrefix>-private-key
+#   SNOWFLAKE_DATABASE     <- param.database (NOT from KV)
+#   SNOWFLAKE_SCHEMA       <- param.schema   (NOT from KV)
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: snowflake
+  annotations:
+    definition.oam.dev/description: "Snowflake warehouse binding via External Secrets (Azure Key Vault) — renders the normalized <name>-conn Secret (SNOWFLAKE_ACCOUNT/USER/PRIVATE_KEY/DATABASE/SCHEMA). The pluggable WAREHOUSE seam for analytics-platform."
+    definition.oam.dev/requires-source-code: "false"
+    definition.oam.dev/shape: external-secret
+spec:
+  workload:
+    definition:
+      apiVersion: external-secrets.io/v1
+      kind: ExternalSecret
+    type: externalsecrets.external-secrets.io
+  schematic:
+    cue:
+      template: |
+        output: {
+          apiVersion: "external-secrets.io/v1"
+          kind: "ExternalSecret"
+          metadata: {
+            name: context.name + "-conn"
+            namespace: context.namespace
+            labels: {
+              "binding.cafe.io/category": "warehouse"
+              "app.oam.dev/component":    context.name
+            }
+            if parameter.targetEnvironment != _|_ {
+              annotations: {
+                "app.oam.dev/cluster": parameter.targetEnvironment
+              }
+            }
+          }
+          spec: {
+            refreshInterval: "1h"
+            // Azure Key Vault kv-socrates-6706 via the azure-keyvault
+            // ClusterSecretStore (same store as auth0-idp).
+            secretStoreRef: {
+              kind: "ClusterSecretStore"
+              name: "azure-keyvault"
+            }
+            target: {
+              name: context.name + "-conn"
+              creationPolicy: "Owner"
+              template: {
+                engineVersion: "v2"
+                data: {
+                  SNOWFLAKE_ACCOUNT:     "{{ .account }}"
+                  SNOWFLAKE_USER:        "{{ .user }}"
+                  SNOWFLAKE_PRIVATE_KEY: "{{ .privateKey }}"
+                  // DATABASE/SCHEMA come from params, not Key Vault.
+                  SNOWFLAKE_DATABASE:    parameter.database
+                  SNOWFLAKE_SCHEMA:      parameter.schema
+                }
+              }
+            }
+            data: [
+              {
+                secretKey: "account"
+                remoteRef: { key: parameter.secretPrefix + "-account" }
+              },
+              {
+                secretKey: "user"
+                remoteRef: { key: parameter.secretPrefix + "-user" }
+              },
+              {
+                secretKey: "privateKey"
+                remoteRef: { key: parameter.secretPrefix + "-private-key" }
+              },
+            ]
+          }
+        }
+
+        parameter: {
+          // +usage=Key Vault secret-name prefix; expects <prefix>-account/-user/-private-key in kv-socrates-6706. Defaults to snowflake.
+          secretPrefix: *"snowflake" | string
+
+          // +usage=Snowflake database the warehouse writes to (emitted as SNOWFLAKE_DATABASE; from params, not Key Vault). Defaults to INGEST.
+          database: *"INGEST" | string
+
+          // +usage=Snowflake schema (emitted as SNOWFLAKE_SCHEMA; from params, not Key Vault). Defaults to INGEST.
+          schema: *"INGEST" | string
+
+          // +usage=Optional vCluster deployment target.
+          targetEnvironment?: string
+        }

@@ -66,9 +66,10 @@ spec:
                 description: >-
                   Scaffold language, passed to the composed ApplicationClaim which maps it
                   to a template repo (python->onion-architecture-template,
-                  rasa->chat-template, nodejs->graphql-federation-gateway-template).
-                  Mirrors the ApplicationClaim XRD enum. NOTE: java is advertised for
-                  enum parity but microservice-creator has no springboot template yet.
+                  rasa->chat-template, nodejs->graphql-federation-gateway-template,
+                  java/springboot->identity-service-template). Mirrors the ApplicationClaim
+                  XRD enum. java/springboot scaffolds via mscv template-select.sh +
+                  java-springboot.sh (reuses shlapolosa/identity-service-template).
                 enum: [python, java, rasa, nodejs]
                 default: python
               framework:

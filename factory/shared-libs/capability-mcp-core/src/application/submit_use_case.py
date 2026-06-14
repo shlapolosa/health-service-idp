@@ -30,6 +30,7 @@ from typing import Any
 import yaml
 
 from . import requirements_spec
+from .analytics_platform_recipe import AnalyticsPlatformError, apply_analytics_platform
 from ..domain.models import SubmitResult
 from ..infrastructure.argo_client import ArgoWorkflowsClient
 from ..infrastructure.github_client import GitHubClient
@@ -95,6 +96,15 @@ class SubmitUseCase:
         # wired to the OAM's singleton identity. Runs BEFORE topology
         # validation so exposure=>identity is enforced on the result.
         oam_yaml = self._auto_expose_external_components(app, oam_yaml)
+
+        # analytics-platform recipe (see _apply_analytics): expand a declarative
+        # analytics-platform component into realtime-platform connectors/processors/
+        # topics. Runs BEFORE topology validation so the (possibly injected)
+        # realtime-platform participates in the singleton check. Additive: OAMs
+        # without an analytics-platform pass through byte-for-byte unchanged.
+        ap_err, app, oam_yaml = self._apply_analytics(app, oam_yaml)
+        if ap_err:
+            return ap_err
 
         target_vcluster = self._target_vcluster(app)
 
@@ -185,6 +195,25 @@ class SubmitUseCase:
         if changed:
             return yaml.safe_dump(app, sort_keys=False)
         return oam_yaml
+
+    @staticmethod
+    def _apply_analytics(app: dict[str, Any],
+                         oam_yaml: str) -> tuple["SubmitResult | None", dict[str, Any], str]:
+        """Run the analytics-platform recipe (analytics_platform_recipe module).
+
+        Returns (error_result_or_None, app, oam_yaml). When an analytics-platform
+        component is present it expands into realtime-platform connectors/processors/
+        topics and the returned (app, oam_yaml) are the transformed pair. When ABSENT
+        the original app/oam_yaml are returned BYTE-FOR-BYTE (additive: no reformat).
+        A duplicate analytics-platform yields a validation-error SubmitResult."""
+        comps = app.get("spec", {}).get("components", []) or []
+        if not any(c.get("type") == "analytics-platform" for c in comps):
+            return None, app, oam_yaml  # pass-through unchanged
+        try:
+            new_app = apply_analytics_platform(app)
+        except AnalyticsPlatformError as e:
+            return SubmitResult(ok=False, message=f"validation failed:\n{e}"), app, oam_yaml
+        return None, new_app, yaml.safe_dump(new_app, sort_keys=False)
 
     @staticmethod
     def _backing_sharing_advisory(app: dict[str, Any]) -> str | None:
@@ -291,6 +320,12 @@ class SubmitUseCase:
         # wired to the OAM's singleton identity. Runs BEFORE topology
         # validation so exposure=>identity is enforced on the result.
         oam_yaml = self._auto_expose_external_components(app, oam_yaml)
+
+        # analytics-platform recipe (same as submit()): expand declarative intent
+        # into realtime-platform connectors/processors/topics before commit/route.
+        ap_err, app, oam_yaml = self._apply_analytics(app, oam_yaml)
+        if ap_err:
+            return ap_err
 
         target_vcluster = self._target_vcluster(app)
 

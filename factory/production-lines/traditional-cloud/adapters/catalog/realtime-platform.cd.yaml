@@ -58,6 +58,16 @@ spec:
             if parameter.topics != _|_ {
               topics: parameter.topics
             }
+            // analytics-platform: Kafka Connect connector instances + Lenses SQL
+            // processors flow into the XRD so the composition's connector- and
+            // processor-provisioning Jobs create them. Populated by the submit-time
+            // analytics recipe; absent on a plain realtime-platform.
+            if parameter.connectors != _|_ {
+              connectors: parameter.connectors
+            }
+            if parameter.processors != _|_ {
+              processors: parameter.processors
+            }
           }
         }
 
@@ -192,7 +202,23 @@ spec:
             partitions: *3 | int
             retention:  *604800000 | int
           }]
-          
+
+          // analytics-platform: Kafka Connect connector instances + Lenses SQL
+          // processors. Normally populated by the submit-time analytics recipe
+          // (not hand-authored); the composition's connector-/processor-provisioning
+          // Jobs create them on the bundled Connect (:8083) / Lenses. Omit for a
+          // plain realtime-platform.
+          connectors?: [...{
+            name:   string
+            class:  string
+            config?: [string]: string
+            secretRefs?: [...string]
+          }]
+          processors?: [...{
+            name: string
+            sql:  string
+          }]
+
           // Advanced optional
           dataRetention?: string // "7d", "30d", etc.
           mqttUsers?: [...{

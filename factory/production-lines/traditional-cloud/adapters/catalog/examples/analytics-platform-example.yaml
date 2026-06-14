@@ -1,0 +1,36 @@
+---
+# analytics-platform example — AUTO-INJECT path.
+# This app declares ONLY an analytics-platform (plus the postgres it ingests from).
+# No realtime-platform is declared: submit-time auto-injects one so the CDC pipeline
+# (Debezium Postgres → Kafka Connect → Lenses SQL → Snowflake → roundtrip) has a
+# realtime claim to run its connectors on. Exactly ONE analytics-platform per app.
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: sales-analytics
+  namespace: default
+spec:
+  components:
+    # 1. Source datastore the warehouse ingests from (CDC reads its WAL).
+    - name: sales-db
+      type: postgresql
+      properties:
+        name: sales-db
+        database: sales
+
+    # 2. Analytics overlay — no `realtime` set, so submit-time auto-injects a
+    #    realtime-platform. warehouse defaults to snowflake (snowflake-conn from
+    #    kv-socrates-6706). ingestion.mode=cdc → Debezium off sales-db-conn.
+    - name: sales-warehouse
+      type: analytics-platform
+      properties:
+        warehouse:
+          type: snowflake
+          database: SALES
+          schema: PUBLIC
+        ingestion:
+          mode: cdc
+          source: sales-db
+          tables: [orders, order_items, customers]
+        roundtrip:
+          topic: sales_enriched

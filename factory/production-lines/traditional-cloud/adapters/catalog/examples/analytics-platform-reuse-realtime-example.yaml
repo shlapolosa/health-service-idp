@@ -1,0 +1,39 @@
+---
+# analytics-platform example — REUSE an existing realtime-platform.
+# Here the app already runs a realtime-platform with declarative topics; the
+# analytics-platform attaches to it (param `realtime`) and ingests in GATEWAY mode
+# (consumes topics already on the platform — no Debezium/CDC). Pipeline still
+# fans Kafka topics → Lenses SQL → Snowflake → roundtrip. Exactly ONE per app.
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: telemetry-analytics
+  namespace: default
+spec:
+  components:
+    # 1. Existing realtime-platform with declarative topics (RT-1 first-class).
+    - name: telemetry-stream
+      type: realtime-platform
+      properties:
+        name: telemetry-stream
+        database: postgres
+        iot: true
+        topics:
+          - { name: sensor_raw, partitions: 3, retention: 604800000 }
+          - { name: sensor_agg, partitions: 3, retention: 604800000 }
+
+    # 2. Analytics overlay REUSING telemetry-stream (no auto-inject).
+    #    ingestion.mode=gateway → consume existing topics; no CDC source needed.
+    - name: telemetry-warehouse
+      type: analytics-platform
+      properties:
+        realtime: telemetry-stream
+        warehouse:
+          type: snowflake
+          database: TELEMETRY
+          schema: PUBLIC
+        ingestion:
+          mode: gateway
+        sinkTopics: [sensor_raw, sensor_agg]
+        roundtrip:
+          topic: sensor_scored

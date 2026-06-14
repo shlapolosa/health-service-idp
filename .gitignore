@@ -98,3 +98,7 @@ tasks/ graphify-out/
 pytest-of-*/
 node-compile-cache/
 .claude/worktrees/
+
+# Snowflake key-pair (never commit)
+*.p8
+rsa_key.*

@@ -1,0 +1,217 @@
+# ANALYTICS-PLATFORM: a THIN OVERLAY ComponentDefinition that attaches an
+# analytics warehouse (Snowflake today; clickhouse later) to a realtime-platform.
+# Modeled structurally on realtime-service.cd.yaml (parameter block, outputs,
+# labels) and reuses auth0-idp/snowflake's ExternalSecret CUE.
+#
+# WHAT THIS CD DOES (and does NOT do):
+#   (a) renders the warehouse ExternalSecret so `warehouse.credentialsSecret`
+#       (default snowflake-conn) EXISTS even when no separate `snowflake`
+#       component is declared — pulls SNOWFLAKE_* from kv-socrates-6706 when
+#       warehouse.type == "snowflake" (SAME CUE shape as snowflake.cd.yaml);
+#   (b) emits a <context.name>-conn Secret carrying analytics metadata
+#       (ANALYTICS_REALTIME / ANALYTICS_WAREHOUSE_SECRET / ANALYTICS_ROUNDTRIP_TOPIC)
+#       for discoverability.
+# It does NOT generate connector configs — that is done at submit-time by the
+# recipe and executed by the realtime claim.
+#
+# Emitted <name>-conn keys:
+#   ANALYTICS_REALTIME          <- param.realtime (submit-time fills if absent)
+#   ANALYTICS_WAREHOUSE_SECRET  <- param.warehouse.credentialsSecret
+#   ANALYTICS_ROUNDTRIP_TOPIC   <- param.roundtrip.topic (only when set)
+apiVersion: core.oam.dev/v1beta1
+kind: ComponentDefinition
+metadata:
+  name: analytics-platform
+  annotations:
+    definition.oam.dev/description: "Analytics overlay — attaches a pluggable warehouse (Snowflake) to a realtime-platform for CDC/gateway ingestion + roundtrip. Renders the warehouse ExternalSecret (so credentialsSecret exists) and a discoverability <name>-conn. Connector configs are produced at submit-time, not here."
+    definition.oam.dev/requires-source-code: "false"
+    definition.oam.dev/shape: external-secret
+spec:
+  workload:
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+    type: configmaps
+  schematic:
+    cue:
+      template: |
+        // (workload) Trivial marker ConfigMap — analytics-platform has no
+        // long-running workload of its own (the data path is the realtime
+        // claim's connectors). This satisfies the workload-output requirement
+        // and records the resolved overlay config for operators.
+        output: {
+          apiVersion: "v1"
+          kind:       "ConfigMap"
+          metadata: {
+            name:      context.name
+            namespace: context.namespace
+            labels: {
+              "app.kubernetes.io/name":       context.name
+              "app.kubernetes.io/component":  "analytics-platform"
+              "app.kubernetes.io/managed-by": "kubevela"
+            }
+            annotations: {
+              if parameter.targetEnvironment != _|_ {
+                "app.oam.dev/cluster": parameter.targetEnvironment
+              }
+              if parameter.realtime != _|_ {
+                "realtime.platform.example.org/integration": parameter.realtime
+              }
+            }
+          }
+          data: {
+            "warehouse.type":     parameter.warehouse.type
+            "warehouse.secret":   parameter.warehouse.credentialsSecret
+            "warehouse.database": parameter.warehouse.database
+            "warehouse.schema":   parameter.warehouse.schema
+            "ingestion.mode":     parameter.ingestion.mode
+            if parameter.ingestion.source != _|_ {
+              "ingestion.source": parameter.ingestion.source
+            }
+            if parameter.realtime != _|_ {
+              "realtime": parameter.realtime
+            }
+            if parameter.roundtrip != _|_ {
+              "roundtrip.topic": parameter.roundtrip.topic
+            }
+          }
+        }
+
+        outputs: {
+          // (a) Warehouse ExternalSecret — SAME shape as snowflake.cd.yaml, so the
+          // credentialsSecret (default snowflake-conn) EXISTS even when no separate
+          // `snowflake` component is declared. Rendered only for the snowflake seam;
+          // a clickhouse warehouse would add its own branch emitting the same -conn.
+          if parameter.warehouse.type == "snowflake" {
+            "warehouse-conn": {
+              apiVersion: "external-secrets.io/v1"
+              kind:       "ExternalSecret"
+              metadata: {
+                name:      parameter.warehouse.credentialsSecret
+                namespace: context.namespace
+                labels: {
+                  "binding.cafe.io/category": "warehouse"
+                  "app.oam.dev/component":    context.name
+                }
+                if parameter.targetEnvironment != _|_ {
+                  annotations: {
+                    "app.oam.dev/cluster": parameter.targetEnvironment
+                  }
+                }
+              }
+              spec: {
+                refreshInterval: "1h"
+                secretStoreRef: {
+                  kind: "ClusterSecretStore"
+                  name: "azure-keyvault"
+                }
+                target: {
+                  name:           parameter.warehouse.credentialsSecret
+                  creationPolicy: "Owner"
+                  template: {
+                    engineVersion: "v2"
+                    data: {
+                      SNOWFLAKE_ACCOUNT:     "{{ .account }}"
+                      SNOWFLAKE_USER:        "{{ .user }}"
+                      SNOWFLAKE_PRIVATE_KEY: "{{ .privateKey }}"
+                      SNOWFLAKE_DATABASE:    parameter.warehouse.database
+                      SNOWFLAKE_SCHEMA:      parameter.warehouse.schema
+                    }
+                  }
+                }
+                data: [
+                  {
+                    secretKey: "account"
+                    remoteRef: { key: parameter.secretPrefix + "-account" }
+                  },
+                  {
+                    secretKey: "user"
+                    remoteRef: { key: parameter.secretPrefix + "-user" }
+                  },
+                  {
+                    secretKey: "privateKey"
+                    remoteRef: { key: parameter.secretPrefix + "-private-key" }
+                  },
+                ]
+              }
+            }
+          }
+
+          // (b) Discoverability <name>-conn — analytics metadata so consumers /
+          // operators can locate the realtime binding, warehouse secret, and
+          // roundtrip topic without re-reading the OAM.
+          "analytics-conn": {
+            apiVersion: "external-secrets.io/v1"
+            kind:       "ExternalSecret"
+            metadata: {
+              name:      context.name + "-conn"
+              namespace: context.namespace
+              labels: {
+                "binding.cafe.io/category": "analytics"
+                "app.oam.dev/component":    context.name
+              }
+            }
+            spec: {
+              refreshInterval: "1h"
+              secretStoreRef: {
+                kind: "ClusterSecretStore"
+                name: "azure-keyvault"
+              }
+              target: {
+                name:           context.name + "-conn"
+                creationPolicy: "Owner"
+                template: {
+                  engineVersion: "v2"
+                  // No remote data needed — these are render-time literals. ESO
+                  // still owns the Secret so it participates in the binding contract.
+                  data: {
+                    ANALYTICS_REALTIME:         [if parameter.realtime != _|_ {parameter.realtime}, ""][0]
+                    ANALYTICS_WAREHOUSE_SECRET: parameter.warehouse.credentialsSecret
+                    ANALYTICS_ROUNDTRIP_TOPIC:  [if parameter.roundtrip != _|_ {parameter.roundtrip.topic}, ""][0]
+                  }
+                }
+              }
+              // No `data:` block — the template emits literals only.
+            }
+          }
+        }
+
+        parameter: {
+          // +usage=The realtime-platform component name this overlay attaches to. Optional — submit-time fills it if absent.
+          realtime?: string
+
+          // +usage=Key Vault secret-name prefix for the warehouse creds; expects <prefix>-account/-user/-private-key in kv-socrates-6706. Defaults to snowflake.
+          secretPrefix: *"snowflake" | string
+
+          // +usage=Pluggable warehouse seam. type selects the provider (snowflake today). credentialsSecret is the -conn this overlay renders+consumes.
+          warehouse: {
+            type:              *"snowflake" | string
+            credentialsSecret: *"snowflake-conn" | string
+            database:          *"INGEST" | string
+            schema:            *"INGEST" | string
+          }
+
+          // +usage=How data reaches the warehouse. cdc = Debezium off a postgres/neon component's <source>-conn; gateway = service POSTs to the realtime gateway.
+          ingestion: {
+            mode:    *"cdc" | "gateway"
+            source?: string
+            tables?: [...string]
+          }
+
+          // +usage=Optional derived feature views (name + SQL) materialized by the submit-time recipe.
+          features?: [...{
+            name: string
+            sql:  string
+          }]
+
+          // +usage=Optional roundtrip — analytics results published back to this Kafka topic.
+          roundtrip?: {
+            topic: string
+          }
+
+          // +usage=Optional additional sink topics the warehouse fans out to.
+          sinkTopics?: [...string]
+
+          // +usage=Optional vCluster deployment target.
+          targetEnvironment?: string
+        }

@@ -1,0 +1,27 @@
+# KB entry — Snowflake cloud data warehouse (OLAP). The pluggable WAREHOUSE seam
+# for analytics-platform; bound via External Secrets (Azure Key Vault kv-socrates-6706).
+technology: snowflake
+category: warehouse
+profile:
+  durability: strong
+  consistency: strong
+  queryModel: relational
+  readPattern: analytical
+  availabilityClass: managed-multizone
+  latencyP99Ms: 500
+  footprint: managed-service
+  throughputClass: very-high
+  scalingModel: elastic
+  costClass: high
+version: { current: "current", tracked: "managed" }
+upstreamSource: managed:snowflake   # managed SaaS — no in-cluster upgrade loop
+provisioning:
+  kind: managed-service
+  source: external-secret:kv-socrates-6706   # SNOWFLAKE_* creds via ESO ClusterSecretStore azure-keyvault
+  requires_cluster_permissions: false
+  notes: |
+    The snowflake CD renders an ESO ExternalSecret pulling SNOWFLAKE_ACCOUNT/USER/PRIVATE_KEY from
+    Azure Key Vault kv-socrates-6706 and emits the normalized <name>-conn Secret (plus DATABASE/SCHEMA
+    from params). It is the backing WAREHOUSE seam consumed by analytics-platform; a future clickhouse
+    CD will emit the SAME-shaped -conn so the overlay stays warehouse-agnostic.
+maturity: kb
