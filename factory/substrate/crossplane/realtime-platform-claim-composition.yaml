@@ -1614,42 +1614,66 @@ spec:
                           echo "Lenses HQ ready"
                       containers:
                       - name: processor-provisioner
-                        image: curlimages/curl:8.5.0
+                        image: python:3.12-alpine
                         # HQ_USER / HQ_PASSWORD come from lenses-credentials.
                         envFrom:
                         - secretRef:
                             name: lenses-credentials
                         command:
-                        - sh
+                        - python3
                         - -c
                         - |
-                          set -u
-                          HQ="http://lenses-hq:9991"
-                          # TODO/ASSUMPTION: SQL-processor deploy endpoint. Verify path.
-                          SP_ENDPOINT="$HQ/api/v1/streams"
-                          # json_escape: turn an arbitrary file's contents into a
-                          # JSON string literal (escape backslash, dquote, then fold
-                          # newlines to \n). Avoids needing jq in the curl image.
-                          json_escape() {
-                            sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' "$1" | awk 'BEGIN{ORS="\\n"}{print}'
-                          }
-                          {{- range $p := $spec.processors }}
-                          echo "Deploying processor {{ $p.name }}"
-                          # Quoted heredoc ('EOF') -> SQL written verbatim, no shell expansion.
-                          cat > /tmp/{{ $p.name }}.sql <<'EOF'
-                          {{ $p.sql }}
-                          EOF
-                          SQL_ESC=$(json_escape /tmp/{{ $p.name }}.sql)
-                          printf '{"name":"%s","sql":"%s"}' "{{ $p.name }}" "$SQL_ESC" > /tmp/{{ $p.name }}.json
-                          curl -sf -X POST \
-                            -H "Content-Type: application/json" \
-                            -u "$HQ_USER:$HQ_PASSWORD" \
-                            --data @/tmp/{{ $p.name }}.json \
-                            "$SP_ENDPOINT" \
-                            && echo "  -> {{ $p.name }} submitted" \
-                            || echo "  -> {{ $p.name }} POST failed (verify SP_ENDPOINT / auth)"
-                          {{- end }}
-                          echo "Processor provisioning complete"
+                          import urllib.request, json, os, time
+                          from http.cookiejar import CookieJar
+                          # Desired processors injected as a JSON literal (valid Python) — no
+                          # shell heredoc / json-escaping, so none of the $N / quote bugs of
+                          # the old curl path. Proven Lenses 6.2 sequence: login -> discover
+                          # env -> (delete existing) -> V2 create deployment.mode=IN_PROC ->
+                          # start by id. (#39 set lenses.sql.execution.mode=IN_PROC so the
+                          # in-agent runner exists; this Job creates+STARTS each processor.)
+                          PROCESSORS = {{ toJson $spec.processors }}
+                          HQ = "http://lenses-hq:9991"
+                          cj = CookieJar(); op = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+                          def call(path, method="GET", data=None):
+                              body = json.dumps(data).encode() if data is not None else (b"" if method in ("PUT","POST","DELETE") else None)
+                              req = urllib.request.Request(HQ+path, data=body, method=method, headers={"Content-Type":"application/json"})
+                              try:
+                                  r = op.open(req, timeout=30); return r.status, r.read().decode("utf-8","replace")
+                              except urllib.error.HTTPError as e:
+                                  return e.code, e.read().decode("utf-8","replace")
+                              except Exception as e:
+                                  return 0, str(e)
+                          call("/api/v1/login","POST",{"username":os.environ["HQ_USER"],"password":os.environ["HQ_PASSWORD"]})
+                          # Discover the environment with a connected agent (fallback 'demo').
+                          s,b = call("/api/v1/environments")
+                          items = json.loads(b).get("items",[]) if s==200 else []
+                          env = next((e["name"] for e in items if e.get("status",{}).get("agent_connected")), None) or (items[0]["name"] if items else "demo")
+                          PX = "/api/v1/environments/%s/proxy" % env
+                          print("HQ env=%s" % env, flush=True)
+                          def existing():
+                              s,b = call(PX+"/api/v1/streams")
+                              return {st["name"]: st["id"] for st in (json.loads(b).get("streams",[]) if s==200 else [])}
+                          for p in PROCESSORS:
+                              name, sql = p["name"], p["sql"]
+                              cur = existing()
+                              if name in cur:
+                                  call(PX+"/api/v1/streams/"+cur[name], "DELETE")  # re-create to pick up SQL changes
+                              pid = None
+                              # Retry: Lenses infers the input-topic schema from data, so a
+                              # create before any events ("topic ... can't be found" / needs
+                              # schema) succeeds once the producer flows; also rides out
+                              # agent_not_connected during startup.
+                              for attempt in range(20):
+                                  s,b = call(PX+"/api/v2/streams","POST",{"name":name,"sql":sql,"deployment":{"mode":"IN_PROC"}})
+                                  if s in (200,201):
+                                      pid = json.loads(b)["id"]; break
+                                  print("  create %s attempt %d -> %s %s" % (name, attempt, s, b[:160]), flush=True)
+                                  time.sleep(30)
+                              if not pid:
+                                  raise SystemExit("processor %s failed to create after retries" % name)
+                              s,b = call(PX+"/api/v1/streams/%s/start" % pid, "PUT")
+                              print("  %s deployed id=%s start=%s" % (name, pid, s), flush=True)
+                          print("Processor provisioning complete", flush=True)
                         resources:
                           requests:
                             memory: 64Mi

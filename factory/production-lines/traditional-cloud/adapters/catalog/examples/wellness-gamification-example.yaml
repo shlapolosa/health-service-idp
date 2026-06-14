@@ -1,0 +1,59 @@
+# Minimal wellness-gamification app — OAM-driven.
+#
+# Demonstrates the composite path for a gamified wellness product:
+#   step events in  ->  real-time leaderboard (SUM steps per user)  ->  live /ws board
+# plus a profiles store. The analytics-platform reuses the realtime-platform spine
+# (exactly-1 per app; injected if absent) and renders the leaderboard as a Lenses SQL
+# feature with a roundtrip topic the gateway fans out over /ws.
+#
+# Components (4): profiles (db) + wellness-stream (Kafka/Lenses spine) +
+# leaderboard (analytics-platform, the gamification logic) + live-board (/ws gateway).
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: wellness-game
+  namespace: default
+spec:
+  components:
+    # User profiles / challenges store.
+    - name: profiles
+      type: postgresql
+      properties:
+        database: wellness
+
+    # Real-time spine: step events in, leaderboard out.
+    - name: wellness-stream
+      type: realtime-platform
+      properties:
+        topics:
+          - name: steps
+          - name: leaderboard
+
+    # Gamification leaderboard: a live SUM of steps per user.
+    # ingestion.mode=gateway -> events arrive from producers (the steps API), not CDC.
+    - name: leaderboard
+      type: analytics-platform
+      properties:
+        realtime: wellness-stream
+        ingestion:
+          mode: gateway
+        features:
+          - name: leaderboard
+            sql: |
+              SET defaults.topic.autocreate=true;
+              INSERT INTO leaderboard
+              SELECT STREAM user_id, SUM(steps) AS total_steps
+              FROM steps
+              GROUP BY user_id
+        roundtrip:
+          topic: leaderboard
+
+    # Live fan-out of the leaderboard to clients over /ws.
+    - name: live-board
+      type: realtime-service
+      properties:
+        name: live-board
+        role: gateway
+        realtime: wellness-stream
+        consumes:
+          - leaderboard
