@@ -108,6 +108,16 @@ def get_status():
 
 
 @lru_cache
+def get_delete():
+    from ..application.delete_use_case import DeleteAppUseCase
+    return DeleteAppUseCase(
+        get_claims(),
+        claim_namespace=os.getenv("CLAIM_NAMESPACE", "default"),
+        argocd_namespace=os.getenv("ARGOCD_NAMESPACE", "argocd"),
+    )
+
+
+@lru_cache
 def get_apim_products() -> "ApimProductClient":
     from ..infrastructure.apim_product_client import ApimProductClient
     return ApimProductClient(
