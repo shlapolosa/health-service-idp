@@ -43,3 +43,25 @@ class SubmitResult:
     # The dev-agent trigger (W3) keys re-fires on this value. None when no
     # requirements travelled with the submission (exactly today's behaviour).
     spec_hash: Optional[str] = None
+
+
+@dataclass
+class DeleteResult:
+    """app.delete — outcome of tearing down an OAM application's full footprint.
+
+    `planned` is the ordered list of (kind, name) the use-case discovered and
+    intends to act on; on a real run `deleted`/`auto_sync_disabled` record what
+    actually happened. dry_run returns ok=True with planned populated and the
+    delete lists empty. Defeating the GitOps recreation loop hinges on
+    `auto_sync_disabled` happening BEFORE any delete (see recreation-loop
+    memory): the result surfaces that ordering for auditability.
+    """
+    ok: bool
+    app_name: str = ""
+    dry_run: bool = False
+    purge_repos: bool = False
+    planned: list[str] = field(default_factory=list)        # "Kind/name" entries, in action order
+    auto_sync_disabled: list[str] = field(default_factory=list)  # ArgoCD apps patched first
+    deleted: list[str] = field(default_factory=list)        # "Kind/name" actually deleted
+    errors: list[str] = field(default_factory=list)         # non-fatal per-resource failures
+    message: str = ""

@@ -108,11 +108,49 @@ spec:
               snowflake:
                 type: object
                 properties:
-                  enabled: 
+                  enabled:
                     type: boolean
                     default: false
-                  credentialsSecret: 
+                  credentialsSecret:
                     type: string
+              # analytics-platform: Kafka Connect connector instances. The
+              # composition's connector-provisioning Job loops over this and
+              # PUTs each to the bundled Connect (:8083). Absent/empty -> the
+              # Job is not rendered (backward compatible).
+              connectors:
+                type: array
+                description: "Kafka Connect connector instances to PUT to the bundled Connect (:8083)."
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    class:
+                      type: string
+                    config:
+                      type: object
+                      additionalProperties:
+                        type: string
+                    secretRefs:
+                      type: array
+                      items:
+                        type: string
+                  required: ["name", "class"]
+              # analytics-platform: Lenses SQL stream processors. The
+              # composition's processor-provisioning Job loops over this and
+              # submits each .sql to Lenses HQ. Absent/empty -> the Job is not
+              # rendered (backward compatible).
+              processors:
+                type: array
+                description: "Lenses SQL stream processors to deploy."
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    sql:
+                      type: string
+                  required: ["name", "sql"]
             required: ["name"]
                   
           status:

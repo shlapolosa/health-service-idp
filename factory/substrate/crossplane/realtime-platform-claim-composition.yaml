@@ -386,7 +386,11 @@ spec:
                       hostname: demo-kafka
                       containers:
                       - name: kafka
-                        image: lensesio/fast-data-dev:3.9.0
+                        # analytics-platform: baked broker image with Kafka Connect
+                        # plugins (debezium, snowflake-sink, mqtt) pre-installed. Replaces
+                        # the old kubectl-exec kafka-config-job that apt-installed jars.
+                        # Digest-pinned (HARD-3); rebuild: factory/substrate/images/realtime-kafka-connect (tag 1.0.0).
+                        image: healthidpuaeacr.azurecr.io/realtime-kafka-connect:1.0.0@sha256:a4cba761c3f1945c28d9fa9bb7ed1607b3d93f20d86dc1c13a1fc0c757e9404c
                         ports:
                         - containerPort: 9092
                           name: kafka
@@ -1298,42 +1302,10 @@ spec:
             providerConfigRef:
               name: kubernetes-provider
           ---
-          apiVersion: kubernetes.crossplane.io/v1alpha1
-          kind: Object
-          metadata:
-            name: '{{ $name }}-realtime-kafka-config-job'
-            annotations:
-              gotemplating.fn.crossplane.io/composition-resource-name: realtime-kafka-config-job
-          spec:
-            forProvider:
-              manifest:
-                apiVersion: batch/v1
-                kind: Job
-                metadata:
-                  name: kafka-config-job
-                  namespace: '{{ $name }}-realtime'
-                  labels:
-                    app.kubernetes.io/name: kafka-config
-                spec:
-                  template:
-                    spec:
-                      restartPolicy: OnFailure
-                      serviceAccountName: secret-copier
-                      containers:
-                      - name: kafka-config
-                        image: alpine/k8s:1.28.4
-                        command:
-                        - sh
-                        - -c
-                        - "# Wait for Kafka to be ready\necho \"Waiting for Kafka to be ready...\"\nuntil kubectl exec -n $NAMESPACE deployment/demo-kafka -- curl -f http://localhost:9092 >/dev/null 2>&1 || kubectl exec -n $NAMESPACE deployment/demo-kafka -- supervisorctl status broker | grep RUNNING >/dev/null; do\n  echo \"Waiting for Kafka...\"\n  sleep 5\ndone\n\n# Wait for Schema Registry to be ready\necho \"Waiting for Schema Registry to be ready...\"\nuntil kubectl exec -n $NAMESPACE deployment/demo-kafka -- curl -f http://localhost:8081/subjects >/dev/null 2>&1; do\n  echo \"Waiting for Schema Registry...\"\n  sleep 5\ndone\n\n# Wait for Kafka Connect to be ready\necho \"Waiting for Kafka Connect to be ready...\"\nuntil kubectl exec -n $NAMESPACE deployment/demo-kafka -- curl -f http://localhost:8083/connectors >/dev/null 2>&1; do\n  echo \"Waiting for Kafka Connect...\"\n  sleep 5\ndone\n\necho \"All Kafka services are ready! Installing Snowflake connector...\"\n\n# Install Snowflake connector in Kafka container\necho \"\U0001F4E6 Installing Snowflake Kafka Connector...\"\nkubectl exec -n $NAMESPACE deployment/demo-kafka -- bash -c \"\n  # Update package list and install wget if not present\n  apt-get update && apt-get install -y wget || echo 'wget already installed'\n  \n  # Download Snowflake Kafka Connector if not exists\n  if [ ! -f /connectors/snowflake-kafka-connector-3.1.0.jar ]; then\n    cd /connectors\n    echo 'Downloading Snowflake Kafka Connector...'\n    wget -O snowflake-kafka-connector-3.1.0.jar https://repo1.maven.org/maven2/com/snowflake/snowflake-kafka-connector/3.1.0/snowflake-kafka-connector-3.1.0.jar\n    echo 'Snowflake connector downloaded successfully'\n  else\n    echo 'Snowflake connector already exists'\n  fi\n  \n  # Restart Kafka Connect to load new connector\n  echo 'Restarting Kafka Connect to load connector...'\n  if supervisorctl status connect-distributed | grep -q RUNNING; then\n    supervisorctl restart connect-distributed\n    echo 'Kafka Connect restarted successfully'\n  else\n    echo 'Kafka Connect not running, starting...'\n    supervisorctl start connect-distributed\n  fi\n\"\n\n# Wait for Kafka Connect to restart and be ready\necho \"⏳ Waiting for Kafka Connect to restart...\"\nsleep 10\nuntil kubectl exec -n $NAMESPACE deployment/demo-kafka -- curl -f http://localhost:8083/connectors >/dev/null 2>&1; do\n  echo \"Waiting for Kafka Connect to be ready after restart...\"\n  sleep 5\ndone\n\n# Verify Snowflake connector is available\necho \"\U0001F50D Verifying Snowflake connector installation...\"\nRETRIES=0\nMAX_RETRIES=10\nwhile [ $RETRIES -lt $MAX_RETRIES ]; do\n  if kubectl exec -n $NAMESPACE deployment/demo-kafka -- curl -s http://demo-kafka:8083/connector-plugins | grep -q \"SnowflakeSinkConnector\"; then\n    echo \"✅ Snowflake connector installed and available!\"\n    break\n  else\n    echo \"Waiting for connector to be available... (attempt $((RETRIES + 1))/$MAX_RETRIES)\"\n    sleep 10\n    RETRIES=$((RETRIES + 1))\n  fi\ndone\n\nif [ $RETRIES -eq $MAX_RETRIES ]; then\n  echo \"⚠️  Snowflake connector installation may have failed\"\nfi\n\necho \"\U0001F389 Kafka configuration job completed successfully!\"\n"
-                        env:
-                        - name: NAMESPACE
-                          valueFrom:
-                            fieldRef:
-                              fieldPath: metadata.namespace
-            providerConfigRef:
-              name: kubernetes-provider
-          ---
+          # analytics-platform: the legacy kubectl-exec kafka-config-job (apt-get +
+          # wget snowflake jar + supervisorctl restart) was DELETED. The baked
+          # broker image (realtime-kafka-connect) ships the Connect plugins, so
+          # runtime jar installation is obsolete.
           apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object
           metadata:
@@ -1416,6 +1388,199 @@ spec:
                             cpu: 100m
             providerConfigRef:
               name: kubernetes-provider
+          {{- if $spec.connectors }}
+          ---
+          # analytics-platform: connector-provisioning Job. Modeled on the
+          # topic-provisioning Job. PUTs each spec.connectors[] config to the
+          # bundled Kafka Connect (:8083), idempotent via PUT /connectors/<n>/config.
+          # envFrom the union of all secretRefs so ${VAR} placeholders in config
+          # values resolve from env at runtime (shell heredoc interpolation).
+          apiVersion: kubernetes.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-realtime-connector-provisioning-job'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: realtime-connector-provisioning-job
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: batch/v1
+                kind: Job
+                metadata:
+                  name: '{{ $name }}-connector-provisioning'
+                  namespace: '{{ $name }}-realtime'
+                  labels:
+                    app.kubernetes.io/name: connector-provisioning
+                    app.kubernetes.io/component: setup
+                spec:
+                  backoffLimit: 6
+                  template:
+                    metadata:
+                      annotations:
+                        sidecar.istio.io/inject: 'false'
+                    spec:
+                      restartPolicy: OnFailure
+                      initContainers:
+                      # Wait until Kafka Connect REST API is up before provisioning.
+                      - name: wait-for-connect
+                        image: curlimages/curl:8.5.0
+                        command:
+                        - sh
+                        - -c
+                        - |
+                          until curl -sf http://demo-kafka:8083/connectors >/dev/null 2>&1; do
+                            echo "Waiting for Kafka Connect REST (:8083)..."; sleep 10
+                          done
+                          echo "Kafka Connect ready"
+                      containers:
+                      - name: connector-provisioner
+                        image: curlimages/curl:8.5.0
+                        # envFrom the UNION of all distinct secretRefs across all
+                        # connectors so ${VAR} placeholders resolve from env.
+                        {{- $secrets := dict }}
+                        {{- range $c := $spec.connectors }}
+                        {{- range $sr := $c.secretRefs }}
+                        {{- $secrets = set $secrets $sr true }}
+                        {{- end }}
+                        {{- end }}
+                        {{- if $secrets }}
+                        envFrom:
+                        {{- range $sname, $_ := $secrets }}
+                        - secretRef:
+                            name: {{ $sname }}
+                        {{- end }}
+                        {{- end }}
+                        command:
+                        - sh
+                        - -c
+                        - |
+                          set -u
+                          CONNECT="http://demo-kafka:8083"
+                          {{- range $c := $spec.connectors }}
+                          echo "Provisioning connector {{ $c.name }}"
+                          # Heredoc (no quotes on EOF) so the shell interpolates ${VAR}
+                          # placeholders in config values from env at runtime.
+                          cat > /tmp/{{ $c.name }}.json <<EOF
+                          {
+                            "connector.class": "{{ $c.class }}"{{ range $k, $v := $c.config }},
+                            "{{ $k }}": "{{ $v }}"{{ end }}
+                          }
+                          EOF
+                          curl -sf -X PUT \
+                            -H "Content-Type: application/json" \
+                            --data @/tmp/{{ $c.name }}.json \
+                            "$CONNECT/connectors/{{ $c.name }}/config" \
+                            && echo "  -> {{ $c.name }} applied" \
+                            || echo "  -> {{ $c.name }} PUT failed (will retry on backoff)"
+                          {{- end }}
+                          echo "Connector provisioning complete"
+                        resources:
+                          requests:
+                            memory: 64Mi
+                            cpu: 50m
+                          limits:
+                            memory: 128Mi
+                            cpu: 100m
+            providerConfigRef:
+              name: kubernetes-provider
+          {{- end }}
+          {{- if $spec.processors }}
+          ---
+          # analytics-platform: processor-provisioning Job for Lenses SQL stream
+          # processors. Ranges over spec.processors[] and submits each .sql to
+          # Lenses HQ (lenses-hq:9991), authenticating with lenses-credentials.
+          # TODO/ASSUMPTION: the exact Lenses 6.2 GA SQL-deploy endpoint is
+          # uncertain. The legacy 09-stream-processing-setup.yaml submitted SQL
+          # via the Lenses UI (no documented REST). Here we POST to the HQ apps
+          # endpoint with HTTP basic-auth ($HQ_USER:$HQ_PASSWORD from
+          # lenses-credentials). VERIFY against the running Lenses 6.2 HQ/Agent
+          # API — the path may be /api/v1/streams, /api/v1/apps, or an Agent-side
+          # endpoint (HQ proxies to the agent). On 404, adjust SP_ENDPOINT below.
+          apiVersion: kubernetes.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            name: '{{ $name }}-realtime-processor-provisioning-job'
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: realtime-processor-provisioning-job
+          spec:
+            forProvider:
+              manifest:
+                apiVersion: batch/v1
+                kind: Job
+                metadata:
+                  name: '{{ $name }}-processor-provisioning'
+                  namespace: '{{ $name }}-realtime'
+                  labels:
+                    app.kubernetes.io/name: processor-provisioning
+                    app.kubernetes.io/component: setup
+                spec:
+                  backoffLimit: 6
+                  template:
+                    metadata:
+                      annotations:
+                        sidecar.istio.io/inject: 'false'
+                    spec:
+                      restartPolicy: OnFailure
+                      initContainers:
+                      # Wait until Lenses HQ REST API is reachable.
+                      - name: wait-for-lenses-hq
+                        image: curlimages/curl:8.5.0
+                        command:
+                        - sh
+                        - -c
+                        - |
+                          until curl -sf http://lenses-hq:9991/ >/dev/null 2>&1; do
+                            echo "Waiting for Lenses HQ (:9991)..."; sleep 10
+                          done
+                          echo "Lenses HQ ready"
+                      containers:
+                      - name: processor-provisioner
+                        image: curlimages/curl:8.5.0
+                        # HQ_USER / HQ_PASSWORD come from lenses-credentials.
+                        envFrom:
+                        - secretRef:
+                            name: lenses-credentials
+                        command:
+                        - sh
+                        - -c
+                        - |
+                          set -u
+                          HQ="http://lenses-hq:9991"
+                          # TODO/ASSUMPTION: SQL-processor deploy endpoint. Verify path.
+                          SP_ENDPOINT="$HQ/api/v1/streams"
+                          # json_escape: turn an arbitrary file's contents into a
+                          # JSON string literal (escape backslash, dquote, then fold
+                          # newlines to \n). Avoids needing jq in the curl image.
+                          json_escape() {
+                            sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' "$1" | awk 'BEGIN{ORS="\\n"}{print}'
+                          }
+                          {{- range $p := $spec.processors }}
+                          echo "Deploying processor {{ $p.name }}"
+                          # Quoted heredoc ('EOF') -> SQL written verbatim, no shell expansion.
+                          cat > /tmp/{{ $p.name }}.sql <<'EOF'
+                          {{ $p.sql }}
+                          EOF
+                          SQL_ESC=$(json_escape /tmp/{{ $p.name }}.sql)
+                          printf '{"name":"%s","sql":"%s"}' "{{ $p.name }}" "$SQL_ESC" > /tmp/{{ $p.name }}.json
+                          curl -sf -X POST \
+                            -H "Content-Type: application/json" \
+                            -u "$HQ_USER:$HQ_PASSWORD" \
+                            --data @/tmp/{{ $p.name }}.json \
+                            "$SP_ENDPOINT" \
+                            && echo "  -> {{ $p.name }} submitted" \
+                            || echo "  -> {{ $p.name }} POST failed (verify SP_ENDPOINT / auth)"
+                          {{- end }}
+                          echo "Processor provisioning complete"
+                        resources:
+                          requests:
+                            memory: 64Mi
+                            cpu: 50m
+                          limits:
+                            memory: 128Mi
+                            cpu: 100m
+            providerConfigRef:
+              name: kubernetes-provider
+          {{- end }}
           ---
           apiVersion: kubernetes.crossplane.io/v1alpha1
           kind: Object

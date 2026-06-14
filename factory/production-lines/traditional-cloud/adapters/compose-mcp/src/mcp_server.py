@@ -175,6 +175,33 @@ def app_status(name: str) -> dict[str, Any]:
     return deps.get_status().status_of(name)
 
 
+@mcp.tool(name="app.delete",
+          description="Tear down an OAM application's ENTIRE footprint and defeat the GitOps "
+                      "recreation loop. Disables ArgoCD auto-sync FIRST (so selfHeal cannot "
+                      "resurrect deleted children), then finalizer-patches + deletes — in the "
+                      "recreation-safe order — the OAM Application, the AppContainerClaim (the "
+                      "recreation root) and leaf claims (Application/Realtime/Graphql/Webhook), "
+                      "the ArgoCD Applications, and the app's namespaces (<name>, <name>-*). "
+                      "Idempotent. Refuses protected platform apps (platform-definitions / "
+                      "substrate-services). deletionPolicy:Orphan keeps the GitHub source + "
+                      "gitops repos, so this does NOT delete repositories. Pass dry_run=true to "
+                      "get the ordered plan without changing anything. purge_repos is reserved "
+                      "(repos are NOT removed by this tool).")
+def app_delete(name: str, purge_repos: bool = False, dry_run: bool = False) -> dict[str, Any]:
+    r = deps.get_delete().delete(name, purge_repos=purge_repos, dry_run=dry_run)
+    return {
+        "ok": r.ok,
+        "app_name": r.app_name,
+        "dry_run": r.dry_run,
+        "purge_repos": r.purge_repos,
+        "planned": r.planned,
+        "auto_sync_disabled": r.auto_sync_disabled,
+        "deleted": r.deleted,
+        "errors": r.errors,
+        "message": r.message,
+    }
+
+
 @mcp.tool(name="app.submit_wait",
           description="Deferred OAM provisioning for MFG-TC consumers whose OAM references CDs "
                       "not yet present. Commits to gitops + fires oam-apply-wait. "
