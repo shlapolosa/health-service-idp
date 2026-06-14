@@ -45,4 +45,4 @@ RUN set -eux; \
     unzip -j -o /tmp/mqtt.zip "*.jar" -d /connectors/kafka-connect-mqtt/; \
     rm -f /tmp/mqtt.zip; \
     apt-get purge -y wget unzip && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*; \
-    echo "Baked plugins:" && ls -R /connectors | head -40
+    echo "Baked plugins:"; ls /connectors
