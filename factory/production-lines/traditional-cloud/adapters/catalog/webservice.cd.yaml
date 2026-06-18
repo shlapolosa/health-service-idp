@@ -32,6 +32,13 @@ spec:
               }
             }
             annotations: {
+              // DEV-AGENT W5: opt the rendered ksvc into the dev-agent all-Ready
+              // sensor and stamp the OAM spec hash so the sensor's Job name is
+              // dev-agent-<app>-<spec-hash-8> (deterministic idempotency).
+              "dev-agent.cafe.io/enabled": "true"
+              if parameter.specHash != _|_ {
+                "dev-agent.cafe.io/spec-hash": parameter.specHash
+              }
               // Multi-cluster deployment support
               if parameter.targetEnvironment != _|_ {
                 "app.oam.dev/cluster": parameter.targetEnvironment
@@ -303,6 +310,11 @@ spec:
           openApiPath?: string           // Custom OpenAPI spec path (e.g., "/api/v1/openapi.json")
           apiVersion?: string            // API version for GraphQL federation (e.g., "v1", "v2")
           
+          // DEV-AGENT W5: OAM spec hash (from app.submit). Stamped as
+          // dev-agent.cafe.io/spec-hash so the all-ready-sensor derives a stable
+          // Job name. Optional — absent => sensor falls back to g<generation>.
+          specHash?: string
+
           // Optional database and cache settings
           database?: string
           // +usage=Name of a sibling identity component (e.g. auth0-idp) to bind. Injects envFrom "<name>-conn" (AUTH0_*/JWT_ISSUER_URI).

@@ -1,0 +1,68 @@
+name: dev-agent-ci
+
+# DEV-AGENT W5: hermetic CI for the dev-agent adapter. Lints the shell scripts
+# (bash -n), py-compiles + unit-tests the acceptance/traceability scripts, and
+# runs the offline dry-run harness (no cluster, no network, no APIM key —
+# git/kubectl/opencode are PATH-stubbed inside tests/dry-run.sh).
+#
+# Style mirrors .github/workflows/contract-test-runner-ci.yml (checkout +
+# setup-python + a single test job). Test-only: the dev-agent image is built out
+# of band via `az acr build` (see factory/docs/plans/dev-agent-factory.md).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "factory/production-lines/traditional-cloud/adapters/dev-agent/**"
+      - ".github/workflows/dev-agent-ci.yml"
+  pull_request:
+    paths:
+      - "factory/production-lines/traditional-cloud/adapters/dev-agent/**"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  DEV_AGENT: factory/production-lines/traditional-cloud/adapters/dev-agent
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # PyYAML powers parse_acceptance.py; pytest runs both the script unit tests
+      # and the dry-run's in-Job local acceptance gate (Scenario 10).
+      - name: Install test deps
+        run: pip install pytest pyyaml
+
+      - name: Shell lint (bash -n)
+        run: |
+          set -e
+          for s in "$DEV_AGENT"/scripts/*.sh "$DEV_AGENT"/tests/*.sh; do
+            echo "bash -n $s"
+            bash -n "$s"
+          done
+
+      - name: Python py-compile (scripts)
+        run: python -m py_compile "$DEV_AGENT"/scripts/*.py
+
+      - name: Python unit tests (scripts)
+        working-directory: ${{ env.DEV_AGENT }}/scripts
+        run: |
+          if ls tests/ >/dev/null 2>&1 || ls test_*.py >/dev/null 2>&1; then
+            PYTHONPATH=. python -m pytest -q
+          else
+            echo "no pytest tests alongside scripts/ — skipping"
+          fi
+
+      # The harness resolves python3 from PATH; ubuntu's system python3 carries the
+      # pip-installed pyyaml/pytest, so Scenario 10 (v0.3 TDD gate) actually runs.
+      - name: Offline dry-run harness
+        run: bash "$DEV_AGENT/tests/dry-run.sh"

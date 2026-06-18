@@ -174,6 +174,7 @@ for svc in "${SERVICES[@]}"; do
     if [ "$rc" -eq 3 ]; then
       echo "MALFORMED acceptance block in REQUIREMENTS.md — aborting (no silent fallback):" >&2
       cat "$WORK_DIR/parse-err.txt" >&2
+      echo "dev-agent ${APP_NAME}: malformed acceptance block in REQUIREMENTS.md" > /dev/termination-log
       exit 1
     fi
     echo "  $svc: parse_acceptance non-fatal rc=$rc — legacy path"
@@ -353,6 +354,7 @@ for (( n=1; n<=MAX_ITERATIONS; n++ )); do
       exit 0
     fi
     echo "opencode produced no changes while contract tests are red — escalating" >&2
+    echo "dev-agent ${APP_NAME}: no changes produced while contract tests red (iteration $n)" > /dev/termination-log
     exit 1
   fi
 
@@ -371,7 +373,10 @@ for (( n=1; n<=MAX_ITERATIONS; n++ )); do
     echo "no in-surface changes after forbidden-path revert — exiting quietly"
     exit 0
   fi
-  secret_scan "${CHANGED_FILES[@]}" || exit 1
+  if ! secret_scan "${CHANGED_FILES[@]}"; then
+    echo "dev-agent ${APP_NAME}: secret pattern detected in diff — refusing to push" > /dev/termination-log
+    exit 1
+  fi
 
   # -------------------------------------------------------------------------
   # W4 local acceptance gate: every CHANGED acceptance-block service must be
@@ -397,6 +402,7 @@ for (( n=1; n<=MAX_ITERATIONS; n++ )); do
       echo "local acceptance gate RED (iteration $n) — re-prompting without push"
       if [ "$n" -eq "$MAX_ITERATIONS" ]; then
         echo "exhausted MAX_ITERATIONS with uncovered acceptance criteria — escalating" >&2
+        echo "dev-agent ${APP_NAME}: exhausted ${MAX_ITERATIONS} iterations with uncovered acceptance criteria" > /dev/termination-log
         exit 1
       fi
       continue
@@ -419,7 +425,10 @@ for (( n=1; n<=MAX_ITERATIONS; n++ )); do
     && mkdir -p .dev-agent && printf '%s\n' "$REQ_HASH" > .dev-agent/spec-hash \
     && git add -A \
     && git commit -m "feat(dev-agent): implement logic per REQUIREMENTS.md [iteration $n]" )
-  ( cd "$SRC_DIR" && push_with_retry ) || exit 1
+  if ! ( cd "$SRC_DIR" && push_with_retry ); then
+    echo "dev-agent ${APP_NAME}: git push permanently rejected after ${MAX_PUSH_ATTEMPTS} attempts" > /dev/termination-log
+    exit 1
+  fi
 
   # W4: wait for the HARD-4 contract-test verdicts of the NEW revisions.
   VERDICTS_OUT="$WORK_DIR/verdicts-$n.jsonl"
@@ -438,4 +447,5 @@ for (( n=1; n<=MAX_ITERATIONS; n++ )); do
 done
 
 echo "exhausted MAX_ITERATIONS=$MAX_ITERATIONS with red contract tests — escalating (Slack notify handled by platform)" >&2
+echo "dev-agent ${APP_NAME}: exhausted ${MAX_ITERATIONS} iterations with red contract tests" > /dev/termination-log
 exit 1

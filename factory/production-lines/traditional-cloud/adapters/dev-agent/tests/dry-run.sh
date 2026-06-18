@@ -177,6 +177,52 @@ if [ "${OPENCODE_MODE:-edit}" = "edit" ]; then
     echo "# implemented by stub run $n" >> "$f"
     echo "$f" >> .claude-changed
   done
+elif [ "${OPENCODE_MODE:-edit}" = "tdd" ]; then
+  # v0.3 skill-driven TDD path: the stub plays the role of opencode running the
+  # tdd-acceptance skill — it writes a PASSING pytest test per kind:test criterion
+  # id (test_<nid>) AND a real implementation so the local acceptance gate goes
+  # red->green. Hermetic: no model call, deterministic fixture.
+  for d in microservices/*/; do
+    [ -d "${d}src" ] || continue
+    svc="$(basename "$d")"
+    # Implementation: to_message validates sensor_id + numeric value, stamps received_at.
+    cat > "${d}src/handlers.py" <<'PYEOF'
+def to_message(payload):
+    if not payload.get("sensor_id"):
+        raise ValueError("sensor_id required")
+    v = payload.get("value")
+    if not isinstance(v, (int, float)):
+        raise ValueError("value must be numeric")
+    out = dict(payload)
+    out["received_at"] = "2026-01-01T00:00:00Z"
+    return out
+PYEOF
+    echo "${d}src/handlers.py" | sed "s#^#$PWD/#" >/dev/null
+    echo "microservices/$svc/src/handlers.py" >> .claude-changed
+    # Tests: one passing test per acceptance criterion id present in REQUIREMENTS.md.
+    mkdir -p "${d}tests"
+    cat > "${d}tests/test_acceptance.py" <<'PYEOF'
+import pytest
+from src.handlers import to_message
+
+
+def test_ing_1():
+    out = to_message({"sensor_id": "s1", "value": 42, "ts": 1})
+    assert out["received_at"]
+    assert out["value"] == 42
+
+
+def test_ing_2():
+    with pytest.raises(ValueError):
+        to_message({"value": 42})
+
+
+def test_ing_3():
+    with pytest.raises(ValueError):
+        to_message({"sensor_id": "s1", "value": "abc"})
+PYEOF
+    echo "microservices/$svc/tests/test_acceptance.py" >> .claude-changed
+  done
 fi
 exit 0
 STUBEOF
@@ -202,6 +248,38 @@ EOF
   if [ "${SRC_REQ:-0}" = "1" ]; then
     printf '# Requirements\nMARKER-SOURCE-REQ: ingest heart-rate, emit anomalies\n' \
       > "$base/source/REQUIREMENTS.md"
+  fi
+  # v0.3 acceptance-block REQUIREMENTS.md (service demo-svc, 3 kind:test criteria).
+  # Drives the skill-driven TDD path + the local COVERED gate.
+  if [ "${ACCEPTANCE_REQ:-0}" = "1" ]; then
+    cat > "$base/source/REQUIREMENTS.md" <<'REQEOF'
+# Requirements
+
+MARKER-ACCEPTANCE-REQ: ingest readings, validate, stamp received_at
+
+```acceptance
+service: demo-svc
+criteria:
+  - id: ing-1
+    statement: "a valid reading is normalised and stamped with received_at"
+    kind: test
+    given: "a reading {sensor_id, value, ts} with a numeric value"
+    when: "to_message is called"
+    then: "it returns the reading with a received_at timestamp added"
+  - id: ing-2
+    statement: "a reading missing sensor_id is rejected"
+    kind: test
+    given: "a reading with no sensor_id"
+    when: "to_message is called"
+    then: "it raises ValueError"
+  - id: ing-3
+    statement: "a non-numeric value is rejected"
+    kind: test
+    given: "a reading whose value is non-numeric"
+    when: "to_message is called"
+    then: "it raises ValueError"
+```
+REQEOF
   fi
   if [ "${GITOPS_REQ:-0}" = "1" ]; then
     printf '# Requirements\nMARKER-GITOPS-REQ: gitops copy\n' > "$base/gitops/REQUIREMENTS.md"
@@ -372,6 +450,52 @@ if [ "$RC" = "0" ] && [ "$(opencode_count "$S")" = "0" ] && grep -q "no REQUIREM
   ok "missing spec everywhere: quiet no-op"
 else
   bad "missing-spec behaviour wrong (rc=$RC)"; tail -5 "$S.log"
+fi
+
+echo "=== Scenario 10: v0.3 acceptance-block service — red->green TDD, local COVERED gate + TRACEABILITY.md ==="
+S="$ROOT/s10"; ACCEPTANCE_REQ=1 make_fixtures "$ROOT/fx10"
+# parse_acceptance.py imports PyYAML; check it under the SAME python3 the harness
+# resolves (env -i PATH puts /usr/bin/python3 first), and pytest for the gate.
+HARNESS_PY="env -i PATH=$STUB_DIR:/usr/bin:/bin:/usr/sbin:/sbin:$PYTHON_BIN_DIR python3"
+if $HARNESS_PY -c 'import yaml, pytest' 2>/dev/null; then
+  # The opencode TDD stub writes a passing test_<id> per criterion + a real impl;
+  # local_gate runs pytest -> check_acceptance COVERED -> emit_traceability.
+  if run_entrypoint "$S" "$ROOT/fx10" OPENCODE_MODE=tdd CT_SEQUENCE="pass" MAX_ITERATIONS=2 > "$S.log" 2>&1; then
+    ok "acceptance-block service: exit 0 (red->green TDD, contract test green)"
+  else
+    bad "acceptance-block run failed (rc=$?)"; tail -25 "$S.log"
+  fi
+  # The skill-driven TDD path must have been chosen (not the legacy path).
+  if grep -q "acceptance block present — skill-driven TDD path" "$S.log"; then
+    ok "demo-svc classified as acceptance-block -> skill-driven TDD path"
+  else
+    bad "service not routed to the skill-driven TDD path"; tail -10 "$S.log"
+  fi
+  # Local acceptance gate must have reported COVERED before the push.
+  if grep -q "COVERED" "$S.log"; then
+    ok "local acceptance gate reported COVERED (every kind:test criterion passes)"
+  else
+    bad "local acceptance gate did not report COVERED"; tail -20 "$S.log"
+  fi
+  # Deterministic TRACEABILITY.md emitted into the in-surface service dir + committed.
+  if [ -f "$S/work/src/microservices/demo-svc/TRACEABILITY.md" ]; then
+    ok "TRACEABILITY.md emitted for the acceptance-block service"
+  else
+    bad "TRACEABILITY.md not emitted"; ls -R "$S/work/src/microservices/demo-svc" 2>/dev/null | head
+  fi
+  # The local gate MUST go RED (exit 1) when coverage is not met: run the gate's
+  # check_acceptance directly against the spec with an EMPTY junit -> non-zero.
+  EMPTY_JUNIT="$S/empty-junit.xml"
+  printf '<testsuite tests="0"></testsuite>\n' > "$EMPTY_JUNIT"
+  if $HARNESS_PY "$SCRIPTS_DIR/check_acceptance.py" "$ROOT/fx10/source/REQUIREMENTS.md" \
+       --service demo-svc --junit "$EMPTY_JUNIT" > "$S.gate.log" 2>&1; then
+    bad "check_acceptance returned 0 with zero passing tests (should be non-zero)"
+  else
+    ok "check_acceptance exits non-zero when coverage is NOT COVERED"
+  fi
+else
+  echo "  ⚠️  PyYAML/pytest not importable under the harness python3 — skipping Scenario 10"
+  echo "      (v0.3 TDD gate). 'pip install pyyaml pytest' to exercise it (CI does)."
 fi
 
 echo

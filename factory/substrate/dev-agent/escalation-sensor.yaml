@@ -1,0 +1,161 @@
+---
+# DEV-AGENT W5: Slack escalation path.
+#
+# The dev-agent runs as a one-shot Job in dev-agent-system (created by the
+# all-ready-sensor). On its escalate exits (iterations exhausted red, push
+# permanently rejected, secret detected, no-changes-while-red, malformed
+# acceptance block) the entrypoint exits 1 AND writes a compact one-line reason
+# to /dev/termination-log (surfaced as the container's
+# status.containerStatuses[].state.terminated.message).
+#
+# A failed Job => status.failed > 0. Argo Events cannot post the termination
+# message directly (the EventSource emits the Job object, whose status.failed
+# is the trigger), so this sensor forwards the Job body to slack-api-server's
+# /oam/webhook — the SAME consumer endpoint argocd-health-to-slack.yaml uses;
+# the server owns formatting + channel routing.
+#
+# DESIGN — mirrors argocd-health-to-slack.yaml (resource EventSource + http
+# trigger to slack-api-server) and all-ready-sensor.yaml (its OWN SA, Job-watch
+# RBAC namespaced to dev-agent-system). Strictly additive: no dev-agent Job has
+# ever failed until one escalates, so this sensor is inert until then.
+#
+# EventSource: watch dev-agent Jobs in dev-agent-system; fire on status.failed.
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: dev-agent-job-watcher
+  namespace: argo-events
+spec:
+  template:
+    serviceAccountName: dev-agent-escalation-sa
+  resource:
+    dev-agent-failed-job:
+      namespace: dev-agent-system
+      group: batch
+      version: v1
+      resource: jobs
+      eventTypes:
+        - ADD
+        - UPDATE
+      filter:
+        # Only the dev-agent's own Jobs (stamped by the all-ready-sensor trigger).
+        labels:
+          - key: app.kubernetes.io/name
+            operation: "=="
+            value: "dev-agent"
+---
+# Sensor: fire when status.failed > 0; forward the compact failure to Slack.
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: dev-agent-escalation-to-slack
+  namespace: argo-events
+spec:
+  template:
+    serviceAccountName: dev-agent-escalation-sa
+  dependencies:
+    - name: dev-agent-job-failed
+      eventSourceName: dev-agent-job-watcher
+      eventName: dev-agent-failed-job
+      # gjson numeric compare (same idiom family as the Ready==True filters):
+      # status.failed must be >= 1. A running/succeeded Job has no failed count.
+      filters:
+        dataLogicalOperator: "and"
+        data:
+          - path: 'body.status.failed'
+            type: number
+            comparator: ">="
+            value:
+              - "1"
+  triggers:
+    - template:
+        name: slack-api-escalation-trigger
+        http:
+          url: http://slack-api-server.default.svc.cluster.local/oam/webhook
+          method: POST
+          headers:
+            Content-Type: application/json
+          payload:
+            # Full Job body (carries metadata.name = dev-agent-<app>-<hash> and
+            # the terminated.message reason); the slack-api-server formats it.
+            - src:
+                dependencyName: dev-agent-job-failed
+                dataKey: body
+              dest: body
+            - src:
+                dependencyName: dev-agent-job-failed
+                dataKey: type
+              dest: operation
+            # Compact reason: prefer the container terminationMessage, fall back
+            # to the Job name. Hoisted to a top-level field so the server can
+            # render a one-line Slack escalation without re-walking the Job.
+            - src:
+                dependencyName: dev-agent-job-failed
+                dataTemplate: |-
+                  {{- $name := .Input.body.metadata.name -}}
+                  {{- printf "dev-agent escalation: %s failed (see Job %s in dev-agent-system)" $name $name -}}
+              dest: text
+          retryStrategy:
+            steps: 3
+            duration: "3s"
+            factor: 2
+---
+# SA for the EventSource (watch Jobs) + Sensor (POST to slack-api-server).
+# Independent of dev-agent-event-sa / oam-event-sa so nothing existing is touched.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dev-agent-escalation-sa
+  namespace: argo-events
+---
+# Job-watch RBAC, namespaced to dev-agent-system (matches how all-ready-sensor.yaml
+# scopes its Job-creator Role to that namespace). The EventSource only needs to
+# read the dev-agent Jobs there; it never mutates them.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dev-agent-job-watcher
+  namespace: dev-agent-system
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dev-agent-job-watcher-binding
+  namespace: dev-agent-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dev-agent-job-watcher
+subjects:
+  - kind: ServiceAccount
+    name: dev-agent-escalation-sa
+    namespace: argo-events
+---
+# Argo Events sensor/eventsource pods emit k8s Events; grant that in argo-events.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dev-agent-escalation-events
+  namespace: argo-events
+rules:
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dev-agent-escalation-events-binding
+  namespace: argo-events
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dev-agent-escalation-events
+subjects:
+  - kind: ServiceAccount
+    name: dev-agent-escalation-sa
+    namespace: argo-events

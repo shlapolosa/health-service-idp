@@ -35,6 +35,12 @@ spec:
               "app": context.name
             }
             annotations: {
+              // DEV-AGENT W5: opt the rendered ksvc into the dev-agent all-Ready
+              // sensor + stamp the OAM spec hash for the deterministic Job name.
+              "dev-agent.cafe.io/enabled": "true"
+              if parameter.specHash != _|_ {
+                "dev-agent.cafe.io/spec-hash": parameter.specHash
+              }
               // Multi-cluster deployment support
               if parameter.targetEnvironment != _|_ {
                 "app.oam.dev/cluster": parameter.targetEnvironment
@@ -441,6 +447,9 @@ spec:
           // #175: opt-in standalone scaffold claim (single-component OAMs
           // only — under UNIFY-1 scaffolding belongs to the app-level claim).
           bootstrap?: bool
+          // DEV-AGENT W5: OAM spec hash; stamped as dev-agent.cafe.io/spec-hash
+          // so the all-ready-sensor derives a stable Job name. Optional.
+          specHash?: string
           // Container image — defaults to the ACR :latest placeholder; overridable via
           // OAM `properties.image` (BYO image or W3 digest pin). Parity with webservice CD.
           // HARD-3 #170: `*default | string` keeps a provided image VERBATIM; :latest

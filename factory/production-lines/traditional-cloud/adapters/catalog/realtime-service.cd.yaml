@@ -36,6 +36,12 @@ spec:
               "contract-test.cafe.io/enabled": "true"
             }
             annotations: {
+              // DEV-AGENT W5: opt the rendered ksvc into the dev-agent all-Ready
+              // sensor + stamp the OAM spec hash for the deterministic Job name.
+              "dev-agent.cafe.io/enabled": "true"
+              if parameter.specHash != _|_ {
+                "dev-agent.cafe.io/spec-hash": parameter.specHash
+              }
               if parameter.targetEnvironment != _|_ {
                 "app.oam.dev/cluster": parameter.targetEnvironment
               }
@@ -314,6 +320,9 @@ spec:
           // in the CI commit-back (RE2 has no negative-lookahead, so it is not
           // cleanly expressible as a vela 1.10 CUE regex constraint).
           image: *"healthidpuaeacr.azurecr.io/\(context.name):latest" | string
+          // DEV-AGENT W5: OAM spec hash; stamped as dev-agent.cafe.io/spec-hash
+          // so the all-ready-sensor derives a stable Job name. Optional.
+          specHash?: string
           port: *8080 | int
           version: *"latest" | string
           healthPath: *"/health" | string
