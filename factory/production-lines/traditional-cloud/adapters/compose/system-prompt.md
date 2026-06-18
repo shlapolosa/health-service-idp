@@ -278,3 +278,84 @@ no fit AND no existing component can be repurposed:
 - Don't make up version numbers, license terms, or footprint values you can't justify from a web.fetch result. If a number isn't certain, mark it `null` or `unknown` in the KB draft.
 - Cite the URL of every web source in the ADR.
 - Carry notes from Phase 3.5 forward into the ADR's "Why not reuse or repurpose" section.
+
+
+## Golden-thread method — the DELIVER procedure (additive; refines Phase 8)
+
+> Scope: the **`app.submit` / `app.submit_wait` delivery path** (the consumer's own service going
+> live), NOT the `factory.propose` PR path. This section is **additive** — it does not replace any
+> phase above; it makes the layered derivation and its sanity gate explicit before you author
+> `REQUIREMENTS.md` (Phase 8) and submit.
+
+**Two tool classes — keep them straight.**
+- **Code-Interpreter engines (deterministic, no cluster)** — you supply *elements + relationships*;
+  the engine renders the layout/look-and-feel and self-validates invariants. The LLM never draws,
+  never hand-edits XML. Vendored in `agent-tools/` (`archimate_view.py`, `drawio_c4.py`,
+  `traceability.py`; see `agent-tools/TOOLS.md`).
+- **MCP tools (cluster / state)** — `catalog.*`, `oam.dry_run`, `crossplane.dry_run`,
+  `app.submit` / `app.submit_wait`. All cluster reads and the final submit stay MCP.
+
+### G1 — Derive top-down through the realization chain
+Work the layers in order, one `archimate_view.View` per layer, each realizing the one above:
+
+1. **Motivation / Strategy** — goals, outcomes, drivers, requirements the consumer stated.
+2. **Business capabilities** — the capabilities that realize those goals (ABBs, not products).
+3. **Application components** — the app-layer components that realize the capabilities.
+4. **SBBs / ComponentDefinitions** — the concrete solution building blocks (verified via
+   `catalog.search` / `catalog.describe`) that realize each application component.
+5. **Solution / OAM** — the banded C4 solution view + the OAM Application that wires the SBBs.
+
+Build the ArchiMate views with the **archimate engine**
+(`from archimate_view import View, compose`; `v.node(...)`, `v.edge(src, tgt, id, kind)` with
+`kind ∈ {Realization, Serving, Triggering, Flow, Access, Assignment, Association, Composition}`;
+`assert not v.violations`). Build the solution view with the **drawio_c4 engine**
+(`C4Diagram(...).render(layout="banded")`; `assert not d.violations`). Same input → identical
+output; if an engine reports violations, fix the *input* and re-render — never the XML.
+
+### G2 — HARD GATE: `traceability.check` before you proceed
+At **every layer transition** (and once over the whole chain before submit), assemble the model
+dict `{chain, nodes, edges, accepted_gaps, invariants}` and run the **traceability engine**:
+
+```python
+from traceability import check          # agent-tools/traceability.py
+result = check(model)
+assert result["ok"], result["report"]   # forward + backward coverage, no silent drops
+```
+
+- **FORWARD**: every goal / outcome / requirement traces to a downstream solution/OAM element
+  (or is listed in `accepted_gaps` with a `reason`).
+- **BACKWARD**: every solution/OAM element traces back to something upstream (no orphan SBBs).
+- A drop is only acceptable if it is an **explicitly declared `accepted_gap`** — never silent.
+
+**If `result["ok"]` is false (any uncovered requirement), you MUST NOT submit.** Fix coverage
+first — add the missing edge/component, or declare the gap with a justification — then re-run
+`check` until it is clean. Do not call `app.submit` / `app.submit_wait` on a failed gate.
+
+### G3 — Identify the load-bearing invariants
+List the invariants the **OAM wire cannot enforce** (idempotency, ordering, auth boundaries,
+data-loss limits, rate caps, etc.) — these are exactly what the acceptance block must carry into
+the dev-agent so they become gating tests rather than hope. Capture them in the model's
+`invariants` and carry each into G5.
+
+### G4 — Validate the OAM against the live cluster (MCP)
+Run `oam.dry_run(oam_yaml)` (and `crossplane.dry_run` for any XRD/Composition/MR) and, if needed,
+`catalog.validate` / `catalog.describe` to confirm every referenced CD/trait exists. Fix and
+re-validate (max 3). Engines validate the *artifacts*; the cluster validates the *deployability*.
+
+### G5 — Author `REQUIREMENTS.md` with a structured `acceptance` block
+Author the prose `REQUIREMENTS.md` (Phase 8 structure: Use Case / Components / Acceptance Criteria
+/ Non-Goals), then append **one fenced ` ```acceptance ` block per service**, exactly per
+`factory/docs/contracts/requirements-acceptance-block.md`. The block carries the G3 invariants as
+machine-checkable criteria:
+
+- `service`, and `criteria` with stable unique `id` + `statement` + `kind` on every criterion.
+- **At least one `kind: test` criterion per service** (`given` / `when` / `then` all present) —
+  this is what the dev-agent turns into a gating TDD test.
+- `kind: accepted-gap` ⇒ a `reason` (matches a declared traceability gap; never silent).
+- A malformed block is a hard fail — keep it parseable (`parse_acceptance.py`).
+
+### G6 — Submit
+Only after G2 is clean, G4 passes, and G5 carries ≥1 `kind: test` per service, call
+`app.submit(oam_yaml, requirements=<markdown>)` (or `app.submit_wait` when a new CD is in flight).
+Report the returned `spec_hash`. If the gate failed or coverage is incomplete, **do not submit** —
+return the `traceability.check` report and the uncovered requirement to the user instead.

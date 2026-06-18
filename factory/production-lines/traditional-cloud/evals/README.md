@@ -8,8 +8,8 @@ is needed.
 
 | File | Purpose |
 |---|---|
-| `dataset.jsonl` | 20 test prompts across 7 categories (recall, composite, discover, submit_routing, safety, phase_order, reuse_repurpose). Each row carries `id`, `category`, `query` (+ rich expectation metadata kept for future custom evaluators). |
-| `custom_evaluators/*.yaml` | Three prompt-based judges for architect-specific assertions. **Not used in v1.** Registered via Foundry portal when wanted in v1.5+. |
+| `dataset.jsonl` | 22 test prompts across 8 categories (recall, composite, discover, submit_routing, safety, phase_order, reuse_repurpose, golden_thread). Each row carries `id`, `category`, `query` (+ rich expectation metadata kept for future custom evaluators). |
+| `custom_evaluators/*.yaml` | Five prompt-based judges for architect-specific assertions. **Not used in v1.** Registered via Foundry portal when wanted in v1.5+. |
 | `run_evals.py` | Uploads dataset, creates eval + run with agent target, polls, prints report URL. |
 | `.github/workflows/architect-evals.yml` | Nightly cron + on-demand trigger. |
 
@@ -22,8 +22,16 @@ is needed.
 | `builtin.tool_call_accuracy` | Foundry judge model | were the tool calls correct? (uses `sample.output_items`) |
 | `builtin.violence` | safety classifier | catches refusal failures on safety rows |
 
-v1.5 will add the three custom prompt judges (`reuse_principle`, `phase_order`, `submit_routing`)
-once they're registered in the Foundry portal — definitions ready in `custom_evaluators/*.yaml`.
+v1.5 will add the five custom prompt judges (`reuse_principle`, `phase_order`, `submit_routing`,
+`traceability_gate`, `acceptance_block`) once they're registered in the Foundry portal —
+definitions ready in `custom_evaluators/*.yaml`.
+
+The two golden-thread (W2) judges assert the layered DELIVER procedure encoded in the system prompt:
+- `traceability_gate` — on an uncovered-coverage row, the agent runs `traceability.check` and does
+  NOT call `app.submit` / `app.submit_wait` (dataset row `golden-thread-01`).
+- `acceptance_block` — the authored `REQUIREMENTS.md` carries a parseable ```acceptance block with
+  ≥1 `kind: test` criterion (dataset row `golden-thread-02`; mechanically checkable with
+  `adapters/dev-agent/scripts/parse_acceptance.py`).
 
 ## First-run setup
 

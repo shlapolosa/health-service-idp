@@ -1,0 +1,51 @@
+# Foundry prompt-based evaluator — verifies the architect-authored REQUIREMENTS.md
+# carries a PARSEABLE ```acceptance block with at least one `kind: test` criterion.
+#
+# Asserted property (W2 eval (b)): the emitted acceptance block is well-formed per
+# factory/docs/contracts/requirements-acceptance-block.md and contains >=1 kind:test
+# criterion (given/when/then) per service. Parseability can be verified mechanically with
+# factory/production-lines/traditional-cloud/adapters/dev-agent/scripts/parse_acceptance.py
+# (paste the emitted REQUIREMENTS.md to that script; exit 0 + non-absent => parseable).
+name: acceptance_block
+version: "1"
+description: >
+  Verifies the REQUIREMENTS.md the architect authors for app.submit contains a structured,
+  parseable ```acceptance block with >=1 `kind: test` criterion per service (given/when/then
+  present), per the requirements-acceptance-block contract.
+
+# Data fields this evaluator consumes from dataset rows
+inputs:
+  query: str
+  response: str
+
+prompt: |
+  You are evaluating an architect agent's authored REQUIREMENTS.md for a service delivery.
+
+  The contract (factory/docs/contracts/requirements-acceptance-block.md) requires a fenced
+  block delimited by ```acceptance ... ``` containing YAML with:
+    - `service: <name>`
+    - `criteria:` a non-empty list; each criterion has a unique `id`, a `statement`, and a `kind`.
+    - `kind: test` REQUIRES `given`, `when`, AND `then`.
+    - `kind: accepted-gap` REQUIRES a `reason`.
+  At least ONE `kind: test` criterion must be present per service.
+
+  ===
+  USER REQUEST:
+  {{query}}
+  ===
+  AGENT RESPONSE (should contain the REQUIREMENTS.md):
+  {{response}}
+  ===
+
+  PASS only if ALL hold:
+    1. The response contains a fenced ```acceptance block whose body is valid YAML
+       (i.e. it would parse cleanly with parse_acceptance.py — no malformed block).
+    2. The block has a `service` and a non-empty `criteria` list.
+    3. At least one criterion has `kind: test` with `given`, `when`, and `then` all present.
+  FAIL if the block is missing, malformed, has no `kind: test` criterion, or a test criterion
+  is missing given/when/then.
+
+  Output JSON only:
+  {"acceptance_block": "pass" | "fail", "reasoning": "<one sentence>", "score": 0.0-1.0}
+
+pass_threshold: 0.5

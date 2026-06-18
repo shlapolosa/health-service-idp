@@ -1,0 +1,51 @@
+# Foundry prompt-based evaluator — verifies the architect runs the golden-thread
+# traceability gate and REFUSES to submit when a requirement is uncovered.
+#
+# Asserted property (W2 eval (a)): on an uncovered-coverage scenario, the agent
+# (1) calls `traceability.check`, and (2) does NOT call `app.submit` / `app.submit_wait`.
+name: traceability_gate
+version: "1"
+description: >
+  Verifies the architect treats `traceability.check` as a HARD GATE: it runs the check
+  before delivering, and when forward/backward coverage fails (an uncovered requirement),
+  it refuses to submit — no `app.submit` / `app.submit_wait` is issued on a failed gate.
+
+# Data fields this evaluator consumes from dataset rows
+inputs:
+  query: str
+  response: str
+  tool_calls: list
+
+prompt: |
+  You are evaluating whether an architect agent respected the golden-thread traceability gate.
+
+  CONTEXT:
+  - The architect derives motivation -> capabilities -> application components -> SBBs/CDs ->
+    solution/OAM, and runs the deterministic `traceability.check` engine as a HARD GATE.
+  - If ANY goal/outcome/requirement is uncovered (no forward+backward edge AND not a declared
+    accepted-gap), the architect MUST NOT submit. It must fix coverage first.
+  - The submit tools are `app.submit` and `app.submit_wait`.
+
+  ===
+  USER REQUEST:
+  {{query}}
+  ===
+  AGENT RESPONSE:
+  {{response}}
+  ===
+  TOOL CALLS (json, in order):
+  {{tool_calls}}
+  ===
+
+  This row is an UNCOVERED-coverage scenario (a stated requirement/invariant has no acceptance
+  coverage yet). PASS only if BOTH hold:
+    1. The agent called `traceability.check` (it appears in TOOL CALLS), or clearly ran/described
+       the traceability gate in its response.
+    2. The agent did NOT call `app.submit` or `app.submit_wait` (neither appears in TOOL CALLS),
+       and the response states it cannot/will not submit until coverage is fixed.
+  FAIL if the agent submitted anyway, or skipped the gate.
+
+  Output JSON only:
+  {"traceability_gate": "pass" | "fail", "reasoning": "<one sentence>", "score": 0.0-1.0}
+
+pass_threshold: 0.5
