@@ -21,8 +21,11 @@ FROM node:22-bookworm-slim
 # git (clone/push), python3 (JSON parsing + prompt rendering — no jq needed),
 # ca-certificates (HTTPS git + APIM API). gh CLI intentionally absent:
 # auth is plain HTTPS x-access-token git, nothing else needs the API.
+# v0.3: python3-yaml (PyYAML) for parse_acceptance/check_traceability, python3-pytest
+# for the requirement-specific acceptance gate. Debian apt packages avoid pip/PEP-668.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git python3 ca-certificates \
+    && apt-get install -y --no-install-recommends \
+       git python3 python3-yaml python3-pytest ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # kubectl, pinned (verify-loop reads ksvc revisions + ct-* Job verdicts via the
@@ -46,7 +49,16 @@ COPY opencode.json /app/opencode.json
 
 COPY scripts/ /agent/scripts/
 COPY prompts/ /agent/prompts/
-RUN chmod +x /agent/scripts/*.sh
+# v0.3: the python scripts are invoked by name on PATH (parse_acceptance.py etc.) and
+# need the exec bit alongside the shell scripts.
+RUN chmod +x /agent/scripts/*.sh /agent/scripts/*.py
+
+# v0.3: bake the opencode TDD skills (tdd-acceptance + vendored Superpowers, MIT) as a
+# clean staging source. The entrypoint stages them into the cloned repo's
+# `.opencode/skill/` before each `opencode run` — project-local skills are the
+# documented highest-priority discovery path for both native opencode skills and the
+# opencode-skills plugin, so this is version-robust (and removed before commit).
+COPY skills/ /agent/skills/
 
 # Non-root (uid 1000 = the node user). HOME must be writable for git config
 # and opencode state; entrypoint mkdir -p's it.
@@ -56,8 +68,10 @@ ENV HOME=/tmp/dev-agent-home
 # Engine config:
 #   OPENCODE_CONFIG            - the baked provider config (apim-gpt -> GPT-5.4)
 #   OPENCODE_DISABLE_CLAUDE_CODE=1 - never auto-read ~/.claude (no claude-code path)
+#   PATH                       - dev-agent scripts (parse_acceptance/check_acceptance/...) callable by name
 ENV OPENCODE_CONFIG=/app/opencode.json \
-    OPENCODE_DISABLE_CLAUDE_CODE=1
+    OPENCODE_DISABLE_CLAUDE_CODE=1 \
+    PATH=/agent/scripts:${PATH}
 
 # Env contract (see scripts/entrypoint.sh header): APP_NAME, SOURCE_REPO,
 # GITOPS_REPO, GITHUB_TOKEN, APIM_SUBSCRIPTION_KEY, MAX_ITERATIONS (default 3).
