@@ -44,9 +44,11 @@ and binds them to this platform's structured acceptance contract
 4. **REFACTOR — stay green.** Apply DI / GoF / Onion cleanups (per the repo CLAUDE.md) without changing
    any test outcome.
 
-5. **VERIFY (gate).** Run:
-   `pytest microservices/$SVC/tests/ --junitxml=/tmp/$SVC.xml -q`
-   `check_acceptance.py REQUIREMENTS.md --service "$SVC" --junit /tmp/$SVC.xml`
+5. **VERIFY (gate).** Run pytest **from inside the service dir** (so `src/handlers.py` imports resolve
+   the same way the platform gate runs them — running from the repo root will break the import):
+   `cd microservices/$SVC && PYTHONPATH="$PWD:$PWD/src" pytest tests/ --junitxml=/tmp/$SVC.xml -q`
+   `check_acceptance.py <REQUIREMENTS-path> --service "$SVC" --junit /tmp/$SVC.xml`
+   (use the absolute REQUIREMENTS path the entrypoint gave you, since you changed directory).
    It must report **COVERED** (every `kind: test` id → a passing `test_<id>_*`). If not, return to RED
    for the uncovered ids. (verification-before-completion: no completion claim without this evidence.)
 

@@ -46,6 +46,8 @@ WORK_DIR="${WORK_DIR:-/tmp/dev-agent}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROMPT_TEMPLATE="${PROMPT_TEMPLATE:-$SCRIPT_DIR/../prompts/implement.md}"
+TDD_TEMPLATE="${TDD_TEMPLATE:-$SCRIPT_DIR/../prompts/implement-tdd.md}"
+SKILLS_SRC="${SKILLS_SRC:-/agent/skills}"          # baked opencode TDD skills (W4)
 VERIFY_LOOP="${VERIFY_LOOP:-$SCRIPT_DIR/verify-loop.sh}"
 
 mkdir -p "$WORK_DIR" "${HOME:-/tmp/dev-agent-home}"
@@ -151,6 +153,39 @@ if [ "${#SERVICES[@]}" -eq 0 ]; then
 fi
 echo "services with logic slots: ${SERVICES[*]}"
 
+# ---------------------------------------------------------------------------
+# W4: classify each service by whether REQUIREMENTS.md carries a structured
+# ```acceptance block for it. Services WITH a block take the skill-driven TDD
+# path (red→green from criteria + the local coverage gate); services WITHOUT
+# fall back to the legacy free-form implement path (v0.2.0 behaviour).
+# A MALFORMED block is a hard fail (contract: never silent-fallback).
+# ---------------------------------------------------------------------------
+ACCEPTANCE_SERVICES=()
+for svc in "${SERVICES[@]}"; do
+  if out="$(python3 "$SCRIPT_DIR/parse_acceptance.py" "$REQ_FILE" --service "$svc" 2>"$WORK_DIR/parse-err.txt")"; then
+    if printf '%s' "$out" | grep -q '"absent"'; then
+      echo "  $svc: no acceptance block — legacy path"
+    else
+      ACCEPTANCE_SERVICES+=("$svc")
+      echo "  $svc: acceptance block present — skill-driven TDD path"
+    fi
+  else
+    rc=$?
+    if [ "$rc" -eq 3 ]; then
+      echo "MALFORMED acceptance block in REQUIREMENTS.md — aborting (no silent fallback):" >&2
+      cat "$WORK_DIR/parse-err.txt" >&2
+      exit 1
+    fi
+    echo "  $svc: parse_acceptance non-fatal rc=$rc — legacy path"
+  fi
+done
+
+is_acceptance() { # svc -> 0 if it has an acceptance block
+  local s="$1" x
+  for x in "${ACCEPTANCE_SERVICES[@]:-}"; do [ "$x" = "$s" ] && return 0; done
+  return 1
+}
+
 edit_surface_for() {
   local svc="$1"
   if [ -f "$SRC_DIR/microservices/$svc/src/handlers.py" ]; then
@@ -180,6 +215,79 @@ out = (tpl
        .replace("__FEEDBACK__", open(os.environ["DA_FEEDBACK_FILE"]).read()))
 open(os.environ["DA_OUT"], "w").write(out)
 PYEOF
+}
+
+# W4: TDD prompt renderer (skill-driven path). The skill reads the criteria itself
+# via parse_acceptance.py, so we pass the requirements PATH, not the full body.
+render_tdd_prompt() { # svc iteration feedback_file out_file
+  DA_TPL="$TDD_TEMPLATE" DA_FEEDBACK_FILE="$3" DA_APP="$APP_NAME" DA_SVC="$1" \
+  DA_ITER="$2" DA_MAX="$MAX_ITERATIONS" DA_REQ_FILE="$REQ_FILE" DA_OUT="$4" python3 - <<'PYEOF'
+import os
+tpl = open(os.environ["DA_TPL"]).read()
+out = (tpl
+       .replace("__APP_NAME__", os.environ["DA_APP"])
+       .replace("__SERVICE_NAME__", os.environ["DA_SVC"])
+       .replace("__ITERATION__", os.environ["DA_ITER"])
+       .replace("__MAX_ITERATIONS__", os.environ["DA_MAX"])
+       .replace("__REQ_FILE__", os.environ["DA_REQ_FILE"])
+       .replace("__FEEDBACK__", open(os.environ["DA_FEEDBACK_FILE"]).read()))
+open(os.environ["DA_OUT"], "w").write(out)
+PYEOF
+}
+
+# W4: stage the baked opencode TDD skills into the cloned repo's project-local
+# `.opencode/skill/` — the documented highest-priority discovery path for both
+# native opencode skills and the opencode-skills plugin. Removed again before we
+# compute the diff so the skills are NEVER committed/pushed.
+HAD_OPENCODE_DIR=false; [ -d "$SRC_DIR/.opencode" ] && HAD_OPENCODE_DIR=true
+stage_skills() {
+  [ -d "$SKILLS_SRC" ] || { echo "WARN: no skills dir at $SKILLS_SRC — skill discovery may fail" >&2; return 0; }
+  mkdir -p "$SRC_DIR/.opencode/skill"
+  cp -R "$SKILLS_SRC"/. "$SRC_DIR/.opencode/skill/"
+}
+unstage_skills() {
+  if $HAD_OPENCODE_DIR; then rm -rf "$SRC_DIR/.opencode/skill"; else rm -rf "$SRC_DIR/.opencode"; fi
+}
+
+run_opencode() { # prompt_file svc
+  ( cd "$SRC_DIR" && \
+    opencode run "$(cat "$1")" \
+      --dir "$SRC_DIR" \
+      -m "$OPENCODE_MODEL" \
+      --dangerously-skip-permissions \
+      --format json ) || echo "opencode run for $2 exited non-zero (continuing; git state decides)"
+}
+
+# W4 local gate (the requirement-specific gate that runs IN the Job, before push —
+# the post-deploy HARD-4 contract test is the second, independent gate). For an
+# acceptance-block service: run its pytest, assert every kind:test criterion has a
+# passing test (check_acceptance == COVERED), then emit the deterministic
+# TRACEABILITY.md + .dev-agent/traceability.json. Returns 0 COVERED / 1 not.
+local_gate() { # svc reqfile report_out
+  local svc="$1" reqfile="$2" report="$3"
+  local junit="$WORK_DIR/$svc-junit.xml"
+  rm -f "$junit"
+  # Run pytest FROM the service dir with both it and its src/ on PYTHONPATH, so the
+  # scaffold's `src/handlers.py` resolves whether the test imports `src.handlers` or
+  # `handlers` (running from the monorepo root would break both). junit is absolute.
+  # PYTHONDONTWRITEBYTECODE + no:cacheprovider keep caches out of the commit.
+  local sdir="$SRC_DIR/microservices/$svc"
+  ( cd "$sdir" && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$sdir:$sdir/src:${PYTHONPATH:-}" \
+      python3 -m pytest tests/ --junitxml="$junit" -p no:cacheprovider -q ) || true
+  local ca_args=( "$reqfile" --service "$svc" )
+  [ -f "$junit" ] && ca_args+=( --junit "$junit" )
+  if ! python3 "$SCRIPT_DIR/check_acceptance.py" "${ca_args[@]}" > "$report" 2>&1; then
+    return 1
+  fi
+  # COVERED → deterministic traceability (platform-written, in-surface → committed).
+  local changed_csv
+  changed_csv="$(cd "$SRC_DIR" && git status --porcelain | awk '{print $2}' \
+                  | grep "^microservices/$svc/" | paste -sd, - || true)"
+  python3 "$SCRIPT_DIR/emit_traceability.py" "$reqfile" --service "$svc" \
+    --junit "$junit" --changed "$changed_csv" \
+    --md "$SRC_DIR/microservices/$svc/TRACEABILITY.md" \
+    --json "$SRC_DIR/microservices/$svc/.dev-agent/traceability.json" >/dev/null 2>&1 || true
+  return 0
 }
 
 # Pre-push secret scan (repos are PUBLIC — never push a credential).
@@ -217,22 +325,26 @@ printf '(none — first attempt)\n' > "$FEEDBACK_FILE"
 
 for (( n=1; n<=MAX_ITERATIONS; n++ )); do
   echo "=== iteration $n/$MAX_ITERATIONS ==="
+  # Stage the TDD skills only when at least one service uses the skill-driven path.
+  [ "${#ACCEPTANCE_SERVICES[@]:-0}" -gt 0 ] && stage_skills
   for svc in "${SERVICES[@]}"; do
     PROMPT_OUT="$WORK_DIR/prompt-$n-$svc.txt"
-    render_prompt "$svc" "$n" "$FEEDBACK_FILE" "$PROMPT_OUT"
-    echo "--- opencode implement: $svc (iteration $n, model $OPENCODE_MODEL) ---"
     # opencode run: prompt is POSITIONAL (NOT -p; -p is --password in opencode).
     # --dir scopes the working tree; -m selects provider/model;
     # --dangerously-skip-permissions == acceptEdits-equivalent (egress is sandboxed
     # by NetworkPolicy); --format json keeps stdout machine-parseable. git state
     # (below) is the source of truth for "did it change files", not the exit code.
-    ( cd "$SRC_DIR" && \
-      opencode run "$(cat "$PROMPT_OUT")" \
-        --dir "$SRC_DIR" \
-        -m "$OPENCODE_MODEL" \
-        --dangerously-skip-permissions \
-        --format json ) || echo "opencode run for $svc exited non-zero (continuing; git state decides)"
+    if is_acceptance "$svc"; then
+      render_tdd_prompt "$svc" "$n" "$FEEDBACK_FILE" "$PROMPT_OUT"
+      echo "--- opencode TDD via tdd-acceptance skill: $svc (iteration $n, model $OPENCODE_MODEL) ---"
+    else
+      render_prompt "$svc" "$n" "$FEEDBACK_FILE" "$PROMPT_OUT"
+      echo "--- opencode implement (legacy): $svc (iteration $n, model $OPENCODE_MODEL) ---"
+    fi
+    run_opencode "$PROMPT_OUT" "$svc"
   done
+  # Remove the staged skills BEFORE diffing so they are never committed/pushed.
+  [ "${#ACCEPTANCE_SERVICES[@]:-0}" -gt 0 ] && unstage_skills
 
   CHANGED="$(cd "$SRC_DIR" && git status --porcelain)"
   if [ -z "$CHANGED" ]; then
@@ -260,6 +372,37 @@ for (( n=1; n<=MAX_ITERATIONS; n++ )); do
     exit 0
   fi
   secret_scan "${CHANGED_FILES[@]}" || exit 1
+
+  # -------------------------------------------------------------------------
+  # W4 local acceptance gate: every CHANGED acceptance-block service must be
+  # COVERED (its kind:test criteria all pass) BEFORE we push. On any miss we
+  # feed the coverage report back and re-prompt — without pushing a red spec.
+  # -------------------------------------------------------------------------
+  if [ "${#ACCEPTANCE_SERVICES[@]:-0}" -gt 0 ]; then
+    GATE_FAIL=0; : > "$WORK_DIR/local-feedback.txt"
+    for svc in "${ACCEPTANCE_SERVICES[@]}"; do
+      printf '%s\n' "$CHANGED" | awk '{print $2}' | grep -q "^microservices/$svc/" || continue
+      echo "--- local acceptance gate: $svc ---"
+      if local_gate "$svc" "$REQ_FILE" "$WORK_DIR/gate-$svc.txt"; then
+        cat "$WORK_DIR/gate-$svc.txt"
+        echo "  $svc: COVERED (+TRACEABILITY.md)"
+      else
+        GATE_FAIL=1
+        { echo "### service $svc — acceptance coverage NOT met:"; cat "$WORK_DIR/gate-$svc.txt"; echo; } \
+          >> "$WORK_DIR/local-feedback.txt"
+      fi
+    done
+    if [ "$GATE_FAIL" -eq 1 ]; then
+      cp "$WORK_DIR/local-feedback.txt" "$FEEDBACK_FILE"
+      echo "local acceptance gate RED (iteration $n) — re-prompting without push"
+      if [ "$n" -eq "$MAX_ITERATIONS" ]; then
+        echo "exhausted MAX_ITERATIONS with uncovered acceptance criteria — escalating" >&2
+        exit 1
+      fi
+      continue
+    fi
+    echo "local acceptance gate: all changed acceptance-block services COVERED"
+  fi
 
   CHANGED_SERVICES="$(printf '%s\n' "$CHANGED" | awk '{print $2}' | grep '^microservices/' | cut -d/ -f2 | sort -u | tr '\n' ' ')"
   echo "changed services: $CHANGED_SERVICES"
