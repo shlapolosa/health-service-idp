@@ -22,3 +22,51 @@ A realtime sensor pipeline proving the RT-2 role model end-to-end.
 - The post-deploy contract test (HARD-4) passes for every component.
 - Malformed telemetry is rejected at the ingest edge with HTTP 4xx, not
   produced to `sensor_raw`.
+
+## Acceptance blocks (structured — dev-agent contract)
+> Schema: `factory/docs/contracts/requirements-acceptance-block.md`. The dev-agent turns each
+> `kind: test` criterion into a failing pytest first (TDD red), then implements to green.
+
+```acceptance
+service: rtdemo2-ingest
+criteria:
+  - id: ing-1
+    statement: "a valid reading is normalised and stamped with received_at"
+    kind: test
+    given: "a reading {sensor_id, value, ts} with a numeric value"
+    when: "to_message is called"
+    then: "it returns the reading with a received_at timestamp added"
+  - id: ing-2
+    statement: "a reading missing sensor_id is rejected"
+    kind: test
+    given: "a reading with no sensor_id"
+    when: "to_message is called"
+    then: "it raises ValueError (not produced to sensor_raw)"
+  - id: ing-3
+    statement: "a non-numeric value is rejected"
+    kind: test
+    given: "a reading whose value is non-numeric"
+    when: "to_message is called"
+    then: "it raises ValueError"
+```
+
+```acceptance
+service: rtdemo2-processor
+criteria:
+  - id: proc-1
+    statement: "rolling average of the last 10 values per sensor_id"
+    kind: test
+    given: "a sequence of readings for one sensor_id"
+    when: "transform is called per reading"
+    then: "the emitted message has rolling_avg over the last 10 values and a count"
+  - id: proc-2
+    statement: "malformed messages are dropped"
+    kind: test
+    given: "a message missing sensor_id or value"
+    when: "transform is called"
+    then: "it returns None (the message is dropped, not emitted)"
+  - id: proc-3
+    statement: "end-to-end one-in-one-out is proven post-deploy"
+    kind: accepted-gap
+    reason: "covered by the HARD-4 data-plane contract test (ct-<rev>), not a unit test"
+```
