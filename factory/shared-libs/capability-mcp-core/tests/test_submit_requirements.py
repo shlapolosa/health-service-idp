@@ -214,6 +214,69 @@ def _normalized() -> str:
     return requirements_spec.normalize(_VALID_REQS)
 
 
+# ---------------------------------------------------------------------------
+# ARCH-BUNDLE: the whole architecture bundle travels into <app>/docs/architecture/
+# ---------------------------------------------------------------------------
+
+_ARTIFACTS = {
+    "oam.yaml": "apiVersion: core.oam.dev/v1beta1\nkind: Application\n",
+    "traceability.yaml": "goals: []\n",
+    "c4.drawio": "<mxGraphModel/>",
+}
+
+
+def test_submit_with_artifacts_commits_arch_bundle_update_path():
+    # repo exists -> update path -> every artifact lands under docs/architecture/<relpath>
+    gh = RecordingGitHub(existing_repos={"my-svc-gitops"})
+    uc, gh = _uc(github=gh)
+    res = uc.submit(_oam(), requirements=_VALID_REQS, artifacts=_ARTIFACTS)
+    assert res.ok, res.message
+    for rel in _ARTIFACTS:
+        key = ("my-svc-gitops", f"docs/architecture/{rel}")
+        assert key in gh.commits, f"{rel} not committed under docs/architecture/"
+        assert gh.blobs[key] == _ARTIFACTS[rel]
+    # SPEC-1 unchanged: REQUIREMENTS.md still also lands at the monorepo ROOT
+    assert ("my-svc-gitops", "REQUIREMENTS.md") in gh.commits
+    assert "arch bundle" in res.message
+
+
+def test_submit_wait_with_artifacts_commits_arch_bundle():
+    gh = RecordingGitHub(existing_repos={"my-svc-gitops"})
+    uc, gh = _uc(github=gh)
+    res = uc.submit_wait(_oam(), requirements=_VALID_REQS, artifacts=_ARTIFACTS)
+    assert res.ok, res.message
+    for rel in _ARTIFACTS:
+        assert ("my-svc-gitops", f"docs/architecture/{rel}") in gh.commits
+
+
+def test_submit_without_artifacts_no_arch_commits_regression():
+    # omitting artifacts => byte-identical to pre-ARCH-BUNDLE: zero docs/architecture/ commits
+    gh = RecordingGitHub(existing_repos={"my-svc-gitops"})
+    uc, gh = _uc(github=gh)
+    before = uc.submit(_oam(), requirements=_VALID_REQS)
+    arch_commits = [c for c in gh.commits if c[1].startswith("docs/architecture/")]
+    assert arch_commits == [], "no artifacts => no docs/architecture/ commits"
+    assert "arch bundle" not in before.message
+
+
+def test_submit_artifacts_none_and_empty_are_noop():
+    # None (default) and {} are both no-ops: same commit set as the no-artifacts path
+    for arts in (None, {}):
+        gh = RecordingGitHub(existing_repos={"my-svc-gitops"})
+        uc, gh = _uc(github=gh)
+        uc.submit(_oam(), requirements=_VALID_REQS, artifacts=arts)
+        assert not [c for c in gh.commits if c[1].startswith("docs/architecture/")]
+
+
+def test_submit_artifacts_day0_monorepo_absent_nonfatal():
+    # day-0: repo not created yet -> artifact commits fail silently, submit still ok
+    gh = RecordingGitHub(missing_repos={"my-svc-gitops"})
+    uc, gh = _uc(github=gh)
+    res = uc.submit(_oam(), requirements=_VALID_REQS, artifacts=_ARTIFACTS)
+    assert res.ok, res.message
+    assert not [c for c in gh.commits if c[1].startswith("docs/architecture/")]
+
+
 # --- RT-2 (#176): realtime role travels through services[] -------------------
 
 def _mk_app(components):

@@ -69,6 +69,21 @@ jobs:
               payload = {"oam_yaml": open(oam).read()}
               if os.path.exists(req):
                   payload["requirements"] = open(req).read()
+              # ARCH-BUNDLE: carry the WHOLE approved bundle (oam.yaml + REQUIREMENTS.md
+              # + any diagrams/traceability) into the source monorepo under
+              # docs/architecture/. Map = relpath within the app dir -> content (text
+              # files only; binaries that don't UTF-8-decode are skipped).
+              artifacts = {}
+              for root, _dirs, files in os.walk(app_dir):
+                  for fn in files:
+                      fp = os.path.join(root, fn)
+                      rel = os.path.relpath(fp, app_dir)
+                      try:
+                          artifacts[rel] = open(fp, encoding="utf-8").read()
+                      except (UnicodeDecodeError, OSError):
+                          pass  # skip non-text/binary artifacts
+              if artifacts:
+                  payload["artifacts"] = artifacts
               data = json.dumps(payload).encode()
               headers = {"Content-Type": "application/json"}
               if key:

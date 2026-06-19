@@ -157,10 +157,15 @@ def catalog_connectivity_recipes(
                       "externally-verifiable contract checks, plus Non-Goals. When supplied it is "
                       "committed next to the OAM in the central ledger and at the app monorepo "
                       "root as REQUIREMENTS.md, and a deterministic `spec_hash` is returned (the "
-                      "dev-agent keys its implementation re-fires on it). Omit it for the exact "
-                      "legacy behaviour.")
-def app_submit(oam_yaml: str, requirements: str | None = None) -> dict[str, Any]:
-    r = deps.get_submit().submit(oam_yaml, requirements=requirements)
+                      "dev-agent keys its implementation re-fires on it). Optionally pass "
+                      "`artifacts`: a {relpath: content} map of the architecture bundle "
+                      "(e.g. oam.yaml, traceability.yaml, c4.drawio) — each is committed into "
+                      "the source monorepo under docs/architecture/<relpath> (best-effort; "
+                      "REQUIREMENTS.md still also lands at the repo root). Omit both for the "
+                      "exact legacy behaviour.")
+def app_submit(oam_yaml: str, requirements: str | None = None,
+               artifacts: dict[str, str] | None = None) -> dict[str, Any]:
+    r = deps.get_submit().submit(oam_yaml, requirements=requirements, artifacts=artifacts)
     return {
         "ok": r.ok,
         "commit_sha": r.commit_sha,
@@ -209,9 +214,12 @@ def app_delete(name: str, purge_repos: bool = False, dry_run: bool = False) -> d
           description="Deferred OAM provisioning for MFG-TC consumers whose OAM references CDs "
                       "not yet present. Commits to gitops + fires oam-apply-wait. "
                       "Returns same shape as app.submit. Accepts the same optional "
-                      "`requirements` (REQUIREMENTS.md markdown/base64) as app.submit.")
-def app_submit_wait(oam_yaml: str, requirements: str | None = None) -> dict[str, Any]:
-    r = deps.get_submit().submit_wait(oam_yaml, requirements=requirements)
+                      "`requirements` (REQUIREMENTS.md markdown/base64) and `artifacts` "
+                      "(architecture bundle {relpath: content}, committed under "
+                      "docs/architecture/) as app.submit.")
+def app_submit_wait(oam_yaml: str, requirements: str | None = None,
+                    artifacts: dict[str, str] | None = None) -> dict[str, Any]:
+    r = deps.get_submit().submit_wait(oam_yaml, requirements=requirements, artifacts=artifacts)
     return {
         "ok": r.ok,
         "commit_sha": r.commit_sha,
@@ -275,11 +283,12 @@ async def _api_submit(request):
         body = await request.json()
         oam_yaml = body.get("oam_yaml", "")
         requirements = body.get("requirements")  # SPEC-1: optional, additive
+        artifacts = body.get("artifacts")        # ARCH-BUNDLE: optional, additive
         if not oam_yaml:
             return JSONResponse({"ok": False, "message": "oam_yaml required"}, status_code=400)
     except Exception:  # noqa: BLE001
         return JSONResponse({"ok": False, "message": "invalid JSON body"}, status_code=400)
-    r = deps.get_submit().submit(oam_yaml, requirements=requirements)
+    r = deps.get_submit().submit(oam_yaml, requirements=requirements, artifacts=artifacts)
     return JSONResponse({
         "ok": r.ok,
         "commit_sha": r.commit_sha,
@@ -296,11 +305,12 @@ async def _api_submit_wait(request):
         body = await request.json()
         oam_yaml = body.get("oam_yaml", "")
         requirements = body.get("requirements")
+        artifacts = body.get("artifacts")        # ARCH-BUNDLE: optional, additive
         if not oam_yaml:
             return JSONResponse({"ok": False, "message": "oam_yaml required"}, status_code=400)
     except Exception:  # noqa: BLE001
         return JSONResponse({"ok": False, "message": "invalid JSON body"}, status_code=400)
-    r = deps.get_submit().submit_wait(oam_yaml, requirements=requirements)
+    r = deps.get_submit().submit_wait(oam_yaml, requirements=requirements, artifacts=artifacts)
     return JSONResponse({
         "ok": r.ok,
         "commit_sha": r.commit_sha,

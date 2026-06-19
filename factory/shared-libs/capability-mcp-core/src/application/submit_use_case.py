@@ -42,6 +42,12 @@ _OAM_TEMPLATE = "oam-apply"                       # legacy fallback for non-scaf
 _SVC_OAM_PATH = "oam/applications/application.yaml"  # single reconciled truth per service repo
 # SPEC-1 (#173, dev-agent W1): where the use-case spec lands.
 _SVC_REQUIREMENTS_PATH = "REQUIREMENTS.md"        # app monorepo root (per-service gitops repo)
+# ARCH-BUNDLE: the whole architecture bundle (oam.yaml + REQUIREMENTS.md + any
+# diagrams/traceability the architect proposed) also travels into the source
+# monorepo under this dir, so the codebase carries its own design record.
+# REQUIREMENTS.md ALSO stays at the repo ROOT (above) — the dev-agent reads it
+# there; this is purely additive (SPEC-1 root behaviour is unchanged).
+_SVC_ARCH_DIR = "docs/architecture"               # app monorepo arch-bundle dir
 
 
 class SubmitUseCase:
@@ -65,7 +71,8 @@ class SubmitUseCase:
     # Public surface (MCP tools wrap these)
     # ----------------------------------------------------------------------
 
-    def submit(self, oam_yaml: str, requirements: str | None = None) -> SubmitResult:
+    def submit(self, oam_yaml: str, requirements: str | None = None,
+               artifacts: dict[str, str] | None = None) -> SubmitResult:
         # 1. parse + identify the app
         try:
             app = yaml.safe_load(oam_yaml)
@@ -159,7 +166,7 @@ class SubmitUseCase:
 
         return self._attach_spec_hash(self._reconcile_apim_product(app, self._with_advisory(
             self._declarative_scaffold(app, app_name, scaffold, target_vcluster, oam_yaml, sha,
-                                       spec),
+                                       spec, artifacts),
             advisory)), spec)
 
     # Component types whose CD accepts the optional `specHash` param and stamps
@@ -321,7 +328,8 @@ class SubmitUseCase:
                             workflow_name=result.workflow_name,
                             message=f"{result.message}\n{msg}")
 
-    def submit_wait(self, oam_yaml: str, requirements: str | None = None) -> SubmitResult:
+    def submit_wait(self, oam_yaml: str, requirements: str | None = None,
+                    artifacts: dict[str, str] | None = None) -> SubmitResult:
         """Deferred sibling of submit() — for OAMs whose ComponentDefinitions don't exist yet.
 
         Skips vela.dry_run (would fail by design — that's why the caller chose
@@ -405,7 +413,7 @@ class SubmitUseCase:
         # Same declarative provisioning as submit(): the claim/ArgoCD do the waiting.
         return self._attach_spec_hash(
             self._declarative_scaffold(app, app_name, scaffold, target_vcluster, oam_yaml, sha,
-                                       spec), spec)
+                                       spec, artifacts), spec)
 
     # ----------------------------------------------------------------------
     # SPEC-1 (#173, dev-agent W1): REQUIREMENTS.md handling
@@ -464,6 +472,46 @@ class SubmitUseCase:
         if ok:
             return f"; spec {shash} -> {svc_repo}/{_SVC_REQUIREMENTS_PATH}"
         return f"; spec {shash} (ledger only — monorepo not ready yet)"
+
+    def _commit_monorepo_artifacts(self, svc_repo: str,
+                                   artifacts: dict[str, str] | None) -> str:
+        """ARCH-BUNDLE: commit the whole architecture bundle (oam.yaml +
+        REQUIREMENTS.md + any diagrams/traceability the architect proposed) into
+        the source monorepo under `docs/architecture/<relpath>`, so the codebase
+        carries its own design record alongside the root REQUIREMENTS.md the
+        dev-agent reads (SPEC-1 root behaviour is untouched).
+
+        `artifacts` maps a relative path (e.g. `oam.yaml`, `traceability.yaml`,
+        `c4.drawio`) -> content. Mirrors _commit_monorepo_requirements: each file
+        is committed idempotently (the github client no-ops an unchanged blob via
+        its existing-sha PUT). Best-effort — a missing repo (day-0), a single bad
+        path, or a transport error is logged and swallowed, NEVER raised. Returns
+        a short message fragment for the SubmitResult. Purely additive: None / {}
+        => no commits, byte-identical to pre-ARCH-BUNDLE behaviour."""
+        if not artifacts:
+            return ""
+        committed: list[str] = []
+        for relpath, content in artifacts.items():
+            rel = str(relpath).lstrip("/")
+            if not rel or content is None:
+                continue
+            dest = f"{_SVC_ARCH_DIR}/{rel}"
+            try:
+                ok, _ = self.github.commit_file(
+                    dest, content,
+                    message=f"arch: {rel} (capability-mcp app.submit)",
+                    branch=self.gitops_branch, repo=svc_repo,
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.warning("ARCH-BUNDLE: artifact commit raised for %s/%s "
+                               "(non-fatal): %s", svc_repo, dest, e)
+                continue
+            if ok:
+                committed.append(rel)
+        if committed:
+            return (f"; arch bundle -> {svc_repo}/{_SVC_ARCH_DIR}/ "
+                    f"({', '.join(committed)})")
+        return ""
 
     @staticmethod
     def _attach_spec_hash(result: "SubmitResult",
@@ -735,7 +783,8 @@ class SubmitUseCase:
                               scaffold_comp: dict[str, Any],
                               target_vcluster: str | None, oam_yaml: str,
                               sha: str,
-                              spec: tuple[str, str] | None = None) -> SubmitResult:
+                              spec: tuple[str, str] | None = None,
+                              artifacts: dict[str, str] | None = None) -> SubmitResult:
         """Declarative-spine path: update via direct repo commit, day-0 via claim.
 
         UNIFY-1 (#153): tenancy unit is the OAM. ONE AppContainerClaim named after
@@ -789,10 +838,12 @@ class SubmitUseCase:
             # SPEC-1: the monorepo exists on the update path — land REQUIREMENTS.md
             # at its root (idempotent; the github client no-ops an unchanged blob).
             spec_msg = self._commit_monorepo_requirements(svc_repo, spec)
+            # ARCH-BUNDLE: land the whole architecture bundle under docs/architecture/.
+            arch_msg = self._commit_monorepo_artifacts(svc_repo, artifacts)
             return SubmitResult(ok=True, commit_sha=svc_sha,
                                 message=(f"updated {app_name}; committed {svc_sha} to "
                                          f"{svc_repo}/{_SVC_OAM_PATH}; ArgoCD will reconcile "
-                                         f"(ledger {sha}){reconcile_msg}{spec_msg}"))
+                                         f"(ledger {sha}){reconcile_msg}{spec_msg}{arch_msg}"))
 
         # DAY-0 path: create the AppContainerClaim named after the OAM. Composition
         # does the rest (one repo pair via templates, OAM seed, one ApplicationClaim
@@ -831,11 +882,14 @@ class SubmitUseCase:
         # re-landed at the monorepo root on the next (update-path) submit. We still
         # attempt the monorepo commit best-effort in case the repo already exists.
         spec_msg = self._commit_monorepo_requirements(svc_repo, spec)
+        # ARCH-BUNDLE: best-effort on day-0 too (no-op until the composition
+        # creates the repo; re-landed on the next update-path submit).
+        arch_msg = self._commit_monorepo_artifacts(svc_repo, artifacts)
         return SubmitResult(ok=True, commit_sha=sha, workflow_name=app_name,
                             message=(f"submitted {app_name}; committed {sha}; {msg}; "
                                      f"composition will create {svc_repo} + seed OAM + "
                                      f"ArgoCD app + scaffold {svc_count} service(s) "
-                                     f"(target={target_vcluster or 'host'}){spec_msg}"))
+                                     f"(target={target_vcluster or 'host'}){spec_msg}{arch_msg}"))
 
     def _fire_oam_apply(self, app_name: str, namespace: str, target_vcluster: str | None,
                         oam_yaml: str, sha: str, path: str) -> SubmitResult:
