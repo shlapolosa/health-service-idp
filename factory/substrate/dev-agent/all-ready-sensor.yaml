@@ -105,7 +105,7 @@ spec:
                     containers:
                       - name: dev-agent
                         # Pinned tag (HARD-3: never :latest). Bump on az acr build.
-                        image: healthidpuaeacr.azurecr.io/dev-agent:v0.1.0
+                        image: healthidpuaeacr.azurecr.io/dev-agent:v0.3.0
                         # GITHUB_TOKEN + ANTHROPIC_API_KEY from Key Vault via ESO
                         # (factory/substrate/dev-agent/externalsecret.yaml).
                         envFrom:

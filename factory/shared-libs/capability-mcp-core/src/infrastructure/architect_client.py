@@ -92,7 +92,9 @@ class ArchitectClient:
         if not requirement_text or not requirement_text.strip():
             raise ValueError("requirement_text must be non-empty")
 
-        url = f"{self.endpoint.rstrip('/')}/openai/v1/responses?api-version={self.api_version}"
+        # NOTE: the /openai/v1/ path rejects an api-version query param ("not allowed
+        # when using /v1 path"), so we do NOT append one here.
+        url = f"{self.endpoint.rstrip('/')}/openai/v1/responses"
         headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
         body: dict[str, Any] = {
             "input": [{
@@ -117,7 +119,7 @@ class ArchitectClient:
             time.sleep(self.poll_interval_seconds)
             rid = obj.get("id")
             r = requests.get(
-                f"{self.endpoint.rstrip('/')}/openai/v1/responses/{rid}?api-version={self.api_version}",
+                f"{self.endpoint.rstrip('/')}/openai/v1/responses/{rid}",
                 headers=headers, timeout=self.timeout_seconds,
             )
             obj = r.json()

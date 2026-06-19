@@ -71,9 +71,12 @@ def catalog_describe(name: str) -> dict[str, Any]:
 
 
 @mcp.tool(name="catalog.search",
-          description="Rank MFG-TC components by relevance to a use-case description.")
-def catalog_search(query: str, top: int = 5) -> list[dict[str, Any]]:
-    return deps.get_catalog().search(query, top)
+          description="Rank MFG-TC components for a structured CapabilityRequest: "
+                      "{category: str, qualityAttributes: {name: value, ...}, weights?: {...}}. "
+                      "Returns scored candidates. (Engine is CapabilityScorer.score — it needs the "
+                      "structured request, NOT a free-text query.)")
+def catalog_search(request: dict[str, Any]) -> list[dict[str, Any]]:
+    return deps.get_catalog().search(request)
 
 
 @mcp.tool(name="catalog.scaffold",
