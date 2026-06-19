@@ -84,6 +84,12 @@ class SubmitUseCase:
         except requirements_spec.RequirementsError as e:
             return SubmitResult(ok=False, message=f"invalid requirements: {e}")
 
+        # DEV-AGENT W5 (#173): forward the spec_hash into each scaffold component's
+        # properties.specHash, before validation/commit, so it lands in the rendered
+        # ksvc annotation (dev-agent.cafe.io/spec-hash) the all-ready-sensor keys on.
+        # No-op when no requirements travelled with the submit (additive).
+        oam_yaml = self._inject_spec_hash(app, oam_yaml, spec)
+
         # GQL-1 (#155): render-inject explicit `sources:` onto any graphql-gateway
         # component that omitted them, before validation/commit. app.submit is the
         # only place that can see sibling components, so it authors the authoritative
@@ -155,6 +161,43 @@ class SubmitUseCase:
             self._declarative_scaffold(app, app_name, scaffold, target_vcluster, oam_yaml, sha,
                                        spec),
             advisory)), spec)
+
+    # Component types whose CD accepts the optional `specHash` param and stamps
+    # the `dev-agent.cafe.io/spec-hash` annotation from it (the 4 dev-agent
+    # scaffold catalog CDs). Keep in lock-step with the CDs under
+    # adapters/catalog/{webservice,realtime-service,graphql-gateway,rasa-chatbot}.cd.yaml.
+    _SPEC_HASH_TYPES = ("webservice", "realtime-service", "graphql-gateway", "rasa-chatbot")
+
+    @classmethod
+    def _inject_spec_hash(cls, app: dict[str, Any], oam_yaml: str,
+                          spec: tuple[str, str] | None) -> str:
+        """DEV-AGENT W5 (#173): forward the computed spec_hash into each scaffold
+        component's `properties.specHash` so it flows submit → component
+        properties → CD `parameter.specHash` → `dev-agent.cafe.io/spec-hash`
+        annotation (read by the all-ready-sensor to key re-fires).
+
+        Purely additive: when no requirements travelled with the submit
+        (`spec is None`) the OAM is returned BYTE-FOR-BYTE unchanged, so existing
+        submissions are unaffected and the CD's `if parameter.specHash != _|_`
+        guard leaves the annotation absent. Only stamps components whose CD reads
+        the param (_SPEC_HASH_TYPES); a consumer-supplied explicit specHash is
+        left untouched (this never overwrites an existing value)."""
+        if spec is None:
+            return oam_yaml
+        spec_hash = spec[1]
+        comps = app.get("spec", {}).get("components", []) or []
+        changed = False
+        for comp in comps:
+            if comp.get("type") not in cls._SPEC_HASH_TYPES:
+                continue
+            props = comp.setdefault("properties", {})
+            if props.get("specHash"):
+                continue  # respect a consumer-supplied value
+            props["specHash"] = spec_hash
+            changed = True
+        if changed:
+            return yaml.safe_dump(app, sort_keys=False)
+        return oam_yaml
 
     @staticmethod
     def _auto_expose_external_components(app: dict[str, Any], oam_yaml: str) -> str:
@@ -309,6 +352,11 @@ class SubmitUseCase:
             spec = self._prepare_requirements(requirements)
         except requirements_spec.RequirementsError as e:
             return SubmitResult(ok=False, message=f"invalid requirements: {e}")
+
+        # DEV-AGENT W5 (#173): same spec_hash → properties.specHash injection as
+        # submit() so the deferred path also carries the hash into the committed OAM
+        # and the eventually-rendered ksvc annotation (additive; no-op when no spec).
+        oam_yaml = self._inject_spec_hash(app, oam_yaml, spec)
 
         # GQL-1 (#155): same render-injection as submit() so the deferred path also
         # commits the authoritative explicit sources to the ledger.
