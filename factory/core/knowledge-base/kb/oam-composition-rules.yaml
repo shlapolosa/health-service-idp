@@ -34,6 +34,21 @@ rules:
         instead of declaring another realtime-platform.
       - graphql-gateway: add upstream services to its `sources:` list instead of
         declaring another gateway.
+  scaffold-images:
+    invariant: >-
+      For components the platform SCAFFOLDS (webservice / realtime-service whose
+      code the platform generates and CI builds), do NOT set `properties.image`.
+      Omit it: the component definition's default engages the scaffold + CI path,
+      which builds a real image and commits the digest back (HARD-3). Setting a
+      placeholder image instead forces the "bring-your-own-image" path AND, unless
+      the image is from an allowed registry, is rejected at apply by the
+      `image-source-allowlist` ValidatingAdmissionPolicy.
+    allowed-registries: ["healthidpuaeacr.azurecr.io/", "docker.io/socrates12345/"]
+    how-to-satisfy:
+      - Scaffolded service (you are NOT supplying a prebuilt image): OMIT `image`.
+        The dev-agent will implement the logic and CI builds the image.
+      - Bring-your-own-image: set `image` to an EXISTING tag under an allowed
+        registry (never a placeholder, never `:latest`).
 discoverable-via:
   - oam.dry_run / catalog.validate — violations appear as `platform-policy: ...`
     lines in `diagnostics` and flip `ok` to false (pre-propose self-correction).
