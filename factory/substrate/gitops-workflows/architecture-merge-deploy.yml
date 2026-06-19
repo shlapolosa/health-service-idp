@@ -1,0 +1,90 @@
+# ============================================================================
+# architecture-merge-deploy — the MERGE half of the architecture approval gate.
+#
+# INSTALL LOCATION: this workflow belongs in the **health-service-idp-gitops**
+# repo at `.github/workflows/architecture-merge-deploy.yml` (NOT the source repo).
+# It is staged here so it lives next to the front-door code that opens the PR
+# (factory.from_requirement -> architect -> factory.propose review PR). Copy it
+# into the gitops repo to activate.
+#
+# THE GATE: factory.from_requirement makes the architect open a *review* PR that
+# adds `proposed-architectures/<app>/{oam.yaml,REQUIREMENTS.md}`. A human reviews
+# the diff and MERGES = approval. This workflow fires ONLY on push to main
+# (i.e. after merge) and runs the REAL deploy via app.submit_wait — preserving
+# validate -> commit -> oam-apply-wait workflow -> spec_hash. Nothing deploys
+# until the PR is merged.
+# ============================================================================
+name: Architecture Merge → Deploy
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'proposed-architectures/**/oam.yaml'
+
+permissions:
+  contents: read
+
+env:
+  # The compose MCP REST mirror of app.submit_wait. Override via repo variable
+  # MCP_SUBMIT_WAIT_URL (e.g. the APIM-fronted URL with a subscription key).
+  MCP_SUBMIT_WAIT_URL: >-
+    ${{ vars.MCP_SUBMIT_WAIT_URL ||
+        'http://capability-mcp-mfg-tc.default.20.233.105.82.nip.io/api/submit_wait' }}
+
+jobs:
+  deploy-approved-architectures:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2   # need HEAD~1 to diff the merge
+
+      - name: Deploy each newly-approved architecture
+        env:
+          MCP_SUBMIT_WAIT_URL: ${{ env.MCP_SUBMIT_WAIT_URL }}
+          # Optional APIM subscription key if MCP_SUBMIT_WAIT_URL points at APIM.
+          MCP_SUBSCRIPTION_KEY: ${{ secrets.MCP_SUBSCRIPTION_KEY }}
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess, sys, urllib.request, urllib.error
+
+          url = os.environ["MCP_SUBMIT_WAIT_URL"]
+          key = os.environ.get("MCP_SUBSCRIPTION_KEY", "").strip()
+
+          # Files added/modified by this merge under proposed-architectures/*/oam.yaml
+          diff = subprocess.run(
+              ["git", "diff", "--name-only", "--diff-filter=AM", "HEAD~1", "HEAD"],
+              capture_output=True, text=True, check=True).stdout.splitlines()
+          oam_files = [f for f in diff
+                       if f.startswith("proposed-architectures/") and f.endswith("/oam.yaml")]
+          if not oam_files:
+              print("no approved oam.yaml in this merge — nothing to deploy"); sys.exit(0)
+
+          rc = 0
+          for oam in oam_files:
+              app_dir = os.path.dirname(oam)
+              req = os.path.join(app_dir, "REQUIREMENTS.md")
+              payload = {"oam_yaml": open(oam).read()}
+              if os.path.exists(req):
+                  payload["requirements"] = open(req).read()
+              data = json.dumps(payload).encode()
+              headers = {"Content-Type": "application/json"}
+              if key:
+                  headers["Ocp-Apim-Subscription-Key"] = key
+              print(f"::group::deploy {app_dir} -> app.submit_wait")
+              r = urllib.request.Request(url, data=data, headers=headers, method="POST")
+              try:
+                  with urllib.request.urlopen(r, timeout=120) as resp:
+                      body = resp.read().decode()
+                      print(resp.status, body)
+                      if not json.loads(body).get("ok"):
+                          rc = 1
+              except urllib.error.HTTPError as e:
+                  print("HTTP", e.code, e.read().decode()[:500]); rc = 1
+              except Exception as e:  # noqa: BLE001
+                  print("ERR", type(e).__name__, e); rc = 1
+              print("::endgroup::")
+          sys.exit(rc)
+          PY

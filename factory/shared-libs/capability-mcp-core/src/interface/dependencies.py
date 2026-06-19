@@ -151,3 +151,38 @@ def get_classify_router() -> ClassifyRouterClient:
 @lru_cache
 def get_route() -> RouteUseCase:
     return RouteUseCase(get_classify_router())
+
+
+# ---- W6 front-door (PROPOSE / approval gate): architect-v1 -> review PR ----
+
+@lru_cache
+def get_architect_client() -> "ArchitectClient":
+    from ..infrastructure.architect_client import ArchitectClient
+    return ArchitectClient(
+        endpoint=os.getenv(
+            "ARCHITECT_AGENT_ENDPOINT",
+            "https://aifoundry-socrates.services.ai.azure.com/api/projects/usecase-architect-poc",
+        ),
+        agent_name=os.getenv("ARCHITECT_AGENT_NAME", "architect-v1"),
+        propose_repo=os.getenv("ARCHITECT_PROPOSE_REPO", "health-service-idp-gitops"),
+    )
+
+
+def _architect_token() -> str:
+    """Foundry data-plane bearer token. Prefer a pre-minted secret
+    (ARCHITECT_AGENT_TOKEN) for the long-lived ksvc; else mint via
+    DefaultAzureCredential for the Foundry data-plane audience."""
+    tok = os.getenv("ARCHITECT_AGENT_TOKEN", "").strip()
+    if tok:
+        return tok
+    from azure.identity import DefaultAzureCredential
+    scope = os.getenv("ARCHITECT_AGENT_SCOPE", "https://ai.azure.com/.default")
+    return DefaultAzureCredential().get_token(scope).token
+
+
+@lru_cache
+def get_from_requirement() -> "FromRequirementUseCase":
+    from ..application.from_requirement_use_case import FromRequirementUseCase
+    # NOTE: no SubmitUseCase dependency — the front-door PROPOSES (opens a review
+    # PR) and never deploys. Deployment happens on PR merge (a separate trigger).
+    return FromRequirementUseCase(get_architect_client(), _architect_token)

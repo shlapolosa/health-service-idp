@@ -219,12 +219,49 @@ def app_submit_wait(oam_yaml: str, requirements: str | None = None) -> dict[str,
 
 
 # ============================================================
+#  W6 single front-door — PROPOSE for approval (architecture gate)
+# ============================================================
+
+
+@mcp.tool(name="factory.from_requirement",
+          description="Single front-door (ARCHITECTURE APPROVAL GATE): take a RAW "
+                      "natural-language requirement and drive the architect-v1 Foundry agent to "
+                      "PROPOSE an architecture for human approval. The architect follows its "
+                      "golden-thread method (reusing existing ComponentDefinitions, validating via "
+                      "oam.dry_run) and, when its traceability gate passes, opens a REVIEW Pull "
+                      "Request via factory.propose (proposed-architectures/<app>/{oam.yaml,"
+                      "REQUIREMENTS.md}). It does NOT deploy. Returns {ok, pr_url, pr_number, "
+                      "message}. A human approves by MERGING the PR; a merge-triggered workflow "
+                      "runs the real deploy (app.submit_wait). Use app.submit/app.submit_wait "
+                      "directly only when you already have an approved OAM to deploy now.")
+def factory_from_requirement(text: str) -> dict[str, Any]:
+    r = deps.get_from_requirement().from_requirement(text)
+    return {"ok": r.ok, "pr_url": r.pr_url, "pr_number": r.pr_number, "message": r.message}
+
+
+# ============================================================
 #  ASGI wiring
 # ============================================================
 
 
 async def _healthz(_request):
     return JSONResponse({"status": "ok", "service": "capability-mcp-mfg-tc"})
+
+
+# REST mirror of factory.from_requirement for non-MCP intakes (slack free-text).
+async def _api_from_requirement(request):
+    try:
+        body = await request.json()
+        text = body.get("text", "")
+        if not text:
+            return JSONResponse({"ok": False, "message": "text required"}, status_code=400)
+    except Exception:  # noqa: BLE001
+        return JSONResponse({"ok": False, "message": "invalid JSON body"}, status_code=400)
+    r = deps.get_from_requirement().from_requirement(text)
+    return JSONResponse(
+        {"ok": r.ok, "pr_url": r.pr_url, "pr_number": r.pr_number, "message": r.message},
+        status_code=200 if r.ok else 422,
+    )
 
 
 # Declarative-spine W6: plain REST mirror of app.submit / app.status for
@@ -249,6 +286,27 @@ async def _api_submit(request):
     }, status_code=200 if r.ok else 422)
 
 
+async def _api_submit_wait(request):
+    """REST mirror of app.submit_wait — the deploy the architecture merge-gate calls
+    after a human approves (merges) the architect's review PR."""
+    try:
+        body = await request.json()
+        oam_yaml = body.get("oam_yaml", "")
+        requirements = body.get("requirements")
+        if not oam_yaml:
+            return JSONResponse({"ok": False, "message": "oam_yaml required"}, status_code=400)
+    except Exception:  # noqa: BLE001
+        return JSONResponse({"ok": False, "message": "invalid JSON body"}, status_code=400)
+    r = deps.get_submit().submit_wait(oam_yaml, requirements=requirements)
+    return JSONResponse({
+        "ok": r.ok,
+        "commit_sha": r.commit_sha,
+        "workflow_name": r.workflow_name,
+        "message": r.message,
+        "spec_hash": r.spec_hash,
+    }, status_code=200 if r.ok else 422)
+
+
 async def _api_status(request):
     name = request.path_params.get("name", "")
     return JSONResponse(deps.get_status().status_of(name))
@@ -259,5 +317,7 @@ def build_app():
     app.add_middleware(EntraJWTMiddleware)
     app.routes.append(Route("/healthz", _healthz, methods=["GET"]))
     app.routes.append(Route("/api/submit", _api_submit, methods=["POST"]))
+    app.routes.append(Route("/api/submit_wait", _api_submit_wait, methods=["POST"]))
     app.routes.append(Route("/api/status/{name}", _api_status, methods=["GET"]))
+    app.routes.append(Route("/api/from_requirement", _api_from_requirement, methods=["POST"]))
     return app
