@@ -97,16 +97,28 @@ def validate(text: str) -> None:
     Intentionally lenient on the rest (Use Case / Components / Non-Goals) — the
     file is read by both a human and the dev-agent; we only hard-require the one
     section the contract loop depends on.
+
+    Accepts EITHER representation of the acceptance contract:
+      - a prose `## Acceptance Criteria` heading + >=1 criterion line (legacy SPEC-1), OR
+      - >=1 fenced ```acceptance block (the W3 architect<->dev-agent contract,
+        factory/docs/contracts/requirements-acceptance-block.md). The dev-agent's
+        parse_acceptance.py reads the fenced blocks; the architect emits them per
+        service, so this is the canonical form going forward.
     """
     if not text or not text.strip():
         raise RequirementsError("requirements is empty")
+
+    # W3 contract: a fenced ```acceptance block satisfies the gate.
+    if "```acceptance" in text:
+        return
 
     lines = text.split("\n")
     heading_idx = next((i for i, ln in enumerate(lines)
                         if _ACCEPTANCE_HEADING.match(ln)), None)
     if heading_idx is None:
         raise RequirementsError(
-            "requirements must contain an '## Acceptance Criteria' section")
+            "requirements must contain an '## Acceptance Criteria' section "
+            "or a fenced ```acceptance block")
 
     # Gather the section body (until the next markdown heading) and require at
     # least one non-empty, non-heading line.
