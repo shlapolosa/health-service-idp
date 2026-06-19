@@ -1,0 +1,40 @@
+# KB entry — platform OAM-composition rules (not a backing technology).
+# Documents the platform-composition invariants the platform enforces at
+# app.submit AND now surfaces via oam.dry_run / catalog.validate, so the
+# architect can discover + self-correct them BEFORE proposing an OAM.
+technology: oam-composition-rules
+category: platform-policy
+maturity: kb
+summary: >-
+  Invariants every OAM Application must satisfy. They are enforced at app.submit
+  and reported by oam.dry_run as `platform-policy: ...` diagnostics. Compose to
+  satisfy them up front rather than being rejected at submit.
+rules:
+  identity-topology:
+    invariant: >-
+      If ANY webservice-class component (webservice / webservice-shape /
+      realtime-service) is externally exposed, the OAM MUST contain EXACTLY ONE
+      identity component of type `auth0-idp`. Zero identity + an exposed
+      component is rejected; more than one identity component is always rejected.
+    a-component-is-exposed-when: >-
+      it carries the `expose-api` trait OR sets `properties.exposeApi: true`.
+      Note graphql-gateway and realtime-service are external-by-default — submit
+      auto-attaches expose-api to them, so they also require the identity.
+    how-to-satisfy:
+      - Add exactly ONE `auth0-idp` component.
+      - On every exposed webservice set `properties.identity: <auth0-idp-name>`.
+      - On every `expose-api` trait set `properties.identity: <auth0-idp-name>`
+        (all exposed APIs auth through the same identity).
+  singletons:
+    invariant: >-
+      An OAM declares AT MOST ONE `realtime-platform` and AT MOST ONE
+      `graphql-gateway`. Duplicates are rejected — reuse the single instance.
+    how-to-satisfy:
+      - realtime-platform: bind each webservice to it via `realtime: <name>`
+        instead of declaring another realtime-platform.
+      - graphql-gateway: add upstream services to its `sources:` list instead of
+        declaring another gateway.
+discoverable-via:
+  - oam.dry_run / catalog.validate — violations appear as `platform-policy: ...`
+    lines in `diagnostics` and flip `ok` to false (pre-propose self-correction).
+  - app.submit — same checks reject with the same messages (authoritative gate).

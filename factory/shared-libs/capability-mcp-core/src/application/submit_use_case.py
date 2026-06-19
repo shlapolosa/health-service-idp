@@ -29,7 +29,7 @@ from typing import Any
 
 import yaml
 
-from . import requirements_spec
+from . import oam_policies, requirements_spec
 from .analytics_platform_recipe import AnalyticsPlatformError, apply_analytics_platform
 from ..domain.models import SubmitResult
 from ..infrastructure.argo_client import ArgoWorkflowsClient
@@ -482,13 +482,11 @@ class SubmitUseCase:
     @staticmethod
     def _is_exposed(c: dict[str, Any]) -> bool:
         """A webservice-class component is externally exposed iff it carries the
-        `expose-api` trait OR sets `properties.exposeApi`. Factored out of
-        _validate_identity_topology so the APIM-product membership helper
-        (_external_api_ids) reuses the exact same predicate (APIM-PRODUCT-1 #161)."""
-        for t in c.get("traits") or []:
-            if t.get("type") == "expose-api":
-                return True
-        return bool((c.get("properties") or {}).get("exposeApi"))
+        `expose-api` trait OR sets `properties.exposeApi`. Delegates to the
+        shared oam_policies predicate so submit's APIM-product membership helper
+        (_external_api_ids) and the dry-run policy surface use the EXACT same
+        rule (APIM-PRODUCT-1 #161; oam_policies extraction 2026-06-19)."""
+        return oam_policies.is_exposed(c)
 
     # Component types whose exposure is gated by the _is_exposed predicate.
     _EXPOSABLE_TYPES = ("webservice", "webservice-shape", "realtime-service")
@@ -532,42 +530,18 @@ class SubmitUseCase:
     def _validate_identity_topology(app: dict[str, Any]) -> str | None:
         """Platform invariant: >=1 exposed webservice => exactly ONE identity
         component (type auth0-idp) authing all the OAM's APIs. Multiple identity
-        components per OAM are always rejected. Returns an error string or None.
+        components per OAM are always rejected; so are duplicate platform
+        singletons (realtime-platform / graphql-gateway). Returns an error string
+        or None.
+
+        Delegates to oam_policies.validate_policies (the shared source of truth,
+        also surfaced to the architect via oam.dry_run since 2026-06-19) and keeps
+        submit's single-string contract by returning the FIRST violation — the
+        rule order in validate_policies is identical to this method's historical
+        order so behaviour (rejection + message) is unchanged.
         """
-        comps = app.get("spec", {}).get("components", []) or []
-        identity_comps = [c.get("name") for c in comps if c.get("type") == "auth0-idp"]
-
-        _is_exposed = SubmitUseCase._is_exposed
-
-        exposed = [c.get("name") for c in comps
-                   if c.get("type") in ("webservice", "webservice-shape", "realtime-service")
-                   and _is_exposed(c)]
-
-        if len(identity_comps) > 1:
-            return ("identity topology: found %d identity components (%s) - an OAM must "
-                    "have at most ONE; point every webservice's `identity:` ref and every "
-                    "expose-api trait at the same component"
-                    % (len(identity_comps), ", ".join(identity_comps)))
-        if exposed and not identity_comps:
-            return ("identity topology: components %s are externally exposed but the OAM "
-                    "has no identity component - add ONE auth0-idp component and reference "
-                    "it via `identity:` + expose-api(identity=...)" % ", ".join(exposed))
-
-        # Singleton platform components (user invariant 2026-06-07, same class
-        # as one-identity-per-OAM): an OAM declares at most ONE realtime-platform
-        # and at most ONE graphql-gateway; every webservice REUSES it via its
-        # `realtime:` ref / the gateway's sources list instead of declaring
-        # another instance.
-        for singleton_type, reuse_hint in (
-            ("realtime-platform", "bind webservices to it via `realtime: <name>`"),
-            ("graphql-gateway", "add upstream services to its `sources:` instead"),
-        ):
-            dupes = [c.get("name") for c in comps if c.get("type") == singleton_type]
-            if len(dupes) > 1:
-                return ("singleton topology: found %d %s components (%s) - an OAM must "
-                        "declare at most ONE; %s"
-                        % (len(dupes), singleton_type, ", ".join(dupes), reuse_hint))
-        return None
+        violations = oam_policies.validate_policies(app)
+        return violations[0] if violations else None
 
     def _needs_scaffold(self, app: dict[str, Any]) -> dict[str, Any] | None:
         """Inspect OAM components; return the webservice component dict that needs scaffolding,

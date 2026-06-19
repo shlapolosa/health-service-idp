@@ -12,6 +12,7 @@ from ..infrastructure.cue_param_parser import parse_parameter_block
 from ..infrastructure.k8s_catalog_client import K8sCatalogClient
 from ..infrastructure.recipes_loader import RecipesLoader
 from ..infrastructure.vela_client import VelaClient
+from . import oam_policies
 from .scoring import CapabilityScorer
 
 logger = logging.getLogger(__name__)
@@ -161,6 +162,20 @@ class CatalogUseCases:
 
     def validate(self, oam_yaml: str) -> dict[str, Any]:
         ok, diag = self.vela.dry_run(oam_yaml)
+        # Surface the platform-composition policies (identity-topology + singleton
+        # rules) that were historically enforced only at app.submit time. The
+        # architect self-corrects on what oam.dry_run reports, so appending these
+        # here lets it discover + fix exposure=>identity / duplicate-singleton
+        # problems PRE-propose instead of being rejected at submit (2026-06-19).
+        try:
+            app = yaml.safe_load(oam_yaml)
+        except Exception:  # noqa: BLE001
+            app = None
+        policy_violations = oam_policies.validate_policies(app) if isinstance(app, dict) else []
+        if policy_violations:
+            ok = False
+            policy_lines = "\n".join(f"platform-policy: {v}" for v in policy_violations)
+            diag = f"{diag}\n{policy_lines}" if diag else policy_lines
         return {"ok": ok, "diagnostics": diag}
 
     def dry_run_oam(self, oam_yaml: str) -> dict[str, Any]:
