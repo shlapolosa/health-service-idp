@@ -21,35 +21,31 @@ rules:
       Note graphql-gateway and realtime-service are external-by-default — submit
       auto-attaches expose-api to them, so they also require the identity.
     how-to-satisfy:
-      - Add exactly ONE `auth0-idp` component.
-      - On every exposed webservice set `properties.identity: <auth0-idp-name>`.
-      - On every `expose-api` trait set `properties.identity: <auth0-idp-name>`
-        (all exposed APIs auth through the same identity).
+      - "Add exactly ONE auth0-idp component."
+      - "On every exposed webservice set properties.identity = <auth0-idp-name>."
+      - "On every expose-api trait set properties.identity = <auth0-idp-name> (all exposed APIs auth through the same identity)."
   singletons:
     invariant: >-
       An OAM declares AT MOST ONE `realtime-platform` and AT MOST ONE
       `graphql-gateway`. Duplicates are rejected — reuse the single instance.
     how-to-satisfy:
-      - realtime-platform: bind each webservice to it via `realtime: <name>`
-        instead of declaring another realtime-platform.
-      - graphql-gateway: add upstream services to its `sources:` list instead of
-        declaring another gateway.
+      - "realtime-platform: bind each webservice to it via `realtime` = <name> instead of declaring another realtime-platform."
+      - "graphql-gateway: add upstream services to its `sources` list instead of declaring another gateway."
   scaffold-images:
     invariant: >-
       For components the platform SCAFFOLDS (webservice / realtime-service whose
       code the platform generates and CI builds), do NOT set `properties.image`.
       Omit it: the component definition's default engages the scaffold + CI path,
       which builds a real image and commits the digest back (HARD-3). Setting a
-      placeholder image instead forces the "bring-your-own-image" path AND, unless
+      placeholder image instead forces the bring-your-own-image path AND, unless
       the image is from an allowed registry, is rejected at apply by the
       `image-source-allowlist` ValidatingAdmissionPolicy.
-    allowed-registries: ["healthidpuaeacr.azurecr.io/", "docker.io/socrates12345/"]
+    allowed-registries:
+      - "healthidpuaeacr.azurecr.io/"
+      - "docker.io/socrates12345/"
     how-to-satisfy:
-      - Scaffolded service (you are NOT supplying a prebuilt image): OMIT `image`.
-        The dev-agent will implement the logic and CI builds the image.
-      - Bring-your-own-image: set `image` to an EXISTING tag under an allowed
-        registry (never a placeholder, never `:latest`).
+      - "Scaffolded service (you are NOT supplying a prebuilt image): OMIT image. The dev-agent implements the logic and CI builds the image."
+      - "Bring-your-own-image: set image to an EXISTING tag under an allowed registry (never a placeholder, never latest)."
 discoverable-via:
-  - oam.dry_run / catalog.validate — violations appear as `platform-policy: ...`
-    lines in `diagnostics` and flip `ok` to false (pre-propose self-correction).
-  - app.submit — same checks reject with the same messages (authoritative gate).
+  - "oam.dry_run / catalog.validate — violations appear as `platform-policy: ...` lines in diagnostics and flip ok to false (pre-propose self-correction)."
+  - "app.submit — same checks reject with the same messages (authoritative gate)."
