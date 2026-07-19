@@ -1,0 +1,175 @@
+<model xmlns="http://www.opengroup.org/xsd/archimate/3.0/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" identifier="id-wellness-tech">
+<name xml:lang="en">Wellness Platform — Technology Layer</name>
+<elements>
+<element identifier="a_platform" xsi:type="ApplicationComponent"><name xml:lang="en">Gamification Platform — 13 microservices</name></element>
+<element identifier="a_event" xsi:type="ApplicationComponent"><name xml:lang="en">Event Hub</name></element>
+<element identifier="a_analytics" xsi:type="ApplicationComponent"><name xml:lang="en">Analytics &amp; Reporting</name></element>
+<element identifier="a_consent" xsi:type="ApplicationComponent"><name xml:lang="en">Consent &amp; Identity</name></element>
+<element identifier="a_bff" xsi:type="ApplicationComponent"><name xml:lang="en">Sahatna BFFs</name></element>
+<element identifier="a_gateway" xsi:type="ApplicationComponent"><name xml:lang="en">Member Gateway (/ws)</name></element>
+<element identifier="a_data" xsi:type="ApplicationComponent"><name xml:lang="en">Platform Data Stores</name></element>
+<element identifier="abb_runtime" xsi:type="TechnologyService"><name xml:lang="en">Container Workload Runtime</name></element>
+<element identifier="abb_mesh" xsi:type="TechnologyService"><name xml:lang="en">Service Mesh &amp; API Gateway</name></element>
+<element identifier="abb_stream" xsi:type="TechnologyService"><name xml:lang="en">Event Streaming Platform</name></element>
+<element identifier="abb_streamproc" xsi:type="TechnologyService"><name xml:lang="en">Stream Processing &amp; Feature Computation</name></element>
+<element identifier="abb_oltp" xsi:type="TechnologyService"><name xml:lang="en">Relational Persistence (OLTP)</name></element>
+<element identifier="abb_olap" xsi:type="TechnologyService"><name xml:lang="en">Analytical Data Store (OLAP)</name></element>
+<element identifier="abb_push" xsi:type="TechnologyService"><name xml:lang="en">Real-time Push Channel</name></element>
+<element identifier="abb_iam" xsi:type="TechnologyService"><name xml:lang="en">Identity &amp; Access Management</name></element>
+<element identifier="abb_federation" xsi:type="TechnologyService"><name xml:lang="en">API Federation &amp; Aggregation</name></element>
+<element identifier="abb_secrets" xsi:type="TechnologyService"><name xml:lang="en">Secrets Management</name></element>
+<element identifier="abb_gitops" xsi:type="TechnologyService"><name xml:lang="en">Declarative Provisioning (GitOps)</name></element>
+<element identifier="abb_obs" xsi:type="TechnologyService"><name xml:lang="en">Observability</name></element>
+<element identifier="sbb_knative" xsi:type="SystemSoftware"><name xml:lang="en">Knative Serving  ·  OAM: webservice</name></element>
+<element identifier="sbb_istio" xsi:type="SystemSoftware"><name xml:lang="en">Istio + Azure APIM</name></element>
+<element identifier="sbb_kafka" xsi:type="SystemSoftware"><name xml:lang="en">Kafka + Lenses  ·  OAM: realtime-platform</name></element>
+<element identifier="sbb_lenses" xsi:type="SystemSoftware"><name xml:lang="en">Lenses SQL processors  ·  OAM: analytics-platform</name></element>
+<element identifier="sbb_neon" xsi:type="SystemSoftware"><name xml:lang="en">Neon PostgreSQL  ·  OAM: postgresql</name></element>
+<element identifier="sbb_snowflake" xsi:type="SystemSoftware"><name xml:lang="en">Snowflake + Kafka Connect  ·  OAM: analytics-platform</name></element>
+<element identifier="sbb_ws" xsi:type="SystemSoftware"><name xml:lang="en">WebSocket Gateway  ·  OAM: realtime-service</name></element>
+<element identifier="sbb_auth0" xsi:type="SystemSoftware"><name xml:lang="en">Auth0  ·  OAM: auth0-idp</name></element>
+<element identifier="sbb_hive" xsi:type="SystemSoftware"><name xml:lang="en">Hive Gateway  ·  OAM: graphql-gateway</name></element>
+<element identifier="sbb_kv" xsi:type="SystemSoftware"><name xml:lang="en">Azure Key Vault + External Secrets</name></element>
+<element identifier="sbb_oam" xsi:type="SystemSoftware"><name xml:lang="en">KubeVela + Crossplane + ArgoCD  ·  OAM control plane</name></element>
+<element identifier="sbb_obs" xsi:type="SystemSoftware"><name xml:lang="en">Prometheus + Grafana + Jaeger</name></element>
+</elements><relationships>
+<relationship identifier="abb_runtime__a_platform__R" source="abb_runtime" target="a_platform" xsi:type="Realization"/>
+<relationship identifier="abb_stream__a_event__R" source="abb_stream" target="a_event" xsi:type="Realization"/>
+<relationship identifier="abb_olap__a_analytics__R" source="abb_olap" target="a_analytics" xsi:type="Realization"/>
+<relationship identifier="abb_push__a_gateway__R" source="abb_push" target="a_gateway" xsi:type="Realization"/>
+<relationship identifier="abb_iam__a_consent__R" source="abb_iam" target="a_consent" xsi:type="Realization"/>
+<relationship identifier="abb_federation__a_bff__R" source="abb_federation" target="a_bff" xsi:type="Realization"/>
+<relationship identifier="abb_oltp__a_data__R" source="abb_oltp" target="a_data" xsi:type="Realization"/>
+<relationship identifier="abb_mesh__a_platform__S" source="abb_mesh" target="a_platform" xsi:type="Serving"/>
+<relationship identifier="abb_secrets__a_platform__S" source="abb_secrets" target="a_platform" xsi:type="Serving"/>
+<relationship identifier="abb_gitops__a_platform__S" source="abb_gitops" target="a_platform" xsi:type="Serving"/>
+<relationship identifier="abb_obs__a_platform__S" source="abb_obs" target="a_platform" xsi:type="Serving"/>
+<relationship identifier="abb_streamproc__a_analytics__S" source="abb_streamproc" target="a_analytics" xsi:type="Serving"/>
+<relationship identifier="sbb_knative__abb_runtime__R" source="sbb_knative" target="abb_runtime" xsi:type="Realization"/>
+<relationship identifier="sbb_istio__abb_mesh__R" source="sbb_istio" target="abb_mesh" xsi:type="Realization"/>
+<relationship identifier="sbb_kafka__abb_stream__R" source="sbb_kafka" target="abb_stream" xsi:type="Realization"/>
+<relationship identifier="sbb_lenses__abb_streamproc__R" source="sbb_lenses" target="abb_streamproc" xsi:type="Realization"/>
+<relationship identifier="sbb_neon__abb_oltp__R" source="sbb_neon" target="abb_oltp" xsi:type="Realization"/>
+<relationship identifier="sbb_snowflake__abb_olap__R" source="sbb_snowflake" target="abb_olap" xsi:type="Realization"/>
+<relationship identifier="sbb_ws__abb_push__R" source="sbb_ws" target="abb_push" xsi:type="Realization"/>
+<relationship identifier="sbb_auth0__abb_iam__R" source="sbb_auth0" target="abb_iam" xsi:type="Realization"/>
+<relationship identifier="sbb_hive__abb_federation__R" source="sbb_hive" target="abb_federation" xsi:type="Realization"/>
+<relationship identifier="sbb_kv__abb_secrets__R" source="sbb_kv" target="abb_secrets" xsi:type="Realization"/>
+<relationship identifier="sbb_oam__abb_gitops__R" source="sbb_oam" target="abb_gitops" xsi:type="Realization"/>
+<relationship identifier="sbb_obs__abb_obs__R" source="sbb_obs" target="abb_obs" xsi:type="Realization"/>
+</relationships><views><diagrams>
+<view identifier="view-tech-abb" xsi:type="Diagram"><name xml:lang="en">Technology Architecture — Building Blocks (ABB)</name>
+<node identifier="n-view-tech-abb-a_platform" elementRef="a_platform" xsi:type="Element" x="2013" y="70" w="190" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-abb-a_event" elementRef="a_event" xsi:type="Element" x="965" y="70" w="190" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-abb-a_analytics" elementRef="a_analytics" xsi:type="Element" x="1227" y="70" w="190" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-abb-a_consent" elementRef="a_consent" xsi:type="Element" x="2275" y="70" w="190" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-abb-a_bff" elementRef="a_bff" xsi:type="Element" x="2537" y="70" w="190" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-abb-a_gateway" elementRef="a_gateway" xsi:type="Element" x="1751" y="70" w="190" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-abb-a_data" elementRef="a_data" xsi:type="Element" x="1489" y="70" w="190" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-abb-abb_runtime" elementRef="abb_runtime" xsi:type="Element" x="1580" y="260" w="230" h="56"><style><fillColor r="201" g="231" b="184"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-abb-abb_mesh" elementRef="abb_mesh" xsi:type="Element" x="1882" y="260" w="230" h="56"><style><fillColor r="201" g="231" b="184"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-abb-abb_stream" elementRef="abb_stream" xsi:type="Element" x="70" y="260" w="230" h="56"><style><fillColor r="201" g="231" b="184"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-abb-abb_streamproc" elementRef="abb_streamproc" xsi:type="Element" x="372" y="260" w="230" h="56"><style><fillColor r="201" g="231" b="184"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-abb-abb_oltp" elementRef="abb_oltp" xsi:type="Element" x="976" y="260" w="230" h="56"><style><fillColor r="201" g="231" b="184"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-abb-abb_olap" elementRef="abb_olap" xsi:type="Element" x="674" y="260" w="230" h="56"><style><fillColor r="201" g="231" b="184"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-abb-abb_push" elementRef="abb_push" xsi:type="Element" x="1278" y="260" w="230" h="56"><style><fillColor r="201" g="231" b="184"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-abb-abb_iam" elementRef="abb_iam" xsi:type="Element" x="3090" y="260" w="230" h="56"><style><fillColor r="201" g="231" b="184"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-abb-abb_federation" elementRef="abb_federation" xsi:type="Element" x="3392" y="260" w="230" h="56"><style><fillColor r="201" g="231" b="184"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-abb-abb_secrets" elementRef="abb_secrets" xsi:type="Element" x="2184" y="260" w="230" h="56"><style><fillColor r="201" g="231" b="184"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-abb-abb_gitops" elementRef="abb_gitops" xsi:type="Element" x="2486" y="260" w="230" h="56"><style><fillColor r="201" g="231" b="184"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-abb-abb_obs" elementRef="abb_obs" xsi:type="Element" x="2788" y="260" w="230" h="56"><style><fillColor r="201" g="231" b="184"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<connection identifier="c-view-tech-abb-abb_runtime__a_platform__R" relationshipRef="abb_runtime__a_platform__R" source="n-view-tech-abb-abb_runtime" target="n-view-tech-abb-a_platform" xsi:type="Relationship"><bendpoint x="1695" y="244"/><bendpoint x="2108" y="244"/></connection>
+<connection identifier="c-view-tech-abb-abb_stream__a_event__R" relationshipRef="abb_stream__a_event__R" source="n-view-tech-abb-abb_stream" target="n-view-tech-abb-a_event" xsi:type="Relationship"><bendpoint x="185" y="259"/><bendpoint x="1060" y="259"/></connection>
+<connection identifier="c-view-tech-abb-abb_olap__a_analytics__R" relationshipRef="abb_olap__a_analytics__R" source="n-view-tech-abb-abb_olap" target="n-view-tech-abb-a_analytics" xsi:type="Relationship"><bendpoint x="789" y="229"/><bendpoint x="1322" y="229"/></connection>
+<connection identifier="c-view-tech-abb-abb_push__a_gateway__R" relationshipRef="abb_push__a_gateway__R" source="n-view-tech-abb-abb_push" target="n-view-tech-abb-a_gateway" xsi:type="Relationship"><bendpoint x="1393" y="214"/><bendpoint x="1846" y="214"/></connection>
+<connection identifier="c-view-tech-abb-abb_iam__a_consent__R" relationshipRef="abb_iam__a_consent__R" source="n-view-tech-abb-abb_iam" target="n-view-tech-abb-a_consent" xsi:type="Relationship"><bendpoint x="3205" y="199"/><bendpoint x="2370" y="199"/></connection>
+<connection identifier="c-view-tech-abb-abb_federation__a_bff__R" relationshipRef="abb_federation__a_bff__R" source="n-view-tech-abb-abb_federation" target="n-view-tech-abb-a_bff" xsi:type="Relationship"><bendpoint x="3507" y="184"/><bendpoint x="2632" y="184"/></connection>
+<connection identifier="c-view-tech-abb-abb_oltp__a_data__R" relationshipRef="abb_oltp__a_data__R" source="n-view-tech-abb-abb_oltp" target="n-view-tech-abb-a_data" xsi:type="Relationship"><bendpoint x="1091" y="169"/><bendpoint x="1584" y="169"/></connection>
+<connection identifier="c-view-tech-abb-abb_mesh__a_platform__S" relationshipRef="abb_mesh__a_platform__S" source="n-view-tech-abb-abb_mesh" target="n-view-tech-abb-a_platform" xsi:type="Relationship"><bendpoint x="1997" y="154"/><bendpoint x="2108" y="154"/></connection>
+<connection identifier="c-view-tech-abb-abb_secrets__a_platform__S" relationshipRef="abb_secrets__a_platform__S" source="n-view-tech-abb-abb_secrets" target="n-view-tech-abb-a_platform" xsi:type="Relationship"><bendpoint x="2299" y="139"/><bendpoint x="2108" y="139"/></connection>
+<connection identifier="c-view-tech-abb-abb_gitops__a_platform__S" relationshipRef="abb_gitops__a_platform__S" source="n-view-tech-abb-abb_gitops" target="n-view-tech-abb-a_platform" xsi:type="Relationship"><bendpoint x="2601" y="244"/><bendpoint x="2108" y="244"/></connection>
+<connection identifier="c-view-tech-abb-abb_obs__a_platform__S" relationshipRef="abb_obs__a_platform__S" source="n-view-tech-abb-abb_obs" target="n-view-tech-abb-a_platform" xsi:type="Relationship"><bendpoint x="2903" y="244"/><bendpoint x="2108" y="244"/></connection>
+<connection identifier="c-view-tech-abb-abb_streamproc__a_analytics__S" relationshipRef="abb_streamproc__a_analytics__S" source="n-view-tech-abb-abb_streamproc" target="n-view-tech-abb-a_analytics" xsi:type="Relationship"><bendpoint x="487" y="244"/><bendpoint x="1322" y="244"/></connection>
+</view>
+<view identifier="view-tech-sbb" xsi:type="Diagram"><name xml:lang="en">Solution Realization — SBB realizes ABB</name>
+<node identifier="n-view-tech-sbb-abb_runtime" elementRef="abb_runtime" xsi:type="Element" x="130" y="70" w="230" h="56"><style><fillColor r="201" g="231" b="184"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-sbb-abb_mesh" elementRef="abb_mesh" xsi:type="Element" x="432" y="70" w="230" h="56"><style><fillColor r="201" g="231" b="184"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-sbb-abb_stream" elementRef="abb_stream" xsi:type="Element" x="734" y="70" w="230" h="56"><style><fillColor r="201" g="231" b="184"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-sbb-abb_streamproc" elementRef="abb_streamproc" xsi:type="Element" x="1036" y="70" w="230" h="56"><style><fillColor r="201" g="231" b="184"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-sbb-abb_oltp" elementRef="abb_oltp" xsi:type="Element" x="1338" y="70" w="230" h="56"><style><fillColor r="201" g="231" b="184"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-sbb-abb_olap" elementRef="abb_olap" xsi:type="Element" x="1640" y="70" w="230" h="56"><style><fillColor r="201" g="231" b="184"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-sbb-abb_push" elementRef="abb_push" xsi:type="Element" x="1942" y="70" w="230" h="56"><style><fillColor r="201" g="231" b="184"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-sbb-abb_iam" elementRef="abb_iam" xsi:type="Element" x="2244" y="70" w="230" h="56"><style><fillColor r="201" g="231" b="184"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-sbb-abb_federation" elementRef="abb_federation" xsi:type="Element" x="2546" y="70" w="230" h="56"><style><fillColor r="201" g="231" b="184"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-sbb-abb_secrets" elementRef="abb_secrets" xsi:type="Element" x="2848" y="70" w="230" h="56"><style><fillColor r="201" g="231" b="184"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-sbb-abb_gitops" elementRef="abb_gitops" xsi:type="Element" x="3150" y="70" w="230" h="56"><style><fillColor r="201" g="231" b="184"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-sbb-abb_obs" elementRef="abb_obs" xsi:type="Element" x="3452" y="70" w="230" h="56"><style><fillColor r="201" g="231" b="184"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-sbb-sbb_knative" elementRef="sbb_knative" xsi:type="Element" x="70" y="258" w="240" h="54"><style><fillColor r="221" g="240" b="204"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-sbb-sbb_istio" elementRef="sbb_istio" xsi:type="Element" x="382" y="258" w="240" h="54"><style><fillColor r="221" g="240" b="204"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-sbb-sbb_kafka" elementRef="sbb_kafka" xsi:type="Element" x="694" y="258" w="240" h="54"><style><fillColor r="221" g="240" b="204"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-sbb-sbb_lenses" elementRef="sbb_lenses" xsi:type="Element" x="1006" y="258" w="240" h="54"><style><fillColor r="221" g="240" b="204"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-sbb-sbb_neon" elementRef="sbb_neon" xsi:type="Element" x="1318" y="258" w="240" h="54"><style><fillColor r="221" g="240" b="204"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-sbb-sbb_snowflake" elementRef="sbb_snowflake" xsi:type="Element" x="1630" y="258" w="240" h="54"><style><fillColor r="221" g="240" b="204"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-sbb-sbb_ws" elementRef="sbb_ws" xsi:type="Element" x="1942" y="258" w="240" h="54"><style><fillColor r="221" g="240" b="204"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-sbb-sbb_auth0" elementRef="sbb_auth0" xsi:type="Element" x="2254" y="258" w="240" h="54"><style><fillColor r="221" g="240" b="204"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-sbb-sbb_hive" elementRef="sbb_hive" xsi:type="Element" x="2566" y="258" w="240" h="54"><style><fillColor r="221" g="240" b="204"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-sbb-sbb_kv" elementRef="sbb_kv" xsi:type="Element" x="2878" y="258" w="240" h="54"><style><fillColor r="221" g="240" b="204"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-sbb-sbb_oam" elementRef="sbb_oam" xsi:type="Element" x="3190" y="258" w="240" h="54"><style><fillColor r="221" g="240" b="204"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-tech-sbb-sbb_obs" elementRef="sbb_obs" xsi:type="Element" x="3502" y="258" w="240" h="54"><style><fillColor r="221" g="240" b="204"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<connection identifier="c-view-tech-sbb-sbb_knative__abb_runtime__R" relationshipRef="sbb_knative__abb_runtime__R" source="n-view-tech-sbb-sbb_knative" target="n-view-tech-sbb-abb_runtime" xsi:type="Relationship"><bendpoint x="190" y="242"/><bendpoint x="245" y="242"/></connection>
+<connection identifier="c-view-tech-sbb-sbb_istio__abb_mesh__R" relationshipRef="sbb_istio__abb_mesh__R" source="n-view-tech-sbb-sbb_istio" target="n-view-tech-sbb-abb_mesh" xsi:type="Relationship"><bendpoint x="502" y="257"/><bendpoint x="547" y="257"/></connection>
+<connection identifier="c-view-tech-sbb-sbb_kafka__abb_stream__R" relationshipRef="sbb_kafka__abb_stream__R" source="n-view-tech-sbb-sbb_kafka" target="n-view-tech-sbb-abb_stream" xsi:type="Relationship"><bendpoint x="814" y="227"/><bendpoint x="849" y="227"/></connection>
+<connection identifier="c-view-tech-sbb-sbb_lenses__abb_streamproc__R" relationshipRef="sbb_lenses__abb_streamproc__R" source="n-view-tech-sbb-sbb_lenses" target="n-view-tech-sbb-abb_streamproc" xsi:type="Relationship"><bendpoint x="1126" y="212"/><bendpoint x="1151" y="212"/></connection>
+<connection identifier="c-view-tech-sbb-sbb_neon__abb_oltp__R" relationshipRef="sbb_neon__abb_oltp__R" source="n-view-tech-sbb-sbb_neon" target="n-view-tech-sbb-abb_oltp" xsi:type="Relationship"><bendpoint x="1438" y="197"/><bendpoint x="1453" y="197"/></connection>
+<connection identifier="c-view-tech-sbb-sbb_snowflake__abb_olap__R" relationshipRef="sbb_snowflake__abb_olap__R" source="n-view-tech-sbb-sbb_snowflake" target="n-view-tech-sbb-abb_olap" xsi:type="Relationship"><bendpoint x="1750" y="182"/><bendpoint x="1755" y="182"/></connection>
+<connection identifier="c-view-tech-sbb-sbb_ws__abb_push__R" relationshipRef="sbb_ws__abb_push__R" source="n-view-tech-sbb-sbb_ws" target="n-view-tech-sbb-abb_push" xsi:type="Relationship"><bendpoint x="2062" y="167"/><bendpoint x="2057" y="167"/></connection>
+<connection identifier="c-view-tech-sbb-sbb_auth0__abb_iam__R" relationshipRef="sbb_auth0__abb_iam__R" source="n-view-tech-sbb-sbb_auth0" target="n-view-tech-sbb-abb_iam" xsi:type="Relationship"><bendpoint x="2374" y="152"/><bendpoint x="2359" y="152"/></connection>
+<connection identifier="c-view-tech-sbb-sbb_hive__abb_federation__R" relationshipRef="sbb_hive__abb_federation__R" source="n-view-tech-sbb-sbb_hive" target="n-view-tech-sbb-abb_federation" xsi:type="Relationship"><bendpoint x="2686" y="137"/><bendpoint x="2661" y="137"/></connection>
+<connection identifier="c-view-tech-sbb-sbb_kv__abb_secrets__R" relationshipRef="sbb_kv__abb_secrets__R" source="n-view-tech-sbb-sbb_kv" target="n-view-tech-sbb-abb_secrets" xsi:type="Relationship"><bendpoint x="2998" y="242"/><bendpoint x="2963" y="242"/></connection>
+<connection identifier="c-view-tech-sbb-sbb_oam__abb_gitops__R" relationshipRef="sbb_oam__abb_gitops__R" source="n-view-tech-sbb-sbb_oam" target="n-view-tech-sbb-abb_gitops" xsi:type="Relationship"><bendpoint x="3310" y="242"/><bendpoint x="3265" y="242"/></connection>
+<connection identifier="c-view-tech-sbb-sbb_obs__abb_obs__R" relationshipRef="sbb_obs__abb_obs__R" source="n-view-tech-sbb-sbb_obs" target="n-view-tech-sbb-abb_obs" xsi:type="Relationship"><bendpoint x="3622" y="242"/><bendpoint x="3567" y="242"/></connection>
+</view>
+</diagrams></views></model>

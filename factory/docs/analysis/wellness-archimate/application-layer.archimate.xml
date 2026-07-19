@@ -1,0 +1,741 @@
+<model xmlns="http://www.opengroup.org/xsd/archimate/3.0/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" identifier="id-wellness-applayer">
+<name xml:lang="en">Wellness Platform — Application Layer</name>
+<elements>
+<element identifier="act_member" xsi:type="BusinessRole"><name xml:lang="en">Member / Citizen</name></element>
+<element identifier="ac_gw" xsi:type="ApplicationComponent"><name xml:lang="en">API Gateway</name></element>
+<element identifier="ac_bff_member" xsi:type="ApplicationComponent"><name xml:lang="en">Member BFF</name></element>
+<element identifier="ac_bff_chal" xsi:type="ApplicationComponent"><name xml:lang="en">Challenge BFF</name></element>
+<element identifier="ac_bff_rewards" xsi:type="ApplicationComponent"><name xml:lang="en">Rewards BFF</name></element>
+<element identifier="if_appui" xsi:type="ApplicationInterface"><name xml:lang="en">Sahatna App UI</name></element>
+<element identifier="if_gwapi" xsi:type="ApplicationInterface"><name xml:lang="en">Sahatna Gateway API</name></element>
+<element identifier="if_pubapi" xsi:type="ApplicationInterface"><name xml:lang="en">Platform Public API</name></element>
+<element identifier="if_maladapter" xsi:type="ApplicationInterface"><name xml:lang="en">Malaffi Adapter Interface</name></element>
+<element identifier="if_provadapter" xsi:type="ApplicationInterface"><name xml:lang="en">Provider Adapter Interface</name></element>
+<element identifier="if_eventif" xsi:type="ApplicationInterface"><name xml:lang="en">Event Streaming Interface</name></element>
+<element identifier="if_malapi" xsi:type="ApplicationInterface"><name xml:lang="en">Malaffi Membership API</name></element>
+<element identifier="if_provapi" xsi:type="ApplicationInterface"><name xml:lang="en">Provider Redemption API</name></element>
+<element identifier="ac_malaffi" xsi:type="ApplicationComponent"><name xml:lang="en">Malaffi HIE  (external)</name></element>
+<element identifier="ac_provider" xsi:type="ApplicationComponent"><name xml:lang="en">Reward Providers  (external)</name></element>
+<element identifier="as_malmember" xsi:type="ApplicationService"><name xml:lang="en">Membership Query (scoped)</name></element>
+<element identifier="as_malclin" xsi:type="ApplicationService"><name xml:lang="en">Clinical Cohort &amp; Segmentation Service</name></element>
+<element identifier="as_provredeem" xsi:type="ApplicationService"><name xml:lang="en">Voucher Redemption Service</name></element>
+<element identifier="do_demographic" xsi:type="DataObject"><name xml:lang="en">Demographic Data</name></element>
+<element identifier="do_telemetry" xsi:type="DataObject"><name xml:lang="en">Telemetry Data</name></element>
+<element identifier="do_clinical" xsi:type="DataObject"><name xml:lang="en">Clinical Data</name></element>
+<element identifier="do_segment" xsi:type="DataObject"><name xml:lang="en">Segment / Local Membership</name></element>
+<element identifier="do_challenge" xsi:type="DataObject"><name xml:lang="en">Challenge Data</name></element>
+<element identifier="do_eligresult" xsi:type="DataObject"><name xml:lang="en">Eligibility Result</name></element>
+<element identifier="do_score" xsi:type="DataObject"><name xml:lang="en">Score Data</name></element>
+<element identifier="do_wallet" xsi:type="DataObject"><name xml:lang="en">Wallet Ledger</name></element>
+<element identifier="do_redemption" xsi:type="DataObject"><name xml:lang="en">Redemption Data</name></element>
+<element identifier="do_voucher" xsi:type="DataObject"><name xml:lang="en">Voucher Data</name></element>
+<element identifier="ac_mobile" xsi:type="ApplicationComponent"><name xml:lang="en">Mobile App</name></element>
+<element identifier="ac_cohort" xsi:type="ApplicationComponent"><name xml:lang="en">Cohort &amp; Segmentation Service</name></element>
+<element identifier="ac_challenge" xsi:type="ApplicationComponent"><name xml:lang="en">Challenge Service</name></element>
+<element identifier="ac_enrol" xsi:type="ApplicationComponent"><name xml:lang="en">Enrolment &amp; Eligibility Service</name></element>
+<element identifier="ac_scoring" xsi:type="ApplicationComponent"><name xml:lang="en">Scoring &amp; Recognition Service</name></element>
+<element identifier="ac_verify" xsi:type="ApplicationComponent"><name xml:lang="en">Verification Service</name></element>
+<element identifier="ac_wallet" xsi:type="ApplicationComponent"><name xml:lang="en">Wallet Service</name></element>
+<element identifier="ac_market" xsi:type="ApplicationComponent"><name xml:lang="en">Marketplace &amp; Voucher Service</name></element>
+<element identifier="ac_partner" xsi:type="ApplicationComponent"><name xml:lang="en">Partner &amp; Settlement Service</name></element>
+<element identifier="ac_engage" xsi:type="ApplicationComponent"><name xml:lang="en">Engagement Service</name></element>
+<element identifier="ac_consent" xsi:type="ApplicationComponent"><name xml:lang="en">Consent &amp; Identity Service</name></element>
+<element identifier="ac_fraud" xsi:type="ApplicationComponent"><name xml:lang="en">Fraud &amp; Integrity Service</name></element>
+<element identifier="ac_analytics" xsi:type="ApplicationComponent"><name xml:lang="en">Analytics &amp; Reporting Service</name></element>
+<element identifier="ac_event" xsi:type="ApplicationComponent"><name xml:lang="en">Event Hub</name></element>
+<element identifier="col_sahatna" xsi:type="ApplicationCollaboration"><name xml:lang="en">Sahatna</name></element>
+<element identifier="col_platform" xsi:type="ApplicationCollaboration"><name xml:lang="en">Gamification Platform</name></element>
+<element identifier="fn_p9" xsi:type="BusinessFunction"><name xml:lang="en">Eligibility Evaluation</name></element>
+<element identifier="as_elig" xsi:type="ApplicationService"><name xml:lang="en">Eligibility Service</name></element>
+<element identifier="ev_login" xsi:type="ApplicationEvent"><name xml:lang="en">User Logged In</name></element>
+<element identifier="ev_elig" xsi:type="ApplicationEvent"><name xml:lang="en">Eligibility Resolved</name></element>
+<element identifier="fn_enrolsub" xsi:type="ApplicationFunction"><name xml:lang="en">Create Enrolment Subscription</name></element>
+<element identifier="fn_present" xsi:type="ApplicationFunction"><name xml:lang="en">Presentation &amp; Aggregation</name></element>
+<element identifier="ia_elig" xsi:type="ApplicationInteraction"><name xml:lang="en">Determine Eligible Challenges</name></element>
+<element identifier="fn_elig" xsi:type="ApplicationFunction"><name xml:lang="en">Eligibility Resolution</name></element>
+<element identifier="fn_localmem" xsi:type="ApplicationFunction"><name xml:lang="en">Local Membership Check</name></element>
+<element identifier="fn_hydrate" xsi:type="ApplicationFunction"><name xml:lang="en">Hydrate Published Content</name></element>
+<element identifier="col_elig" xsi:type="ApplicationCollaboration"><name xml:lang="en">Eligibility Determination</name></element>
+<element identifier="ac_cms" xsi:type="ApplicationComponent"><name xml:lang="en">Sahatna CMS</name></element>
+<element identifier="fn_p3" xsi:type="BusinessFunction"><name xml:lang="en">Wellness Scoring &amp; Recognition</name></element>
+<element identifier="fn_p5" xsi:type="BusinessFunction"><name xml:lang="en">Reward Points &amp; Wallet</name></element>
+<element identifier="fn_p6" xsi:type="BusinessFunction"><name xml:lang="en">Marketplace &amp; Redemption</name></element>
+<element identifier="as_scoring" xsi:type="ApplicationService"><name xml:lang="en">Scoring Service</name></element>
+<element identifier="as_wallet" xsi:type="ApplicationService"><name xml:lang="en">Wallet Service</name></element>
+<element identifier="as_redeem" xsi:type="ApplicationService"><name xml:lang="en">Redemption Service</name></element>
+<element identifier="ev_verified" xsi:type="ApplicationEvent"><name xml:lang="en">Activity Verified</name></element>
+<element identifier="fn_score" xsi:type="ApplicationFunction"><name xml:lang="en">Scoring</name></element>
+<element identifier="fn_rescred" xsi:type="ApplicationFunction"><name xml:lang="en">Reservation &amp; Crediting</name></element>
+<element identifier="ev_credited" xsi:type="ApplicationEvent"><name xml:lang="en">Points Credited</name></element>
+<element identifier="ev_voucher" xsi:type="ApplicationEvent"><name xml:lang="en">Voucher Issued</name></element>
+<element identifier="ia_redeem" xsi:type="ApplicationInteraction"><name xml:lang="en">Fulfil Redemption</name></element>
+<element identifier="fn_redorch" xsi:type="ApplicationFunction"><name xml:lang="en">Redemption Orchestration</name></element>
+<element identifier="fn_fraudchk" xsi:type="ApplicationFunction"><name xml:lang="en">Fraud Check</name></element>
+<element identifier="col_redeem" xsi:type="ApplicationCollaboration"><name xml:lang="en">Redemption Fulfilment</name></element>
+<element identifier="fn_p7" xsi:type="BusinessFunction"><name xml:lang="en">Partner Lifecycle &amp; Settlement</name></element>
+<element identifier="as_partner" xsi:type="ApplicationService"><name xml:lang="en">Partner API</name></element>
+<element identifier="if_partnerportal" xsi:type="ApplicationInterface"><name xml:lang="en">Partner Portal API</name></element>
+<element identifier="fn_kyb" xsi:type="ApplicationFunction"><name xml:lang="en">KYB Verification</name></element>
+<element identifier="ev_partner_approved" xsi:type="ApplicationEvent"><name xml:lang="en">Partner Approved</name></element>
+<element identifier="fn_contract" xsi:type="ApplicationFunction"><name xml:lang="en">Contracting &amp; Catalogue Setup</name></element>
+<element identifier="ev_settlement" xsi:type="ApplicationEvent"><name xml:lang="en">Settlement Generated</name></element>
+<element identifier="fn_offboard" xsi:type="ApplicationFunction"><name xml:lang="en">Offboarding</name></element>
+<element identifier="do_kyb" xsi:type="DataObject"><name xml:lang="en">KYB / Application Record</name></element>
+<element identifier="do_contract" xsi:type="DataObject"><name xml:lang="en">Partner Contract</name></element>
+<element identifier="do_catalogue" xsi:type="DataObject"><name xml:lang="en">Catalogue Data</name></element>
+<element identifier="do_settlement" xsi:type="DataObject"><name xml:lang="en">Settlement / Invoice</name></element>
+<element identifier="ia_settle" xsi:type="ApplicationInteraction"><name xml:lang="en">Reconcile &amp; Settle</name></element>
+<element identifier="fn_settle" xsi:type="ApplicationFunction"><name xml:lang="en">Settlement Reconciliation</name></element>
+<element identifier="col_settle" xsi:type="ApplicationCollaboration"><name xml:lang="en">Settlement Collaboration</name></element>
+<element identifier="fn_p2" xsi:type="BusinessFunction"><name xml:lang="en">Challenge Lifecycle Management</name></element>
+<element identifier="as_challenge" xsi:type="ApplicationService"><name xml:lang="en">Challenge Management API</name></element>
+<element identifier="fn_author" xsi:type="ApplicationFunction"><name xml:lang="en">Challenge Authoring</name></element>
+<element identifier="fn_bind" xsi:type="ApplicationFunction"><name xml:lang="en">Eligibility Binding</name></element>
+<element identifier="fn_publish" xsi:type="ApplicationFunction"><name xml:lang="en">Publish &amp; Freeze</name></element>
+<element identifier="ev_chalpub" xsi:type="ApplicationEvent"><name xml:lang="en">Challenge Published</name></element>
+<element identifier="fn_p4" xsi:type="BusinessFunction"><name xml:lang="en">Activity Verification</name></element>
+<element identifier="as_verify" xsi:type="ApplicationService"><name xml:lang="en">Verification API</name></element>
+<element identifier="ev_actsynced" xsi:type="ApplicationEvent"><name xml:lang="en">Activity Synced</name></element>
+<element identifier="fn_verify" xsi:type="ApplicationFunction"><name xml:lang="en">Activity Verification</name></element>
+<element identifier="fn_concl" xsi:type="BusinessFunction"><name xml:lang="en">Programme Conclusion</name></element>
+<element identifier="as_concl" xsi:type="ApplicationService"><name xml:lang="en">Programme Conclusion Service</name></element>
+<element identifier="ev_periodend" xsi:type="ApplicationEvent"><name xml:lang="en">Challenge Period Ended</name></element>
+<element identifier="fn_conclude" xsi:type="ApplicationFunction"><name xml:lang="en">Conclude &amp; Standings</name></element>
+<element identifier="ev_concluded" xsi:type="ApplicationEvent"><name xml:lang="en">Challenge Concluded</name></element>
+<element identifier="do_activity" xsi:type="DataObject"><name xml:lang="en">Verified Activity</name></element>
+<element identifier="do_standings" xsi:type="DataObject"><name xml:lang="en">Final Standings</name></element>
+<element identifier="fn_p1" xsi:type="BusinessFunction"><name xml:lang="en">Cohort Planning</name></element>
+<element identifier="as_cohort" xsi:type="ApplicationService"><name xml:lang="en">Cohort &amp; Segmentation API</name></element>
+<element identifier="fn_p8" xsi:type="BusinessFunction"><name xml:lang="en">Engagement &amp; Nudging</name></element>
+<element identifier="as_engage" xsi:type="ApplicationService"><name xml:lang="en">Engagement Service</name></element>
+<element identifier="fn_p10" xsi:type="BusinessFunction"><name xml:lang="en">Consent &amp; Identity</name></element>
+<element identifier="as_consent" xsi:type="ApplicationService"><name xml:lang="en">Consent &amp; Identity Service</name></element>
+<element identifier="fn_p11" xsi:type="BusinessFunction"><name xml:lang="en">Fraud &amp; Integrity</name></element>
+<element identifier="as_fraud" xsi:type="ApplicationService"><name xml:lang="en">Integrity API</name></element>
+<element identifier="fn_p12" xsi:type="BusinessFunction"><name xml:lang="en">Analytics &amp; Insight</name></element>
+<element identifier="as_analytics" xsi:type="ApplicationService"><name xml:lang="en">Analytics Service</name></element>
+<element identifier="fn_p13" xsi:type="BusinessFunction"><name xml:lang="en">Integration &amp; Interoperability</name></element>
+<element identifier="as_eventsvc" xsi:type="ApplicationService"><name xml:lang="en">Event Streaming Service</name></element>
+</elements><relationships>
+<relationship identifier="ac_mobile__if_appui__Assignment" source="ac_mobile" target="if_appui" xsi:type="Assignment"/>
+<relationship identifier="ac_gw__if_gwapi__Assignment" source="ac_gw" target="if_gwapi" xsi:type="Assignment"/>
+<relationship identifier="ac_enrol__if_pubapi__Assignment" source="ac_enrol" target="if_pubapi" xsi:type="Assignment"/>
+<relationship identifier="ac_enrol__if_maladapter__Assignment" source="ac_enrol" target="if_maladapter" xsi:type="Assignment"/>
+<relationship identifier="ac_market__if_provadapter__Assignment" source="ac_market" target="if_provadapter" xsi:type="Assignment"/>
+<relationship identifier="ac_event__if_eventif__Assignment" source="ac_event" target="if_eventif" xsi:type="Assignment"/>
+<relationship identifier="ac_malaffi__if_malapi__Assignment" source="ac_malaffi" target="if_malapi" xsi:type="Assignment"/>
+<relationship identifier="ac_provider__if_provapi__Assignment" source="ac_provider" target="if_provapi" xsi:type="Assignment"/>
+<relationship identifier="ac_malaffi__as_malmember__Realization" source="ac_malaffi" target="as_malmember" xsi:type="Realization"/>
+<relationship identifier="ac_malaffi__as_malclin__Realization" source="ac_malaffi" target="as_malclin" xsi:type="Realization"/>
+<relationship identifier="ac_provider__as_provredeem__Realization" source="ac_provider" target="as_provredeem" xsi:type="Realization"/>
+<relationship identifier="if_appui__act_member__Serving" source="if_appui" target="act_member" xsi:type="Serving"/>
+<relationship identifier="if_malapi__if_maladapter__Serving" source="if_malapi" target="if_maladapter" xsi:type="Serving"/>
+<relationship identifier="if_provapi__if_provadapter__Serving" source="if_provapi" target="if_provadapter" xsi:type="Serving"/>
+<relationship identifier="if_pubapi__ac_bff_member__Serving" source="if_pubapi" target="ac_bff_member" xsi:type="Serving"/>
+<relationship identifier="if_pubapi__ac_bff_chal__Serving" source="if_pubapi" target="ac_bff_chal" xsi:type="Serving"/>
+<relationship identifier="if_pubapi__ac_bff_rewards__Serving" source="if_pubapi" target="ac_bff_rewards" xsi:type="Serving"/>
+<relationship identifier="ac_cohort__do_segment__Access" source="ac_cohort" target="do_segment" xsi:type="Access" accessType="Write"/>
+<relationship identifier="ac_cohort__do_demographic__Access" source="ac_cohort" target="do_demographic" xsi:type="Access" accessType="Read"/>
+<relationship identifier="ac_cohort__do_telemetry__Access" source="ac_cohort" target="do_telemetry" xsi:type="Access" accessType="Read"/>
+<relationship identifier="ac_challenge__do_challenge__Access" source="ac_challenge" target="do_challenge" xsi:type="Access" accessType="Write"/>
+<relationship identifier="ac_enrol__do_eligresult__Access" source="ac_enrol" target="do_eligresult" xsi:type="Access" accessType="Write"/>
+<relationship identifier="ac_enrol__do_challenge__Access" source="ac_enrol" target="do_challenge" xsi:type="Access" accessType="Read"/>
+<relationship identifier="ac_verify__do_telemetry__Access" source="ac_verify" target="do_telemetry" xsi:type="Access" accessType="Read"/>
+<relationship identifier="ac_scoring__do_score__Access" source="ac_scoring" target="do_score" xsi:type="Access" accessType="Write"/>
+<relationship identifier="ac_wallet__do_wallet__Access" source="ac_wallet" target="do_wallet" xsi:type="Access" accessType="Write"/>
+<relationship identifier="ac_market__do_redemption__Access" source="ac_market" target="do_redemption" xsi:type="Access" accessType="Write"/>
+<relationship identifier="ac_market__do_voucher__Access" source="ac_market" target="do_voucher" xsi:type="Access" accessType="Write"/>
+<relationship identifier="ac_malaffi__do_clinical__Access" source="ac_malaffi" target="do_clinical" xsi:type="Access" accessType="Write"/>
+<relationship identifier="act_member__ev_login__Triggering" source="act_member" target="ev_login" xsi:type="Triggering"/>
+<relationship identifier="ev_login__fn_present__Triggering" source="ev_login" target="fn_present" xsi:type="Triggering"/>
+<relationship identifier="fn_present__if_pubapi__Triggering" source="fn_present" target="if_pubapi" xsi:type="Triggering"/>
+<relationship identifier="if_pubapi__ia_elig__Triggering" source="if_pubapi" target="ia_elig" xsi:type="Triggering"/>
+<relationship identifier="ia_elig__fn_elig__Triggering" source="ia_elig" target="fn_elig" xsi:type="Triggering"/>
+<relationship identifier="fn_elig__fn_localmem__Triggering" source="fn_elig" target="fn_localmem" xsi:type="Triggering"/>
+<relationship identifier="fn_localmem__ev_elig__Triggering" source="fn_localmem" target="ev_elig" xsi:type="Triggering"/>
+<relationship identifier="ev_elig__fn_hydrate__Triggering" source="ev_elig" target="fn_hydrate" xsi:type="Triggering"/>
+<relationship identifier="fn_hydrate__fn_enrolsub__Triggering" source="fn_hydrate" target="fn_enrolsub" xsi:type="Triggering"/>
+<relationship identifier="as_elig__fn_p9__Serving" source="as_elig" target="fn_p9" xsi:type="Serving"/>
+<relationship identifier="ia_elig__as_elig__Realization" source="ia_elig" target="as_elig" xsi:type="Realization"/>
+<relationship identifier="if_malapi__fn_elig__Serving" source="if_malapi" target="fn_elig" xsi:type="Serving"/>
+<relationship identifier="as_malmember__fn_elig__Serving" source="as_malmember" target="fn_elig" xsi:type="Serving"/>
+<relationship identifier="fn_elig__do_challenge__Access" source="fn_elig" target="do_challenge" xsi:type="Access" accessType="Read"/>
+<relationship identifier="fn_elig__do_eligresult__Access" source="fn_elig" target="do_eligresult" xsi:type="Access" accessType="Write"/>
+<relationship identifier="fn_elig__do_segment__Access" source="fn_elig" target="do_segment" xsi:type="Access" accessType="Read"/>
+<relationship identifier="fn_localmem__do_segment__Access" source="fn_localmem" target="do_segment" xsi:type="Access" accessType="Read"/>
+<relationship identifier="fn_localmem__do_demographic__Access" source="fn_localmem" target="do_demographic" xsi:type="Access" accessType="Read"/>
+<relationship identifier="fn_localmem__do_telemetry__Access" source="fn_localmem" target="do_telemetry" xsi:type="Access" accessType="Read"/>
+<relationship identifier="as_scoring__fn_p3__Serving" source="as_scoring" target="fn_p3" xsi:type="Serving"/>
+<relationship identifier="as_wallet__fn_p5__Serving" source="as_wallet" target="fn_p5" xsi:type="Serving"/>
+<relationship identifier="as_redeem__fn_p6__Serving" source="as_redeem" target="fn_p6" xsi:type="Serving"/>
+<relationship identifier="ev_verified__fn_score__Triggering" source="ev_verified" target="fn_score" xsi:type="Triggering"/>
+<relationship identifier="fn_score__fn_rescred__Triggering" source="fn_score" target="fn_rescred" xsi:type="Triggering"/>
+<relationship identifier="fn_rescred__ev_credited__Triggering" source="fn_rescred" target="ev_credited" xsi:type="Triggering"/>
+<relationship identifier="act_member__ac_bff_rewards__Serving" source="act_member" target="ac_bff_rewards" xsi:type="Serving"/>
+<relationship identifier="ac_bff_rewards__as_redeem__Serving" source="ac_bff_rewards" target="as_redeem" xsi:type="Serving"/>
+<relationship identifier="as_redeem__ia_redeem__Triggering" source="as_redeem" target="ia_redeem" xsi:type="Triggering"/>
+<relationship identifier="ia_redeem__fn_redorch__Triggering" source="ia_redeem" target="fn_redorch" xsi:type="Triggering"/>
+<relationship identifier="fn_redorch__fn_fraudchk__Triggering" source="fn_redorch" target="fn_fraudchk" xsi:type="Triggering"/>
+<relationship identifier="fn_redorch__as_provredeem__Triggering" source="fn_redorch" target="as_provredeem" xsi:type="Triggering"/>
+<relationship identifier="as_provredeem__ev_voucher__Triggering" source="as_provredeem" target="ev_voucher" xsi:type="Triggering"/>
+<relationship identifier="fn_score__do_telemetry__Access" source="fn_score" target="do_telemetry" xsi:type="Access" accessType="Read"/>
+<relationship identifier="fn_score__do_score__Access" source="fn_score" target="do_score" xsi:type="Access" accessType="Write"/>
+<relationship identifier="fn_rescred__do_wallet__Access" source="fn_rescred" target="do_wallet" xsi:type="Access" accessType="Write"/>
+<relationship identifier="fn_redorch__do_wallet__Access" source="fn_redorch" target="do_wallet" xsi:type="Access" accessType="Read"/>
+<relationship identifier="fn_redorch__do_redemption__Access" source="fn_redorch" target="do_redemption" xsi:type="Access" accessType="Write"/>
+<relationship identifier="fn_redorch__do_voucher__Access" source="fn_redorch" target="do_voucher" xsi:type="Access" accessType="Write"/>
+<relationship identifier="ac_partner__as_partner__Realization" source="ac_partner" target="as_partner" xsi:type="Realization"/>
+<relationship identifier="as_partner__fn_p7__Serving" source="as_partner" target="fn_p7" xsi:type="Serving"/>
+<relationship identifier="ac_partner__if_partnerportal__Assignment" source="ac_partner" target="if_partnerportal" xsi:type="Assignment"/>
+<relationship identifier="if_partnerportal__ac_provider__Serving" source="if_partnerportal" target="ac_provider" xsi:type="Serving"/>
+<relationship identifier="fn_kyb__ev_partner_approved__Triggering" source="fn_kyb" target="ev_partner_approved" xsi:type="Triggering"/>
+<relationship identifier="ev_partner_approved__fn_contract__Triggering" source="ev_partner_approved" target="fn_contract" xsi:type="Triggering"/>
+<relationship identifier="fn_contract__ia_settle__Triggering" source="fn_contract" target="ia_settle" xsi:type="Triggering"/>
+<relationship identifier="ia_settle__fn_settle__Triggering" source="ia_settle" target="fn_settle" xsi:type="Triggering"/>
+<relationship identifier="fn_settle__ev_settlement__Triggering" source="fn_settle" target="ev_settlement" xsi:type="Triggering"/>
+<relationship identifier="ev_settlement__fn_offboard__Triggering" source="ev_settlement" target="fn_offboard" xsi:type="Triggering"/>
+<relationship identifier="fn_kyb__do_kyb__Access" source="fn_kyb" target="do_kyb" xsi:type="Access" accessType="Write"/>
+<relationship identifier="fn_contract__do_contract__Access" source="fn_contract" target="do_contract" xsi:type="Access" accessType="Write"/>
+<relationship identifier="fn_contract__do_catalogue__Access" source="fn_contract" target="do_catalogue" xsi:type="Access" accessType="Write"/>
+<relationship identifier="fn_settle__do_redemption__Access" source="fn_settle" target="do_redemption" xsi:type="Access" accessType="Read"/>
+<relationship identifier="fn_settle__do_settlement__Access" source="fn_settle" target="do_settlement" xsi:type="Access" accessType="Write"/>
+<relationship identifier="fn_offboard__do_contract__Access" source="fn_offboard" target="do_contract" xsi:type="Access" accessType="Read"/>
+<relationship identifier="as_challenge__fn_p2__Serving" source="as_challenge" target="fn_p2" xsi:type="Serving"/>
+<relationship identifier="as_verify__fn_p4__Serving" source="as_verify" target="fn_p4" xsi:type="Serving"/>
+<relationship identifier="as_concl__fn_concl__Serving" source="as_concl" target="fn_concl" xsi:type="Serving"/>
+<relationship identifier="fn_author__as_challenge__Realization" source="fn_author" target="as_challenge" xsi:type="Realization"/>
+<relationship identifier="fn_verify__as_verify__Realization" source="fn_verify" target="as_verify" xsi:type="Realization"/>
+<relationship identifier="fn_conclude__as_concl__Realization" source="fn_conclude" target="as_concl" xsi:type="Realization"/>
+<relationship identifier="fn_author__fn_bind__Triggering" source="fn_author" target="fn_bind" xsi:type="Triggering"/>
+<relationship identifier="fn_bind__fn_publish__Triggering" source="fn_bind" target="fn_publish" xsi:type="Triggering"/>
+<relationship identifier="fn_publish__ev_chalpub__Triggering" source="fn_publish" target="ev_chalpub" xsi:type="Triggering"/>
+<relationship identifier="ev_actsynced__fn_verify__Triggering" source="ev_actsynced" target="fn_verify" xsi:type="Triggering"/>
+<relationship identifier="fn_verify__ev_verified__Triggering" source="fn_verify" target="ev_verified" xsi:type="Triggering"/>
+<relationship identifier="ev_periodend__fn_conclude__Triggering" source="ev_periodend" target="fn_conclude" xsi:type="Triggering"/>
+<relationship identifier="fn_conclude__ev_concluded__Triggering" source="fn_conclude" target="ev_concluded" xsi:type="Triggering"/>
+<relationship identifier="fn_author__do_segment__Access" source="fn_author" target="do_segment" xsi:type="Access" accessType="Read"/>
+<relationship identifier="fn_author__do_challenge__Access" source="fn_author" target="do_challenge" xsi:type="Access" accessType="Write"/>
+<relationship identifier="fn_bind__do_challenge__Access" source="fn_bind" target="do_challenge" xsi:type="Access" accessType="Write"/>
+<relationship identifier="fn_publish__do_challenge__Access" source="fn_publish" target="do_challenge" xsi:type="Access" accessType="Read"/>
+<relationship identifier="fn_verify__do_telemetry__Access" source="fn_verify" target="do_telemetry" xsi:type="Access" accessType="Read"/>
+<relationship identifier="fn_verify__do_activity__Access" source="fn_verify" target="do_activity" xsi:type="Access" accessType="Write"/>
+<relationship identifier="fn_conclude__do_score__Access" source="fn_conclude" target="do_score" xsi:type="Access" accessType="Read"/>
+<relationship identifier="fn_conclude__do_standings__Access" source="fn_conclude" target="do_standings" xsi:type="Access" accessType="Write"/>
+<relationship identifier="ac_cohort__as_cohort__Realization" source="ac_cohort" target="as_cohort" xsi:type="Realization"/>
+<relationship identifier="as_cohort__fn_p1__Serving" source="as_cohort" target="fn_p1" xsi:type="Serving"/>
+<relationship identifier="ac_challenge__as_challenge__Realization" source="ac_challenge" target="as_challenge" xsi:type="Realization"/>
+<relationship identifier="ac_enrol__as_elig__Realization" source="ac_enrol" target="as_elig" xsi:type="Realization"/>
+<relationship identifier="ac_scoring__as_scoring__Realization" source="ac_scoring" target="as_scoring" xsi:type="Realization"/>
+<relationship identifier="ac_verify__as_verify__Realization" source="ac_verify" target="as_verify" xsi:type="Realization"/>
+<relationship identifier="ac_wallet__as_wallet__Realization" source="ac_wallet" target="as_wallet" xsi:type="Realization"/>
+<relationship identifier="ac_market__as_redeem__Realization" source="ac_market" target="as_redeem" xsi:type="Realization"/>
+<relationship identifier="ac_engage__as_engage__Realization" source="ac_engage" target="as_engage" xsi:type="Realization"/>
+<relationship identifier="as_engage__fn_p8__Serving" source="as_engage" target="fn_p8" xsi:type="Serving"/>
+<relationship identifier="ac_consent__as_consent__Realization" source="ac_consent" target="as_consent" xsi:type="Realization"/>
+<relationship identifier="as_consent__fn_p10__Serving" source="as_consent" target="fn_p10" xsi:type="Serving"/>
+<relationship identifier="ac_fraud__as_fraud__Realization" source="ac_fraud" target="as_fraud" xsi:type="Realization"/>
+<relationship identifier="as_fraud__fn_p11__Serving" source="as_fraud" target="fn_p11" xsi:type="Serving"/>
+<relationship identifier="ac_analytics__as_analytics__Realization" source="ac_analytics" target="as_analytics" xsi:type="Realization"/>
+<relationship identifier="as_analytics__fn_p12__Serving" source="as_analytics" target="fn_p12" xsi:type="Serving"/>
+<relationship identifier="ac_event__as_eventsvc__Realization" source="ac_event" target="as_eventsvc" xsi:type="Realization"/>
+<relationship identifier="as_eventsvc__fn_p13__Serving" source="as_eventsvc" target="fn_p13" xsi:type="Serving"/>
+<relationship identifier="ac_challenge__as_concl__Realization" source="ac_challenge" target="as_concl" xsi:type="Realization"/>
+</relationships><views><diagrams>
+<view identifier="view-app-cooperation" xsi:type="Diagram"><name xml:lang="en">Application Cooperation</name>
+<node identifier="n-view-app-cooperation-act_member" elementRef="act_member" xsi:type="Element" x="70" y="93" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-if_appui" elementRef="if_appui" xsi:type="Element" x="1618" y="313" w="140" h="44"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-if_gwapi" elementRef="if_gwapi" xsi:type="Element" x="1690" y="100" w="140" h="44"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-if_pubapi" elementRef="if_pubapi" xsi:type="Element" x="1830" y="313" w="140" h="44"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-if_maladapter" elementRef="if_maladapter" xsi:type="Element" x="1902" y="100" w="140" h="44"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-if_provadapter" elementRef="if_provadapter" xsi:type="Element" x="2650" y="100" w="140" h="44"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-if_eventif" elementRef="if_eventif" xsi:type="Element" x="3130" y="100" w="140" h="44"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-if_malapi" elementRef="if_malapi" xsi:type="Element" x="2042" y="313" w="140" h="44"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-if_provapi" elementRef="if_provapi" xsi:type="Element" x="2518" y="313" w="140" h="44"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-ac_malaffi" elementRef="ac_malaffi" xsi:type="Element" x="2254" y="306" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-ac_provider" elementRef="ac_provider" xsi:type="Element" x="2730" y="306" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-as_malmember" elementRef="as_malmember" xsi:type="Element" x="2114" y="95" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-as_malclin" elementRef="as_malclin" xsi:type="Element" x="2382" y="95" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-as_provredeem" elementRef="as_provredeem" xsi:type="Element" x="2862" y="95" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-do_demographic" elementRef="do_demographic" xsi:type="Element" x="2994" y="309" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-do_telemetry" elementRef="do_telemetry" xsi:type="Element" x="3246" y="309" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-do_clinical" elementRef="do_clinical" xsi:type="Element" x="3314" y="496" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-do_segment" elementRef="do_segment" xsi:type="Element" x="3498" y="309" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-do_challenge" elementRef="do_challenge" xsi:type="Element" x="3750" y="309" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-do_eligresult" elementRef="do_eligresult" xsi:type="Element" x="4002" y="309" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-do_score" elementRef="do_score" xsi:type="Element" x="4254" y="309" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-do_wallet" elementRef="do_wallet" xsi:type="Element" x="4506" y="309" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-do_redemption" elementRef="do_redemption" xsi:type="Element" x="4758" y="309" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-do_voucher" elementRef="do_voucher" xsi:type="Element" x="5010" y="309" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-col_sahatna" elementRef="col_sahatna" xsi:type="Element" x="334" y="70" w="1284" h="104"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="11"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-app-cooperation-ac_mobile" elementRef="ac_mobile" xsi:type="Element" x="352" y="98" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-ac_gw" elementRef="ac_gw" xsi:type="Element" x="616" y="98" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-ac_bff_member" elementRef="ac_bff_member" xsi:type="Element" x="880" y="98" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-ac_bff_chal" elementRef="ac_bff_chal" xsi:type="Element" x="1144" y="98" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-ac_bff_rewards" elementRef="ac_bff_rewards" xsi:type="Element" x="1408" y="98" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+</node>
+<node identifier="n-view-app-cooperation-col_platform" elementRef="col_platform" xsi:type="Element" x="3342" y="70" w="3396" h="104"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="11"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-app-cooperation-ac_cohort" elementRef="ac_cohort" xsi:type="Element" x="3360" y="98" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-ac_challenge" elementRef="ac_challenge" xsi:type="Element" x="3624" y="98" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-ac_enrol" elementRef="ac_enrol" xsi:type="Element" x="3888" y="98" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-ac_scoring" elementRef="ac_scoring" xsi:type="Element" x="4152" y="98" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-ac_verify" elementRef="ac_verify" xsi:type="Element" x="4416" y="98" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-ac_wallet" elementRef="ac_wallet" xsi:type="Element" x="4680" y="98" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-ac_market" elementRef="ac_market" xsi:type="Element" x="4944" y="98" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-ac_partner" elementRef="ac_partner" xsi:type="Element" x="5208" y="98" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-ac_engage" elementRef="ac_engage" xsi:type="Element" x="5472" y="98" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-ac_consent" elementRef="ac_consent" xsi:type="Element" x="5736" y="98" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-ac_fraud" elementRef="ac_fraud" xsi:type="Element" x="6000" y="98" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-ac_analytics" elementRef="ac_analytics" xsi:type="Element" x="6264" y="98" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-cooperation-ac_event" elementRef="ac_event" xsi:type="Element" x="6528" y="98" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+</node>
+<connection identifier="c-view-app-cooperation-ac_mobile__if_appui__Assignment" relationshipRef="ac_mobile__if_appui__Assignment" source="n-view-app-cooperation-ac_mobile" target="n-view-app-cooperation-if_appui" xsi:type="Relationship"><bendpoint x="448" y="172"/><bendpoint x="1688" y="172"/></connection>
+<connection identifier="c-view-app-cooperation-ac_gw__if_gwapi__Assignment" relationshipRef="ac_gw__if_gwapi__Assignment" source="n-view-app-cooperation-ac_gw" target="n-view-app-cooperation-if_gwapi" xsi:type="Relationship"><bendpoint x="824" y="127"/><bendpoint x="824" y="122"/></connection>
+<connection identifier="c-view-app-cooperation-ac_enrol__if_pubapi__Assignment" relationshipRef="ac_enrol__if_pubapi__Assignment" source="n-view-app-cooperation-ac_enrol" target="n-view-app-cooperation-if_pubapi" xsi:type="Relationship"><bendpoint x="3984" y="187"/><bendpoint x="1900" y="187"/></connection>
+<connection identifier="c-view-app-cooperation-ac_enrol__if_maladapter__Assignment" relationshipRef="ac_enrol__if_maladapter__Assignment" source="n-view-app-cooperation-ac_enrol" target="n-view-app-cooperation-if_maladapter" xsi:type="Relationship"><bendpoint x="3872" y="127"/><bendpoint x="3872" y="122"/></connection>
+<connection identifier="c-view-app-cooperation-ac_market__if_provadapter__Assignment" relationshipRef="ac_market__if_provadapter__Assignment" source="n-view-app-cooperation-ac_market" target="n-view-app-cooperation-if_provadapter" xsi:type="Relationship"><bendpoint x="4928" y="127"/><bendpoint x="4928" y="122"/></connection>
+<connection identifier="c-view-app-cooperation-ac_event__if_eventif__Assignment" relationshipRef="ac_event__if_eventif__Assignment" source="n-view-app-cooperation-ac_event" target="n-view-app-cooperation-if_eventif" xsi:type="Relationship"><bendpoint x="6512" y="127"/><bendpoint x="6512" y="122"/></connection>
+<connection identifier="c-view-app-cooperation-ac_malaffi__if_malapi__Assignment" relationshipRef="ac_malaffi__if_malapi__Assignment" source="n-view-app-cooperation-ac_malaffi" target="n-view-app-cooperation-if_malapi" xsi:type="Relationship"></connection>
+<connection identifier="c-view-app-cooperation-ac_provider__if_provapi__Assignment" relationshipRef="ac_provider__if_provapi__Assignment" source="n-view-app-cooperation-ac_provider" target="n-view-app-cooperation-if_provapi" xsi:type="Relationship"></connection>
+<connection identifier="c-view-app-cooperation-ac_malaffi__as_malmember__Realization" relationshipRef="ac_malaffi__as_malmember__Realization" source="n-view-app-cooperation-ac_malaffi" target="n-view-app-cooperation-as_malmember" xsi:type="Relationship"><bendpoint x="2350" y="290"/><bendpoint x="2212" y="290"/></connection>
+<connection identifier="c-view-app-cooperation-ac_malaffi__as_malclin__Realization" relationshipRef="ac_malaffi__as_malclin__Realization" source="n-view-app-cooperation-ac_malaffi" target="n-view-app-cooperation-as_malclin" xsi:type="Relationship"><bendpoint x="2350" y="305"/><bendpoint x="2480" y="305"/></connection>
+<connection identifier="c-view-app-cooperation-ac_provider__as_provredeem__Realization" relationshipRef="ac_provider__as_provredeem__Realization" source="n-view-app-cooperation-ac_provider" target="n-view-app-cooperation-as_provredeem" xsi:type="Relationship"><bendpoint x="2826" y="275"/><bendpoint x="2960" y="275"/></connection>
+<connection identifier="c-view-app-cooperation-if_appui__act_member__Serving" relationshipRef="if_appui__act_member__Serving" source="n-view-app-cooperation-if_appui" target="n-view-app-cooperation-act_member" xsi:type="Relationship"><bendpoint x="1688" y="252"/><bendpoint x="166" y="252"/></connection>
+<connection identifier="c-view-app-cooperation-if_malapi__if_maladapter__Serving" relationshipRef="if_malapi__if_maladapter__Serving" source="n-view-app-cooperation-if_malapi" target="n-view-app-cooperation-if_maladapter" xsi:type="Relationship"><bendpoint x="2112" y="237"/><bendpoint x="1972" y="237"/></connection>
+<connection identifier="c-view-app-cooperation-if_provapi__if_provadapter__Serving" relationshipRef="if_provapi__if_provadapter__Serving" source="n-view-app-cooperation-if_provapi" target="n-view-app-cooperation-if_provadapter" xsi:type="Relationship"><bendpoint x="2588" y="222"/><bendpoint x="2720" y="222"/></connection>
+<connection identifier="c-view-app-cooperation-if_pubapi__ac_bff_member__Serving" relationshipRef="if_pubapi__ac_bff_member__Serving" source="n-view-app-cooperation-if_pubapi" target="n-view-app-cooperation-ac_bff_member" xsi:type="Relationship"><bendpoint x="1900" y="207"/><bendpoint x="976" y="207"/></connection>
+<connection identifier="c-view-app-cooperation-if_pubapi__ac_bff_chal__Serving" relationshipRef="if_pubapi__ac_bff_chal__Serving" source="n-view-app-cooperation-if_pubapi" target="n-view-app-cooperation-ac_bff_chal" xsi:type="Relationship"><bendpoint x="1900" y="297"/><bendpoint x="1240" y="297"/></connection>
+<connection identifier="c-view-app-cooperation-if_pubapi__ac_bff_rewards__Serving" relationshipRef="if_pubapi__ac_bff_rewards__Serving" source="n-view-app-cooperation-if_pubapi" target="n-view-app-cooperation-ac_bff_rewards" xsi:type="Relationship"><bendpoint x="1900" y="297"/><bendpoint x="1504" y="297"/></connection>
+<connection identifier="c-view-app-cooperation-ac_cohort__do_segment__Access" relationshipRef="ac_cohort__do_segment__Access" source="n-view-app-cooperation-ac_cohort" target="n-view-app-cooperation-do_segment" xsi:type="Relationship"><bendpoint x="3456" y="157"/><bendpoint x="3588" y="157"/></connection>
+<connection identifier="c-view-app-cooperation-ac_cohort__do_demographic__Access" relationshipRef="ac_cohort__do_demographic__Access" source="n-view-app-cooperation-ac_cohort" target="n-view-app-cooperation-do_demographic" xsi:type="Relationship"><bendpoint x="3456" y="172"/><bendpoint x="3084" y="172"/></connection>
+<connection identifier="c-view-app-cooperation-ac_cohort__do_telemetry__Access" relationshipRef="ac_cohort__do_telemetry__Access" source="n-view-app-cooperation-ac_cohort" target="n-view-app-cooperation-do_telemetry" xsi:type="Relationship"><bendpoint x="3456" y="172"/><bendpoint x="3336" y="172"/></connection>
+<connection identifier="c-view-app-cooperation-ac_challenge__do_challenge__Access" relationshipRef="ac_challenge__do_challenge__Access" source="n-view-app-cooperation-ac_challenge" target="n-view-app-cooperation-do_challenge" xsi:type="Relationship"><bendpoint x="3720" y="172"/><bendpoint x="3840" y="172"/></connection>
+<connection identifier="c-view-app-cooperation-ac_enrol__do_eligresult__Access" relationshipRef="ac_enrol__do_eligresult__Access" source="n-view-app-cooperation-ac_enrol" target="n-view-app-cooperation-do_eligresult" xsi:type="Relationship"><bendpoint x="3984" y="172"/><bendpoint x="4092" y="172"/></connection>
+<connection identifier="c-view-app-cooperation-ac_enrol__do_challenge__Access" relationshipRef="ac_enrol__do_challenge__Access" source="n-view-app-cooperation-ac_enrol" target="n-view-app-cooperation-do_challenge" xsi:type="Relationship"><bendpoint x="3984" y="172"/><bendpoint x="3840" y="172"/></connection>
+<connection identifier="c-view-app-cooperation-ac_verify__do_telemetry__Access" relationshipRef="ac_verify__do_telemetry__Access" source="n-view-app-cooperation-ac_verify" target="n-view-app-cooperation-do_telemetry" xsi:type="Relationship"><bendpoint x="4512" y="172"/><bendpoint x="3336" y="172"/></connection>
+<connection identifier="c-view-app-cooperation-ac_scoring__do_score__Access" relationshipRef="ac_scoring__do_score__Access" source="n-view-app-cooperation-ac_scoring" target="n-view-app-cooperation-do_score" xsi:type="Relationship"><bendpoint x="4248" y="172"/><bendpoint x="4344" y="172"/></connection>
+<connection identifier="c-view-app-cooperation-ac_wallet__do_wallet__Access" relationshipRef="ac_wallet__do_wallet__Access" source="n-view-app-cooperation-ac_wallet" target="n-view-app-cooperation-do_wallet" xsi:type="Relationship"><bendpoint x="4776" y="172"/><bendpoint x="4596" y="172"/></connection>
+<connection identifier="c-view-app-cooperation-ac_market__do_redemption__Access" relationshipRef="ac_market__do_redemption__Access" source="n-view-app-cooperation-ac_market" target="n-view-app-cooperation-do_redemption" xsi:type="Relationship"><bendpoint x="5040" y="172"/><bendpoint x="4848" y="172"/></connection>
+<connection identifier="c-view-app-cooperation-ac_market__do_voucher__Access" relationshipRef="ac_market__do_voucher__Access" source="n-view-app-cooperation-ac_market" target="n-view-app-cooperation-do_voucher" xsi:type="Relationship"><bendpoint x="5040" y="172"/><bendpoint x="5100" y="172"/></connection>
+<connection identifier="c-view-app-cooperation-ac_malaffi__do_clinical__Access" relationshipRef="ac_malaffi__do_clinical__Access" source="n-view-app-cooperation-ac_malaffi" target="n-view-app-cooperation-do_clinical" xsi:type="Relationship"><bendpoint x="2350" y="380"/><bendpoint x="3404" y="380"/></connection>
+</view>
+<view identifier="view-app-eligibility" xsi:type="Diagram"><name xml:lang="en">Eligibility Determination</name>
+<node identifier="n-view-app-eligibility-fn_p9" elementRef="fn_p9" xsi:type="Element" x="1256" y="70" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-eligibility-act_member" elementRef="act_member" xsi:type="Element" x="70" y="469" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-eligibility-as_elig" elementRef="as_elig" xsi:type="Element" x="1254" y="260" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-eligibility-ev_login" elementRef="ev_login" xsi:type="Element" x="334" y="475" w="162" h="46"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-eligibility-if_pubapi" elementRef="if_pubapi" xsi:type="Element" x="868" y="476" w="140" h="44"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-eligibility-ev_elig" elementRef="ev_elig" xsi:type="Element" x="1908" y="475" w="162" h="46"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-eligibility-fn_enrolsub" elementRef="fn_enrolsub" xsi:type="Element" x="2442" y="469" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-eligibility-as_malmember" elementRef="as_malmember" xsi:type="Element" x="518" y="682" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-eligibility-ac_malaffi" elementRef="ac_malaffi" xsi:type="Element" x="1256" y="868" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-eligibility-if_malapi" elementRef="if_malapi" xsi:type="Element" x="786" y="687" w="140" h="44"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-eligibility-do_challenge" elementRef="do_challenge" xsi:type="Element" x="998" y="683" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-eligibility-do_eligresult" elementRef="do_eligresult" xsi:type="Element" x="1250" y="683" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-eligibility-do_segment" elementRef="do_segment" xsi:type="Element" x="1502" y="683" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-eligibility-do_demographic" elementRef="do_demographic" xsi:type="Element" x="1754" y="683" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-eligibility-do_telemetry" elementRef="do_telemetry" xsi:type="Element" x="2006" y="683" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-eligibility-do_clinical" elementRef="do_clinical" xsi:type="Element" x="1262" y="1058" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-eligibility-ac_mobile" elementRef="ac_mobile" xsi:type="Element" x="568" y="446" w="228" h="104"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="11"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-app-eligibility-fn_present" elementRef="fn_present" xsi:type="Element" x="586" y="474" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+</node>
+<node identifier="n-view-app-eligibility-col_elig" elementRef="col_elig" xsi:type="Element" x="1080" y="446" w="756" h="104"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="11"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-app-eligibility-ia_elig" elementRef="ia_elig" xsi:type="Element" x="1098" y="474" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-eligibility-fn_elig" elementRef="fn_elig" xsi:type="Element" x="1362" y="474" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-eligibility-fn_localmem" elementRef="fn_localmem" xsi:type="Element" x="1626" y="474" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+</node>
+<node identifier="n-view-app-eligibility-ac_cms" elementRef="ac_cms" xsi:type="Element" x="2142" y="446" w="228" h="104"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="11"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-app-eligibility-fn_hydrate" elementRef="fn_hydrate" xsi:type="Element" x="2160" y="474" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+</node>
+<connection identifier="c-view-app-eligibility-act_member__ev_login__Triggering" relationshipRef="act_member__ev_login__Triggering" source="n-view-app-eligibility-act_member" target="n-view-app-eligibility-ev_login" xsi:type="Relationship"></connection>
+<connection identifier="c-view-app-eligibility-ev_login__fn_present__Triggering" relationshipRef="ev_login__fn_present__Triggering" source="n-view-app-eligibility-ev_login" target="n-view-app-eligibility-fn_present" xsi:type="Relationship"><bendpoint x="512" y="498"/><bendpoint x="512" y="503"/></connection>
+<connection identifier="c-view-app-eligibility-fn_present__if_pubapi__Triggering" relationshipRef="fn_present__if_pubapi__Triggering" source="n-view-app-eligibility-fn_present" target="n-view-app-eligibility-if_pubapi" xsi:type="Relationship"><bendpoint x="794" y="503"/><bendpoint x="794" y="498"/></connection>
+<connection identifier="c-view-app-eligibility-if_pubapi__ia_elig__Triggering" relationshipRef="if_pubapi__ia_elig__Triggering" source="n-view-app-eligibility-if_pubapi" target="n-view-app-eligibility-ia_elig" xsi:type="Relationship"><bendpoint x="1024" y="498"/><bendpoint x="1024" y="503"/></connection>
+<connection identifier="c-view-app-eligibility-ia_elig__fn_elig__Triggering" relationshipRef="ia_elig__fn_elig__Triggering" source="n-view-app-eligibility-ia_elig" target="n-view-app-eligibility-fn_elig" xsi:type="Relationship"></connection>
+<connection identifier="c-view-app-eligibility-fn_elig__fn_localmem__Triggering" relationshipRef="fn_elig__fn_localmem__Triggering" source="n-view-app-eligibility-fn_elig" target="n-view-app-eligibility-fn_localmem" xsi:type="Relationship"></connection>
+<connection identifier="c-view-app-eligibility-fn_localmem__ev_elig__Triggering" relationshipRef="fn_localmem__ev_elig__Triggering" source="n-view-app-eligibility-fn_localmem" target="n-view-app-eligibility-ev_elig" xsi:type="Relationship"><bendpoint x="1834" y="503"/><bendpoint x="1834" y="498"/></connection>
+<connection identifier="c-view-app-eligibility-ev_elig__fn_hydrate__Triggering" relationshipRef="ev_elig__fn_hydrate__Triggering" source="n-view-app-eligibility-ev_elig" target="n-view-app-eligibility-fn_hydrate" xsi:type="Relationship"><bendpoint x="2086" y="498"/><bendpoint x="2086" y="503"/></connection>
+<connection identifier="c-view-app-eligibility-fn_hydrate__fn_enrolsub__Triggering" relationshipRef="fn_hydrate__fn_enrolsub__Triggering" source="n-view-app-eligibility-fn_hydrate" target="n-view-app-eligibility-fn_enrolsub" xsi:type="Relationship"><bendpoint x="2368" y="503"/><bendpoint x="2368" y="498"/></connection>
+<connection identifier="c-view-app-eligibility-as_elig__fn_p9__Serving" relationshipRef="as_elig__fn_p9__Serving" source="n-view-app-eligibility-as_elig" target="n-view-app-eligibility-fn_p9" xsi:type="Relationship"></connection>
+<connection identifier="c-view-app-eligibility-ia_elig__as_elig__Realization" relationshipRef="ia_elig__as_elig__Realization" source="n-view-app-eligibility-ia_elig" target="n-view-app-eligibility-as_elig" xsi:type="Relationship"><bendpoint x="1194" y="458"/><bendpoint x="1352" y="458"/></connection>
+<connection identifier="c-view-app-eligibility-ac_malaffi__if_malapi__Assignment" relationshipRef="ac_malaffi__if_malapi__Assignment" source="n-view-app-eligibility-ac_malaffi" target="n-view-app-eligibility-if_malapi" xsi:type="Relationship"><bendpoint x="1352" y="852"/><bendpoint x="856" y="852"/></connection>
+<connection identifier="c-view-app-eligibility-ac_malaffi__as_malmember__Realization" relationshipRef="ac_malaffi__as_malmember__Realization" source="n-view-app-eligibility-ac_malaffi" target="n-view-app-eligibility-as_malmember" xsi:type="Relationship"><bendpoint x="1352" y="867"/><bendpoint x="616" y="867"/></connection>
+<connection identifier="c-view-app-eligibility-if_malapi__fn_elig__Serving" relationshipRef="if_malapi__fn_elig__Serving" source="n-view-app-eligibility-if_malapi" target="n-view-app-eligibility-fn_elig" xsi:type="Relationship"><bendpoint x="856" y="671"/><bendpoint x="1458" y="671"/></connection>
+<connection identifier="c-view-app-eligibility-as_malmember__fn_elig__Serving" relationshipRef="as_malmember__fn_elig__Serving" source="n-view-app-eligibility-as_malmember" target="n-view-app-eligibility-fn_elig" xsi:type="Relationship"><bendpoint x="616" y="651"/><bendpoint x="1458" y="651"/></connection>
+<connection identifier="c-view-app-eligibility-fn_elig__do_challenge__Access" relationshipRef="fn_elig__do_challenge__Access" source="n-view-app-eligibility-fn_elig" target="n-view-app-eligibility-do_challenge" xsi:type="Relationship"><bendpoint x="1458" y="548"/><bendpoint x="1088" y="548"/></connection>
+<connection identifier="c-view-app-eligibility-fn_elig__do_eligresult__Access" relationshipRef="fn_elig__do_eligresult__Access" source="n-view-app-eligibility-fn_elig" target="n-view-app-eligibility-do_eligresult" xsi:type="Relationship"><bendpoint x="1458" y="563"/><bendpoint x="1340" y="563"/></connection>
+<connection identifier="c-view-app-eligibility-fn_elig__do_segment__Access" relationshipRef="fn_elig__do_segment__Access" source="n-view-app-eligibility-fn_elig" target="n-view-app-eligibility-do_segment" xsi:type="Relationship"><bendpoint x="1458" y="533"/><bendpoint x="1592" y="533"/></connection>
+<connection identifier="c-view-app-eligibility-fn_localmem__do_segment__Access" relationshipRef="fn_localmem__do_segment__Access" source="n-view-app-eligibility-fn_localmem" target="n-view-app-eligibility-do_segment" xsi:type="Relationship"><bendpoint x="1722" y="578"/><bendpoint x="1592" y="578"/></connection>
+<connection identifier="c-view-app-eligibility-fn_localmem__do_demographic__Access" relationshipRef="fn_localmem__do_demographic__Access" source="n-view-app-eligibility-fn_localmem" target="n-view-app-eligibility-do_demographic" xsi:type="Relationship"><bendpoint x="1722" y="593"/><bendpoint x="1844" y="593"/></connection>
+<connection identifier="c-view-app-eligibility-fn_localmem__do_telemetry__Access" relationshipRef="fn_localmem__do_telemetry__Access" source="n-view-app-eligibility-fn_localmem" target="n-view-app-eligibility-do_telemetry" xsi:type="Relationship"><bendpoint x="1722" y="608"/><bendpoint x="2096" y="608"/></connection>
+<connection identifier="c-view-app-eligibility-ac_malaffi__do_clinical__Access" relationshipRef="ac_malaffi__do_clinical__Access" source="n-view-app-eligibility-ac_malaffi" target="n-view-app-eligibility-do_clinical" xsi:type="Relationship"></connection>
+</view>
+<view identifier="view-app-earn-redeem" xsi:type="Diagram"><name xml:lang="en">Earn &amp; Redeem</name>
+<node identifier="n-view-app-earn-redeem-fn_p3" elementRef="fn_p3" xsi:type="Element" x="389" y="70" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-earn-redeem-fn_p5" elementRef="fn_p5" xsi:type="Element" x="653" y="70" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-earn-redeem-fn_p6" elementRef="fn_p6" xsi:type="Element" x="1129" y="70" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-earn-redeem-as_scoring" elementRef="as_scoring" xsi:type="Element" x="70" y="285" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-earn-redeem-as_wallet" elementRef="as_wallet" xsi:type="Element" x="338" y="285" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-earn-redeem-as_redeem" elementRef="as_redeem" xsi:type="Element" x="606" y="285" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-earn-redeem-ev_verified" elementRef="ev_verified" xsi:type="Element" x="1393" y="76" w="162" h="46"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-earn-redeem-fn_score" elementRef="fn_score" xsi:type="Element" x="1627" y="70" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-earn-redeem-fn_rescred" elementRef="fn_rescred" xsi:type="Element" x="1891" y="70" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-earn-redeem-ev_credited" elementRef="ev_credited" xsi:type="Element" x="2155" y="76" w="162" h="46"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-earn-redeem-act_member" elementRef="act_member" xsi:type="Element" x="1257" y="686" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-earn-redeem-ac_bff_rewards" elementRef="ac_bff_rewards" xsi:type="Element" x="747" y="496" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-earn-redeem-ac_provider" elementRef="ac_provider" xsi:type="Element" x="1011" y="496" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-earn-redeem-if_provapi" elementRef="if_provapi" xsi:type="Element" x="917" y="77" w="140" h="44"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-earn-redeem-as_provredeem" elementRef="as_provredeem" xsi:type="Element" x="1702" y="285" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-earn-redeem-ev_voucher" elementRef="ev_voucher" xsi:type="Element" x="1970" y="289" w="162" h="46"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-earn-redeem-do_telemetry" elementRef="do_telemetry" xsi:type="Element" x="2204" y="286" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-earn-redeem-do_score" elementRef="do_score" xsi:type="Element" x="2456" y="286" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-earn-redeem-do_wallet" elementRef="do_wallet" xsi:type="Element" x="1779" y="499" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-earn-redeem-do_redemption" elementRef="do_redemption" xsi:type="Element" x="1275" y="499" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-earn-redeem-do_voucher" elementRef="do_voucher" xsi:type="Element" x="1527" y="499" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-earn-redeem-col_redeem" elementRef="col_redeem" xsi:type="Element" x="874" y="260" w="756" h="104"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="11"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-app-earn-redeem-ia_redeem" elementRef="ia_redeem" xsi:type="Element" x="892" y="288" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-earn-redeem-fn_redorch" elementRef="fn_redorch" xsi:type="Element" x="1156" y="288" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-earn-redeem-fn_fraudchk" elementRef="fn_fraudchk" xsi:type="Element" x="1420" y="288" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+</node>
+<connection identifier="c-view-app-earn-redeem-as_scoring__fn_p3__Serving" relationshipRef="as_scoring__fn_p3__Serving" source="n-view-app-earn-redeem-as_scoring" target="n-view-app-earn-redeem-fn_p3" xsi:type="Relationship"><bendpoint x="168" y="269"/><bendpoint x="485" y="269"/></connection>
+<connection identifier="c-view-app-earn-redeem-as_wallet__fn_p5__Serving" relationshipRef="as_wallet__fn_p5__Serving" source="n-view-app-earn-redeem-as_wallet" target="n-view-app-earn-redeem-fn_p5" xsi:type="Relationship"><bendpoint x="436" y="284"/><bendpoint x="749" y="284"/></connection>
+<connection identifier="c-view-app-earn-redeem-as_redeem__fn_p6__Serving" relationshipRef="as_redeem__fn_p6__Serving" source="n-view-app-earn-redeem-as_redeem" target="n-view-app-earn-redeem-fn_p6" xsi:type="Relationship"><bendpoint x="704" y="254"/><bendpoint x="1225" y="254"/></connection>
+<connection identifier="c-view-app-earn-redeem-ev_verified__fn_score__Triggering" relationshipRef="ev_verified__fn_score__Triggering" source="n-view-app-earn-redeem-ev_verified" target="n-view-app-earn-redeem-fn_score" xsi:type="Relationship"></connection>
+<connection identifier="c-view-app-earn-redeem-fn_score__fn_rescred__Triggering" relationshipRef="fn_score__fn_rescred__Triggering" source="n-view-app-earn-redeem-fn_score" target="n-view-app-earn-redeem-fn_rescred" xsi:type="Relationship"></connection>
+<connection identifier="c-view-app-earn-redeem-fn_rescred__ev_credited__Triggering" relationshipRef="fn_rescred__ev_credited__Triggering" source="n-view-app-earn-redeem-fn_rescred" target="n-view-app-earn-redeem-ev_credited" xsi:type="Relationship"></connection>
+<connection identifier="c-view-app-earn-redeem-act_member__ac_bff_rewards__Serving" relationshipRef="act_member__ac_bff_rewards__Serving" source="n-view-app-earn-redeem-act_member" target="n-view-app-earn-redeem-ac_bff_rewards" xsi:type="Relationship"><bendpoint x="1353" y="670"/><bendpoint x="843" y="670"/></connection>
+<connection identifier="c-view-app-earn-redeem-ac_bff_rewards__as_redeem__Serving" relationshipRef="ac_bff_rewards__as_redeem__Serving" source="n-view-app-earn-redeem-ac_bff_rewards" target="n-view-app-earn-redeem-as_redeem" xsi:type="Relationship"><bendpoint x="843" y="480"/><bendpoint x="704" y="480"/></connection>
+<connection identifier="c-view-app-earn-redeem-as_redeem__ia_redeem__Triggering" relationshipRef="as_redeem__ia_redeem__Triggering" source="n-view-app-earn-redeem-as_redeem" target="n-view-app-earn-redeem-ia_redeem" xsi:type="Relationship"><bendpoint x="818" y="312"/><bendpoint x="818" y="317"/></connection>
+<connection identifier="c-view-app-earn-redeem-ia_redeem__fn_redorch__Triggering" relationshipRef="ia_redeem__fn_redorch__Triggering" source="n-view-app-earn-redeem-ia_redeem" target="n-view-app-earn-redeem-fn_redorch" xsi:type="Relationship"></connection>
+<connection identifier="c-view-app-earn-redeem-fn_redorch__fn_fraudchk__Triggering" relationshipRef="fn_redorch__fn_fraudchk__Triggering" source="n-view-app-earn-redeem-fn_redorch" target="n-view-app-earn-redeem-fn_fraudchk" xsi:type="Relationship"></connection>
+<connection identifier="c-view-app-earn-redeem-fn_redorch__as_provredeem__Triggering" relationshipRef="fn_redorch__as_provredeem__Triggering" source="n-view-app-earn-redeem-fn_redorch" target="n-view-app-earn-redeem-as_provredeem" xsi:type="Relationship"><bendpoint x="1364" y="317"/><bendpoint x="1364" y="312"/></connection>
+<connection identifier="c-view-app-earn-redeem-as_provredeem__ev_voucher__Triggering" relationshipRef="as_provredeem__ev_voucher__Triggering" source="n-view-app-earn-redeem-as_provredeem" target="n-view-app-earn-redeem-ev_voucher" xsi:type="Relationship"></connection>
+<connection identifier="c-view-app-earn-redeem-ac_provider__if_provapi__Assignment" relationshipRef="ac_provider__if_provapi__Assignment" source="n-view-app-earn-redeem-ac_provider" target="n-view-app-earn-redeem-if_provapi" xsi:type="Relationship"><bendpoint x="1107" y="225"/><bendpoint x="987" y="225"/></connection>
+<connection identifier="c-view-app-earn-redeem-ac_provider__as_provredeem__Realization" relationshipRef="ac_provider__as_provredeem__Realization" source="n-view-app-earn-redeem-ac_provider" target="n-view-app-earn-redeem-as_provredeem" xsi:type="Relationship"><bendpoint x="1107" y="495"/><bendpoint x="1800" y="495"/></connection>
+<connection identifier="c-view-app-earn-redeem-fn_score__do_telemetry__Access" relationshipRef="fn_score__do_telemetry__Access" source="n-view-app-earn-redeem-fn_score" target="n-view-app-earn-redeem-do_telemetry" xsi:type="Relationship"><bendpoint x="1723" y="144"/><bendpoint x="2294" y="144"/></connection>
+<connection identifier="c-view-app-earn-redeem-fn_score__do_score__Access" relationshipRef="fn_score__do_score__Access" source="n-view-app-earn-redeem-fn_score" target="n-view-app-earn-redeem-do_score" xsi:type="Relationship"><bendpoint x="1723" y="159"/><bendpoint x="2546" y="159"/></connection>
+<connection identifier="c-view-app-earn-redeem-fn_rescred__do_wallet__Access" relationshipRef="fn_rescred__do_wallet__Access" source="n-view-app-earn-redeem-fn_rescred" target="n-view-app-earn-redeem-do_wallet" xsi:type="Relationship"><bendpoint x="1987" y="144"/><bendpoint x="1869" y="144"/></connection>
+<connection identifier="c-view-app-earn-redeem-fn_redorch__do_wallet__Access" relationshipRef="fn_redorch__do_wallet__Access" source="n-view-app-earn-redeem-fn_redorch" target="n-view-app-earn-redeem-do_wallet" xsi:type="Relationship"><bendpoint x="1252" y="362"/><bendpoint x="1869" y="362"/></connection>
+<connection identifier="c-view-app-earn-redeem-fn_redorch__do_redemption__Access" relationshipRef="fn_redorch__do_redemption__Access" source="n-view-app-earn-redeem-fn_redorch" target="n-view-app-earn-redeem-do_redemption" xsi:type="Relationship"><bendpoint x="1252" y="377"/><bendpoint x="1365" y="377"/></connection>
+<connection identifier="c-view-app-earn-redeem-fn_redorch__do_voucher__Access" relationshipRef="fn_redorch__do_voucher__Access" source="n-view-app-earn-redeem-fn_redorch" target="n-view-app-earn-redeem-do_voucher" xsi:type="Relationship"><bendpoint x="1252" y="347"/><bendpoint x="1617" y="347"/></connection>
+</view>
+<view identifier="view-app-partner" xsi:type="Diagram"><name xml:lang="en">Partner Lifecycle</name>
+<node identifier="n-view-app-partner-fn_p7" elementRef="fn_p7" xsi:type="Element" x="70" y="93" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-partner-as_partner" elementRef="as_partner" xsi:type="Element" x="376" y="306" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-partner-ac_partner" elementRef="ac_partner" xsi:type="Element" x="1114" y="492" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-partner-ac_provider" elementRef="ac_provider" xsi:type="Element" x="334" y="93" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-partner-if_partnerportal" elementRef="if_partnerportal" xsi:type="Element" x="644" y="311" w="140" h="44"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-partner-fn_kyb" elementRef="fn_kyb" xsi:type="Element" x="598" y="93" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-partner-ev_partner_approved" elementRef="ev_partner_approved" xsi:type="Element" x="862" y="99" w="162" h="46"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-partner-fn_contract" elementRef="fn_contract" xsi:type="Element" x="1096" y="93" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-partner-ev_settlement" elementRef="ev_settlement" xsi:type="Element" x="1924" y="99" w="162" h="46"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-partner-fn_offboard" elementRef="fn_offboard" xsi:type="Element" x="2158" y="93" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-partner-do_kyb" elementRef="do_kyb" xsi:type="Element" x="856" y="307" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-partner-do_contract" elementRef="do_contract" xsi:type="Element" x="1864" y="307" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-partner-do_catalogue" elementRef="do_catalogue" xsi:type="Element" x="1108" y="307" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-partner-do_redemption" elementRef="do_redemption" xsi:type="Element" x="1360" y="307" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-partner-do_settlement" elementRef="do_settlement" xsi:type="Element" x="1612" y="307" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-partner-col_settle" elementRef="col_settle" xsi:type="Element" x="1360" y="70" w="492" h="104"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="11"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-app-partner-ia_settle" elementRef="ia_settle" xsi:type="Element" x="1378" y="98" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-partner-fn_settle" elementRef="fn_settle" xsi:type="Element" x="1642" y="98" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+</node>
+<connection identifier="c-view-app-partner-ac_partner__as_partner__Realization" relationshipRef="ac_partner__as_partner__Realization" source="n-view-app-partner-ac_partner" target="n-view-app-partner-as_partner" xsi:type="Relationship"><bendpoint x="1210" y="476"/><bendpoint x="474" y="476"/></connection>
+<connection identifier="c-view-app-partner-as_partner__fn_p7__Serving" relationshipRef="as_partner__fn_p7__Serving" source="n-view-app-partner-as_partner" target="n-view-app-partner-fn_p7" xsi:type="Relationship"><bendpoint x="474" y="290"/><bendpoint x="166" y="290"/></connection>
+<connection identifier="c-view-app-partner-ac_partner__if_partnerportal__Assignment" relationshipRef="ac_partner__if_partnerportal__Assignment" source="n-view-app-partner-ac_partner" target="n-view-app-partner-if_partnerportal" xsi:type="Relationship"><bendpoint x="1210" y="491"/><bendpoint x="714" y="491"/></connection>
+<connection identifier="c-view-app-partner-if_partnerportal__ac_provider__Serving" relationshipRef="if_partnerportal__ac_provider__Serving" source="n-view-app-partner-if_partnerportal" target="n-view-app-partner-ac_provider" xsi:type="Relationship"><bendpoint x="714" y="265"/><bendpoint x="430" y="265"/></connection>
+<connection identifier="c-view-app-partner-fn_kyb__ev_partner_approved__Triggering" relationshipRef="fn_kyb__ev_partner_approved__Triggering" source="n-view-app-partner-fn_kyb" target="n-view-app-partner-ev_partner_approved" xsi:type="Relationship"></connection>
+<connection identifier="c-view-app-partner-ev_partner_approved__fn_contract__Triggering" relationshipRef="ev_partner_approved__fn_contract__Triggering" source="n-view-app-partner-ev_partner_approved" target="n-view-app-partner-fn_contract" xsi:type="Relationship"></connection>
+<connection identifier="c-view-app-partner-fn_contract__ia_settle__Triggering" relationshipRef="fn_contract__ia_settle__Triggering" source="n-view-app-partner-fn_contract" target="n-view-app-partner-ia_settle" xsi:type="Relationship"><bendpoint x="1304" y="122"/><bendpoint x="1304" y="127"/></connection>
+<connection identifier="c-view-app-partner-ia_settle__fn_settle__Triggering" relationshipRef="ia_settle__fn_settle__Triggering" source="n-view-app-partner-ia_settle" target="n-view-app-partner-fn_settle" xsi:type="Relationship"></connection>
+<connection identifier="c-view-app-partner-fn_settle__ev_settlement__Triggering" relationshipRef="fn_settle__ev_settlement__Triggering" source="n-view-app-partner-fn_settle" target="n-view-app-partner-ev_settlement" xsi:type="Relationship"><bendpoint x="1850" y="127"/><bendpoint x="1850" y="122"/></connection>
+<connection identifier="c-view-app-partner-ev_settlement__fn_offboard__Triggering" relationshipRef="ev_settlement__fn_offboard__Triggering" source="n-view-app-partner-ev_settlement" target="n-view-app-partner-fn_offboard" xsi:type="Relationship"></connection>
+<connection identifier="c-view-app-partner-fn_kyb__do_kyb__Access" relationshipRef="fn_kyb__do_kyb__Access" source="n-view-app-partner-fn_kyb" target="n-view-app-partner-do_kyb" xsi:type="Relationship"><bendpoint x="694" y="167"/><bendpoint x="946" y="167"/></connection>
+<connection identifier="c-view-app-partner-fn_contract__do_contract__Access" relationshipRef="fn_contract__do_contract__Access" source="n-view-app-partner-fn_contract" target="n-view-app-partner-do_contract" xsi:type="Relationship"><bendpoint x="1192" y="182"/><bendpoint x="1954" y="182"/></connection>
+<connection identifier="c-view-app-partner-fn_contract__do_catalogue__Access" relationshipRef="fn_contract__do_catalogue__Access" source="n-view-app-partner-fn_contract" target="n-view-app-partner-do_catalogue" xsi:type="Relationship"><bendpoint x="1192" y="152"/><bendpoint x="1198" y="152"/></connection>
+<connection identifier="c-view-app-partner-fn_settle__do_redemption__Access" relationshipRef="fn_settle__do_redemption__Access" source="n-view-app-partner-fn_settle" target="n-view-app-partner-do_redemption" xsi:type="Relationship"><bendpoint x="1738" y="202"/><bendpoint x="1450" y="202"/></connection>
+<connection identifier="c-view-app-partner-fn_settle__do_settlement__Access" relationshipRef="fn_settle__do_settlement__Access" source="n-view-app-partner-fn_settle" target="n-view-app-partner-do_settlement" xsi:type="Relationship"><bendpoint x="1738" y="217"/><bendpoint x="1702" y="217"/></connection>
+<connection identifier="c-view-app-partner-fn_offboard__do_contract__Access" relationshipRef="fn_offboard__do_contract__Access" source="n-view-app-partner-fn_offboard" target="n-view-app-partner-do_contract" xsi:type="Relationship"><bendpoint x="2254" y="242"/><bendpoint x="1954" y="242"/></connection>
+</view>
+<view identifier="view-app-author" xsi:type="Diagram"><name xml:lang="en">Authoring · Verification · Conclusion</name>
+<node identifier="n-view-app-author-fn_p2" elementRef="fn_p2" xsi:type="Element" x="919" y="70" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-author-as_challenge" elementRef="as_challenge" xsi:type="Element" x="913" y="260" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-author-fn_author" elementRef="fn_author" xsi:type="Element" x="70" y="446" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-author-fn_bind" elementRef="fn_bind" xsi:type="Element" x="334" y="446" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-author-fn_publish" elementRef="fn_publish" xsi:type="Element" x="598" y="446" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-author-ev_chalpub" elementRef="ev_chalpub" xsi:type="Element" x="862" y="452" w="162" h="46"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-author-fn_p4" elementRef="fn_p4" xsi:type="Element" x="1183" y="70" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-author-as_verify" elementRef="as_verify" xsi:type="Element" x="1181" y="260" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-author-ev_actsynced" elementRef="ev_actsynced" xsi:type="Element" x="1096" y="452" w="162" h="46"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-author-fn_verify" elementRef="fn_verify" xsi:type="Element" x="1330" y="446" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-author-ev_verified" elementRef="ev_verified" xsi:type="Element" x="1594" y="452" w="162" h="46"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-author-fn_concl" elementRef="fn_concl" xsi:type="Element" x="1447" y="70" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-author-as_concl" elementRef="as_concl" xsi:type="Element" x="1449" y="260" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-author-ev_periodend" elementRef="ev_periodend" xsi:type="Element" x="1828" y="452" w="162" h="46"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-author-fn_conclude" elementRef="fn_conclude" xsi:type="Element" x="2062" y="446" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-author-ev_concluded" elementRef="ev_concluded" xsi:type="Element" x="2326" y="452" w="162" h="46"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-author-do_segment" elementRef="do_segment" xsi:type="Element" x="559" y="636" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-author-do_challenge" elementRef="do_challenge" xsi:type="Element" x="811" y="636" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-author-do_telemetry" elementRef="do_telemetry" xsi:type="Element" x="1063" y="636" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-author-do_activity" elementRef="do_activity" xsi:type="Element" x="1315" y="636" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-author-do_score" elementRef="do_score" xsi:type="Element" x="1567" y="636" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-author-do_standings" elementRef="do_standings" xsi:type="Element" x="1819" y="636" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<connection identifier="c-view-app-author-as_challenge__fn_p2__Serving" relationshipRef="as_challenge__fn_p2__Serving" source="n-view-app-author-as_challenge" target="n-view-app-author-fn_p2" xsi:type="Relationship"><bendpoint x="1011" y="244"/><bendpoint x="1015" y="244"/></connection>
+<connection identifier="c-view-app-author-as_verify__fn_p4__Serving" relationshipRef="as_verify__fn_p4__Serving" source="n-view-app-author-as_verify" target="n-view-app-author-fn_p4" xsi:type="Relationship"></connection>
+<connection identifier="c-view-app-author-as_concl__fn_concl__Serving" relationshipRef="as_concl__fn_concl__Serving" source="n-view-app-author-as_concl" target="n-view-app-author-fn_concl" xsi:type="Relationship"><bendpoint x="1547" y="259"/><bendpoint x="1543" y="259"/></connection>
+<connection identifier="c-view-app-author-fn_author__as_challenge__Realization" relationshipRef="fn_author__as_challenge__Realization" source="n-view-app-author-fn_author" target="n-view-app-author-as_challenge" xsi:type="Relationship"><bendpoint x="166" y="430"/><bendpoint x="1011" y="430"/></connection>
+<connection identifier="c-view-app-author-fn_verify__as_verify__Realization" relationshipRef="fn_verify__as_verify__Realization" source="n-view-app-author-fn_verify" target="n-view-app-author-as_verify" xsi:type="Relationship"><bendpoint x="1426" y="445"/><bendpoint x="1279" y="445"/></connection>
+<connection identifier="c-view-app-author-fn_conclude__as_concl__Realization" relationshipRef="fn_conclude__as_concl__Realization" source="n-view-app-author-fn_conclude" target="n-view-app-author-as_concl" xsi:type="Relationship"><bendpoint x="2158" y="415"/><bendpoint x="1547" y="415"/></connection>
+<connection identifier="c-view-app-author-fn_author__fn_bind__Triggering" relationshipRef="fn_author__fn_bind__Triggering" source="n-view-app-author-fn_author" target="n-view-app-author-fn_bind" xsi:type="Relationship"></connection>
+<connection identifier="c-view-app-author-fn_bind__fn_publish__Triggering" relationshipRef="fn_bind__fn_publish__Triggering" source="n-view-app-author-fn_bind" target="n-view-app-author-fn_publish" xsi:type="Relationship"></connection>
+<connection identifier="c-view-app-author-fn_publish__ev_chalpub__Triggering" relationshipRef="fn_publish__ev_chalpub__Triggering" source="n-view-app-author-fn_publish" target="n-view-app-author-ev_chalpub" xsi:type="Relationship"></connection>
+<connection identifier="c-view-app-author-ev_actsynced__fn_verify__Triggering" relationshipRef="ev_actsynced__fn_verify__Triggering" source="n-view-app-author-ev_actsynced" target="n-view-app-author-fn_verify" xsi:type="Relationship"></connection>
+<connection identifier="c-view-app-author-fn_verify__ev_verified__Triggering" relationshipRef="fn_verify__ev_verified__Triggering" source="n-view-app-author-fn_verify" target="n-view-app-author-ev_verified" xsi:type="Relationship"></connection>
+<connection identifier="c-view-app-author-ev_periodend__fn_conclude__Triggering" relationshipRef="ev_periodend__fn_conclude__Triggering" source="n-view-app-author-ev_periodend" target="n-view-app-author-fn_conclude" xsi:type="Relationship"></connection>
+<connection identifier="c-view-app-author-fn_conclude__ev_concluded__Triggering" relationshipRef="fn_conclude__ev_concluded__Triggering" source="n-view-app-author-fn_conclude" target="n-view-app-author-ev_concluded" xsi:type="Relationship"></connection>
+<connection identifier="c-view-app-author-fn_author__do_segment__Access" relationshipRef="fn_author__do_segment__Access" source="n-view-app-author-fn_author" target="n-view-app-author-do_segment" xsi:type="Relationship"><bendpoint x="166" y="520"/><bendpoint x="649" y="520"/></connection>
+<connection identifier="c-view-app-author-fn_author__do_challenge__Access" relationshipRef="fn_author__do_challenge__Access" source="n-view-app-author-fn_author" target="n-view-app-author-do_challenge" xsi:type="Relationship"><bendpoint x="166" y="535"/><bendpoint x="901" y="535"/></connection>
+<connection identifier="c-view-app-author-fn_bind__do_challenge__Access" relationshipRef="fn_bind__do_challenge__Access" source="n-view-app-author-fn_bind" target="n-view-app-author-do_challenge" xsi:type="Relationship"><bendpoint x="430" y="505"/><bendpoint x="901" y="505"/></connection>
+<connection identifier="c-view-app-author-fn_publish__do_challenge__Access" relationshipRef="fn_publish__do_challenge__Access" source="n-view-app-author-fn_publish" target="n-view-app-author-do_challenge" xsi:type="Relationship"><bendpoint x="694" y="550"/><bendpoint x="901" y="550"/></connection>
+<connection identifier="c-view-app-author-fn_verify__do_telemetry__Access" relationshipRef="fn_verify__do_telemetry__Access" source="n-view-app-author-fn_verify" target="n-view-app-author-do_telemetry" xsi:type="Relationship"><bendpoint x="1426" y="565"/><bendpoint x="1153" y="565"/></connection>
+<connection identifier="c-view-app-author-fn_verify__do_activity__Access" relationshipRef="fn_verify__do_activity__Access" source="n-view-app-author-fn_verify" target="n-view-app-author-do_activity" xsi:type="Relationship"><bendpoint x="1426" y="580"/><bendpoint x="1405" y="580"/></connection>
+<connection identifier="c-view-app-author-fn_conclude__do_score__Access" relationshipRef="fn_conclude__do_score__Access" source="n-view-app-author-fn_conclude" target="n-view-app-author-do_score" xsi:type="Relationship"><bendpoint x="2158" y="595"/><bendpoint x="1657" y="595"/></connection>
+<connection identifier="c-view-app-author-fn_conclude__do_standings__Access" relationshipRef="fn_conclude__do_standings__Access" source="n-view-app-author-fn_conclude" target="n-view-app-author-do_standings" xsi:type="Relationship"><bendpoint x="2158" y="610"/><bendpoint x="1909" y="610"/></connection>
+</view>
+<view identifier="view-app-realization" xsi:type="Diagram"><name xml:lang="en">Application → Business Realization Seam</name>
+<node identifier="n-view-app-realization-fn_p1" elementRef="fn_p1" xsi:type="Element" x="98" y="70" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-as_cohort" elementRef="as_cohort" xsi:type="Element" x="70" y="260" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-ac_cohort" elementRef="ac_cohort" xsi:type="Element" x="230" y="446" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-fn_p2" elementRef="fn_p2" xsi:type="Element" x="890" y="70" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-as_challenge" elementRef="as_challenge" xsi:type="Element" x="874" y="260" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-ac_challenge" elementRef="ac_challenge" xsi:type="Element" x="1286" y="446" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-fn_p9" elementRef="fn_p9" xsi:type="Element" x="362" y="70" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-as_elig" elementRef="as_elig" xsi:type="Element" x="338" y="260" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-ac_enrol" elementRef="ac_enrol" xsi:type="Element" x="494" y="446" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-fn_p3" elementRef="fn_p3" xsi:type="Element" x="626" y="70" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-as_scoring" elementRef="as_scoring" xsi:type="Element" x="606" y="260" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-ac_scoring" elementRef="ac_scoring" xsi:type="Element" x="758" y="446" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-fn_p4" elementRef="fn_p4" xsi:type="Element" x="1154" y="70" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-as_verify" elementRef="as_verify" xsi:type="Element" x="1142" y="260" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-ac_verify" elementRef="ac_verify" xsi:type="Element" x="1022" y="446" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-fn_p5" elementRef="fn_p5" xsi:type="Element" x="1418" y="70" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-as_wallet" elementRef="as_wallet" xsi:type="Element" x="1410" y="260" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-ac_wallet" elementRef="ac_wallet" xsi:type="Element" x="1550" y="446" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-fn_p6" elementRef="fn_p6" xsi:type="Element" x="1946" y="70" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-as_redeem" elementRef="as_redeem" xsi:type="Element" x="1946" y="260" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-ac_market" elementRef="ac_market" xsi:type="Element" x="1814" y="446" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-fn_p7" elementRef="fn_p7" xsi:type="Element" x="2210" y="70" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-as_partner" elementRef="as_partner" xsi:type="Element" x="2214" y="260" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-ac_partner" elementRef="ac_partner" xsi:type="Element" x="2078" y="446" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-fn_p8" elementRef="fn_p8" xsi:type="Element" x="2474" y="70" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-as_engage" elementRef="as_engage" xsi:type="Element" x="2482" y="260" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-ac_engage" elementRef="ac_engage" xsi:type="Element" x="2342" y="446" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-fn_p10" elementRef="fn_p10" xsi:type="Element" x="2738" y="70" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-as_consent" elementRef="as_consent" xsi:type="Element" x="2750" y="260" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-ac_consent" elementRef="ac_consent" xsi:type="Element" x="2606" y="446" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-fn_p11" elementRef="fn_p11" xsi:type="Element" x="3002" y="70" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-as_fraud" elementRef="as_fraud" xsi:type="Element" x="3018" y="260" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-ac_fraud" elementRef="ac_fraud" xsi:type="Element" x="2870" y="446" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-fn_p12" elementRef="fn_p12" xsi:type="Element" x="3266" y="70" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-as_analytics" elementRef="as_analytics" xsi:type="Element" x="3286" y="260" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-ac_analytics" elementRef="ac_analytics" xsi:type="Element" x="3134" y="446" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-fn_p13" elementRef="fn_p13" xsi:type="Element" x="3530" y="70" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-as_eventsvc" elementRef="as_eventsvc" xsi:type="Element" x="3554" y="260" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-ac_event" elementRef="ac_event" xsi:type="Element" x="3398" y="446" w="192" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-fn_concl" elementRef="fn_concl" xsi:type="Element" x="1682" y="70" w="192" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-view-app-realization-as_concl" elementRef="as_concl" xsi:type="Element" x="1678" y="260" w="196" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<connection identifier="c-view-app-realization-ac_cohort__as_cohort__Realization" relationshipRef="ac_cohort__as_cohort__Realization" source="n-view-app-realization-ac_cohort" target="n-view-app-realization-as_cohort" xsi:type="Relationship"><bendpoint x="326" y="430"/><bendpoint x="168" y="430"/></connection>
+<connection identifier="c-view-app-realization-as_cohort__fn_p1__Serving" relationshipRef="as_cohort__fn_p1__Serving" source="n-view-app-realization-as_cohort" target="n-view-app-realization-fn_p1" xsi:type="Relationship"><bendpoint x="168" y="244"/><bendpoint x="194" y="244"/></connection>
+<connection identifier="c-view-app-realization-ac_challenge__as_challenge__Realization" relationshipRef="ac_challenge__as_challenge__Realization" source="n-view-app-realization-ac_challenge" target="n-view-app-realization-as_challenge" xsi:type="Relationship"><bendpoint x="1382" y="445"/><bendpoint x="972" y="445"/></connection>
+<connection identifier="c-view-app-realization-as_challenge__fn_p2__Serving" relationshipRef="as_challenge__fn_p2__Serving" source="n-view-app-realization-as_challenge" target="n-view-app-realization-fn_p2" xsi:type="Relationship"><bendpoint x="972" y="259"/><bendpoint x="986" y="259"/></connection>
+<connection identifier="c-view-app-realization-ac_enrol__as_elig__Realization" relationshipRef="ac_enrol__as_elig__Realization" source="n-view-app-realization-ac_enrol" target="n-view-app-realization-as_elig" xsi:type="Relationship"><bendpoint x="590" y="415"/><bendpoint x="436" y="415"/></connection>
+<connection identifier="c-view-app-realization-as_elig__fn_p9__Serving" relationshipRef="as_elig__fn_p9__Serving" source="n-view-app-realization-as_elig" target="n-view-app-realization-fn_p9" xsi:type="Relationship"><bendpoint x="436" y="229"/><bendpoint x="458" y="229"/></connection>
+<connection identifier="c-view-app-realization-ac_scoring__as_scoring__Realization" relationshipRef="ac_scoring__as_scoring__Realization" source="n-view-app-realization-ac_scoring" target="n-view-app-realization-as_scoring" xsi:type="Relationship"><bendpoint x="854" y="400"/><bendpoint x="704" y="400"/></connection>
+<connection identifier="c-view-app-realization-as_scoring__fn_p3__Serving" relationshipRef="as_scoring__fn_p3__Serving" source="n-view-app-realization-as_scoring" target="n-view-app-realization-fn_p3" xsi:type="Relationship"><bendpoint x="704" y="214"/><bendpoint x="722" y="214"/></connection>
+<connection identifier="c-view-app-realization-ac_verify__as_verify__Realization" relationshipRef="ac_verify__as_verify__Realization" source="n-view-app-realization-ac_verify" target="n-view-app-realization-as_verify" xsi:type="Relationship"><bendpoint x="1118" y="385"/><bendpoint x="1240" y="385"/></connection>
+<connection identifier="c-view-app-realization-as_verify__fn_p4__Serving" relationshipRef="as_verify__fn_p4__Serving" source="n-view-app-realization-as_verify" target="n-view-app-realization-fn_p4" xsi:type="Relationship"><bendpoint x="1240" y="199"/><bendpoint x="1250" y="199"/></connection>
+<connection identifier="c-view-app-realization-ac_wallet__as_wallet__Realization" relationshipRef="ac_wallet__as_wallet__Realization" source="n-view-app-realization-ac_wallet" target="n-view-app-realization-as_wallet" xsi:type="Relationship"><bendpoint x="1646" y="370"/><bendpoint x="1508" y="370"/></connection>
+<connection identifier="c-view-app-realization-as_wallet__fn_p5__Serving" relationshipRef="as_wallet__fn_p5__Serving" source="n-view-app-realization-as_wallet" target="n-view-app-realization-fn_p5" xsi:type="Relationship"><bendpoint x="1508" y="184"/><bendpoint x="1514" y="184"/></connection>
+<connection identifier="c-view-app-realization-ac_market__as_redeem__Realization" relationshipRef="ac_market__as_redeem__Realization" source="n-view-app-realization-ac_market" target="n-view-app-realization-as_redeem" xsi:type="Relationship"><bendpoint x="1910" y="355"/><bendpoint x="2044" y="355"/></connection>
+<connection identifier="c-view-app-realization-as_redeem__fn_p6__Serving" relationshipRef="as_redeem__fn_p6__Serving" source="n-view-app-realization-as_redeem" target="n-view-app-realization-fn_p6" xsi:type="Relationship"><bendpoint x="2044" y="169"/><bendpoint x="2042" y="169"/></connection>
+<connection identifier="c-view-app-realization-ac_partner__as_partner__Realization" relationshipRef="ac_partner__as_partner__Realization" source="n-view-app-realization-ac_partner" target="n-view-app-realization-as_partner" xsi:type="Relationship"><bendpoint x="2174" y="340"/><bendpoint x="2312" y="340"/></connection>
+<connection identifier="c-view-app-realization-as_partner__fn_p7__Serving" relationshipRef="as_partner__fn_p7__Serving" source="n-view-app-realization-as_partner" target="n-view-app-realization-fn_p7" xsi:type="Relationship"><bendpoint x="2312" y="154"/><bendpoint x="2306" y="154"/></connection>
+<connection identifier="c-view-app-realization-ac_engage__as_engage__Realization" relationshipRef="ac_engage__as_engage__Realization" source="n-view-app-realization-ac_engage" target="n-view-app-realization-as_engage" xsi:type="Relationship"><bendpoint x="2438" y="325"/><bendpoint x="2580" y="325"/></connection>
+<connection identifier="c-view-app-realization-as_engage__fn_p8__Serving" relationshipRef="as_engage__fn_p8__Serving" source="n-view-app-realization-as_engage" target="n-view-app-realization-fn_p8" xsi:type="Relationship"><bendpoint x="2580" y="139"/><bendpoint x="2570" y="139"/></connection>
+<connection identifier="c-view-app-realization-ac_consent__as_consent__Realization" relationshipRef="ac_consent__as_consent__Realization" source="n-view-app-realization-ac_consent" target="n-view-app-realization-as_consent" xsi:type="Relationship"><bendpoint x="2702" y="430"/><bendpoint x="2848" y="430"/></connection>
+<connection identifier="c-view-app-realization-as_consent__fn_p10__Serving" relationshipRef="as_consent__fn_p10__Serving" source="n-view-app-realization-as_consent" target="n-view-app-realization-fn_p10" xsi:type="Relationship"><bendpoint x="2848" y="244"/><bendpoint x="2834" y="244"/></connection>
+<connection identifier="c-view-app-realization-ac_fraud__as_fraud__Realization" relationshipRef="ac_fraud__as_fraud__Realization" source="n-view-app-realization-ac_fraud" target="n-view-app-realization-as_fraud" xsi:type="Relationship"><bendpoint x="2966" y="430"/><bendpoint x="3116" y="430"/></connection>
+<connection identifier="c-view-app-realization-as_fraud__fn_p11__Serving" relationshipRef="as_fraud__fn_p11__Serving" source="n-view-app-realization-as_fraud" target="n-view-app-realization-fn_p11" xsi:type="Relationship"><bendpoint x="3116" y="244"/><bendpoint x="3098" y="244"/></connection>
+<connection identifier="c-view-app-realization-ac_analytics__as_analytics__Realization" relationshipRef="ac_analytics__as_analytics__Realization" source="n-view-app-realization-ac_analytics" target="n-view-app-realization-as_analytics" xsi:type="Relationship"><bendpoint x="3230" y="430"/><bendpoint x="3384" y="430"/></connection>
+<connection identifier="c-view-app-realization-as_analytics__fn_p12__Serving" relationshipRef="as_analytics__fn_p12__Serving" source="n-view-app-realization-as_analytics" target="n-view-app-realization-fn_p12" xsi:type="Relationship"><bendpoint x="3384" y="244"/><bendpoint x="3362" y="244"/></connection>
+<connection identifier="c-view-app-realization-ac_event__as_eventsvc__Realization" relationshipRef="ac_event__as_eventsvc__Realization" source="n-view-app-realization-ac_event" target="n-view-app-realization-as_eventsvc" xsi:type="Relationship"><bendpoint x="3494" y="430"/><bendpoint x="3652" y="430"/></connection>
+<connection identifier="c-view-app-realization-as_eventsvc__fn_p13__Serving" relationshipRef="as_eventsvc__fn_p13__Serving" source="n-view-app-realization-as_eventsvc" target="n-view-app-realization-fn_p13" xsi:type="Relationship"><bendpoint x="3652" y="244"/><bendpoint x="3626" y="244"/></connection>
+<connection identifier="c-view-app-realization-ac_challenge__as_concl__Realization" relationshipRef="ac_challenge__as_concl__Realization" source="n-view-app-realization-ac_challenge" target="n-view-app-realization-as_concl" xsi:type="Relationship"><bendpoint x="1382" y="430"/><bendpoint x="1776" y="430"/></connection>
+<connection identifier="c-view-app-realization-as_concl__fn_concl__Serving" relationshipRef="as_concl__fn_concl__Serving" source="n-view-app-realization-as_concl" target="n-view-app-realization-fn_concl" xsi:type="Relationship"><bendpoint x="1776" y="244"/><bendpoint x="1778" y="244"/></connection>
+</view>
+</diagrams></views></model>

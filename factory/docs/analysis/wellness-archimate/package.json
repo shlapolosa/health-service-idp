@@ -1,0 +1,13 @@
+{
+  "name": "gen-elk-c4",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "ELK (elkjs) banded top-down C4 solution architecture SVG renderer",
+  "scripts": {
+    "gen": "node gen_elk_c4.js"
+  },
+  "dependencies": {
+    "elkjs": "^0.9.3"
+  }
+}

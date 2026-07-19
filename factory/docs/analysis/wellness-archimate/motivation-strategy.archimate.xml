@@ -1,0 +1,908 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<model xmlns="http://www.opengroup.org/xsd/archimate/3.0/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.opengroup.org/xsd/archimate/3.0/ http://www.opengroup.org/xsd/archimate/3.0/archimate3_Diagram.xsd" identifier="id-wellness-motstrat">
+<name xml:lang="en">Wellness Platform — Motivation &amp; Strategy</name>
+<documentation xml:lang="en">Motivation and Strategy layers derived from the wellness platform requirements/rules catalogue. Generated; see gen_motivation_strategy.py.</documentation>
+<elements>
+<element identifier="member" xsi:type="Stakeholder">
+<name xml:lang="en">Member / Citizen</name>
+<documentation xml:lang="en">The wellness participant who enrols in challenges, earns Sahatna Points and redeems rewards.</documentation>
+</element>
+<element identifier="doh" xsi:type="Stakeholder">
+<name xml:lang="en">Department of Health (ADPHC/DoH)</name>
+<documentation xml:lang="en">Programme sponsor, regulator and prize authority. Winners/prizes sit on the off-platform DoH trust boundary (RULE-333).</documentation>
+</element>
+<element identifier="partner" xsi:type="Stakeholder">
+<name xml:lang="en">Reward Partner / Aggregator</name>
+<documentation xml:lang="en">Voucher and merchant providers (incl. UAE aggregators YouGotaGift/Reloadly and direct e&amp;) supplying redeemable value.</documentation>
+</element>
+<element identifier="admin" xsi:type="Stakeholder">
+<name xml:lang="en">Programme Administrator / CMS Author</name>
+<documentation xml:lang="en">Authors challenges, segments, scoring plans and surveys; operates the programme.</documentation>
+</element>
+<element identifier="fraud" xsi:type="Stakeholder">
+<name xml:lang="en">Fraud &amp; Integrity Analyst</name>
+<documentation xml:lang="en">Owns gaming/abuse risk and inline integrity checks on the value path.</documentation>
+</element>
+<element identifier="ops" xsi:type="Stakeholder">
+<name xml:lang="en">Platform Operator / Engineering</name>
+<documentation xml:lang="en">Owns maintainability, evolvability and operability of the platform.</documentation>
+</element>
+<element identifier="val_member" xsi:type="Value">
+<name xml:lang="en">Healthier, rewarded life</name>
+<documentation xml:lang="en">Sustained wellbeing plus a rewarding, trustworthy earning experience for the member.</documentation>
+</element>
+<element identifier="val_doh" xsi:type="Value">
+<name xml:lang="en">Population-health ROI &amp; accountability</name>
+<documentation xml:lang="en">Demonstrable, auditable public-health outcomes and programme accountability for the DoH.</documentation>
+</element>
+<element identifier="d1" xsi:type="Driver">
+<name xml:lang="en">Population health &amp; behaviour change</name>
+<documentation xml:lang="en">Drive sustained healthy behaviour across the population (DoH mandate).</documentation>
+</element>
+<element identifier="d2" xsi:type="Driver">
+<name xml:lang="en">Member engagement &amp; retention</name>
+<documentation xml:lang="en">Keep members active and returning across multi-week challenges.</documentation>
+</element>
+<element identifier="d3" xsi:type="Driver">
+<name xml:lang="en">Reward-economy trust &amp; financial integrity</name>
+<documentation xml:lang="en">Points have real monetary value; the economy must be trustworthy and balanced.</documentation>
+</element>
+<element identifier="d4" xsi:type="Driver">
+<name xml:lang="en">Fraud, gaming &amp; abuse risk</name>
+<documentation xml:lang="en">Rewards attract gaming of activity, scoring and redemption.</documentation>
+</element>
+<element identifier="d5" xsi:type="Driver">
+<name xml:lang="en">Regulatory &amp; data-protection compliance</name>
+<documentation xml:lang="en">UAE PDPL, health-data sensitivity, 7y retention obligations.</documentation>
+</element>
+<element identifier="d6" xsi:type="Driver">
+<name xml:lang="en">Partner ecosystem viability &amp; redemption reliability</name>
+<documentation xml:lang="en">Redemption depends on a viable, reliable partner/aggregator network.</documentation>
+</element>
+<element identifier="d7" xsi:type="Driver">
+<name xml:lang="en">Auditability &amp; reproducibility</name>
+<documentation xml:lang="en">Scoring/eligibility decisions on a money path must be replayable and auditable.</documentation>
+</element>
+<element identifier="d8" xsi:type="Driver">
+<name xml:lang="en">Programme agility &amp; evolvability</name>
+<documentation xml:lang="en">The programme must adapt cohorts, scoring, rewards and partners without re-engineering.</documentation>
+</element>
+<element identifier="a1" xsi:type="Assessment">
+<name xml:lang="en">Scoring that can't be audited or replayed erodes trust</name>
+<documentation xml:lang="en">If how a score was reached cannot be reproduced or explained, members and the sponsor cannot trust the rewards.</documentation>
+</element>
+<element identifier="a2" xsi:type="Assessment">
+<name xml:lang="en">Letting analytics drive money or live state would jeopardise integrity</name>
+<documentation xml:lang="en">Operational decisions and value must rest on authoritative records, not on derived analytical copies.</documentation>
+</element>
+<element identifier="a3" xsi:type="Assessment">
+<name xml:lang="en">Unverified activity enables gaming</name>
+<documentation xml:lang="en">Without a verification gate, self-reported/raw activity can be gamed for rewards.</documentation>
+</element>
+<element identifier="a4" xsi:type="Assessment">
+<name xml:lang="en">Engagement decays without timely nudges</name>
+<documentation xml:lang="en">Members disengage if recognition and nudges are not timely and contextual.</documentation>
+</element>
+<element identifier="a5" xsi:type="Assessment">
+<name xml:lang="en">Fragmented partner coverage slows reward redemption</name>
+<documentation xml:lang="en">Integrating each reward provider individually is slow and leaves gaps in coverage.</documentation>
+</element>
+<element identifier="a6" xsi:type="Assessment">
+<name xml:lang="en">Coupling analytics to operations would slow the member experience and limit agility</name>
+<documentation xml:lang="en">Tying the live member journey to analytical processing would harm responsiveness and the ability to change cohorts quickly.</documentation>
+</element>
+<element identifier="g1" xsi:type="Goal">
+<name xml:lang="en">Drive sustained healthy behaviour change</name>
+<documentation xml:lang="en">Members adopt and sustain measurably healthier behaviour.</documentation>
+</element>
+<element identifier="g2" xsi:type="Goal">
+<name xml:lang="en">Operate a trustworthy, auditable reward economy</name>
+<documentation xml:lang="en">A balanced, tamper-evident points economy redeemable for real value.</documentation>
+</element>
+<element identifier="g3" xsi:type="Goal">
+<name xml:lang="en">Reproducible, version-pinned scoring &amp; eligibility</name>
+<documentation xml:lang="en">Every scoring and eligibility decision is exactly replayable.</documentation>
+</element>
+<element identifier="g4" xsi:type="Goal">
+<name xml:lang="en">Let analytics and operations evolve independently</name>
+<documentation xml:lang="en">The insight/decisioning plane and the live member-experience plane can each change without disrupting the other.</documentation>
+</element>
+<element identifier="g5" xsi:type="Goal">
+<name xml:lang="en">Reliable partner redemption &amp; reconciled settlement</name>
+<documentation xml:lang="en">Members redeem reliably; partner settlement reconciles to the ledger.</documentation>
+</element>
+<element identifier="g6" xsi:type="Goal">
+<name xml:lang="en">Regulatory-compliant data handling &amp; consent</name>
+<documentation xml:lang="en">Consent-driven, PDPL-compliant handling of personal and clinical data.</documentation>
+</element>
+<element identifier="g7" xsi:type="Goal">
+<name xml:lang="en">Prevent fraud &amp; gaming of rewards</name>
+<documentation xml:lang="en">Gaming of activity, scoring and redemption is detected and blocked.</documentation>
+</element>
+<element identifier="g8" xsi:type="Goal">
+<name xml:lang="en">Maximise engagement via recognition &amp; nudges</name>
+<documentation xml:lang="en">Timely recognition, streaks and nudges keep members engaged.</documentation>
+</element>
+<element identifier="o1" xsi:type="Outcome">
+<name xml:lang="en">Segments built (local) or consumed (clinical), reproducibly</name>
+<documentation xml:lang="en">Local segments are built and version-pinned by the platform; clinical segments are consumed from the external builder; both reproducible.</documentation>
+</element>
+<element identifier="o2" xsi:type="Outcome">
+<name xml:lang="en">Real-time, consistent enrolment eligibility</name>
+<documentation xml:lang="en">Members are enrolled immediately against a stable, consistent eligibility basis.</documentation>
+</element>
+<element identifier="o3" xsi:type="Outcome">
+<name xml:lang="en">Scores computed consistently and reproducibly</name>
+<documentation xml:lang="en">Identical activity yields identical scores, every time, and can be re-derived.</documentation>
+</element>
+<element identifier="o4" xsi:type="Outcome">
+<name xml:lang="en">Rewards earned are credited reliably and transparently</name>
+<documentation xml:lang="en">Earned rewards reach the member's balance dependably and visibly.</documentation>
+</element>
+<element identifier="o5" xsi:type="Outcome">
+<name xml:lang="en">Members redeem rewards reliably and promptly</name>
+<documentation xml:lang="en">Redemption succeeds within the expected time and the reward is delivered.</documentation>
+</element>
+<element identifier="o6" xsi:type="Outcome">
+<name xml:lang="en">Partner settlements reconcile accurately</name>
+<documentation xml:lang="en">What partners are paid reconciles to what members redeemed, with discrepancies surfaced.</documentation>
+</element>
+<element identifier="o7" xsi:type="Outcome">
+<name xml:lang="en">Only genuine, verified activity earns rewards</name>
+<documentation xml:lang="en">Unverified or gamed activity does not earn rewards.</documentation>
+</element>
+<element identifier="o8" xsi:type="Outcome">
+<name xml:lang="en">Members receive timely recognition and encouragement</name>
+<documentation xml:lang="en">Recognition and nudges arrive at the moments that sustain engagement.</documentation>
+</element>
+<element identifier="o9" xsi:type="Outcome">
+<name xml:lang="en">Past decisions are auditable and reproducible</name>
+<documentation xml:lang="en">Any historical scoring or eligibility decision can be reconstructed for audit.</documentation>
+</element>
+<element identifier="p1" xsi:type="Principle">
+<name xml:lang="en">Reproducibility by design</name>
+<documentation xml:lang="en">Once a decision is published its basis is fixed, so the decision can always be reproduced.</documentation>
+</element>
+<element identifier="p2" xsi:type="Principle">
+<name xml:lang="en">Operational &amp; financial records are authoritative</name>
+<documentation xml:lang="en">The system of record governs live state and money; analytical copies are never the source of truth.</documentation>
+</element>
+<element identifier="p3" xsi:type="Principle">
+<name xml:lang="en">Rewards are earned only on verified activity</name>
+<documentation xml:lang="en">Trust in the economy depends on rewarding genuine, verified behaviour.</documentation>
+</element>
+<element identifier="p4" xsi:type="Principle">
+<name xml:lang="en">Manage the reward economy to financial-grade integrity</name>
+<documentation xml:lang="en">Balances are accurate, auditable and never silently lost or duplicated.</documentation>
+</element>
+<element identifier="p5" xsi:type="Principle">
+<name xml:lang="en">Check integrity before any value moves</name>
+<documentation xml:lang="en">No value is transferred without an integrity check.</documentation>
+</element>
+<element identifier="p6" xsi:type="Principle">
+<name xml:lang="en">Information shared between capabilities is consistent &amp; traceable</name>
+<documentation xml:lang="en">Shared information has a known, evolvable meaning and can be traced end to end.</documentation>
+</element>
+<element identifier="p7" xsi:type="Principle">
+<name xml:lang="en">Scoring policy is business-owned and changeable without code</name>
+<documentation xml:lang="en">The business defines and versions scoring rules as governed policy, not engineering changes.</documentation>
+</element>
+<element identifier="p8" xsi:type="Principle">
+<name xml:lang="en">No action is rewarded or charged twice</name>
+<documentation xml:lang="en">Repeated or retried requests never double-credit or double-charge a member.</documentation>
+</element>
+<element identifier="p9" xsi:type="Principle">
+<name xml:lang="en">Loosely couple capabilities so each can change independently</name>
+<documentation xml:lang="en">Capabilities depend on each other as little as possible to maximise evolvability.</documentation>
+</element>
+<element identifier="r1" xsi:type="Requirement">
+<name xml:lang="en">Build local segments &amp; consume external clinical segments</name>
+<documentation xml:lang="en">DoH defines features; the platform builds versioned local (demographic/telemetry) segments and consumes externally-built clinical segments (Clinical Team/Malaffi).</documentation>
+</element>
+<element identifier="r2" xsi:type="Requirement">
+<name xml:lang="en">Author &amp; publish challenges with frozen eligibility</name>
+<documentation xml:lang="en">CHAL-SVC: challenge lifecycle + frozen {segmentId,segmentVersion} binding.</documentation>
+</element>
+<element identifier="r3" xsi:type="Requirement">
+<name xml:lang="en">Verify activity &amp; clinical signals before scoring</name>
+<documentation xml:lang="en">ACTV-SVC/CLIN-SVC: emit activity.verified only on validated, normalised input.</documentation>
+</element>
+<element identifier="r4" xsi:type="Requirement">
+<name xml:lang="en">Score goals, streaks, weekly &amp; challenge scores</name>
+<documentation xml:lang="en">SCORE/GOAL/STREAK/BADGE: daily goal, streak tiers, weekly &amp; challenge score.</documentation>
+</element>
+<element identifier="r5" xsi:type="Requirement">
+<name xml:lang="en">Maintain the member rewards balance with reservations</name>
+<documentation xml:lang="en">Keep an accurate member rewards balance, holding (reserving) amounts during redemption until confirmed.</documentation>
+</element>
+<element identifier="r6" xsi:type="Requirement">
+<name xml:lang="en">Operate marketplace redemption with partner adapters</name>
+<documentation xml:lang="en">MARKET-SVC: redemption via PartnerAdapter, routing policy, failure sweepers.</documentation>
+</element>
+<element identifier="r7" xsi:type="Requirement">
+<name xml:lang="en">Manage partner lifecycle KYB→…→settlement→offboard</name>
+<documentation xml:lang="en">Partner lifecycle: onboarding/KYB, contracting, redemption, settlement, offboarding.</documentation>
+</element>
+<element identifier="r8" xsi:type="Requirement">
+<name xml:lang="en">Provide engagement &amp; nudge across the journey</name>
+<documentation xml:lang="en">NUDGE-SVC: contextual nudges across enrolment and earning loop.</documentation>
+</element>
+<element identifier="r9" xsi:type="Requirement">
+<name xml:lang="en">Manage consent &amp; identity per PDPL</name>
+<documentation xml:lang="en">CONS-SVC/ID-SVC: consent purposes, identity &amp; auth.</documentation>
+</element>
+<element identifier="r10" xsi:type="Requirement">
+<name xml:lang="en">Provide reliable information exchange between capabilities</name>
+<documentation xml:lang="en">Capabilities exchange information dependably and in order, with no loss.</documentation>
+</element>
+<element identifier="r11" xsi:type="Requirement">
+<name xml:lang="en">Provide analytics, warehousing &amp; reporting</name>
+<documentation xml:lang="en">Consolidated data for population analytics, insight and reporting.</documentation>
+</element>
+<element identifier="r12" xsi:type="Requirement">
+<name xml:lang="en">Enforce fraud &amp; integrity checks inline</name>
+<documentation xml:lang="en">FRAUD-SVC: synchronous integrity check on the value path.</documentation>
+</element>
+<element identifier="c1" xsi:type="Constraint">
+<name xml:lang="en">Eligibility basis is fixed at publish</name>
+<documentation xml:lang="en">A challenge's eligibility criteria are frozen when it is published, so enrolment is reproducible and auditable.</documentation>
+</element>
+<element identifier="c2" xsi:type="Constraint">
+<name xml:lang="en">Live member reads resolve in real time from authoritative records</name>
+<documentation xml:lang="en">Enrolment and earning reads meet the real-time latency budget and never depend on the analytics plane.</documentation>
+</element>
+<element identifier="c3" xsi:type="Constraint">
+<name xml:lang="en">Reservation 300s; partner timeout 10s; 3 retries then release</name>
+<documentation xml:lang="en">Redemption timing &amp; retry discipline (RULE-210/211/212).</documentation>
+</element>
+<element identifier="c4" xsi:type="Constraint">
+<name xml:lang="en">Settlement: 5% holdback, 30-day dispute, 0.1% discrepancy</name>
+<documentation xml:lang="en">Settlement controls (RULE-214/215).</documentation>
+</element>
+<element identifier="c5" xsi:type="Constraint">
+<name xml:lang="en">Retain 7y; mask PII at 2y; 90-day offboarding wind-down</name>
+<documentation xml:lang="en">Data retention &amp; partner offboarding (RULE-206/218).</documentation>
+</element>
+<element identifier="c6" xsi:type="Constraint">
+<name xml:lang="en">Withdrawal is irreversible: progress voided, no reward credited</name>
+<documentation xml:lang="en">On withdrawal, accumulated progress is voided and no reward is credited.</documentation>
+</element>
+<element identifier="c7" xsi:type="Constraint">
+<name xml:lang="en">WeeklyScore capped at 100; Points = score×10, never reset</name>
+<documentation xml:lang="en">Scoring/points invariants (RULE-318/319/321).</documentation>
+</element>
+<element identifier="c8" xsi:type="Constraint">
+<name xml:lang="en">Winners/prizes are off-platform (DoH boundary)</name>
+<documentation xml:lang="en">Prize award sits outside the platform trust boundary (RULE-333).</documentation>
+</element>
+<element identifier="cap1" xsi:type="Capability">
+<name xml:lang="en">Local Segmentation (platform) &amp; Clinical Segment Consumption (external)</name>
+<documentation xml:lang="en">Build versioned local segments on the platform; consume clinical segments built externally by the Clinical Team on Malaffi.</documentation>
+</element>
+<element identifier="cap2" xsi:type="Capability">
+<name xml:lang="en">Challenge Lifecycle Management</name>
+<documentation xml:lang="en">Authoring, publishing, enrolment, conclusion of challenges.</documentation>
+</element>
+<element identifier="cap3" xsi:type="Capability">
+<name xml:lang="en">Wellness Scoring &amp; Recognition</name>
+<documentation xml:lang="en">Goal/streak/badge scoring, weekly &amp; challenge aggregation.</documentation>
+</element>
+<element identifier="cap4" xsi:type="Capability">
+<name xml:lang="en">Activity &amp; Clinical Verification</name>
+<documentation xml:lang="en">Validate and normalise activity/clinical signals.</documentation>
+</element>
+<element identifier="cap5" xsi:type="Capability">
+<name xml:lang="en">Reward Points &amp; Wallet</name>
+<documentation xml:lang="en">Ledger, reservations, credits.</documentation>
+</element>
+<element identifier="cap6" xsi:type="Capability">
+<name xml:lang="en">Marketplace &amp; Redemption</name>
+<documentation xml:lang="en">Catalogue, redemption, partner adapters.</documentation>
+</element>
+<element identifier="cap7" xsi:type="Capability">
+<name xml:lang="en">Partner Lifecycle &amp; Settlement</name>
+<documentation xml:lang="en">KYB, contracting, settlement, offboarding.</documentation>
+</element>
+<element identifier="cap8" xsi:type="Capability">
+<name xml:lang="en">Engagement &amp; Nudging</name>
+<documentation xml:lang="en">Contextual nudges and recognition.</documentation>
+</element>
+<element identifier="cap9" xsi:type="Capability">
+<name xml:lang="en">Consent, Identity &amp; Compliance</name>
+<documentation xml:lang="en">Consent purposes, identity, data-protection.</documentation>
+</element>
+<element identifier="cap10" xsi:type="Capability">
+<name xml:lang="en">Fraud &amp; Integrity</name>
+<documentation xml:lang="en">Inline and async integrity checks.</documentation>
+</element>
+<element identifier="cap11" xsi:type="Capability">
+<name xml:lang="en">Integration &amp; Interoperability</name>
+<documentation xml:lang="en">Reliable information exchange and integration between capabilities and partners.</documentation>
+</element>
+<element identifier="cap12" xsi:type="Capability">
+<name xml:lang="en">Analytics &amp; Insight</name>
+<documentation xml:lang="en">Consolidated analytics, insight and reporting over programme data.</documentation>
+</element>
+<element identifier="coa1" xsi:type="CourseOfAction">
+<name xml:lang="en">Separate analytical insight from operational delivery</name>
+<documentation xml:lang="en">Keep the live member experience fast and reliable while population analytics and decisioning evolve independently behind a clean boundary.</documentation>
+</element>
+<element identifier="coa2" xsi:type="CourseOfAction">
+<name xml:lang="en">Deliver as modular, independently-evolvable capability services</name>
+<documentation xml:lang="en">Organise the platform as cohesive capabilities that can be changed and scaled independently.</documentation>
+</element>
+<element identifier="coa3" xsi:type="CourseOfAction">
+<name xml:lang="en">Govern scoring as versioned, business-owned policy</name>
+<documentation xml:lang="en">Treat scoring rules as governed, versioned policy the business controls and can replay, rather than embedded code.</documentation>
+</element>
+<element identifier="coa4" xsi:type="CourseOfAction">
+<name xml:lang="en">Run rewards as financial-grade accounts</name>
+<documentation xml:lang="en">Operate the points economy with the integrity, auditability and controls of financial accounting.</documentation>
+</element>
+<element identifier="coa5" xsi:type="CourseOfAction">
+<name xml:lang="en">Source rewards through aggregators for fast, broad coverage</name>
+<documentation xml:lang="en">Partner via reward aggregators to obtain broad UAE coverage quickly, with direct integrations where warranted.</documentation>
+</element>
+<element identifier="coa6" xsi:type="CourseOfAction">
+<name xml:lang="en">Protect reward integrity at every transaction</name>
+<documentation xml:lang="en">Guard every value-bearing transaction against fraud and double-processing.</documentation>
+</element>
+<element identifier="res1" xsi:type="Resource">
+<name xml:lang="en">Scoring policy library</name>
+<documentation xml:lang="en">The governed, versioned library of scoring rules and recognition criteria.</documentation>
+</element>
+<element identifier="res2" xsi:type="Resource">
+<name xml:lang="en">Partner network &amp; catalogue</name>
+<documentation xml:lang="en">Contracted partners and redeemable catalogue.</documentation>
+</element>
+<element identifier="res3" xsi:type="Resource">
+<name xml:lang="en">Member activity &amp; clinical data</name>
+<documentation xml:lang="en">Member-generated activity and clinical signals used to recognise wellness behaviour.</documentation>
+</element>
+<element identifier="res4" xsi:type="Resource">
+<name xml:lang="en">Sahatna Points reward economy</name>
+<documentation xml:lang="en">The points currency as a managed asset.</documentation>
+</element>
+<element identifier="vs1" xsi:type="ValueStream">
+<name xml:lang="en">Earn &amp; Redeem Wellness Rewards</name>
+<documentation xml:lang="en">Member value stream: Identify cohort -&gt; Enrol -&gt; Earn/Score -&gt; Recognise -&gt; Redeem -&gt; Settle.</documentation>
+</element>
+<element identifier="d9" xsi:type="Driver">
+<name xml:lang="en">Financial-services regulatory compliance (AML/SVF)</name>
+<documentation xml:lang="en">Points redeemable for real value may constitute a CBUAE stored-value facility; AML &amp; sanctions-screening obligations apply (gap #4).</documentation>
+</element>
+<element identifier="d10" xsi:type="Driver">
+<name xml:lang="en">ADHICS / health-data compliance</name>
+<documentation xml:lang="en">Abu Dhabi Healthcare Information &amp; Cyber Security standard governs clinical-data handling (gap #8).</documentation>
+</element>
+<element identifier="r13" xsi:type="Requirement">
+<name xml:lang="en">AML / Stored-Value controls</name>
+<documentation xml:lang="en">Transaction monitoring, sanctions screening and stored-value-facility controls over the points economy (gap #4).</documentation>
+</element>
+<element identifier="r14" xsi:type="Requirement">
+<name xml:lang="en">PDPL data-subject rights</name>
+<documentation xml:lang="en">Access, rectification, erasure, portability and objection over personal &amp; clinical data (gap #7).</documentation>
+</element>
+<element identifier="p10" xsi:type="Principle">
+<name xml:lang="en">Minimal PII to partners</name>
+<documentation xml:lang="en">Disclose the least PII necessary to partners on the redemption path; data minimisation (gap #9).</documentation>
+</element>
+<element identifier="p11" xsi:type="Principle">
+<name xml:lang="en">Erasure reconciled with the immutable ledger</name>
+<documentation xml:lang="en">Right-to-erasure satisfied via crypto-shredding/tombstoning without breaking the append-only ledger (gap #7).</documentation>
+</element>
+<element identifier="c9" xsi:type="Constraint">
+<name xml:lang="en">Clinical signals handled as special-category data</name>
+<documentation xml:lang="en">CLIN-SVC data classified and protected as special-category per ADHICS (gap #8).</documentation>
+</element>
+<element identifier="c10" xsi:type="Constraint">
+<name xml:lang="en">Data residency &amp; cross-border-transfer controls</name>
+<documentation xml:lang="en">Enforce UAE data residency; restrict/secure cross-border PII transfer to global partners (gap #9).</documentation>
+</element>
+<element identifier="r15" xsi:type="Requirement">
+<name xml:lang="en">Title &amp; Progression (recognition tiers)</name>
+<documentation xml:lang="en">TITLE-SVC: member titles, levels and progression recognition.</documentation>
+</element>
+<element identifier="coa7" xsi:type="CourseOfAction">
+<name xml:lang="en">Adopt privacy-by-design, consent-led data governance</name>
+<documentation xml:lang="en">Govern personal and health data by explicit consent and privacy-by-design, aligned to PDPL and ADHICS.</documentation>
+</element>
+<element identifier="coa8" xsi:type="CourseOfAction">
+<name xml:lang="en">Operate the points economy under financial-regulatory controls</name>
+<documentation xml:lang="en">Treat the points economy as potentially regulated stored value, with AML/KYC-grade controls.</documentation>
+</element>
+</elements>
+<relationships>
+<relationship identifier="rel-1" source="member" target="d1" xsi:type="Association"/>
+<relationship identifier="rel-2" source="member" target="d2" xsi:type="Association"/>
+<relationship identifier="rel-3" source="doh" target="d1" xsi:type="Association"/>
+<relationship identifier="rel-4" source="doh" target="d5" xsi:type="Association"/>
+<relationship identifier="rel-5" source="doh" target="d7" xsi:type="Association"/>
+<relationship identifier="rel-6" source="partner" target="d6" xsi:type="Association"/>
+<relationship identifier="rel-7" source="partner" target="d3" xsi:type="Association"/>
+<relationship identifier="rel-8" source="admin" target="d7" xsi:type="Association"/>
+<relationship identifier="rel-9" source="admin" target="d2" xsi:type="Association"/>
+<relationship identifier="rel-10" source="fraud" target="d4" xsi:type="Association"/>
+<relationship identifier="rel-11" source="fraud" target="d3" xsi:type="Association"/>
+<relationship identifier="rel-12" source="ops" target="d8" xsi:type="Association"/>
+<relationship identifier="rel-13" source="ops" target="d7" xsi:type="Association"/>
+<relationship identifier="rel-14" source="val_member" target="member" xsi:type="Association"/>
+<relationship identifier="rel-15" source="val_doh" target="doh" xsi:type="Association"/>
+<relationship identifier="rel-16" source="a1" target="d7" xsi:type="Association"/>
+<relationship identifier="rel-17" source="a1" target="g3" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-18" source="a2" target="d3" xsi:type="Association"/>
+<relationship identifier="rel-19" source="a2" target="g2" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-20" source="a3" target="d4" xsi:type="Association"/>
+<relationship identifier="rel-21" source="a3" target="g7" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-22" source="a4" target="d2" xsi:type="Association"/>
+<relationship identifier="rel-23" source="a4" target="g8" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-24" source="a5" target="d6" xsi:type="Association"/>
+<relationship identifier="rel-25" source="a5" target="g5" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-26" source="a6" target="d8" xsi:type="Association"/>
+<relationship identifier="rel-27" source="a6" target="g4" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-28" source="d1" target="g1" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-29" source="d2" target="g1" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-30" source="d2" target="g8" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-31" source="d3" target="g2" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-32" source="d3" target="g5" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-33" source="d4" target="g7" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-34" source="d5" target="g6" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-35" source="d6" target="g5" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-36" source="d7" target="g2" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-37" source="d7" target="g3" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-38" source="d8" target="g4" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-39" source="o1" target="g3" xsi:type="Realization"/>
+<relationship identifier="rel-40" source="o2" target="g4" xsi:type="Realization"/>
+<relationship identifier="rel-41" source="o3" target="g3" xsi:type="Realization"/>
+<relationship identifier="rel-42" source="o4" target="g2" xsi:type="Realization"/>
+<relationship identifier="rel-43" source="o5" target="g5" xsi:type="Realization"/>
+<relationship identifier="rel-44" source="o6" target="g5" xsi:type="Realization"/>
+<relationship identifier="rel-45" source="o7" target="g7" xsi:type="Realization"/>
+<relationship identifier="rel-46" source="o8" target="g8" xsi:type="Realization"/>
+<relationship identifier="rel-47" source="o9" target="g3" xsi:type="Realization"/>
+<relationship identifier="rel-48" source="o1" target="g1" xsi:type="Realization"/>
+<relationship identifier="rel-49" source="r1" target="g1" xsi:type="Realization"/>
+<relationship identifier="rel-50" source="r2" target="g3" xsi:type="Realization"/>
+<relationship identifier="rel-51" source="r3" target="g7" xsi:type="Realization"/>
+<relationship identifier="rel-52" source="r4" target="g1" xsi:type="Realization"/>
+<relationship identifier="rel-53" source="r5" target="g2" xsi:type="Realization"/>
+<relationship identifier="rel-54" source="r6" target="g5" xsi:type="Realization"/>
+<relationship identifier="rel-55" source="r7" target="g5" xsi:type="Realization"/>
+<relationship identifier="rel-56" source="r8" target="g8" xsi:type="Realization"/>
+<relationship identifier="rel-57" source="r9" target="g6" xsi:type="Realization"/>
+<relationship identifier="rel-58" source="r10" target="g4" xsi:type="Realization"/>
+<relationship identifier="rel-59" source="r11" target="g4" xsi:type="Realization"/>
+<relationship identifier="rel-60" source="r12" target="g7" xsi:type="Realization"/>
+<relationship identifier="rel-61" source="p1" target="r1" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-62" source="p1" target="r2" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-63" source="p1" target="r4" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-64" source="p2" target="r5" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-65" source="p2" target="r10" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-66" source="p2" target="r11" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-67" source="p3" target="r3" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-68" source="p3" target="r4" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-69" source="p4" target="r5" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-70" source="p5" target="r6" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-71" source="p5" target="r12" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-72" source="p6" target="r10" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-73" source="p7" target="r4" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-74" source="p8" target="r6" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-75" source="p9" target="r11" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-76" source="p9" target="r1" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-77" source="p1" target="g3" xsi:type="Realization"/>
+<relationship identifier="rel-78" source="p2" target="g2" xsi:type="Realization"/>
+<relationship identifier="rel-79" source="p9" target="g4" xsi:type="Realization"/>
+<relationship identifier="rel-80" source="c1" target="g3" xsi:type="Realization"/>
+<relationship identifier="rel-81" source="c1" target="r2" xsi:type="Influence" modifier="-"/>
+<relationship identifier="rel-82" source="c2" target="g4" xsi:type="Realization"/>
+<relationship identifier="rel-83" source="c2" target="r10" xsi:type="Influence" modifier="-"/>
+<relationship identifier="rel-84" source="c3" target="g5" xsi:type="Realization"/>
+<relationship identifier="rel-85" source="c3" target="r6" xsi:type="Influence" modifier="-"/>
+<relationship identifier="rel-86" source="c4" target="g5" xsi:type="Realization"/>
+<relationship identifier="rel-87" source="c4" target="r7" xsi:type="Influence" modifier="-"/>
+<relationship identifier="rel-88" source="c5" target="g6" xsi:type="Realization"/>
+<relationship identifier="rel-89" source="c5" target="r9" xsi:type="Influence" modifier="-"/>
+<relationship identifier="rel-90" source="c6" target="g1" xsi:type="Realization"/>
+<relationship identifier="rel-91" source="c6" target="r2" xsi:type="Influence" modifier="-"/>
+<relationship identifier="rel-92" source="c7" target="g2" xsi:type="Realization"/>
+<relationship identifier="rel-93" source="c7" target="r4" xsi:type="Influence" modifier="-"/>
+<relationship identifier="rel-94" source="c8" target="doh" xsi:type="Association"/>
+<relationship identifier="rel-95" source="res1" target="cap3" xsi:type="Assignment"/>
+<relationship identifier="rel-96" source="res2" target="cap6" xsi:type="Assignment"/>
+<relationship identifier="rel-97" source="res2" target="cap7" xsi:type="Assignment"/>
+<relationship identifier="rel-98" source="res3" target="cap4" xsi:type="Assignment"/>
+<relationship identifier="rel-99" source="res3" target="cap1" xsi:type="Assignment"/>
+<relationship identifier="rel-100" source="res4" target="cap5" xsi:type="Assignment"/>
+<relationship identifier="rel-101" source="cap1" target="coa1" xsi:type="Realization"/>
+<relationship identifier="rel-102" source="cap11" target="coa1" xsi:type="Realization"/>
+<relationship identifier="rel-103" source="cap12" target="coa1" xsi:type="Realization"/>
+<relationship identifier="rel-104" source="cap2" target="coa2" xsi:type="Realization"/>
+<relationship identifier="rel-105" source="cap8" target="coa2" xsi:type="Realization"/>
+<relationship identifier="rel-106" source="cap11" target="coa2" xsi:type="Realization"/>
+<relationship identifier="rel-107" source="cap3" target="coa3" xsi:type="Realization"/>
+<relationship identifier="rel-108" source="cap5" target="coa4" xsi:type="Realization"/>
+<relationship identifier="rel-109" source="cap6" target="coa5" xsi:type="Realization"/>
+<relationship identifier="rel-110" source="cap7" target="coa5" xsi:type="Realization"/>
+<relationship identifier="rel-111" source="cap10" target="coa6" xsi:type="Realization"/>
+<relationship identifier="rel-112" source="cap4" target="coa6" xsi:type="Realization"/>
+<relationship identifier="rel-113" source="cap9" target="coa7" xsi:type="Realization"/>
+<relationship identifier="rel-114" source="cap5" target="coa8" xsi:type="Realization"/>
+<relationship identifier="rel-115" source="cap10" target="coa8" xsi:type="Realization"/>
+<relationship identifier="rel-116" source="coa1" target="r1" xsi:type="Realization"/>
+<relationship identifier="rel-117" source="coa1" target="r10" xsi:type="Realization"/>
+<relationship identifier="rel-118" source="coa1" target="r11" xsi:type="Realization"/>
+<relationship identifier="rel-119" source="coa2" target="r2" xsi:type="Realization"/>
+<relationship identifier="rel-120" source="coa2" target="r8" xsi:type="Realization"/>
+<relationship identifier="rel-121" source="coa3" target="r4" xsi:type="Realization"/>
+<relationship identifier="rel-122" source="coa3" target="r15" xsi:type="Realization"/>
+<relationship identifier="rel-123" source="coa4" target="r5" xsi:type="Realization"/>
+<relationship identifier="rel-124" source="coa5" target="r6" xsi:type="Realization"/>
+<relationship identifier="rel-125" source="coa5" target="r7" xsi:type="Realization"/>
+<relationship identifier="rel-126" source="coa6" target="r3" xsi:type="Realization"/>
+<relationship identifier="rel-127" source="coa6" target="r12" xsi:type="Realization"/>
+<relationship identifier="rel-128" source="coa7" target="r9" xsi:type="Realization"/>
+<relationship identifier="rel-129" source="coa7" target="r14" xsi:type="Realization"/>
+<relationship identifier="rel-130" source="coa8" target="r13" xsi:type="Realization"/>
+<relationship identifier="rel-131" source="cap1" target="vs1" xsi:type="Serving"/>
+<relationship identifier="rel-132" source="cap2" target="vs1" xsi:type="Serving"/>
+<relationship identifier="rel-133" source="cap3" target="vs1" xsi:type="Serving"/>
+<relationship identifier="rel-134" source="cap5" target="vs1" xsi:type="Serving"/>
+<relationship identifier="rel-135" source="cap6" target="vs1" xsi:type="Serving"/>
+<relationship identifier="rel-136" source="cap7" target="vs1" xsi:type="Serving"/>
+<relationship identifier="rel-137" source="vs1" target="member" xsi:type="Serving"/>
+<relationship identifier="rel-138" source="vs1" target="val_member" xsi:type="Realization"/>
+<relationship identifier="rel-139" source="r15" target="g8" xsi:type="Realization"/>
+<relationship identifier="rel-140" source="doh" target="d9" xsi:type="Association"/>
+<relationship identifier="rel-141" source="fraud" target="d9" xsi:type="Association"/>
+<relationship identifier="rel-142" source="doh" target="d10" xsi:type="Association"/>
+<relationship identifier="rel-143" source="d9" target="g2" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-144" source="d9" target="g6" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-145" source="d10" target="g6" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-146" source="r13" target="g6" xsi:type="Realization"/>
+<relationship identifier="rel-147" source="r13" target="g2" xsi:type="Realization"/>
+<relationship identifier="rel-148" source="r14" target="g6" xsi:type="Realization"/>
+<relationship identifier="rel-149" source="p10" target="r6" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-150" source="p10" target="r7" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-151" source="p10" target="g6" xsi:type="Realization"/>
+<relationship identifier="rel-152" source="p11" target="r5" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-153" source="p11" target="r11" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-154" source="p11" target="r14" xsi:type="Influence" modifier="+"/>
+<relationship identifier="rel-155" source="p11" target="g6" xsi:type="Realization"/>
+<relationship identifier="rel-156" source="c9" target="g6" xsi:type="Realization"/>
+<relationship identifier="rel-157" source="c9" target="r3" xsi:type="Influence" modifier="-"/>
+<relationship identifier="rel-158" source="c9" target="r9" xsi:type="Influence" modifier="-"/>
+<relationship identifier="rel-159" source="c10" target="g6" xsi:type="Realization"/>
+<relationship identifier="rel-160" source="c10" target="r6" xsi:type="Influence" modifier="-"/>
+</relationships>
+<views><diagrams>
+<view identifier="view-motstrat" xsi:type="Diagram">
+<name xml:lang="en">Motivation &amp; Strategy View</name>
+<node identifier="grp-Value" xsi:type="Container" x="14" y="30" w="3554" h="110">
+<label xml:lang="en">Values</label>
+<style><fillColor r="252" g="252" b="252" a="0"/><lineColor r="140" g="140" b="140"/><font name="Sans" size="9"><color r="80" g="80" b="80"/></font></style>
+<node identifier="node-val_member" elementRef="val_member" xsi:type="Element" x="187" y="56" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-val_doh" elementRef="val_doh" xsi:type="Element" x="1247" y="56" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="grp-Stakeholder" xsi:type="Container" x="14" y="140" w="3554" h="110">
+<label xml:lang="en">Stakeholders</label>
+<style><fillColor r="252" g="252" b="252" a="0"/><lineColor r="140" g="140" b="140"/><font name="Sans" size="9"><color r="80" g="80" b="80"/></font></style>
+<node identifier="node-member" elementRef="member" xsi:type="Element" x="187" y="166" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-doh" elementRef="doh" xsi:type="Element" x="1447" y="166" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-partner" elementRef="partner" xsi:type="Element" x="2307" y="166" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-admin" elementRef="admin" xsi:type="Element" x="1247" y="166" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-fraud" elementRef="fraud" xsi:type="Element" x="2737" y="166" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-ops" elementRef="ops" xsi:type="Element" x="1877" y="166" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="grp-Driver" xsi:type="Container" x="14" y="250" w="3554" h="110">
+<label xml:lang="en">Drivers</label>
+<style><fillColor r="252" g="252" b="252" a="0"/><lineColor r="140" g="140" b="140"/><font name="Sans" size="9"><color r="80" g="80" b="80"/></font></style>
+<node identifier="node-d1" elementRef="d1" xsi:type="Element" x="187" y="276" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-d2" elementRef="d2" xsi:type="Element" x="387" y="276" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-d3" elementRef="d3" xsi:type="Element" x="817" y="276" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-d4" elementRef="d4" xsi:type="Element" x="2937" y="276" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-d5" elementRef="d5" xsi:type="Element" x="3137" y="276" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-d6" elementRef="d6" xsi:type="Element" x="2307" y="276" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-d7" elementRef="d7" xsi:type="Element" x="1247" y="276" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-d8" elementRef="d8" xsi:type="Element" x="1877" y="276" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-d9" elementRef="d9" xsi:type="Element" x="1017" y="276" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-d10" elementRef="d10" xsi:type="Element" x="2737" y="276" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="grp-Assessment" xsi:type="Container" x="14" y="360" w="3554" h="110">
+<label xml:lang="en">Assessments</label>
+<style><fillColor r="252" g="252" b="252" a="0"/><lineColor r="140" g="140" b="140"/><font name="Sans" size="9"><color r="80" g="80" b="80"/></font></style>
+<node identifier="node-a1" elementRef="a1" xsi:type="Element" x="1247" y="386" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-a2" elementRef="a2" xsi:type="Element" x="817" y="386" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-a3" elementRef="a3" xsi:type="Element" x="2737" y="386" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-a4" elementRef="a4" xsi:type="Element" x="187" y="386" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-a5" elementRef="a5" xsi:type="Element" x="2307" y="386" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-a6" elementRef="a6" xsi:type="Element" x="1877" y="386" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="grp-Goal" xsi:type="Container" x="14" y="470" w="3554" h="110">
+<label xml:lang="en">Goals</label>
+<style><fillColor r="252" g="252" b="252" a="0"/><lineColor r="140" g="140" b="140"/><font name="Sans" size="9"><color r="80" g="80" b="80"/></font></style>
+<node identifier="node-g1" elementRef="g1" xsi:type="Element" x="187" y="496" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-g2" elementRef="g2" xsi:type="Element" x="817" y="496" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-g3" elementRef="g3" xsi:type="Element" x="1247" y="496" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-g4" elementRef="g4" xsi:type="Element" x="1877" y="496" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-g5" elementRef="g5" xsi:type="Element" x="2307" y="496" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-g6" elementRef="g6" xsi:type="Element" x="2737" y="496" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-g7" elementRef="g7" xsi:type="Element" x="2937" y="496" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-g8" elementRef="g8" xsi:type="Element" x="387" y="496" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="grp-Outcome" xsi:type="Container" x="14" y="580" w="3554" h="110">
+<label xml:lang="en">Outcomes</label>
+<style><fillColor r="252" g="252" b="252" a="0"/><lineColor r="140" g="140" b="140"/><font name="Sans" size="9"><color r="80" g="80" b="80"/></font></style>
+<node identifier="node-o1" elementRef="o1" xsi:type="Element" x="1247" y="606" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-o2" elementRef="o2" xsi:type="Element" x="1877" y="606" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-o3" elementRef="o3" xsi:type="Element" x="1447" y="606" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-o4" elementRef="o4" xsi:type="Element" x="817" y="606" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-o5" elementRef="o5" xsi:type="Element" x="2307" y="606" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-o6" elementRef="o6" xsi:type="Element" x="2507" y="606" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-o7" elementRef="o7" xsi:type="Element" x="2737" y="606" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-o8" elementRef="o8" xsi:type="Element" x="187" y="606" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-o9" elementRef="o9" xsi:type="Element" x="1647" y="606" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="grp-Requirement" xsi:type="Container" x="14" y="690" w="3554" h="110">
+<label xml:lang="en">Requirements</label>
+<style><fillColor r="252" g="252" b="252" a="0"/><lineColor r="140" g="140" b="140"/><font name="Sans" size="9"><color r="80" g="80" b="80"/></font></style>
+<node identifier="node-r1" elementRef="r1" xsi:type="Element" x="1247" y="716" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-r2" elementRef="r2" xsi:type="Element" x="1447" y="716" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-r3" elementRef="r3" xsi:type="Element" x="3137" y="716" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-r4" elementRef="r4" xsi:type="Element" x="387" y="716" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-r5" elementRef="r5" xsi:type="Element" x="1017" y="716" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-r6" elementRef="r6" xsi:type="Element" x="2307" y="716" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-r7" elementRef="r7" xsi:type="Element" x="2507" y="716" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-r8" elementRef="r8" xsi:type="Element" x="587" y="716" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-r9" elementRef="r9" xsi:type="Element" x="3337" y="716" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-r10" elementRef="r10" xsi:type="Element" x="1877" y="716" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-r11" elementRef="r11" xsi:type="Element" x="2077" y="716" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-r12" elementRef="r12" xsi:type="Element" x="2737" y="716" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-r13" elementRef="r13" xsi:type="Element" x="817" y="716" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-r14" elementRef="r14" xsi:type="Element" x="2937" y="716" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-r15" elementRef="r15" xsi:type="Element" x="187" y="716" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="grp-Principle" xsi:type="Container" x="14" y="800" w="3554" h="110">
+<label xml:lang="en">Principles</label>
+<style><fillColor r="252" g="252" b="252" a="0"/><lineColor r="140" g="140" b="140"/><font name="Sans" size="9"><color r="80" g="80" b="80"/></font></style>
+<node identifier="node-p1" elementRef="p1" xsi:type="Element" x="1247" y="826" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-p2" elementRef="p2" xsi:type="Element" x="817" y="826" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-p3" elementRef="p3" xsi:type="Element" x="2737" y="826" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-p4" elementRef="p4" xsi:type="Element" x="1017" y="826" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-p5" elementRef="p5" xsi:type="Element" x="2937" y="826" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-p6" elementRef="p6" xsi:type="Element" x="1877" y="826" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-p7" elementRef="p7" xsi:type="Element" x="1647" y="826" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-p8" elementRef="p8" xsi:type="Element" x="2507" y="826" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-p9" elementRef="p9" xsi:type="Element" x="2077" y="826" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-p10" elementRef="p10" xsi:type="Element" x="2307" y="826" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-p11" elementRef="p11" xsi:type="Element" x="1447" y="826" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="grp-Constraint" xsi:type="Container" x="14" y="910" w="3554" h="110">
+<label xml:lang="en">Constraints</label>
+<style><fillColor r="252" g="252" b="252" a="0"/><lineColor r="140" g="140" b="140"/><font name="Sans" size="9"><color r="80" g="80" b="80"/></font></style>
+<node identifier="node-c1" elementRef="c1" xsi:type="Element" x="1247" y="936" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-c2" elementRef="c2" xsi:type="Element" x="1877" y="936" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-c3" elementRef="c3" xsi:type="Element" x="2307" y="936" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-c4" elementRef="c4" xsi:type="Element" x="2507" y="936" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-c5" elementRef="c5" xsi:type="Element" x="2937" y="936" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-c6" elementRef="c6" xsi:type="Element" x="187" y="936" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-c7" elementRef="c7" xsi:type="Element" x="817" y="936" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-c8" elementRef="c8" xsi:type="Element" x="3137" y="936" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-c9" elementRef="c9" xsi:type="Element" x="3337" y="936" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-c10" elementRef="c10" xsi:type="Element" x="2737" y="936" w="178" h="70"><style><fillColor r="230" g="230" b="250"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="grp-CourseOfAction" xsi:type="Container" x="14" y="1020" w="3554" h="110">
+<label xml:lang="en">Strategy · Courses of Action</label>
+<style><fillColor r="252" g="252" b="252" a="0"/><lineColor r="140" g="140" b="140"/><font name="Sans" size="9"><color r="80" g="80" b="80"/></font></style>
+<node identifier="node-coa1" elementRef="coa1" xsi:type="Element" x="1877" y="1046" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-coa2" elementRef="coa2" xsi:type="Element" x="2077" y="1046" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-coa3" elementRef="coa3" xsi:type="Element" x="1247" y="1046" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-coa4" elementRef="coa4" xsi:type="Element" x="817" y="1046" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-coa5" elementRef="coa5" xsi:type="Element" x="2307" y="1046" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-coa6" elementRef="coa6" xsi:type="Element" x="2737" y="1046" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-coa7" elementRef="coa7" xsi:type="Element" x="2937" y="1046" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-coa8" elementRef="coa8" xsi:type="Element" x="1017" y="1046" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="grp-ValueStream" xsi:type="Container" x="14" y="1130" w="3554" h="110">
+<label xml:lang="en">Strategy · Value Streams</label>
+<style><fillColor r="252" g="252" b="252" a="0"/><lineColor r="140" g="140" b="140"/><font name="Sans" size="9"><color r="80" g="80" b="80"/></font></style>
+<node identifier="node-vs1" elementRef="vs1" xsi:type="Element" x="187" y="1156" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="grp-Resource" xsi:type="Container" x="14" y="1240" w="3554" h="110">
+<label xml:lang="en">Strategy · Resources</label>
+<style><fillColor r="252" g="252" b="252" a="0"/><lineColor r="140" g="140" b="140"/><font name="Sans" size="9"><color r="80" g="80" b="80"/></font></style>
+<node identifier="node-res1" elementRef="res1" xsi:type="Element" x="1247" y="1266" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-res2" elementRef="res2" xsi:type="Element" x="2307" y="1266" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-res3" elementRef="res3" xsi:type="Element" x="2737" y="1266" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-res4" elementRef="res4" xsi:type="Element" x="817" y="1266" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="grp-Capability" xsi:type="Container" x="14" y="1350" w="3554" h="110">
+<label xml:lang="en">Strategy · Capabilities</label>
+<style><fillColor r="252" g="252" b="252" a="0"/><lineColor r="140" g="140" b="140"/><font name="Sans" size="9"><color r="80" g="80" b="80"/></font></style>
+<node identifier="node-cap1" elementRef="cap1" xsi:type="Element" x="1247" y="1376" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-cap2" elementRef="cap2" xsi:type="Element" x="1447" y="1376" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-cap3" elementRef="cap3" xsi:type="Element" x="187" y="1376" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-cap4" elementRef="cap4" xsi:type="Element" x="2937" y="1376" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-cap5" elementRef="cap5" xsi:type="Element" x="817" y="1376" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-cap6" elementRef="cap6" xsi:type="Element" x="2307" y="1376" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-cap7" elementRef="cap7" xsi:type="Element" x="2507" y="1376" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-cap8" elementRef="cap8" xsi:type="Element" x="387" y="1376" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-cap9" elementRef="cap9" xsi:type="Element" x="3137" y="1376" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-cap10" elementRef="cap10" xsi:type="Element" x="2737" y="1376" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-cap11" elementRef="cap11" xsi:type="Element" x="1877" y="1376" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-cap12" elementRef="cap12" xsi:type="Element" x="2077" y="1376" w="178" h="70"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="140"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="grp-reserved0" xsi:type="Container" x="14" y="1460" w="3554" h="200">
+<label xml:lang="en">Business Layer · Services / Processes / Functions / Objects / Events — Phase 3</label>
+<style><fillColor r="245" g="245" b="245" a="0"/><lineColor r="205" g="205" b="205"/><font name="Sans" size="9"><color r="150" g="150" b="150"/></font></style>
+</node>
+<node identifier="grp-reserved1" xsi:type="Container" x="14" y="1660" w="3554" h="170">
+<label xml:lang="en">Application Layer · Components / Services / Data Objects — Phase 4</label>
+<style><fillColor r="245" g="245" b="245" a="0"/><lineColor r="205" g="205" b="205"/><font name="Sans" size="9"><color r="150" g="150" b="150"/></font></style>
+</node>
+<node identifier="grp-reserved2" xsi:type="Container" x="14" y="1830" w="3554" h="150">
+<label xml:lang="en">Technology · OAM component realization (webservice / realtime-platform / postgresql …) — Phase 5</label>
+<style><fillColor r="245" g="245" b="245" a="0"/><lineColor r="205" g="205" b="205"/><font name="Sans" size="9"><color r="150" g="150" b="150"/></font></style>
+</node>
+<connection identifier="conn-1" relationshipRef="rel-1" source="node-member" target="node-d1" xsi:type="Relationship"/>
+<connection identifier="conn-2" relationshipRef="rel-2" source="node-member" target="node-d2" xsi:type="Relationship"><bendpoint x="276" y="256"/><bendpoint x="476" y="256"/></connection>
+<connection identifier="conn-3" relationshipRef="rel-3" source="node-doh" target="node-d1" xsi:type="Relationship"><bendpoint x="1536" y="256"/><bendpoint x="276" y="256"/></connection>
+<connection identifier="conn-4" relationshipRef="rel-4" source="node-doh" target="node-d5" xsi:type="Relationship"><bendpoint x="1536" y="256"/><bendpoint x="3226" y="256"/></connection>
+<connection identifier="conn-5" relationshipRef="rel-5" source="node-doh" target="node-d7" xsi:type="Relationship"><bendpoint x="1536" y="256"/><bendpoint x="1336" y="256"/></connection>
+<connection identifier="conn-6" relationshipRef="rel-6" source="node-partner" target="node-d6" xsi:type="Relationship"/>
+<connection identifier="conn-7" relationshipRef="rel-7" source="node-partner" target="node-d3" xsi:type="Relationship"><bendpoint x="2396" y="256"/><bendpoint x="906" y="256"/></connection>
+<connection identifier="conn-8" relationshipRef="rel-8" source="node-admin" target="node-d7" xsi:type="Relationship"/>
+<connection identifier="conn-9" relationshipRef="rel-9" source="node-admin" target="node-d2" xsi:type="Relationship"><bendpoint x="1336" y="256"/><bendpoint x="476" y="256"/></connection>
+<connection identifier="conn-10" relationshipRef="rel-10" source="node-fraud" target="node-d4" xsi:type="Relationship"><bendpoint x="2826" y="256"/><bendpoint x="3026" y="256"/></connection>
+<connection identifier="conn-11" relationshipRef="rel-11" source="node-fraud" target="node-d3" xsi:type="Relationship"><bendpoint x="2826" y="256"/><bendpoint x="906" y="256"/></connection>
+<connection identifier="conn-12" relationshipRef="rel-12" source="node-ops" target="node-d8" xsi:type="Relationship"/>
+<connection identifier="conn-13" relationshipRef="rel-13" source="node-ops" target="node-d7" xsi:type="Relationship"><bendpoint x="1966" y="256"/><bendpoint x="1336" y="256"/></connection>
+<connection identifier="conn-14" relationshipRef="rel-14" source="node-val_member" target="node-member" xsi:type="Relationship"/>
+<connection identifier="conn-15" relationshipRef="rel-15" source="node-val_doh" target="node-doh" xsi:type="Relationship"><bendpoint x="1336" y="146"/><bendpoint x="1536" y="146"/></connection>
+<connection identifier="conn-16" relationshipRef="rel-16" source="node-a1" target="node-d7" xsi:type="Relationship"/>
+<connection identifier="conn-17" relationshipRef="rel-17" source="node-a1" target="node-g3" xsi:type="Relationship"/>
+<connection identifier="conn-18" relationshipRef="rel-18" source="node-a2" target="node-d3" xsi:type="Relationship"/>
+<connection identifier="conn-19" relationshipRef="rel-19" source="node-a2" target="node-g2" xsi:type="Relationship"/>
+<connection identifier="conn-20" relationshipRef="rel-20" source="node-a3" target="node-d4" xsi:type="Relationship"><bendpoint x="2826" y="366"/><bendpoint x="3026" y="366"/></connection>
+<connection identifier="conn-21" relationshipRef="rel-21" source="node-a3" target="node-g7" xsi:type="Relationship"><bendpoint x="2826" y="476"/><bendpoint x="3026" y="476"/></connection>
+<connection identifier="conn-22" relationshipRef="rel-22" source="node-a4" target="node-d2" xsi:type="Relationship"><bendpoint x="276" y="366"/><bendpoint x="476" y="366"/></connection>
+<connection identifier="conn-23" relationshipRef="rel-23" source="node-a4" target="node-g8" xsi:type="Relationship"><bendpoint x="276" y="476"/><bendpoint x="476" y="476"/></connection>
+<connection identifier="conn-24" relationshipRef="rel-24" source="node-a5" target="node-d6" xsi:type="Relationship"/>
+<connection identifier="conn-25" relationshipRef="rel-25" source="node-a5" target="node-g5" xsi:type="Relationship"/>
+<connection identifier="conn-26" relationshipRef="rel-26" source="node-a6" target="node-d8" xsi:type="Relationship"/>
+<connection identifier="conn-27" relationshipRef="rel-27" source="node-a6" target="node-g4" xsi:type="Relationship"/>
+<connection identifier="conn-28" relationshipRef="rel-28" source="node-d1" target="node-g1" xsi:type="Relationship"/>
+<connection identifier="conn-29" relationshipRef="rel-29" source="node-d2" target="node-g1" xsi:type="Relationship"><bendpoint x="476" y="421"/><bendpoint x="276" y="421"/></connection>
+<connection identifier="conn-30" relationshipRef="rel-30" source="node-d2" target="node-g8" xsi:type="Relationship"/>
+<connection identifier="conn-31" relationshipRef="rel-31" source="node-d3" target="node-g2" xsi:type="Relationship"/>
+<connection identifier="conn-32" relationshipRef="rel-32" source="node-d3" target="node-g5" xsi:type="Relationship"><bendpoint x="906" y="421"/><bendpoint x="2396" y="421"/></connection>
+<connection identifier="conn-33" relationshipRef="rel-33" source="node-d4" target="node-g7" xsi:type="Relationship"/>
+<connection identifier="conn-34" relationshipRef="rel-34" source="node-d5" target="node-g6" xsi:type="Relationship"><bendpoint x="3226" y="421"/><bendpoint x="2826" y="421"/></connection>
+<connection identifier="conn-35" relationshipRef="rel-35" source="node-d6" target="node-g5" xsi:type="Relationship"/>
+<connection identifier="conn-36" relationshipRef="rel-36" source="node-d7" target="node-g2" xsi:type="Relationship"><bendpoint x="1336" y="421"/><bendpoint x="906" y="421"/></connection>
+<connection identifier="conn-37" relationshipRef="rel-37" source="node-d7" target="node-g3" xsi:type="Relationship"/>
+<connection identifier="conn-38" relationshipRef="rel-38" source="node-d8" target="node-g4" xsi:type="Relationship"/>
+<connection identifier="conn-39" relationshipRef="rel-39" source="node-o1" target="node-g3" xsi:type="Relationship"/>
+<connection identifier="conn-40" relationshipRef="rel-40" source="node-o2" target="node-g4" xsi:type="Relationship"/>
+<connection identifier="conn-41" relationshipRef="rel-41" source="node-o3" target="node-g3" xsi:type="Relationship"><bendpoint x="1536" y="586"/><bendpoint x="1336" y="586"/></connection>
+<connection identifier="conn-42" relationshipRef="rel-42" source="node-o4" target="node-g2" xsi:type="Relationship"/>
+<connection identifier="conn-43" relationshipRef="rel-43" source="node-o5" target="node-g5" xsi:type="Relationship"/>
+<connection identifier="conn-44" relationshipRef="rel-44" source="node-o6" target="node-g5" xsi:type="Relationship"><bendpoint x="2596" y="586"/><bendpoint x="2396" y="586"/></connection>
+<connection identifier="conn-45" relationshipRef="rel-45" source="node-o7" target="node-g7" xsi:type="Relationship"><bendpoint x="2826" y="586"/><bendpoint x="3026" y="586"/></connection>
+<connection identifier="conn-46" relationshipRef="rel-46" source="node-o8" target="node-g8" xsi:type="Relationship"><bendpoint x="276" y="586"/><bendpoint x="476" y="586"/></connection>
+<connection identifier="conn-47" relationshipRef="rel-47" source="node-o9" target="node-g3" xsi:type="Relationship"><bendpoint x="1736" y="586"/><bendpoint x="1336" y="586"/></connection>
+<connection identifier="conn-48" relationshipRef="rel-48" source="node-o1" target="node-g1" xsi:type="Relationship"><bendpoint x="1336" y="586"/><bendpoint x="276" y="586"/></connection>
+<connection identifier="conn-49" relationshipRef="rel-49" source="node-r1" target="node-g1" xsi:type="Relationship"><bendpoint x="1336" y="641"/><bendpoint x="276" y="641"/></connection>
+<connection identifier="conn-50" relationshipRef="rel-50" source="node-r2" target="node-g3" xsi:type="Relationship"><bendpoint x="1536" y="641"/><bendpoint x="1336" y="641"/></connection>
+<connection identifier="conn-51" relationshipRef="rel-51" source="node-r3" target="node-g7" xsi:type="Relationship"><bendpoint x="3226" y="641"/><bendpoint x="3026" y="641"/></connection>
+<connection identifier="conn-52" relationshipRef="rel-52" source="node-r4" target="node-g1" xsi:type="Relationship"><bendpoint x="476" y="641"/><bendpoint x="276" y="641"/></connection>
+<connection identifier="conn-53" relationshipRef="rel-53" source="node-r5" target="node-g2" xsi:type="Relationship"><bendpoint x="1106" y="641"/><bendpoint x="906" y="641"/></connection>
+<connection identifier="conn-54" relationshipRef="rel-54" source="node-r6" target="node-g5" xsi:type="Relationship"/>
+<connection identifier="conn-55" relationshipRef="rel-55" source="node-r7" target="node-g5" xsi:type="Relationship"><bendpoint x="2596" y="641"/><bendpoint x="2396" y="641"/></connection>
+<connection identifier="conn-56" relationshipRef="rel-56" source="node-r8" target="node-g8" xsi:type="Relationship"><bendpoint x="676" y="641"/><bendpoint x="476" y="641"/></connection>
+<connection identifier="conn-57" relationshipRef="rel-57" source="node-r9" target="node-g6" xsi:type="Relationship"><bendpoint x="3426" y="641"/><bendpoint x="2826" y="641"/></connection>
+<connection identifier="conn-58" relationshipRef="rel-58" source="node-r10" target="node-g4" xsi:type="Relationship"/>
+<connection identifier="conn-59" relationshipRef="rel-59" source="node-r11" target="node-g4" xsi:type="Relationship"><bendpoint x="2166" y="641"/><bendpoint x="1966" y="641"/></connection>
+<connection identifier="conn-60" relationshipRef="rel-60" source="node-r12" target="node-g7" xsi:type="Relationship"><bendpoint x="2826" y="641"/><bendpoint x="3026" y="641"/></connection>
+<connection identifier="conn-61" relationshipRef="rel-61" source="node-p1" target="node-r1" xsi:type="Relationship"/>
+<connection identifier="conn-62" relationshipRef="rel-62" source="node-p1" target="node-r2" xsi:type="Relationship"><bendpoint x="1336" y="806"/><bendpoint x="1536" y="806"/></connection>
+<connection identifier="conn-63" relationshipRef="rel-63" source="node-p1" target="node-r4" xsi:type="Relationship"><bendpoint x="1336" y="806"/><bendpoint x="476" y="806"/></connection>
+<connection identifier="conn-64" relationshipRef="rel-64" source="node-p2" target="node-r5" xsi:type="Relationship"><bendpoint x="906" y="806"/><bendpoint x="1106" y="806"/></connection>
+<connection identifier="conn-65" relationshipRef="rel-65" source="node-p2" target="node-r10" xsi:type="Relationship"><bendpoint x="906" y="806"/><bendpoint x="1966" y="806"/></connection>
+<connection identifier="conn-66" relationshipRef="rel-66" source="node-p2" target="node-r11" xsi:type="Relationship"><bendpoint x="906" y="806"/><bendpoint x="2166" y="806"/></connection>
+<connection identifier="conn-67" relationshipRef="rel-67" source="node-p3" target="node-r3" xsi:type="Relationship"><bendpoint x="2826" y="806"/><bendpoint x="3226" y="806"/></connection>
+<connection identifier="conn-68" relationshipRef="rel-68" source="node-p3" target="node-r4" xsi:type="Relationship"><bendpoint x="2826" y="806"/><bendpoint x="476" y="806"/></connection>
+<connection identifier="conn-69" relationshipRef="rel-69" source="node-p4" target="node-r5" xsi:type="Relationship"/>
+<connection identifier="conn-70" relationshipRef="rel-70" source="node-p5" target="node-r6" xsi:type="Relationship"><bendpoint x="3026" y="806"/><bendpoint x="2396" y="806"/></connection>
+<connection identifier="conn-71" relationshipRef="rel-71" source="node-p5" target="node-r12" xsi:type="Relationship"><bendpoint x="3026" y="806"/><bendpoint x="2826" y="806"/></connection>
+<connection identifier="conn-72" relationshipRef="rel-72" source="node-p6" target="node-r10" xsi:type="Relationship"/>
+<connection identifier="conn-73" relationshipRef="rel-73" source="node-p7" target="node-r4" xsi:type="Relationship"><bendpoint x="1736" y="806"/><bendpoint x="476" y="806"/></connection>
+<connection identifier="conn-74" relationshipRef="rel-74" source="node-p8" target="node-r6" xsi:type="Relationship"><bendpoint x="2596" y="806"/><bendpoint x="2396" y="806"/></connection>
+<connection identifier="conn-75" relationshipRef="rel-75" source="node-p9" target="node-r11" xsi:type="Relationship"/>
+<connection identifier="conn-76" relationshipRef="rel-76" source="node-p9" target="node-r1" xsi:type="Relationship"><bendpoint x="2166" y="806"/><bendpoint x="1336" y="806"/></connection>
+<connection identifier="conn-77" relationshipRef="rel-77" source="node-p1" target="node-g3" xsi:type="Relationship"/>
+<connection identifier="conn-78" relationshipRef="rel-78" source="node-p2" target="node-g2" xsi:type="Relationship"/>
+<connection identifier="conn-79" relationshipRef="rel-79" source="node-p9" target="node-g4" xsi:type="Relationship"><bendpoint x="2166" y="696"/><bendpoint x="1966" y="696"/></connection>
+<connection identifier="conn-80" relationshipRef="rel-80" source="node-c1" target="node-g3" xsi:type="Relationship"/>
+<connection identifier="conn-81" relationshipRef="rel-81" source="node-c1" target="node-r2" xsi:type="Relationship"><bendpoint x="1336" y="861"/><bendpoint x="1536" y="861"/></connection>
+<connection identifier="conn-82" relationshipRef="rel-82" source="node-c2" target="node-g4" xsi:type="Relationship"/>
+<connection identifier="conn-83" relationshipRef="rel-83" source="node-c2" target="node-r10" xsi:type="Relationship"/>
+<connection identifier="conn-84" relationshipRef="rel-84" source="node-c3" target="node-g5" xsi:type="Relationship"/>
+<connection identifier="conn-85" relationshipRef="rel-85" source="node-c3" target="node-r6" xsi:type="Relationship"/>
+<connection identifier="conn-86" relationshipRef="rel-86" source="node-c4" target="node-g5" xsi:type="Relationship"><bendpoint x="2596" y="751"/><bendpoint x="2396" y="751"/></connection>
+<connection identifier="conn-87" relationshipRef="rel-87" source="node-c4" target="node-r7" xsi:type="Relationship"/>
+<connection identifier="conn-88" relationshipRef="rel-88" source="node-c5" target="node-g6" xsi:type="Relationship"><bendpoint x="3026" y="751"/><bendpoint x="2826" y="751"/></connection>
+<connection identifier="conn-89" relationshipRef="rel-89" source="node-c5" target="node-r9" xsi:type="Relationship"><bendpoint x="3026" y="861"/><bendpoint x="3426" y="861"/></connection>
+<connection identifier="conn-90" relationshipRef="rel-90" source="node-c6" target="node-g1" xsi:type="Relationship"/>
+<connection identifier="conn-91" relationshipRef="rel-91" source="node-c6" target="node-r2" xsi:type="Relationship"><bendpoint x="276" y="861"/><bendpoint x="1536" y="861"/></connection>
+<connection identifier="conn-92" relationshipRef="rel-92" source="node-c7" target="node-g2" xsi:type="Relationship"/>
+<connection identifier="conn-93" relationshipRef="rel-93" source="node-c7" target="node-r4" xsi:type="Relationship"><bendpoint x="906" y="861"/><bendpoint x="476" y="861"/></connection>
+<connection identifier="conn-94" relationshipRef="rel-94" source="node-c8" target="node-doh" xsi:type="Relationship"><bendpoint x="3226" y="586"/><bendpoint x="1536" y="586"/></connection>
+<connection identifier="conn-95" relationshipRef="rel-95" source="node-res1" target="node-cap3" xsi:type="Relationship"><bendpoint x="1336" y="1356"/><bendpoint x="276" y="1356"/></connection>
+<connection identifier="conn-96" relationshipRef="rel-96" source="node-res2" target="node-cap6" xsi:type="Relationship"/>
+<connection identifier="conn-97" relationshipRef="rel-97" source="node-res2" target="node-cap7" xsi:type="Relationship"><bendpoint x="2396" y="1356"/><bendpoint x="2596" y="1356"/></connection>
+<connection identifier="conn-98" relationshipRef="rel-98" source="node-res3" target="node-cap4" xsi:type="Relationship"><bendpoint x="2826" y="1356"/><bendpoint x="3026" y="1356"/></connection>
+<connection identifier="conn-99" relationshipRef="rel-99" source="node-res3" target="node-cap1" xsi:type="Relationship"><bendpoint x="2826" y="1356"/><bendpoint x="1336" y="1356"/></connection>
+<connection identifier="conn-100" relationshipRef="rel-100" source="node-res4" target="node-cap5" xsi:type="Relationship"/>
+<connection identifier="conn-101" relationshipRef="rel-101" source="node-cap1" target="node-coa1" xsi:type="Relationship"><bendpoint x="1336" y="1246"/><bendpoint x="1966" y="1246"/></connection>
+<connection identifier="conn-102" relationshipRef="rel-102" source="node-cap11" target="node-coa1" xsi:type="Relationship"/>
+<connection identifier="conn-103" relationshipRef="rel-103" source="node-cap12" target="node-coa1" xsi:type="Relationship"><bendpoint x="2166" y="1246"/><bendpoint x="1966" y="1246"/></connection>
+<connection identifier="conn-104" relationshipRef="rel-104" source="node-cap2" target="node-coa2" xsi:type="Relationship"><bendpoint x="1536" y="1246"/><bendpoint x="2166" y="1246"/></connection>
+<connection identifier="conn-105" relationshipRef="rel-105" source="node-cap8" target="node-coa2" xsi:type="Relationship"><bendpoint x="476" y="1246"/><bendpoint x="2166" y="1246"/></connection>
+<connection identifier="conn-106" relationshipRef="rel-106" source="node-cap11" target="node-coa2" xsi:type="Relationship"><bendpoint x="1966" y="1246"/><bendpoint x="2166" y="1246"/></connection>
+<connection identifier="conn-107" relationshipRef="rel-107" source="node-cap3" target="node-coa3" xsi:type="Relationship"><bendpoint x="276" y="1246"/><bendpoint x="1336" y="1246"/></connection>
+<connection identifier="conn-108" relationshipRef="rel-108" source="node-cap5" target="node-coa4" xsi:type="Relationship"/>
+<connection identifier="conn-109" relationshipRef="rel-109" source="node-cap6" target="node-coa5" xsi:type="Relationship"/>
+<connection identifier="conn-110" relationshipRef="rel-110" source="node-cap7" target="node-coa5" xsi:type="Relationship"><bendpoint x="2596" y="1246"/><bendpoint x="2396" y="1246"/></connection>
+<connection identifier="conn-111" relationshipRef="rel-111" source="node-cap10" target="node-coa6" xsi:type="Relationship"/>
+<connection identifier="conn-112" relationshipRef="rel-112" source="node-cap4" target="node-coa6" xsi:type="Relationship"><bendpoint x="3026" y="1246"/><bendpoint x="2826" y="1246"/></connection>
+<connection identifier="conn-113" relationshipRef="rel-113" source="node-cap9" target="node-coa7" xsi:type="Relationship"><bendpoint x="3226" y="1246"/><bendpoint x="3026" y="1246"/></connection>
+<connection identifier="conn-114" relationshipRef="rel-114" source="node-cap5" target="node-coa8" xsi:type="Relationship"><bendpoint x="906" y="1246"/><bendpoint x="1106" y="1246"/></connection>
+<connection identifier="conn-115" relationshipRef="rel-115" source="node-cap10" target="node-coa8" xsi:type="Relationship"><bendpoint x="2826" y="1246"/><bendpoint x="1106" y="1246"/></connection>
+<connection identifier="conn-116" relationshipRef="rel-116" source="node-coa1" target="node-r1" xsi:type="Relationship"><bendpoint x="1966" y="916"/><bendpoint x="1336" y="916"/></connection>
+<connection identifier="conn-117" relationshipRef="rel-117" source="node-coa1" target="node-r10" xsi:type="Relationship"/>
+<connection identifier="conn-118" relationshipRef="rel-118" source="node-coa1" target="node-r11" xsi:type="Relationship"><bendpoint x="1966" y="916"/><bendpoint x="2166" y="916"/></connection>
+<connection identifier="conn-119" relationshipRef="rel-119" source="node-coa2" target="node-r2" xsi:type="Relationship"><bendpoint x="2166" y="916"/><bendpoint x="1536" y="916"/></connection>
+<connection identifier="conn-120" relationshipRef="rel-120" source="node-coa2" target="node-r8" xsi:type="Relationship"><bendpoint x="2166" y="916"/><bendpoint x="676" y="916"/></connection>
+<connection identifier="conn-121" relationshipRef="rel-121" source="node-coa3" target="node-r4" xsi:type="Relationship"><bendpoint x="1336" y="916"/><bendpoint x="476" y="916"/></connection>
+<connection identifier="conn-122" relationshipRef="rel-122" source="node-coa3" target="node-r15" xsi:type="Relationship"><bendpoint x="1336" y="916"/><bendpoint x="276" y="916"/></connection>
+<connection identifier="conn-123" relationshipRef="rel-123" source="node-coa4" target="node-r5" xsi:type="Relationship"><bendpoint x="906" y="916"/><bendpoint x="1106" y="916"/></connection>
+<connection identifier="conn-124" relationshipRef="rel-124" source="node-coa5" target="node-r6" xsi:type="Relationship"/>
+<connection identifier="conn-125" relationshipRef="rel-125" source="node-coa5" target="node-r7" xsi:type="Relationship"><bendpoint x="2396" y="916"/><bendpoint x="2596" y="916"/></connection>
+<connection identifier="conn-126" relationshipRef="rel-126" source="node-coa6" target="node-r3" xsi:type="Relationship"><bendpoint x="2826" y="916"/><bendpoint x="3226" y="916"/></connection>
+<connection identifier="conn-127" relationshipRef="rel-127" source="node-coa6" target="node-r12" xsi:type="Relationship"/>
+<connection identifier="conn-128" relationshipRef="rel-128" source="node-coa7" target="node-r9" xsi:type="Relationship"><bendpoint x="3026" y="916"/><bendpoint x="3426" y="916"/></connection>
+<connection identifier="conn-129" relationshipRef="rel-129" source="node-coa7" target="node-r14" xsi:type="Relationship"/>
+<connection identifier="conn-130" relationshipRef="rel-130" source="node-coa8" target="node-r13" xsi:type="Relationship"><bendpoint x="1106" y="916"/><bendpoint x="906" y="916"/></connection>
+<connection identifier="conn-131" relationshipRef="rel-131" source="node-cap1" target="node-vs1" xsi:type="Relationship"><bendpoint x="1336" y="1301"/><bendpoint x="276" y="1301"/></connection>
+<connection identifier="conn-132" relationshipRef="rel-132" source="node-cap2" target="node-vs1" xsi:type="Relationship"><bendpoint x="1536" y="1301"/><bendpoint x="276" y="1301"/></connection>
+<connection identifier="conn-133" relationshipRef="rel-133" source="node-cap3" target="node-vs1" xsi:type="Relationship"/>
+<connection identifier="conn-134" relationshipRef="rel-134" source="node-cap5" target="node-vs1" xsi:type="Relationship"><bendpoint x="906" y="1301"/><bendpoint x="276" y="1301"/></connection>
+<connection identifier="conn-135" relationshipRef="rel-135" source="node-cap6" target="node-vs1" xsi:type="Relationship"><bendpoint x="2396" y="1301"/><bendpoint x="276" y="1301"/></connection>
+<connection identifier="conn-136" relationshipRef="rel-136" source="node-cap7" target="node-vs1" xsi:type="Relationship"><bendpoint x="2596" y="1301"/><bendpoint x="276" y="1301"/></connection>
+<connection identifier="conn-137" relationshipRef="rel-137" source="node-vs1" target="node-member" xsi:type="Relationship"/>
+<connection identifier="conn-138" relationshipRef="rel-138" source="node-vs1" target="node-val_member" xsi:type="Relationship"/>
+<connection identifier="conn-139" relationshipRef="rel-139" source="node-r15" target="node-g8" xsi:type="Relationship"><bendpoint x="276" y="641"/><bendpoint x="476" y="641"/></connection>
+<connection identifier="conn-140" relationshipRef="rel-140" source="node-doh" target="node-d9" xsi:type="Relationship"><bendpoint x="1536" y="256"/><bendpoint x="1106" y="256"/></connection>
+<connection identifier="conn-141" relationshipRef="rel-141" source="node-fraud" target="node-d9" xsi:type="Relationship"><bendpoint x="2826" y="256"/><bendpoint x="1106" y="256"/></connection>
+<connection identifier="conn-142" relationshipRef="rel-142" source="node-doh" target="node-d10" xsi:type="Relationship"><bendpoint x="1536" y="256"/><bendpoint x="2826" y="256"/></connection>
+<connection identifier="conn-143" relationshipRef="rel-143" source="node-d9" target="node-g2" xsi:type="Relationship"><bendpoint x="1106" y="421"/><bendpoint x="906" y="421"/></connection>
+<connection identifier="conn-144" relationshipRef="rel-144" source="node-d9" target="node-g6" xsi:type="Relationship"><bendpoint x="1106" y="421"/><bendpoint x="2826" y="421"/></connection>
+<connection identifier="conn-145" relationshipRef="rel-145" source="node-d10" target="node-g6" xsi:type="Relationship"/>
+<connection identifier="conn-146" relationshipRef="rel-146" source="node-r13" target="node-g6" xsi:type="Relationship"><bendpoint x="906" y="641"/><bendpoint x="2826" y="641"/></connection>
+<connection identifier="conn-147" relationshipRef="rel-147" source="node-r13" target="node-g2" xsi:type="Relationship"/>
+<connection identifier="conn-148" relationshipRef="rel-148" source="node-r14" target="node-g6" xsi:type="Relationship"><bendpoint x="3026" y="641"/><bendpoint x="2826" y="641"/></connection>
+<connection identifier="conn-149" relationshipRef="rel-149" source="node-p10" target="node-r6" xsi:type="Relationship"/>
+<connection identifier="conn-150" relationshipRef="rel-150" source="node-p10" target="node-r7" xsi:type="Relationship"><bendpoint x="2396" y="806"/><bendpoint x="2596" y="806"/></connection>
+<connection identifier="conn-151" relationshipRef="rel-151" source="node-p10" target="node-g6" xsi:type="Relationship"><bendpoint x="2396" y="696"/><bendpoint x="2826" y="696"/></connection>
+<connection identifier="conn-152" relationshipRef="rel-152" source="node-p11" target="node-r5" xsi:type="Relationship"><bendpoint x="1536" y="806"/><bendpoint x="1106" y="806"/></connection>
+<connection identifier="conn-153" relationshipRef="rel-153" source="node-p11" target="node-r11" xsi:type="Relationship"><bendpoint x="1536" y="806"/><bendpoint x="2166" y="806"/></connection>
+<connection identifier="conn-154" relationshipRef="rel-154" source="node-p11" target="node-r14" xsi:type="Relationship"><bendpoint x="1536" y="806"/><bendpoint x="3026" y="806"/></connection>
+<connection identifier="conn-155" relationshipRef="rel-155" source="node-p11" target="node-g6" xsi:type="Relationship"><bendpoint x="1536" y="696"/><bendpoint x="2826" y="696"/></connection>
+<connection identifier="conn-156" relationshipRef="rel-156" source="node-c9" target="node-g6" xsi:type="Relationship"><bendpoint x="3426" y="751"/><bendpoint x="2826" y="751"/></connection>
+<connection identifier="conn-157" relationshipRef="rel-157" source="node-c9" target="node-r3" xsi:type="Relationship"><bendpoint x="3426" y="861"/><bendpoint x="3226" y="861"/></connection>
+<connection identifier="conn-158" relationshipRef="rel-158" source="node-c9" target="node-r9" xsi:type="Relationship"/>
+<connection identifier="conn-159" relationshipRef="rel-159" source="node-c10" target="node-g6" xsi:type="Relationship"/>
+<connection identifier="conn-160" relationshipRef="rel-160" source="node-c10" target="node-r6" xsi:type="Relationship"><bendpoint x="2826" y="861"/><bendpoint x="2396" y="861"/></connection>
+</view>
+</diagrams></views>
+</model>

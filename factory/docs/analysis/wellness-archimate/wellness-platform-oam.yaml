@@ -1,0 +1,259 @@
+# Wellness Platform — OAM Application (full value path: eligibility · earn · redeem · settle)
+#
+# This is the Technology-layer SOLUTION realization of the architecture in this folder. Every component
+# references a REAL ComponentDefinition in the catalog
+# (factory/production-lines/traditional-cloud/adapters/catalog/*.cd.yaml). It is the deployable that the
+# solution-architecture.drawio depicts.
+#
+# Catalog mapping (solution SBB -> OAM component type):
+#   microservices ............ webservice          gamification engine, wallet, marketplace, ...
+#   data stores .............. postgresql          wallet / engine / marketplace stores
+#   Event Hub ................ realtime-platform    Kafka + Lenses async spine
+#   DATA-SVC (OLAP) .......... analytics-platform   warehouse roundtrip on the spine
+#   live board (/ws) ......... realtime-service     member real-time fan-out
+#   BFF federation ........... graphql-gateway      Hive gateway auto-federates the services
+#   identity ................. auth0-idp            *** equivalence note below ***
+#
+# *** IdP equivalence: the solution diagram shows UAE Pass (citizen federation) at the north gateway and
+#     Microsoft Entra (workforce/service identity) at the south gateway. The platform catalog does not
+#     ship those two providers, so we use the platform's identity SBB `auth0-idp` as the equivalent — it
+#     emits the `<name>-conn` secret (AUTH0_*/JWT_ISSUER_URI) that webservices bind via `identity:`,
+#     and APIM validates the minted JWT. On UAE infrastructure you swap auth0-idp for a UAE-Pass
+#     federation + Entra connector emitting the same `-conn` shape; the OAM wiring is unchanged.
+#
+# Bindings (binding-contract): a component named X emits secret `X-conn`; a webservice references it via
+# `database:`/`identity:`/`realtime:`/`cache:` (-> envFrom). `expose-api` trait publishes the service to
+# APIM (the south Platform Gateway). `enableGraphQLFederation: true` makes the member-bff (graphql-gateway)
+# auto-discover and federate it (the north path).
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: wellness-platform
+  namespace: default
+  annotations:
+    app.oam.dev/description: "DoH wellness gamification (Sahatna Points) — full value path"
+spec:
+  components:
+
+    # ---------- identity (auth0-idp ≈ UAE Pass citizen + Entra service) ----------
+    - name: wellness-identity
+      type: auth0-idp
+      properties:
+        kvSecretPrefix: wellness-auth
+
+    # ---------- persistence (postgresql · column-level KMS) ----------
+    - name: wallet-db
+      type: postgresql
+      properties: { database: wallet }
+    - name: engine-db
+      type: postgresql
+      properties: { database: gamification }
+    - name: market-db
+      type: postgresql
+      properties: { database: marketplace }
+
+    # ---------- Event Hub: async integration spine (realtime-platform) ----------
+    # PLATFORM-OWNED single instance (schema/retention/replay = platform concern, inv-6). It never spans the
+    # trust boundary: Sahatna↔platform crossings are SYNC via APIM + the B2B Entra token. The ONE exception is
+    # telemetry-ingest, an inbound boundary-crossing topic Sahatna may publish to DIRECTLY using an Entra
+    # workload/managed identity + topic-scoped ACL (Event-Hub-native auth, NOT the APIM token) when the
+    # wearable firehose is too heavy for sync APIM. See 20-async-eventing-and-b2b-security.md.
+    - name: event-spine
+      type: realtime-platform
+      properties:
+        topics:
+          - name: telemetry-ingest # raw activity from Sahatna (boundary-crossing; Entra MI, scoped ACL) → Verification
+          - name: activity         # activity.verified (Verification → Scoring · FRAUD-SVC)
+          - name: enrolment        # enrolment.created (Enrolment → Verification · Scoring)
+          - name: challenge        # challenge.published / withdrawn / concluded (Challenge → Eligibility Resolver · DATA-SVC · Settlement)
+          - name: wallet           # points.credited (Wallet → DATA-SVC · NUDGE-SVC · live-board)
+          - name: voucher          # voucher.issued (Redemption Orchestrator → DATA-SVC · NUDGE-SVC · FRAUD-SVC)
+          - name: redemption       # redemption.uncertain (Redemption Orchestrator → NUDGE-SVC · DATA-SVC)
+          - name: eligibility      # eligibility.resolved (Eligibility Resolver → DATA-SVC)
+          - name: leaderboard      # roundtrip feature topic (Scoring/Lenses → live-board /ws)
+
+    # ---------- Gamification Platform — core engine (webservice microservices) ----------
+    - name: enrolment-eligibility
+      type: webservice
+      properties:
+        language: python
+        framework: fastapi
+        repository: wellness-platform
+        database: engine-db
+        identity: wellness-identity
+        realtime: event-spine
+        enableGraphQLFederation: true
+      traits:
+        - type: expose-api
+          properties: { identity: wellness-identity }
+
+    - name: challenge-svc
+      type: webservice
+      properties:
+        language: python
+        framework: fastapi
+        repository: wellness-platform
+        database: engine-db
+        identity: wellness-identity
+        realtime: event-spine
+        enableGraphQLFederation: true
+      traits:
+        - type: expose-api
+          properties: { identity: wellness-identity }
+
+    - name: scoring-svc
+      type: webservice
+      properties:
+        language: python
+        framework: fastapi
+        repository: wellness-platform
+        database: engine-db
+        realtime: event-spine
+
+    - name: consent-svc
+      type: webservice
+      properties:
+        language: python
+        framework: fastapi
+        repository: wellness-platform
+        database: engine-db
+        identity: wellness-identity
+
+    # LOCAL segmentation only — builds + stores demographic/telemetry segments (segment_id + membership)
+    # from Sahatna-ingested data. Clinical segments/membership are EXTERNAL (Clinical Team on Malaffi).
+    - name: cohort-svc
+      type: webservice
+      properties:
+        language: python
+        framework: fastapi
+        repository: wellness-platform
+        database: engine-db
+        realtime: event-spine
+
+    # The verified-signal gate (inv-3) — only emits activity.verified; scoring advances only on it.
+    - name: verification-svc
+      type: webservice
+      properties:
+        language: python
+        framework: fastapi
+        repository: wellness-platform
+        realtime: event-spine
+
+    # Malaffi HIE adapter — fronts the TWO external APIs: segment-metadata (authoring, no membership)
+    # and scoped membership-query (eligibility, "of active segment_ids which is X in" — data minimisation).
+    - name: malaffi-adapter
+      type: webservice
+      properties:
+        language: python
+        framework: fastapi
+        repository: wellness-platform
+        identity: wellness-identity
+
+    # ---------- Wallet & Marketplace services ----------
+    - name: wallet-svc
+      type: webservice
+      properties:
+        language: python
+        framework: fastapi
+        repository: wellness-platform
+        database: wallet-db
+        identity: wellness-identity
+        realtime: event-spine
+      traits:
+        - type: expose-api
+          properties: { identity: wellness-identity }
+
+    - name: marketplace-svc
+      type: webservice
+      properties:
+        language: python
+        framework: fastapi
+        repository: wellness-platform
+        database: market-db
+        identity: wellness-identity
+        realtime: event-spine
+        enableGraphQLFederation: true
+      traits:
+        - type: expose-api
+          properties: { identity: wellness-identity }
+
+    - name: partner-settlement-svc
+      type: webservice
+      properties:
+        language: python
+        framework: fastapi
+        repository: wellness-platform
+        database: market-db
+        identity: wellness-identity
+        realtime: event-spine
+      traits:
+        - type: expose-api
+          properties: { identity: wellness-identity }
+
+    - name: fraud-svc
+      type: webservice
+      properties:
+        language: python
+        framework: fastapi
+        repository: wellness-platform
+        realtime: event-spine
+
+    - name: engagement-svc          # Engagement: nudges · goals · cohort plans (decides WHAT to send)
+      type: webservice
+      properties:
+        language: python
+        framework: fastapi
+        repository: wellness-platform
+        realtime: event-spine
+
+    # NUDGE-SVC: composes notification requests + consent-gates, then calls Sahatna's EXTERNAL
+    # Notifications API via APIM (Sahatna owns end-user delivery & UX). It has NO channels of its own.
+    # Consent (notify-consent) is propagated from Sahatna into consent-svc and checked here before send.
+    # The Sahatna Notifications API is external (like Malaffi) — modelled as an outbound APIM call, not a
+    # platform component. identity = JWT to call Sahatna's APIM product; realtime = event triggers.
+    - name: notification-svc        # NUDGE-SVC (consent-gated; delegates delivery to Sahatna)
+      type: webservice
+      properties:
+        language: python
+        framework: fastapi
+        repository: wellness-platform
+        identity: wellness-identity
+        realtime: event-spine
+
+    # ---------- DATA-SVC: analytics / OLAP (analytics-platform on the spine) ----------
+    - name: analytics
+      type: analytics-platform
+      properties:
+        realtime: event-spine
+        ingestion:
+          mode: gateway
+        warehouse:
+          type: snowflake
+          credentialsSecret: snowflake-conn
+          database: WELLNESS
+          schema: ANALYTICS
+        features:
+          - name: engagement_rollup
+            sql: |
+              SET defaults.topic.autocreate=true;
+              INSERT INTO leaderboard
+              SELECT STREAM user_id, SUM(points) AS total_points
+              FROM wallet GROUP BY user_id
+        roundtrip:
+          topic: leaderboard
+
+    # ---------- Member real-time channel (/ws gateway) ----------
+    - name: live-board
+      type: realtime-service
+      properties:
+        name: live-board
+        role: gateway
+        realtime: event-spine
+        consumes:
+          - leaderboard
+
+    # ---------- BFF federation: north gateway (graphql-gateway · Hive) ----------
+    - name: member-bff
+      type: graphql-gateway
+      properties:
+        autoSchema: true

@@ -1,0 +1,357 @@
+# auto-generated D2 banded swimlane C4
+direction: down
+
+vars: {}
+
+layers_root: {
+  grid-columns: 1
+  grid-gap: 40
+
+  z_client: "Client Surfaces — Sahatna Citizen App" {
+    grid-rows: 1
+    grid-gap: 30
+    style.fill: "#FFE6CC"
+    style.stroke: "#D79B00"
+    style.stroke-width: 2
+    style.font-size: 18
+    style.bold: true
+    cl_chal: "Challenges" {
+      style.fill: "#FFE6CC"
+      style.stroke: "#D79B00"
+      style.border-radius: 6
+    }
+    cl_wallet: "Rewards and Wallet" {
+      style.fill: "#FFE6CC"
+      style.stroke: "#D79B00"
+      style.border-radius: 6
+    }
+    cl_market: "Marketplace and Redeem" {
+      style.fill: "#FFE6CC"
+      style.stroke: "#D79B00"
+      style.border-radius: 6
+    }
+  }
+
+  z_apim_n: "API Gateway — North" {
+    grid-rows: 1
+    grid-gap: 30
+    style.fill: "#D7E8F2"
+    style.stroke: "#3A7CA5"
+    style.stroke-width: 2
+    style.font-size: 18
+    style.bold: true
+    apim_n: "Azure APIM - Citizen Gateway" {
+      style.fill: "#D7E8F2"
+      style.stroke: "#3A7CA5"
+      style.border-radius: 6
+    }
+    idp_uaepass: "UAE Pass IdP" {
+      style.fill: "#D7E8F2"
+      style.stroke: "#3A7CA5"
+      style.border-radius: 6
+    }
+  }
+
+  z_bff: "BFF Layer — Sahatna BFF" {
+    grid-rows: 1
+    grid-gap: 30
+    style.fill: "#DAE8FC"
+    style.stroke: "#6C8EBF"
+    style.stroke-width: 2
+    style.font-size: 18
+    style.bold: true
+    bff_member: "Member BFF" {
+      style.fill: "#DAE8FC"
+      style.stroke: "#6C8EBF"
+      style.border-radius: 6
+    }
+    bff_admin: "Admin / Partner BFF" {
+      style.fill: "#DAE8FC"
+      style.stroke: "#6C8EBF"
+      style.border-radius: 6
+    }
+    cms_sahatna: "Sahatna CMS" {
+      style.fill: "#DAE8FC"
+      style.stroke: "#6C8EBF"
+      style.border-radius: 6
+    }
+    sah_notify: "Sahatna Notifications API" {
+      style.fill: "#DAE8FC"
+      style.stroke: "#6C8EBF"
+      style.border-radius: 6
+    }
+  }
+
+  z_apim_s: "Integration Layer — South" {
+    grid-rows: 1
+    grid-gap: 30
+    style.fill: "#D7E8F2"
+    style.stroke: "#3A7CA5"
+    style.stroke-width: 2
+    style.font-size: 18
+    style.bold: true
+    apim_s: "Azure APIM - Platform Gateway" {
+      style.fill: "#D7E8F2"
+      style.stroke: "#3A7CA5"
+      style.border-radius: 6
+    }
+    eh_integration: "Event Hub (EVENT-SVC)" {
+      style.fill: "#D7E8F2"
+      style.stroke: "#3A7CA5"
+      style.border-radius: 6
+    }
+    idp_entra: "Microsoft Entra IdP" {
+      style.fill: "#D7E8F2"
+      style.stroke: "#3A7CA5"
+      style.border-radius: 6
+    }
+  }
+
+  z_engine: "Gamification Platform — Core Engine" {
+    grid-rows: 1
+    grid-gap: 30
+    style.fill: "#D5E8D4"
+    style.stroke: "#82B366"
+    style.stroke-width: 2
+    style.font-size: 18
+    style.bold: true
+    en_enrol: "Enrolment and Eligibility" {
+      style.fill: "#D5E8D4"
+      style.stroke: "#82B366"
+      style.border-radius: 6
+    }
+    en_cohort: "Local Segmentation" {
+      style.fill: "#D5E8D4"
+      style.stroke: "#82B366"
+      style.border-radius: 6
+    }
+    en_chal: "Challenge" {
+      style.fill: "#D5E8D4"
+      style.stroke: "#82B366"
+      style.border-radius: 6
+    }
+    en_verify: "Verification" {
+      style.fill: "#D5E8D4"
+      style.stroke: "#82B366"
+      style.border-radius: 6
+    }
+    en_score: "Scoring and Recognition" {
+      style.fill: "#D5E8D4"
+      style.stroke: "#82B366"
+      style.border-radius: 6
+    }
+    en_engage: "Engagement" {
+      style.fill: "#D5E8D4"
+      style.stroke: "#82B366"
+      style.border-radius: 6
+    }
+    en_eligorch: "Eligibility Resolver" {
+      style.fill: "#D5E8D4"
+      style.stroke: "#82B366"
+      style.border-radius: 6
+    }
+    en_maladapter: "Malaffi Adapter" {
+      style.fill: "#D5E8D4"
+      style.stroke: "#82B366"
+      style.border-radius: 6
+    }
+  }
+
+  z_value: "Wallet & Marketplace Services" {
+    grid-rows: 1
+    grid-gap: 30
+    style.fill: "#E1D5E7"
+    style.stroke: "#9673A6"
+    style.stroke-width: 2
+    style.font-size: 18
+    style.bold: true
+    wm_wallet: "Wallet - Points Ledger" {
+      style.fill: "#E1D5E7"
+      style.stroke: "#9673A6"
+      style.border-radius: 6
+    }
+    wm_market: "Marketplace and Voucher" {
+      style.fill: "#E1D5E7"
+      style.stroke: "#9673A6"
+      style.border-radius: 6
+    }
+    wm_partner: "Partner and Settlement" {
+      style.fill: "#E1D5E7"
+      style.stroke: "#9673A6"
+      style.border-radius: 6
+    }
+    wm_fraud: "Fraud and Integrity" {
+      style.fill: "#E1D5E7"
+      style.stroke: "#9673A6"
+      style.border-radius: 6
+    }
+    wm_redorch: "Redemption Orchestrator (saga)" {
+      style.fill: "#E1D5E7"
+      style.stroke: "#9673A6"
+      style.border-radius: 6
+    }
+    wm_padapter: "Partner Adapter Framework" {
+      style.fill: "#E1D5E7"
+      style.stroke: "#9673A6"
+      style.border-radius: 6
+    }
+  }
+
+  z_persist: "Persistence — Azure data stores" {
+    grid-rows: 1
+    grid-gap: 30
+    style.fill: "#FFF2CC"
+    style.stroke: "#D6B656"
+    style.stroke-width: 2
+    style.font-size: 18
+    style.bold: true
+    ps_wallet: "Wallet stores" {
+      style.fill: "#FFF2CC"
+      style.stroke: "#D6B656"
+      style.border-radius: 6
+    }
+    ps_engine: "Challenge and Cohort stores" {
+      style.fill: "#FFF2CC"
+      style.stroke: "#D6B656"
+      style.border-radius: 6
+    }
+    ps_market: "Marketplace stores" {
+      style.fill: "#FFF2CC"
+      style.stroke: "#D6B656"
+      style.border-radius: 6
+    }
+    ps_kv: "Azure Key Vault" {
+      style.fill: "#FFF2CC"
+      style.stroke: "#D6B656"
+      style.border-radius: 6
+    }
+  }
+
+  z_external: "External Partner APIs — outside the platform trust zone" {
+    grid-rows: 1
+    grid-gap: 30
+    style.fill: "#F8CECC"
+    style.stroke: "#B85450"
+    style.stroke-width: 2
+    style.font-size: 18
+    style.bold: true
+    ex_malaffi: "Malaffi HIE" {
+      style.fill: "#F8CECC"
+      style.stroke: "#B85450"
+      style.border-radius: 6
+    }
+    ex_providers: "Reward Providers" {
+      style.fill: "#F8CECC"
+      style.stroke: "#B85450"
+      style.border-radius: 6
+    }
+    ex_doh: "DoH ESB" {
+      style.fill: "#F8CECC"
+      style.stroke: "#B85450"
+      style.border-radius: 6
+    }
+  }
+
+  z_platform: "Platform Services — event consumers, identity, consent, analytics" {
+    grid-rows: 1
+    grid-gap: 30
+    style.fill: "#EEEEEE"
+    style.stroke: "#666666"
+    style.stroke-width: 2
+    style.font-size: 18
+    style.bold: true
+    pf_fraud: "FRAUD-SVC" {
+      style.fill: "#EEEEEE"
+      style.stroke: "#666666"
+      style.border-radius: 6
+    }
+    pf_nudge: "NUDGE-SVC" {
+      style.fill: "#EEEEEE"
+      style.stroke: "#666666"
+      style.border-radius: 6
+    }
+    pf_consent: "CONS-SVC" {
+      style.fill: "#EEEEEE"
+      style.stroke: "#666666"
+      style.border-radius: 6
+    }
+    pf_id: "ID-SVC" {
+      style.fill: "#EEEEEE"
+      style.stroke: "#666666"
+      style.border-radius: 6
+    }
+    pf_data: "DATA-SVC" {
+      style.fill: "#EEEEEE"
+      style.stroke: "#666666"
+      style.border-radius: 6
+    }
+  }
+
+  z_xcut: "Cross-cutting — secrets" {
+    grid-rows: 1
+    grid-gap: 30
+    style.fill: "#F5F5F5"
+    style.stroke: "#666666"
+    style.stroke-width: 2
+    style.font-size: 18
+    style.bold: true
+    xc_secrets: "Secrets Management" {
+      style.fill: "#F5F5F5"
+      style.stroke: "#666666"
+      style.border-radius: 6
+    }
+    xc_gitops: "Declarative Provisioning" {
+      style.fill: "#F5F5F5"
+      style.stroke: "#666666"
+      style.border-radius: 6
+    }
+    xc_obs: "Observability" {
+      style.fill: "#F5F5F5"
+      style.stroke: "#666666"
+      style.border-radius: 6
+    }
+  }
+
+}
+
+layers_root.z_client.cl_chal -> layers_root.z_apim_n.apim_n: {style.stroke: "#333333"; style.stroke-width: 2}
+layers_root.z_client.cl_wallet -> layers_root.z_apim_n.apim_n: {style.stroke: "#333333"; style.stroke-width: 2}
+layers_root.z_client.cl_market -> layers_root.z_apim_n.apim_n: {style.stroke: "#333333"; style.stroke-width: 2}
+layers_root.z_apim_n.apim_n -> layers_root.z_bff.bff_member: {style.stroke: "#333333"; style.stroke-width: 2}
+layers_root.z_apim_n.apim_n -> layers_root.z_bff.bff_admin: {style.stroke: "#333333"; style.stroke-width: 2}
+layers_root.z_bff.bff_member -> layers_root.z_apim_s.apim_s: {style.stroke: "#333333"; style.stroke-width: 2}
+layers_root.z_bff.bff_admin -> layers_root.z_apim_s.apim_s: {style.stroke: "#333333"; style.stroke-width: 2}
+layers_root.z_apim_s.apim_s -> layers_root.z_engine.en_enrol: {style.stroke: "#333333"; style.stroke-width: 2}
+layers_root.z_apim_s.apim_s -> layers_root.z_engine.en_chal: {style.stroke: "#333333"; style.stroke-width: 2}
+layers_root.z_apim_s.apim_s -> layers_root.z_value.wm_wallet: {style.stroke: "#333333"; style.stroke-width: 2}
+layers_root.z_apim_s.apim_s -> layers_root.z_value.wm_market: {style.stroke: "#333333"; style.stroke-width: 2}
+layers_root.z_engine.en_enrol -> layers_root.z_engine.en_eligorch: {style.stroke: "#333333"; style.stroke-width: 2}
+layers_root.z_engine.en_eligorch -> layers_root.z_engine.en_cohort: {style.stroke: "#333333"; style.stroke-width: 2}
+layers_root.z_bff.bff_member -> layers_root.z_bff.cms_sahatna: {style.stroke: "#333333"; style.stroke-width: 2}
+layers_root.z_bff.bff_admin -> layers_root.z_bff.cms_sahatna: {style.stroke: "#333333"; style.stroke-width: 2}
+layers_root.z_value.wm_market -> layers_root.z_value.wm_redorch: {style.stroke: "#333333"; style.stroke-width: 2}
+layers_root.z_value.wm_redorch -> layers_root.z_value.wm_wallet: {style.stroke: "#333333"; style.stroke-width: 2}
+layers_root.z_value.wm_redorch -> layers_root.z_value.wm_fraud: {style.stroke: "#333333"; style.stroke-width: 2}
+layers_root.z_value.wm_wallet -> layers_root.z_persist.ps_wallet: {style.stroke: "#333333"; style.stroke-width: 2}
+layers_root.z_value.wm_market -> layers_root.z_persist.ps_market: {style.stroke: "#333333"; style.stroke-width: 2}
+layers_root.z_engine.en_chal -> layers_root.z_persist.ps_engine: {style.stroke: "#333333"; style.stroke-width: 2}
+layers_root.z_engine.en_maladapter -> layers_root.z_external.ex_malaffi: {style.stroke: "#B85450"; style.stroke-width: 3; style.stroke-dash: 2}
+layers_root.z_value.wm_padapter -> layers_root.z_external.ex_providers: {style.stroke: "#B85450"; style.stroke-width: 3; style.stroke-dash: 2}
+layers_root.z_value.wm_partner -> layers_root.z_external.ex_doh: {style.stroke: "#B85450"; style.stroke-width: 3; style.stroke-dash: 2}
+layers_root.z_engine.en_verify -> layers_root.z_apim_s.eh_integration: {style.stroke: "#9673A6"; style.stroke-width: 2; style.stroke-dash: 4}
+layers_root.z_value.wm_wallet -> layers_root.z_apim_s.eh_integration: {style.stroke: "#9673A6"; style.stroke-width: 2; style.stroke-dash: 4}
+layers_root.z_value.wm_market -> layers_root.z_apim_s.eh_integration: {style.stroke: "#9673A6"; style.stroke-width: 2; style.stroke-dash: 4}
+layers_root.z_apim_s.eh_integration -> layers_root.z_platform.pf_fraud: {style.stroke: "#9673A6"; style.stroke-width: 2; style.stroke-dash: 4}
+layers_root.z_apim_s.eh_integration -> layers_root.z_platform.pf_nudge: {style.stroke: "#9673A6"; style.stroke-width: 2; style.stroke-dash: 4}
+layers_root.z_apim_s.eh_integration -> layers_root.z_platform.pf_data: {style.stroke: "#9673A6"; style.stroke-width: 2; style.stroke-dash: 4}
+layers_root.z_apim_s.eh_integration -> layers_root.z_value.wm_fraud: {style.stroke: "#9673A6"; style.stroke-width: 2; style.stroke-dash: 4}
+layers_root.z_bff.bff_member -> layers_root.z_apim_s.eh_integration: {style.stroke: "#9673A6"; style.stroke-width: 2; style.stroke-dash: 4}
+layers_root.z_apim_s.eh_integration -> layers_root.z_engine.en_verify: {style.stroke: "#9673A6"; style.stroke-width: 2; style.stroke-dash: 4}
+layers_root.z_apim_n.idp_uaepass -> layers_root.z_apim_n.apim_n: {style.stroke: "#3A7CA5"; style.stroke-width: 2; style.stroke-dash: 6}
+layers_root.z_apim_s.idp_entra -> layers_root.z_apim_s.apim_s: {style.stroke: "#3A7CA5"; style.stroke-width: 2; style.stroke-dash: 6}
+layers_root.z_platform.pf_consent -> layers_root.z_engine.en_enrol: {style.stroke: "#3A7CA5"; style.stroke-width: 2; style.stroke-dash: 6}
+layers_root.z_xcut.xc_secrets -> layers_root.z_persist.ps_kv: {style.stroke: "#3A7CA5"; style.stroke-width: 2; style.stroke-dash: 6}
+layers_root.z_platform.pf_nudge -> layers_root.z_platform.pf_consent: {style.stroke: "#333333"; style.stroke-width: 2}
+layers_root.z_platform.pf_nudge -> layers_root.z_apim_n.apim_n: {style.stroke: "#333333"; style.stroke-width: 2}
+layers_root.z_apim_n.apim_n -> layers_root.z_bff.sah_notify: {style.stroke: "#333333"; style.stroke-width: 2}
+layers_root.z_apim_s.apim_s -> layers_root.z_platform.pf_consent: {style.stroke: "#3A7CA5"; style.stroke-width: 2; style.stroke-dash: 6}

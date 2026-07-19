@@ -1,0 +1,428 @@
+# Golden-Thread Traceability Backbone — Wellness Platform
+#
+# A machine-checkable model of the realization links across every architecture layer.
+# Chain (forward = realization, more-concrete realizes more-abstract):
+#   goal -> outcome -> requirement -> course_of_action -> capability -> process
+#        -> app_component -> sbb -> solution_component -> oam_component
+#
+# Element IDs are the REAL IDs from the source artifacts (03/05/06/08/09/11/12/13/14/16/18).
+# Where an artifact under-enumerates a layer (goals/outcomes), stable IDs are minted and
+# the source line is noted in the label/source field.
+#
+# Validate with:  python3 check_traceability.py
+
+chain:
+  - goal
+  - outcome
+  - requirement
+  - course_of_action
+  - capability
+  - process
+  - app_component
+  - sbb
+  - solution_component
+  - oam_component
+
+# ---------------------------------------------------------------------------
+# NODES — one block per layer. {id, layer, label}
+# ---------------------------------------------------------------------------
+nodes:
+
+  # --- GOALS (03-motivation; 8 goals g1..g8, labels from coverage + lane themes) ---
+  - { id: g1, layer: goal, label: "Improve member health outcomes (behaviour change)" }
+  - { id: g2, layer: goal, label: "Sustain engagement via a credible reward economy" }
+  - { id: g3, layer: goal, label: "Reproducible, frozen-on-publish, replayable scoring" }
+  - { id: g4, layer: goal, label: "Loosely-coupled, event-driven, maintainable platform" }
+  - { id: g5, layer: goal, label: "Trustworthy redemption & partner settlement" }
+  - { id: g6, layer: goal, label: "Compliance & data protection (PDPL/ADHICS/AML) — realization hub" }
+  - { id: g7, layer: goal, label: "Auditability & financial-grade integrity" }
+  - { id: g8, layer: goal, label: "Member recognition & progression" }
+
+  # --- OUTCOMES (03-motivation; 9 outcomes o1..o9, values from coverage analysis) ---
+  - { id: o1, layer: outcome, label: "Eligible cohort correctly segmented & enrolled" }
+  - { id: o2, layer: outcome, label: "Eligibility resolved <50ms" }
+  - { id: o3, layer: outcome, label: "WeeklyScore = min(100, sum daily) computed deterministically" }
+  - { id: o4, layer: outcome, label: "Points = WeeklyScore x10, capped, never reset (reward economy)" }
+  - { id: o5, layer: outcome, label: "Redemption within 300s reservation, voucher issued" }
+  - { id: o6, layer: outcome, label: "Settlement with 5% holdback, 30-day dispute window" }
+  - { id: o7, layer: outcome, label: "Only verified signals score (verified-signal gate)" }
+  - { id: o8, layer: outcome, label: "Nudges raise engagement" }
+  - { id: o9, layer: outcome, label: "Scoring replayable from frozen {segmentId,segmentVersion}+ScoringPlan" }
+  # The motivation view's measurable values concentrate on the member-facing flow (o1..o9).
+  # The platform/governance requirements (challenge authoring, consent, integration, analytics,
+  # fraud, progression) realize their goals through the operational/control outcomes below.
+  # These are minted (source: 03 goals g2/g3/g4/g6/g7/g8 + coverage-analysis invariant set) so the
+  # goal->outcome->requirement chain stays unbroken rather than letting requirements realize goals
+  # directly (which the motivation metamodel also permits, but the strict chain does not model).
+  - { id: o10, layer: outcome, label: "Challenges authored, bound to segments & published (frozen)" }   # source: 03 g3/g8, proc Challenge Creation
+  - { id: o11, layer: outcome, label: "Consent captured & identity authenticated (PDPL/ADHICS)" }       # source: 03 g6 compliance hub
+  - { id: o12, layer: outcome, label: "Services integrated on a versioned event spine" }                # source: 03 g4 loose-coupling
+  - { id: o13, layer: outcome, label: "Analytics/insight produced without OLAP being source of truth" } # source: 03 g4/g7
+  - { id: o14, layer: outcome, label: "Fraud & integrity violations blocked inline" }                   # source: 03 g7 integrity
+  - { id: o15, layer: outcome, label: "Titles & progression awarded on recognition tiers" }             # source: 03 g8 recognition
+
+  # --- REQUIREMENTS (03-motivation; r1..r15, one per ABB cluster) ---
+  - { id: r1,  layer: requirement, label: "Cohort segmentation & enrolment" }
+  - { id: r2,  layer: requirement, label: "Challenge lifecycle management" }
+  - { id: r3,  layer: requirement, label: "Activity & clinical verification (verified-signal gate)" }
+  - { id: r4,  layer: requirement, label: "Wellness scoring & recognition" }
+  - { id: r5,  layer: requirement, label: "Reward points & wallet" }
+  - { id: r6,  layer: requirement, label: "Marketplace & redemption" }
+  - { id: r7,  layer: requirement, label: "Partner lifecycle & settlement" }
+  - { id: r8,  layer: requirement, label: "Engagement & nudging" }
+  - { id: r9,  layer: requirement, label: "Consent, identity & authentication" }
+  - { id: r10, layer: requirement, label: "Integration & interoperability (event spine)" }
+  - { id: r11, layer: requirement, label: "Analytics & insight" }
+  - { id: r12, layer: requirement, label: "Fraud & integrity" }
+  - { id: r13, layer: requirement, label: "AML / stored-value controls" }
+  - { id: r14, layer: requirement, label: "PDPL data-subject rights" }
+  - { id: r15, layer: requirement, label: "Title & progression" }
+
+  # --- COURSES OF ACTION (03-motivation; coa1..coa8) ---
+  - { id: coa1, layer: course_of_action, label: "OLAP/OLTP seam (CDC + reverse-ETL)" }
+  - { id: coa2, layer: course_of_action, label: "Event-driven ABB decomposition on a versioned spine" }
+  - { id: coa3, layer: course_of_action, label: "Versioned strategy-registry scoring engine" }
+  - { id: coa4, layer: course_of_action, label: "Two-phase reservation + double-entry ledger" }
+  - { id: coa5, layer: course_of_action, label: "Aggregator-first UAE partner sourcing" }
+  - { id: coa6, layer: course_of_action, label: "Inline fraud guard + idempotency" }
+  - { id: coa7, layer: course_of_action, label: "Privacy-by-design & consent (PDPL/ADHICS)" }
+  - { id: coa8, layer: course_of_action, label: "Points as regulated stored value (AML/KYC)" }
+
+  # --- CAPABILITIES (05-business-capability-realization; cap1..cap12) ---
+  - { id: cap1,  layer: capability, label: "Segmentation — Local & Clinical (external)" }
+  - { id: cap2,  layer: capability, label: "Challenge Lifecycle Management" }
+  - { id: cap3,  layer: capability, label: "Wellness Scoring & Recognition" }
+  - { id: cap4,  layer: capability, label: "Activity & Clinical Verification" }
+  - { id: cap5,  layer: capability, label: "Reward Points & Wallet" }
+  - { id: cap6,  layer: capability, label: "Marketplace & Redemption" }
+  - { id: cap7,  layer: capability, label: "Partner Lifecycle & Settlement" }
+  - { id: cap8,  layer: capability, label: "Engagement & Nudging" }
+  - { id: cap9,  layer: capability, label: "Consent, Identity & Compliance" }
+  - { id: cap10, layer: capability, label: "Fraud & Integrity" }
+  - { id: cap11, layer: capability, label: "Integration & Interoperability" }
+  - { id: cap12, layer: capability, label: "Analytics & Insight" }
+
+  # --- PROCESSES (06-business-process-cooperation; top-level composite phases) ---
+  - { id: c_cohort,   layer: process, label: "Cohort Identification" }
+  - { id: c_create,   layer: process, label: "Challenge Creation" }
+  - { id: c_enrol,    layer: process, label: "Enrolment" }
+  - { id: c_earn,     layer: process, label: "Earning Loop" }
+  - { id: c_reward,   layer: process, label: "Rewards & Redemption" }
+  - { id: c_conclude, layer: process, label: "Conclusion" }
+  - { id: c_onb,      layer: process, label: "Partner Onboarding & KYB" }
+  - { id: c_cat,      layer: process, label: "Partner Contracting & Catalogue" }
+  - { id: c_red,      layer: process, label: "Member Redemption (partner)" }
+  - { id: c_set,      layer: process, label: "Partner Settlement" }
+  - { id: c_off,      layer: process, label: "Partner Offboarding & Exit" }
+
+  # --- APP COMPONENTS (08/09 application layer; internal ac_*) ---
+  - { id: ac_cohort,    layer: app_component, label: "Cohort & Segmentation Service" }
+  - { id: ac_challenge, layer: app_component, label: "Challenge Service" }
+  - { id: ac_enrol,     layer: app_component, label: "Enrolment & Eligibility Service" }
+  - { id: ac_scoring,   layer: app_component, label: "Scoring & Recognition Service" }
+  - { id: ac_verify,    layer: app_component, label: "Verification Service" }
+  - { id: ac_malaffi,   layer: app_component, label: "Malaffi HIE adapter (clinical integration)" }
+  - { id: ac_wallet,    layer: app_component, label: "Wallet Service" }
+  - { id: ac_market,    layer: app_component, label: "Marketplace & Voucher Service" }
+  - { id: ac_partner,   layer: app_component, label: "Partner & Settlement Service" }
+  - { id: ac_engage,    layer: app_component, label: "Engagement Service" }
+  - { id: ac_consent,   layer: app_component, label: "Consent & Identity Service" }
+  - { id: ac_fraud,     layer: app_component, label: "Fraud & Integrity Service" }
+  - { id: ac_analytics, layer: app_component, label: "Analytics & Reporting Service" }
+  - { id: ac_event,     layer: app_component, label: "Event Hub" }
+
+  # --- SBB / ComponentDefinition types (11-technology-view, the catalog types) ---
+  - { id: sbb_webservice,        layer: sbb, label: "webservice (Knative Serving)" }
+  - { id: sbb_postgresql,        layer: sbb, label: "postgresql (Neon PostgreSQL · OLTP)" }
+  - { id: sbb_realtime_platform, layer: sbb, label: "realtime-platform (Kafka + Lenses)" }
+  - { id: sbb_analytics_platform,layer: sbb, label: "analytics-platform (Snowflake + Kafka Connect)" }
+  - { id: sbb_realtime_service,  layer: sbb, label: "realtime-service (WebSocket gateway)" }
+  - { id: sbb_graphql_gateway,   layer: sbb, label: "graphql-gateway (Hive Gateway)" }
+  - { id: sbb_auth0_idp,         layer: sbb, label: "auth0-idp (Auth0 IAM)" }
+
+  # --- SOLUTION COMPONENTS (12-solution-architecture + c4-data.json comp ids) ---
+  - { id: en_cohort,      layer: solution_component, label: "Local Segmentation (engine)" }
+  - { id: en_chal,        layer: solution_component, label: "Challenge (engine)" }
+  - { id: en_enrol,       layer: solution_component, label: "Enrolment and Eligibility (engine)" }
+  - { id: en_eligorch,    layer: solution_component, label: "Eligibility Resolver (engine)" }
+  - { id: en_maladapter,  layer: solution_component, label: "Malaffi Adapter (engine)" }
+  - { id: en_score,       layer: solution_component, label: "Scoring and Recognition (engine)" }
+  - { id: en_verify,      layer: solution_component, label: "Verification (engine)" }
+  - { id: en_engage,      layer: solution_component, label: "Engagement (engine)" }
+  - { id: wm_wallet,      layer: solution_component, label: "Wallet - Points Ledger" }
+  - { id: wm_market,      layer: solution_component, label: "Marketplace and Voucher" }
+  - { id: wm_partner,     layer: solution_component, label: "Partner and Settlement" }
+  - { id: wm_fraud,       layer: solution_component, label: "Fraud and Integrity" }
+  - { id: pf_consent,     layer: solution_component, label: "CONS-SVC (consent)" }
+  - { id: pf_id,          layer: solution_component, label: "ID-SVC (identity)" }
+  - { id: pf_data,        layer: solution_component, label: "DATA-SVC (OLAP/analytics)" }
+  - { id: eh_integration, layer: solution_component, label: "Event Hub (EVENT-SVC, async spine)" }
+  - { id: bff_member,     layer: solution_component, label: "Gamification Service / Member BFF" }
+  - { id: ps_engine,      layer: solution_component, label: "Challenge and Cohort stores" }
+  - { id: ps_wallet,      layer: solution_component, label: "Wallet stores" }
+  - { id: ps_market,      layer: solution_component, label: "Marketplace stores" }
+  - { id: idp_entra,      layer: solution_component, label: "Identity (Entra/Auth0 IdP)" }
+
+  # --- OAM COMPONENTS (13-oam-application + wellness-platform-oam.yaml; the deployable, 19) ---
+  - { id: enrolment-eligibility,  layer: oam_component, label: "enrolment-eligibility (webservice)" }
+  - { id: challenge-svc,          layer: oam_component, label: "challenge-svc (webservice)" }
+  - { id: scoring-svc,            layer: oam_component, label: "scoring-svc (webservice)" }
+  - { id: consent-svc,            layer: oam_component, label: "consent-svc (webservice)" }
+  - { id: cohort-svc,             layer: oam_component, label: "cohort-svc (webservice)" }
+  - { id: verification-svc,       layer: oam_component, label: "verification-svc (webservice)" }
+  - { id: malaffi-adapter,        layer: oam_component, label: "malaffi-adapter (webservice)" }
+  - { id: wallet-svc,             layer: oam_component, label: "wallet-svc (webservice)" }
+  - { id: marketplace-svc,        layer: oam_component, label: "marketplace-svc (webservice)" }
+  - { id: partner-settlement-svc, layer: oam_component, label: "partner-settlement-svc (webservice)" }
+  - { id: fraud-svc,              layer: oam_component, label: "fraud-svc (webservice)" }
+  - { id: engagement-svc,         layer: oam_component, label: "engagement-svc (webservice)" }
+  - { id: wallet-db,              layer: oam_component, label: "wallet-db (postgresql)" }
+  - { id: engine-db,              layer: oam_component, label: "engine-db (postgresql)" }
+  - { id: market-db,              layer: oam_component, label: "market-db (postgresql)" }
+  - { id: event-spine,            layer: oam_component, label: "event-spine (realtime-platform)" }
+  - { id: analytics,              layer: oam_component, label: "analytics (analytics-platform)" }
+  - { id: live-board,             layer: oam_component, label: "live-board (realtime-service)" }
+  - { id: member-bff,             layer: oam_component, label: "member-bff (graphql-gateway)" }
+  - { id: wellness-identity,      layer: oam_component, label: "wellness-identity (auth0-idp)" }
+
+# ---------------------------------------------------------------------------
+# EDGES — realization links between ADJACENT layers only. {from, to}
+# ---------------------------------------------------------------------------
+edges:
+
+  # goal -> outcome
+  - { from: g1, to: o1 }
+  - { from: g1, to: o8 }
+  - { from: g2, to: o4 }
+  - { from: g3, to: o3 }
+  - { from: g3, to: o9 }
+  - { from: g5, to: o5 }
+  - { from: g5, to: o6 }
+  - { from: g6, to: o7 }      # verified-signal gate is a compliance/integrity outcome
+  - { from: g7, to: o9 }
+  - { from: g8, to: o3 }      # recognition derives from score
+  - { from: g4, to: o2 }      # loose-coupling/perf enables <50ms eligibility
+  - { from: g3, to: o10 }     # frozen challenge authoring
+  - { from: g6, to: o11 }     # consent/identity compliance hub
+  - { from: g4, to: o12 }     # integration on versioned spine
+  - { from: g7, to: o13 }     # analytics, OLAP-not-SoT
+  - { from: g7, to: o14 }     # fraud/integrity
+  - { from: g8, to: o15 }     # titles & progression
+
+  # outcome -> requirement
+  - { from: o1, to: r1 }
+  - { from: o2, to: r1 }      # eligibility latency lands on cohort/enrolment requirement
+  - { from: o3, to: r4 }
+  - { from: o4, to: r5 }
+  - { from: o5, to: r6 }
+  - { from: o6, to: r7 }
+  - { from: o7, to: r3 }
+  - { from: o8, to: r8 }
+  - { from: o9, to: r4 }
+  - { from: o10, to: r2 }     # challenge lifecycle
+  - { from: o11, to: r9 }     # consent/identity
+  - { from: o12, to: r10 }    # integration/event spine
+  - { from: o13, to: r11 }    # analytics
+  - { from: o14, to: r12 }    # fraud
+  - { from: o15, to: r15 }    # title/progression
+
+  # requirement -> course_of_action  (every requirement realized by >=1 coa)
+  - { from: r1,  to: coa1 }   # cohort/enrolment via OLAP/OLTP seam + eligibility
+  - { from: r1,  to: coa2 }
+  - { from: r2,  to: coa2 }   # challenge lifecycle on event spine
+  - { from: r3,  to: coa6 }   # verification = inline gate / integrity discipline
+  - { from: r4,  to: coa3 }   # scoring = versioned strategy registry
+  - { from: r5,  to: coa4 }   # wallet = double-entry ledger
+  - { from: r6,  to: coa4 }   # redemption = two-phase reservation
+  - { from: r6,  to: coa5 }   # marketplace sourcing = aggregator-first
+  - { from: r7,  to: coa5 }   # partner settlement = aggregator-first sourcing
+  - { from: r8,  to: coa2 }   # nudging on event spine
+  - { from: r9,  to: coa7 }   # consent/identity = privacy-by-design
+  - { from: r10, to: coa2 }   # integration = event-driven decomposition
+  - { from: r11, to: coa1 }   # analytics = OLAP/OLTP seam
+  - { from: r12, to: coa6 }   # fraud = inline guard
+  - { from: r13, to: coa8 }   # AML = regulated stored value
+  - { from: r14, to: coa7 }   # PDPL rights = privacy-by-design
+  - { from: r15, to: coa3 }   # title/progression rides the scoring registry
+
+  # course_of_action -> capability  (every coa fed by >=1 capability)
+  - { from: coa1, to: cap1 }
+  - { from: coa1, to: cap12 }
+  - { from: coa2, to: cap11 }
+  - { from: coa2, to: cap2 }
+  - { from: coa2, to: cap8 }
+  - { from: coa3, to: cap3 }
+  - { from: coa4, to: cap5 }
+  - { from: coa4, to: cap6 }
+  - { from: coa5, to: cap6 }
+  - { from: coa5, to: cap7 }
+  - { from: coa6, to: cap4 }
+  - { from: coa6, to: cap10 }
+  - { from: coa7, to: cap9 }
+  - { from: coa8, to: cap5 }
+  - { from: coa8, to: cap10 }
+
+  # capability -> process
+  - { from: cap1,  to: c_cohort }
+  - { from: cap1,  to: c_enrol }
+  - { from: cap2,  to: c_create }
+  - { from: cap2,  to: c_conclude }
+  - { from: cap3,  to: c_earn }
+  - { from: cap4,  to: c_earn }       # activity/clinical verification inside earning loop
+  - { from: cap5,  to: c_earn }       # points credited in earning loop
+  - { from: cap5,  to: c_reward }     # reservation in redemption
+  - { from: cap6,  to: c_reward }
+  - { from: cap6,  to: c_red }
+  - { from: cap7,  to: c_onb }
+  - { from: cap7,  to: c_cat }
+  - { from: cap7,  to: c_set }
+  - { from: cap7,  to: c_off }
+  - { from: cap8,  to: c_earn }       # nudging across the earning loop
+  - { from: cap9,  to: c_enrol }      # consent/identity at enrolment (T&C, identity)
+  - { from: cap10, to: c_reward }     # fraud gate on redemption
+  - { from: cap10, to: c_earn }       # fraud gate on earning
+  - { from: cap11, to: c_earn }       # integration/event spine carries the loop
+  - { from: cap12, to: c_conclude }   # analytics/reporting at conclusion
+
+  # process -> app_component
+  - { from: c_cohort,   to: ac_cohort }
+  - { from: c_create,   to: ac_challenge }
+  - { from: c_enrol,    to: ac_enrol }
+  - { from: c_enrol,    to: ac_consent }
+  - { from: c_earn,     to: ac_scoring }
+  - { from: c_earn,     to: ac_verify }
+  - { from: c_earn,     to: ac_malaffi }   # clinical eligibility/signal during earning
+  - { from: c_earn,     to: ac_wallet }
+  - { from: c_earn,     to: ac_engage }
+  - { from: c_earn,     to: ac_fraud }
+  - { from: c_earn,     to: ac_event }
+  - { from: c_reward,   to: ac_market }
+  - { from: c_reward,   to: ac_wallet }
+  - { from: c_red,      to: ac_market }
+  - { from: c_set,      to: ac_partner }
+  - { from: c_onb,      to: ac_partner }
+  - { from: c_cat,      to: ac_partner }
+  - { from: c_off,      to: ac_partner }
+  - { from: c_conclude, to: ac_analytics }
+
+  # app_component -> sbb (ComponentDefinition type)
+  - { from: ac_cohort,    to: sbb_webservice }
+  - { from: ac_challenge, to: sbb_webservice }
+  - { from: ac_enrol,     to: sbb_webservice }
+  - { from: ac_scoring,   to: sbb_webservice }
+  - { from: ac_verify,    to: sbb_webservice }
+  - { from: ac_malaffi,   to: sbb_webservice }
+  - { from: ac_wallet,    to: sbb_webservice }
+  - { from: ac_market,    to: sbb_webservice }
+  - { from: ac_partner,   to: sbb_webservice }
+  - { from: ac_engage,    to: sbb_webservice }
+  - { from: ac_consent,   to: sbb_webservice }
+  - { from: ac_consent,   to: sbb_auth0_idp }       # consent&identity also realizes identity SBB
+  - { from: ac_fraud,     to: sbb_webservice }
+  - { from: ac_event,     to: sbb_realtime_platform }
+  - { from: ac_analytics, to: sbb_analytics_platform }
+  - { from: ac_analytics, to: sbb_realtime_service } # live board push channel rides analytics/leaderboard
+  - { from: ac_enrol,     to: sbb_postgresql }       # engine data store
+  - { from: ac_wallet,    to: sbb_postgresql }       # wallet store
+  - { from: ac_market,    to: sbb_postgresql }       # market store
+  - { from: ac_enrol,     to: sbb_graphql_gateway }  # BFF federates enrolment + sibling services
+
+  # sbb -> solution_component
+  - { from: sbb_webservice,         to: en_cohort }
+  - { from: sbb_webservice,         to: en_chal }
+  - { from: sbb_webservice,         to: en_enrol }
+  - { from: sbb_webservice,         to: en_eligorch }
+  - { from: sbb_webservice,         to: en_maladapter }
+  - { from: sbb_webservice,         to: en_score }
+  - { from: sbb_webservice,         to: en_verify }
+  - { from: sbb_webservice,         to: en_engage }
+  - { from: sbb_webservice,         to: wm_wallet }
+  - { from: sbb_webservice,         to: wm_market }
+  - { from: sbb_webservice,         to: wm_partner }
+  - { from: sbb_webservice,         to: wm_fraud }
+  - { from: sbb_webservice,         to: pf_consent }
+  - { from: sbb_auth0_idp,          to: pf_id }
+  - { from: sbb_auth0_idp,          to: idp_entra }
+  - { from: sbb_analytics_platform, to: pf_data }
+  - { from: sbb_realtime_platform,  to: eh_integration }
+  - { from: sbb_realtime_service,   to: bff_member }   # live board surfaces through member channel
+  - { from: sbb_graphql_gateway,    to: bff_member }
+  - { from: sbb_postgresql,         to: ps_engine }
+  - { from: sbb_postgresql,         to: ps_wallet }
+  - { from: sbb_postgresql,         to: ps_market }
+
+  # solution_component -> oam_component
+  - { from: en_cohort,      to: cohort-svc }
+  - { from: en_chal,        to: challenge-svc }
+  - { from: en_enrol,       to: enrolment-eligibility }
+  - { from: en_eligorch,    to: enrolment-eligibility }
+  - { from: en_maladapter,  to: malaffi-adapter }
+  - { from: en_score,       to: scoring-svc }
+  - { from: en_verify,      to: verification-svc }
+  - { from: en_engage,      to: engagement-svc }
+  - { from: wm_wallet,      to: wallet-svc }
+  - { from: wm_market,      to: marketplace-svc }
+  - { from: wm_partner,     to: partner-settlement-svc }
+  - { from: wm_fraud,       to: fraud-svc }
+  - { from: pf_consent,     to: consent-svc }
+  - { from: pf_id,          to: wellness-identity }
+  - { from: idp_entra,      to: wellness-identity }
+  - { from: pf_data,        to: analytics }
+  - { from: eh_integration, to: event-spine }
+  - { from: bff_member,     to: member-bff }
+  - { from: bff_member,     to: live-board }
+  - { from: ps_engine,      to: engine-db }
+  - { from: ps_wallet,      to: wallet-db }
+  - { from: ps_market,      to: market-db }
+
+# ---------------------------------------------------------------------------
+# ACCEPTED GAPS — elements intentionally WITHOUT downstream realization.
+# Declared so the checker treats them as expected, never silent breaks.
+# Each is a behaviour/control/compliance obligation the OAM cannot express;
+# they live in the services' REQUIREMENTS.md + platform policy/secrets.
+# ---------------------------------------------------------------------------
+accepted_gaps:
+  - { id: r13, layer: requirement, reason: "AML / stored-value controls (coa8) are a cross-cutting control, not a deployable; carried in wallet-svc/fraud-svc REQUIREMENTS.md, no dedicated component." }
+  - { id: r14, layer: requirement, reason: "PDPL data-subject rights are service-internal logic on consent-svc, not an OAM binding; carried in REQUIREMENTS.md." }
+
+# Forward-only: these requirements DO reach a coa, so they are not forward-orphans.
+# They are listed here as documented control obligations, not as a coa/capability gap.
+
+# ---------------------------------------------------------------------------
+# INVARIANTS — inv-1..inv-8 (cited across 13/14/16/19). Each links to the
+# oam/app components it constrains + the REQUIREMENTS.md obligation it carries
+# (the behaviour OAM cannot enforce). These are side-links, not chain edges.
+# ---------------------------------------------------------------------------
+invariants:
+  - id: inv-1
+    label: "Verified-signal gate — only verified signals score"
+    binds: [verification-svc, malaffi-adapter, ac_verify, ac_malaffi]
+    obligation: "verification-svc REQUIREMENTS.md: reject unverified activity/clinical signals before scoring (o7, r3)."
+  - id: inv-2
+    label: "Frozen-on-publish & replayable scoring"
+    binds: [scoring-svc, cohort-svc, ac_scoring, ac_cohort]
+    obligation: "scoring-svc REQUIREMENTS.md: version-pin {segmentId,segmentVersion}+ScoringPlan; event replay (g3, o9, c1)."
+  - id: inv-3
+    label: "Warehouse-not-source-of-truth (OLAP loose from OLTP)"
+    binds: [analytics, event-spine, ac_analytics, ac_event]
+    obligation: "analytics REQUIREMENTS.md: OLAP store is derived; OLTP postgres remains system of record (coa1)."
+  - id: inv-4
+    label: "Financial-grade wallet (two-phase, double-entry, idempotent)"
+    binds: [wallet-svc, ac_wallet]
+    obligation: "wallet-svc REQUIREMENTS.md: double-entry ledger, idempotent credits/debits (inv #4, coa4)."
+  - id: inv-5
+    label: "Inline fraud guard (synchronous gate + idempotency)"
+    binds: [fraud-svc, ac_fraud]
+    obligation: "fraud-svc REQUIREMENTS.md: synchronous fraud check on earn/redeem; idempotency keys (coa6, r12)."
+  - id: inv-6
+    label: "Versioned event spine (schema registry)"
+    binds: [event-spine, ac_event]
+    obligation: "event-spine REQUIREMENTS.md: schema-registered, versioned topics; backward-compatible evolution (coa2, r10)."
+  - id: inv-7
+    label: "Points economy (Points = WeeklyScore x10, cap 100, never reset)"
+    binds: [scoring-svc, wallet-svc, ac_scoring, ac_wallet]
+    obligation: "scoring/wallet REQUIREMENTS.md: deterministic points formula, score cap 100, no reset (o4, inv #7)."
+  - id: inv-8
+    label: "Redemption/settlement discipline (300s reservation, 5% holdback, 30-day dispute, irreversible withdrawal)"
+    binds: [marketplace-svc, partner-settlement-svc, wallet-svc, ac_market, ac_partner]
+    obligation: "marketplace/partner-settlement REQUIREMENTS.md: 300s reservation, 10s/3-retry, 5% holdback, 30-day dispute, 0.1% discrepancy (inv #8, coa4/coa5)."

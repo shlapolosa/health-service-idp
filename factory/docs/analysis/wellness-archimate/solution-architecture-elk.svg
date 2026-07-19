@@ -1,0 +1,302 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2032" height="2788" font-family="Helvetica,Arial">
+<rect width="100%" height="100%" fill="#FFFFFF"/>
+<defs>
+<marker id="a_sync" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#1A1A1A"/></marker>
+<marker id="a_async" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#7A7A7A"/></marker>
+<marker id="a_xtrust" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#B85450"/></marker>
+<marker id="a_identity" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#9966AA"/></marker>
+</defs>
+<text x="196" y="22" font-size="17" font-weight="bold" fill="#1a1a1a">Value Path &#8212; Wellness Platform Solution Architecture</text>
+<text x="196" y="37" font-size="11" fill="#666">eligibility &#183; earn &#183; redeem &#183; settle  &#8226;  dotted = system / trust boundary  &#183;  per-band security context noted</text>
+<rect x="178" y="291" width="1676" height="423" rx="13" fill="none" stroke="#D79B00" stroke-width="3.5" stroke-dasharray="3,7" stroke-linecap="round" opacity="0.95"/>
+<text x="190" y="305" font-size="12" font-weight="bold" letter-spacing="0.4" fill="#D79B00">SAHATNA (server-side)  ·  north gateway · BFF · CMS · notifications     |     Citizen App (above) runs on the device, client-side</text>
+<rect x="178" y="771" width="1676" height="1143" rx="13" fill="none" stroke="#3A7CA5" stroke-width="3.5" stroke-dasharray="3,7" stroke-linecap="round" opacity="0.95"/>
+<text x="190" y="785" font-size="12" font-weight="bold" letter-spacing="0.4" fill="#3A7CA5">GAMIFICATION PLATFORM  ·  admin console + Knative/Istio mesh · versioned event spine · financial-grade ledger</text>
+<rect x="178" y="2315" width="1676" height="423" rx="13" fill="none" stroke="#5A5A5A" stroke-width="3.5" stroke-dasharray="3,7" stroke-linecap="round" opacity="0.95"/>
+<text x="190" y="2329" font-size="12" font-weight="bold" letter-spacing="0.4" fill="#5A5A5A">PLATFORM SHARED SERVICES  ·  identity · consent · fraud · analytics · GitOps · secrets</text>
+<rect x="178" y="2064" width="1676" height="36" rx="7" fill="#FBE9A0" stroke="#C9A100" stroke-width="3.5" stroke-dasharray="3,7" stroke-linecap="round" opacity="1"/>
+<text x="1016.0" y="2086" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#6b5200">PARTNER TRUST BOUNDARY  &#183;  mTLS / OAuth2  &#183;  idempotent  &#183;  10s timeout &#183; 3 retries  &#183;  uncertain &#8594; manual reconcile</text>
+<rect x="196" y="86" width="1640" height="130" rx="8" fill="none" stroke="#D79B00" stroke-width="2"/>
+<text x="209" y="101" font-size="12" font-weight="bold" fill="#D79B00">Sahatna Client (citizen app)</text>
+<rect x="196" y="326" width="1640" height="130" rx="8" fill="none" stroke="#3A7CA5" stroke-width="2"/>
+<text x="209" y="341" font-size="12" font-weight="bold" fill="#3A7CA5">Integration North</text>
+<text x="1824" y="341" font-size="9.5" font-style="italic" text-anchor="end" fill="#3A7CA5">&#128274; UAE Pass OIDC &#183; JWT mint &#183; rate-limit</text>
+<rect x="196" y="566" width="1640" height="130" rx="8" fill="none" stroke="#6C8EBF" stroke-width="2"/>
+<text x="209" y="581" font-size="12" font-weight="bold" fill="#6C8EBF">Sahatna (server-side)</text>
+<text x="1824" y="581" font-size="9.5" font-style="italic" text-anchor="end" fill="#6C8EBF">&#128274; JWT validation &#183; idempotency relay</text>
+<rect x="196" y="806" width="1640" height="130" rx="8" fill="none" stroke="#2E6E8E" stroke-width="2"/>
+<text x="209" y="821" font-size="12" font-weight="bold" fill="#2E6E8E">Platform Client (admin / partner console)</text>
+<text x="1824" y="821" font-size="9.5" font-style="italic" text-anchor="end" fill="#2E6E8E">&#128274; workforce SSO (Entra) &#183; no public ingress</text>
+<rect x="196" y="1046" width="1640" height="130" rx="8" fill="none" stroke="#3A7CA5" stroke-width="2"/>
+<text x="209" y="1061" font-size="12" font-weight="bold" fill="#3A7CA5">Integration South</text>
+<text x="1824" y="1061" font-size="9.5" font-style="italic" text-anchor="end" fill="#3A7CA5">&#128274; Entra OAuth2 (B2B client-creds) &#183; mTLS &#183; per-OAM product</text>
+<rect x="196" y="1286" width="1640" height="130" rx="8" fill="none" stroke="#82B366" stroke-width="2"/>
+<text x="209" y="1301" font-size="12" font-weight="bold" fill="#82B366">Gamification Engine</text>
+<rect x="196" y="1526" width="1640" height="130" rx="8" fill="none" stroke="#9673A6" stroke-width="2"/>
+<text x="209" y="1541" font-size="12" font-weight="bold" fill="#9673A6">Wallet &amp; Marketplace</text>
+<text x="1824" y="1541" font-size="9.5" font-style="italic" text-anchor="end" fill="#9673A6">&#128274; financial-grade &#183; append-only &#183; inline fraud</text>
+<rect x="196" y="1766" width="1640" height="130" rx="8" fill="none" stroke="#D6B656" stroke-width="2"/>
+<text x="209" y="1781" font-size="12" font-weight="bold" fill="#D6B656">Persistence</text>
+<text x="1824" y="1781" font-size="9.5" font-style="italic" text-anchor="end" fill="#D6B656">&#128274; column-level KMS &#183; Key Vault</text>
+<rect x="196" y="2110" width="1640" height="130" rx="8" fill="none" stroke="#B85450" stroke-width="2"/>
+<text x="209" y="2125" font-size="12" font-weight="bold" fill="#B85450">External Partner APIs</text>
+<text x="1824" y="2125" font-size="9.5" font-style="italic" text-anchor="end" fill="#B85450">&#128274; outside platform trust zone</text>
+<rect x="196" y="2350" width="1640" height="130" rx="8" fill="none" stroke="#666666" stroke-width="2"/>
+<text x="209" y="2365" font-size="12" font-weight="bold" fill="#666666">Platform Services</text>
+<text x="1824" y="2365" font-size="9.5" font-style="italic" text-anchor="end" fill="#666666">&#128274; consent-gated &#183; PDPL / ADHICS</text>
+<rect x="196" y="2590" width="1640" height="130" rx="8" fill="none" stroke="#666666" stroke-width="2"/>
+<text x="209" y="2605" font-size="12" font-weight="bold" fill="#666666">Cross-cutting</text>
+<path class="flow" d="M 671.0,202 L 671.0,228 L 838.0,228 L 838.0,360" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-dasharray="none" marker-end="url(#a_sync)" opacity="0.92"/>
+<path class="flow" d="M 901.0,202 L 901.0,228 L 880.0,228 L 880.0,360" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-dasharray="none" marker-end="url(#a_sync)" opacity="0.92"/>
+<path class="flow" d="M 1131.0,202 L 1131.0,228 L 922.0,228 L 922.0,360" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-dasharray="none" marker-end="url(#a_sync)" opacity="0.92"/>
+<path class="flow" d="M 856.0,442 L 856.0,482 L 671.0,482 L 671.0,600" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-dasharray="none" marker-end="url(#a_sync)" opacity="0.92"/>
+<path class="flow" d="M 886.0,442 L 886.0,468 L 901.0,468 L 901.0,600" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-dasharray="none" marker-end="url(#a_sync)" opacity="0.92"/>
+<path class="flow" d="M 636.0,682 L 636.0,708 L 178,708 L 178,948 L 751.0,948 L 751.0,1080" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-dasharray="none" marker-end="url(#a_sync)" opacity="0.92"/>
+<path class="flow" d="M 1016.0,922 L 1016.0,948 L 821.0,948 L 821.0,1080" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-dasharray="none" marker-end="url(#a_sync)" opacity="0.92"/>
+<path class="flow" d="M 801.0,1162 L 801.0,1266.8 L 302.0,1266.8 L 302.0,1320" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-dasharray="none" marker-end="url(#a_sync)" opacity="0.92"/>
+<path class="flow" d="M 831.0,1162 L 831.0,1188.0 L 1118.0,1188.0 L 1118.0,1320" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-dasharray="none" marker-end="url(#a_sync)" opacity="0.92"/>
+<path class="flow" d="M 771.0,1162 L 771.0,1255.5 L 164,1255.5 L 164,1505.1 L 476.0,1505.1 L 476.0,1560" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-dasharray="none" marker-end="url(#a_sync)" opacity="0.92"/>
+<path class="flow" d="M 741.0,1162 L 741.0,1244.2 L 150,1244.2 L 150,1492.3 L 706.0,1492.3 L 706.0,1560" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-dasharray="none" marker-end="url(#a_sync)" opacity="0.92"/>
+<path class="flow" d="M 332.7,1402 L 332.7,1428.0 L 1699.3,1428.0 L 1699.3,1402" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-dasharray="none" marker-end="url(#a_sync)" opacity="0.92"/>
+<path class="flow" d="M 1760.7,1402 L 1760.7,1453.7 L 710.0,1453.7 L 710.0,1402" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-dasharray="none" marker-end="url(#a_sync)" opacity="0.92"/>
+<path class="flow" d="M 706.0,682 L 706.0,708 L 901.0,708 L 901.0,682" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-dasharray="none" marker-end="url(#a_sync)" opacity="0.92"/>
+<path class="flow" d="M 706.0,1642 L 706.0,1668 L 1361.0,1668 L 1361.0,1642" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-dasharray="none" marker-end="url(#a_sync)" opacity="0.92"/>
+<path class="flow" d="M 1308.5,1642 L 1308.5,1682 L 476.0,1682 L 476.0,1642" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-dasharray="none" marker-end="url(#a_sync)" opacity="0.92"/>
+<path class="flow" d="M 1413.5,1642 L 1413.5,1710 L 901.0,1710 L 901.0,1642" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-dasharray="none" marker-end="url(#a_sync)" opacity="0.92"/>
+<path class="flow" d="M 406.0,1642 L 406.0,1668 L 671.0,1668 L 671.0,1800" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-dasharray="none" marker-end="url(#a_sync)" opacity="0.92"/>
+<path class="flow" d="M 636.0,1642 L 636.0,1696 L 1131.0,1696 L 1131.0,1800" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-dasharray="none" marker-end="url(#a_sync)" opacity="0.92"/>
+<path class="flow" d="M 1118.0,1402 L 1118.0,1440.9 L 1854,1440.9 L 1854,1682 L 1361.0,1682 L 1361.0,1800" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-dasharray="none" marker-end="url(#a_sync)" opacity="0.92"/>
+<path class="flow" d="M 506.0,1402 L 506.0,1479.4 L 136,1479.4 L 136,2026 L 786.0,2026 L 786.0,2144" fill="none" stroke="#B85450" stroke-width="2.4" stroke-dasharray="none" marker-end="url(#a_xtrust)" opacity="0.92"/>
+<path class="flow" d="M 1131.0,1642 L 1131.0,1724 L 1868,1724 L 1868,2012 L 1016.0,2012 L 1016.0,2144" fill="none" stroke="#B85450" stroke-width="2.4" stroke-dasharray="none" marker-end="url(#a_xtrust)" opacity="0.92"/>
+<path class="flow" d="M 1591.0,1642 L 1591.0,1668 L 1882,1668 L 1882,2026 L 1246.0,2026 L 1246.0,2144" fill="none" stroke="#B85450" stroke-width="2.4" stroke-dasharray="none" marker-end="url(#a_xtrust)" opacity="0.92"/>
+<path class="flow" d="M 883.3,1320 L 883.3,1255.5 L 1027.7,1255.5 L 1027.7,1162" fill="none" stroke="#7A7A7A" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a_async)" opacity="0.92"/>
+<path class="flow" d="M 406.0,1560 L 406.0,1466.6 L 122,1466.6 L 122,1233.0 L 1004.3,1233.0 L 1004.3,1162" fill="none" stroke="#7A7A7A" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a_async)" opacity="0.92"/>
+<path class="flow" d="M 636.0,1560 L 636.0,1453.7 L 108,1453.7 L 108,1221.8 L 981.0,1221.8 L 981.0,1162" fill="none" stroke="#7A7A7A" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a_async)" opacity="0.92"/>
+<path class="flow" d="M 1074.3,1162 L 1074.3,1199.2 L 1896,1199.2 L 1896,2252 L 1016.0,2252 L 1016.0,2384" fill="none" stroke="#7A7A7A" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a_async)" opacity="0.92"/>
+<path class="flow" d="M 957.7,1162 L 957.7,1210.5 L 94,1210.5 L 94,2294 L 821.0,2294 L 821.0,2384" fill="none" stroke="#7A7A7A" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a_async)" opacity="0.92"/>
+<path class="flow" d="M 1097.7,1162 L 1097.7,1210.5 L 1910,1210.5 L 1910,2266 L 1246.0,2266 L 1246.0,2384" fill="none" stroke="#7A7A7A" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a_async)" opacity="0.92"/>
+<path class="flow" d="M 934.3,1162 L 934.3,1199.2 L 80,1199.2 L 80,1440.9 L 901.0,1440.9 L 901.0,1560" fill="none" stroke="#7A7A7A" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a_async)" opacity="0.92"/>
+<path class="flow" d="M 1361.0,202 L 1361.0,242 L 964.0,242 L 964.0,360" fill="none" stroke="#7A7A7A" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a_async)" opacity="0.92"/>
+<path class="flow" d="M 976.0,442 L 976.0,496 L 1361.0,496 L 1361.0,600" fill="none" stroke="#7A7A7A" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a_async)" opacity="0.92"/>
+<path class="flow" d="M 1361.0,682 L 1361.0,708 L 1924,708 L 1924,962 L 1016.0,962 L 1016.0,1080" fill="none" stroke="#7A7A7A" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a_async)" opacity="0.92"/>
+<path class="flow" d="M 1051.0,1162 L 1051.0,1199.2 L 944.7,1199.2 L 944.7,1320" fill="none" stroke="#7A7A7A" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a_async)" opacity="0.92"/>
+<path class="flow" d="M 1131.0,442 L 1131.0,468 L 916.0,468 L 916.0,442" fill="none" stroke="#9966AA" stroke-width="1.4" stroke-dasharray="3,4" marker-end="url(#a_identity)" opacity="0.92"/>
+<path class="flow" d="M 1246.0,1162 L 1246.0,1244.2 L 861.0,1244.2 L 861.0,1162" fill="none" stroke="#9966AA" stroke-width="1.4" stroke-dasharray="3,4" marker-end="url(#a_identity)" opacity="0.92"/>
+<path class="flow" d="M 591.0,2384 L 591.0,2280 L 66,2280 L 66,1428.0 L 271.3,1428.0 L 271.3,1402" fill="none" stroke="#9966AA" stroke-width="1.4" stroke-dasharray="3,4" marker-end="url(#a_identity)" opacity="0.92"/>
+<path class="flow" d="M 786.0,2624 L 786.0,2492 L 52,2492 L 52,2012 L 901.0,2012 L 901.0,1882" fill="none" stroke="#9966AA" stroke-width="1.4" stroke-dasharray="3,4" marker-end="url(#a_identity)" opacity="0.92"/>
+<path class="flow" d="M 786.0,2466 L 786.0,2506 L 556.0,2506 L 556.0,2466" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-dasharray="none" marker-end="url(#a_sync)" opacity="0.92"/>
+<path class="flow" d="M 751.0,2384 L 751.0,2266 L 38,2266 L 38,468 L 826.0,468 L 826.0,442" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-dasharray="none" marker-end="url(#a_sync)" opacity="0.92"/>
+<path class="flow" d="M 946.0,442 L 946.0,482 L 1131.0,482 L 1131.0,600" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-dasharray="none" marker-end="url(#a_sync)" opacity="0.92"/>
+<path class="flow" d="M 711.0,1162 L 711.0,1188.0 L 24,1188.0 L 24,2252 L 521.0,2252 L 521.0,2384" fill="none" stroke="#9966AA" stroke-width="1.4" stroke-dasharray="3,4" marker-end="url(#a_identity)" opacity="0.92"/>
+<rect x="566.0" y="120" width="210" height="82" rx="6" fill="#FFE6CC" stroke="#D79B00" stroke-width="1.3"/>
+<text x="671.0" y="135" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Challenges</text>
+<text x="671.0" y="155.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">active list · join · progress ·</text>
+<text x="671.0" y="164.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">clinical / demographic / telemetry</text>
+<text x="671.0" y="174.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">mix</text>
+<rect x="796.0" y="120" width="210" height="82" rx="6" fill="#FFE6CC" stroke="#D79B00" stroke-width="1.3"/>
+<text x="901.0" y="135" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Rewards and Wallet</text>
+<text x="901.0" y="155.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">points balance · transactions ·</text>
+<text x="901.0" y="164.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">vouchers · re-display voucher</text>
+<text x="901.0" y="174.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">(rate-limited)</text>
+<rect x="1026.0" y="120" width="210" height="82" rx="6" fill="#FFE6CC" stroke="#D79B00" stroke-width="1.3"/>
+<text x="1131.0" y="135" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Marketplace and Redeem</text>
+<text x="1131.0" y="155.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">item detail · confirm redemption ·</text>
+<text x="1131.0" y="164.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">Idempotency-Key (client UUIDv4)</text>
+<rect x="1256.0" y="120" width="210" height="82" rx="6" fill="#FFE6CC" stroke="#D79B00" stroke-width="1.3"/>
+<text x="1361.0" y="135" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Health Connect SDK</text>
+<text x="1361.0" y="155.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">on-device wearable telemetry</text>
+<text x="1361.0" y="164.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">source · steps · heart-rate ·</text>
+<text x="1361.0" y="174.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">sleep · workouts</text>
+<rect x="796.0" y="360" width="210" height="82" rx="6" fill="#D7E8F2" stroke="#3A7CA5" stroke-width="1.3"/>
+<text x="901.0" y="375" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Azure APIM - Citizen</text>
+<text x="901.0" y="386" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Gateway</text>
+<text x="901.0" y="406.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">JWT validation · rate-limit ·</text>
+<text x="901.0" y="415.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">routing · products · subscription</text>
+<text x="901.0" y="425.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">keys</text>
+<rect x="1026.0" y="360" width="210" height="82" rx="6" fill="#D7E8F2" stroke="#3A7CA5" stroke-width="1.3"/>
+<text x="1131.0" y="375" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">UAE Pass IdP</text>
+<text x="1131.0" y="395.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">citizen identity federation (OIDC)</text>
+<text x="1131.0" y="404.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">· national ID · mints platform JWT</text>
+<rect x="566.0" y="600" width="210" height="82" rx="6" fill="#DAE8FC" stroke="#6C8EBF" stroke-width="1.3"/>
+<text x="671.0" y="615" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Gamification Service</text>
+<text x="671.0" y="635.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">gameplay BFF · JWT relay · session</text>
+<text x="671.0" y="644.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">· fan-out: challenges · wallet ·</text>
+<text x="671.0" y="654.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">market</text>
+<rect x="796.0" y="600" width="210" height="82" rx="6" fill="#DAE8FC" stroke="#6C8EBF" stroke-width="1.3"/>
+<text x="901.0" y="615" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Sahatna CMS</text>
+<text x="901.0" y="635.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">challenge CONTENT (copy · imagery</text>
+<text x="901.0" y="644.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">· TandC) · hydrates eligible</text>
+<text x="901.0" y="654.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">challenge_ids → published</text>
+<rect x="1026.0" y="600" width="210" height="82" rx="6" fill="#DAE8FC" stroke="#6C8EBF" stroke-width="1.3"/>
+<text x="1131.0" y="615" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Sahatna Notifications</text>
+<text x="1131.0" y="626" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">API</text>
+<text x="1131.0" y="646.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">Sahatna OWNS end-user delivery</text>
+<text x="1131.0" y="655.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">(push·email·SMS·in-app) · platform</text>
+<text x="1131.0" y="665.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">calls via APIM · consent-gated ·</text>
+<rect x="1256.0" y="600" width="210" height="82" rx="6" fill="#DAE8FC" stroke="#6C8EBF" stroke-width="1.3"/>
+<text x="1361.0" y="615" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Wearable Service</text>
+<text x="1361.0" y="635.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">ingest Health Connect SDK</text>
+<text x="1361.0" y="644.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">telemetry · writes telemetry to</text>
+<text x="1361.0" y="654.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">Event Hub</text>
+<rect x="911.0" y="840" width="210" height="82" rx="6" fill="#CCE5F5" stroke="#2E6E8E" stroke-width="1.3"/>
+<text x="1016.0" y="855" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Admin / Partner</text>
+<text x="1016.0" y="866" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Console</text>
+<text x="1016.0" y="886.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">partner onboarding · item approval</text>
+<text x="1016.0" y="895.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">· reconciliation · no APIM ingress</text>
+<text x="1016.0" y="905.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">· connects to Platform APIM</text>
+<rect x="681.0" y="1080" width="210" height="82" rx="6" fill="#D7E8F2" stroke="#3A7CA5" stroke-width="1.3"/>
+<text x="786.0" y="1095" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Azure APIM - Platform</text>
+<text x="786.0" y="1106" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Gateway</text>
+<text x="786.0" y="1126.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">service-to-service (sync) · JWT ·</text>
+<text x="786.0" y="1135.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">policy · per-OAM product · mTLS</text>
+<rect x="911.0" y="1080" width="210" height="82" rx="6" fill="#D7E8F2" stroke="#3A7CA5" stroke-width="1.3"/>
+<text x="1016.0" y="1095" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Event Hub (EVENT-SVC)</text>
+<text x="1016.0" y="1115.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">async integration · Kafka + Lenses</text>
+<text x="1016.0" y="1124.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">spine · schema registry ·</text>
+<text x="1016.0" y="1134.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">activity.* · wallet.* · voucher.*</text>
+<rect x="1141.0" y="1080" width="210" height="82" rx="6" fill="#D7E8F2" stroke="#3A7CA5" stroke-width="1.3"/>
+<text x="1246.0" y="1095" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Microsoft Entra IdP</text>
+<text x="1246.0" y="1115.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">workforce / service identity</text>
+<text x="1246.0" y="1124.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">(OAuth2) · B2B: Sahatna</text>
+<text x="1246.0" y="1134.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">app-registration ·</text>
+<rect x="210.0" y="1320" width="184.0" height="82" rx="6" fill="#D5E8D4" stroke="#82B366" stroke-width="1.3"/>
+<text x="302.0" y="1335" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Enrolment and</text>
+<text x="302.0" y="1346" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Eligibility</text>
+<text x="302.0" y="1366.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">resolve eligible challenges ·</text>
+<text x="302.0" y="1375.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">local-vs-Malaffi branch</text>
+<rect x="414.0" y="1320" width="184.0" height="82" rx="6" fill="#D5E8D4" stroke="#82B366" stroke-width="1.3"/>
+<text x="506.0" y="1335" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Malaffi Adapter</text>
+<text x="506.0" y="1355.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">segment metadata (author, no</text>
+<text x="506.0" y="1364.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">membership) · scoped membership</text>
+<text x="506.0" y="1374.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">query (eligibility)</text>
+<rect x="618.0" y="1320" width="184.0" height="82" rx="6" fill="#D5E8D4" stroke="#82B366" stroke-width="1.3"/>
+<text x="710.0" y="1335" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Local Segmentation</text>
+<text x="710.0" y="1355.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">demographic/telemetry segments</text>
+<text x="710.0" y="1364.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">(local) · clinical segments are</text>
+<text x="710.0" y="1374.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">external (Malaffi)</text>
+<rect x="822.0" y="1320" width="184.0" height="82" rx="6" fill="#D5E8D4" stroke="#82B366" stroke-width="1.3"/>
+<text x="914.0" y="1335" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Verification</text>
+<text x="914.0" y="1355.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">wearable / activity verify · emits</text>
+<text x="914.0" y="1364.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">activity.verified</text>
+<rect x="1026.0" y="1320" width="184.0" height="82" rx="6" fill="#D5E8D4" stroke="#82B366" stroke-width="1.3"/>
+<text x="1118.0" y="1335" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Challenge</text>
+<text x="1118.0" y="1355.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">authoring → publish → conclude ·</text>
+<text x="1118.0" y="1364.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">eligibility binding</text>
+<rect x="1230.0" y="1320" width="184.0" height="82" rx="6" fill="#D5E8D4" stroke="#82B366" stroke-width="1.3"/>
+<text x="1322.0" y="1335" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Scoring and</text>
+<text x="1322.0" y="1346" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Recognition</text>
+<text x="1322.0" y="1366.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">daily/weekly scoring · titles ·</text>
+<text x="1322.0" y="1375.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">badges · streaks</text>
+<rect x="1434.0" y="1320" width="184.0" height="82" rx="6" fill="#D5E8D4" stroke="#82B366" stroke-width="1.3"/>
+<text x="1526.0" y="1335" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Engagement</text>
+<text x="1526.0" y="1355.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">nudges · goals · cohort plans</text>
+<rect x="1638.0" y="1320" width="184.0" height="82" rx="6" fill="#D5E8D4" stroke="#82B366" stroke-width="1.3"/>
+<text x="1730.0" y="1335" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Eligibility Resolver</text>
+<text x="1730.0" y="1355.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">membership → segments → map to</text>
+<text x="1730.0" y="1364.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">challenge_ids · returns ids;</text>
+<text x="1730.0" y="1374.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">Sahatna CMS hydrates</text>
+<rect x="336.0" y="1560" width="210" height="82" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.3"/>
+<text x="441.0" y="1575" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Wallet - Points Ledger</text>
+<text x="441.0" y="1595.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">authoritative balance (versioned)</text>
+<text x="441.0" y="1604.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">· append-only · idempotent</text>
+<rect x="566.0" y="1560" width="210" height="82" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.3"/>
+<text x="671.0" y="1575" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Marketplace and</text>
+<text x="671.0" y="1586" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Voucher</text>
+<text x="671.0" y="1606.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">catalog · reserve · issue voucher</text>
+<text x="671.0" y="1615.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">· encrypted code/PIN</text>
+<rect x="796.0" y="1560" width="210" height="82" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.3"/>
+<text x="901.0" y="1575" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Fraud and Integrity</text>
+<text x="901.0" y="1595.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">anomaly detection · velocity /</text>
+<text x="901.0" y="1604.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">duplicate checks</text>
+<rect x="1026.0" y="1560" width="210" height="82" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.3"/>
+<text x="1131.0" y="1575" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Partner Adapter</text>
+<text x="1131.0" y="1586" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Framework</text>
+<text x="1131.0" y="1606.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">routing · auth · idempotency</text>
+<text x="1131.0" y="1615.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">overlay · YGG adapter · aggregator</text>
+<text x="1131.0" y="1625.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">adapters</text>
+<rect x="1256.0" y="1560" width="210" height="82" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.3"/>
+<text x="1361.0" y="1575" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Redemption</text>
+<text x="1361.0" y="1586" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Orchestrator (saga)</text>
+<text x="1361.0" y="1606.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">reserve → fraud → dispatch partner</text>
+<text x="1361.0" y="1615.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">→ confirm/release · state:</text>
+<text x="1361.0" y="1625.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">reserved · partner_pending ·</text>
+<rect x="1486.0" y="1560" width="210" height="82" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.3"/>
+<text x="1591.0" y="1575" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Partner and Settlement</text>
+<text x="1591.0" y="1595.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">contracting · reconciliation · DoH</text>
+<text x="1591.0" y="1604.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">settlement (Phase 4)</text>
+<rect x="566.0" y="1800" width="210" height="82" rx="6" fill="#FFF2CC" stroke="#D6B656" stroke-width="1.3"/>
+<text x="671.0" y="1815" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Wallet stores</text>
+<text x="671.0" y="1835.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">WalletBalance · Transaction ·</text>
+<text x="671.0" y="1844.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">Reservation (idempotency_key)</text>
+<rect x="796.0" y="1800" width="210" height="82" rx="6" fill="#FFF2CC" stroke="#D6B656" stroke-width="1.3"/>
+<text x="901.0" y="1815" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Azure Key Vault</text>
+<text x="901.0" y="1835.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">per-partner credentials ·</text>
+<text x="901.0" y="1844.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">version-bumped rotation</text>
+<rect x="1026.0" y="1800" width="210" height="82" rx="6" fill="#FFF2CC" stroke="#D6B656" stroke-width="1.3"/>
+<text x="1131.0" y="1815" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Marketplace stores</text>
+<text x="1131.0" y="1835.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">Item · Redemption · Voucher ·</text>
+<text x="1131.0" y="1844.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">(encrypted columns)</text>
+<rect x="1256.0" y="1800" width="210" height="82" rx="6" fill="#FFF2CC" stroke="#D6B656" stroke-width="1.3"/>
+<text x="1361.0" y="1815" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Challenge and Cohort</text>
+<text x="1361.0" y="1826" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">stores</text>
+<text x="1361.0" y="1846.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">Challenge · Segment · Score ·</text>
+<text x="1361.0" y="1855.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">Eligibility Result</text>
+<rect x="681.0" y="2144" width="210" height="82" rx="6" fill="#F8CECC" stroke="#B85450" stroke-width="1.3"/>
+<text x="786.0" y="2159" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Malaffi HIE</text>
+<text x="786.0" y="2179.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">clinical membership / eligibility</text>
+<text x="786.0" y="2188.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">· black box · API only</text>
+<rect x="911.0" y="2144" width="210" height="82" rx="6" fill="#F8CECC" stroke="#B85450" stroke-width="1.3"/>
+<text x="1016.0" y="2159" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Reward Providers</text>
+<text x="1016.0" y="2179.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">YouGotaGift (eGift v2.4) ·</text>
+<text x="1016.0" y="2188.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">aggregators · voucher issue /</text>
+<text x="1016.0" y="2198.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">redeem</text>
+<rect x="1141.0" y="2144" width="210" height="82" rx="6" fill="#F8CECC" stroke="#B85450" stroke-width="1.3"/>
+<text x="1246.0" y="2159" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">DoH ESB</text>
+<text x="1246.0" y="2179.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">sponsor · settlement (Phase 4) ·</text>
+<text x="1246.0" y="2188.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">IBAN payouts · VAT invoice</text>
+<rect x="451.0" y="2384" width="210" height="82" rx="6" fill="#EEEEEE" stroke="#666666" stroke-width="1.3"/>
+<text x="556.0" y="2399" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">CONS-SVC</text>
+<text x="556.0" y="2419.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">consent purpose · voucher / data</text>
+<text x="556.0" y="2428.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">sharing · NOTIFY consent</text>
+<text x="556.0" y="2438.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">propagated from Sahatna · checked</text>
+<rect x="681.0" y="2384" width="210" height="82" rx="6" fill="#EEEEEE" stroke="#666666" stroke-width="1.3"/>
+<text x="786.0" y="2399" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">NUDGE-SVC</text>
+<text x="786.0" y="2419.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">compose notification request (no</text>
+<text x="786.0" y="2428.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">channels of its own) ·</text>
+<text x="786.0" y="2438.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">consent-checked → calls Sahatna</text>
+<rect x="911.0" y="2384" width="210" height="82" rx="6" fill="#EEEEEE" stroke="#666666" stroke-width="1.3"/>
+<text x="1016.0" y="2399" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">FRAUD-SVC</text>
+<text x="1016.0" y="2419.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">anomaly detection · DLQ signals</text>
+<rect x="1141.0" y="2384" width="210" height="82" rx="6" fill="#EEEEEE" stroke="#666666" stroke-width="1.3"/>
+<text x="1246.0" y="2399" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">DATA-SVC</text>
+<text x="1246.0" y="2419.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">warehouse + analytics (OLAP) ·</text>
+<text x="1246.0" y="2428.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">settlement aggregation ·</text>
+<text x="1246.0" y="2438.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">dashboards</text>
+<rect x="1371.0" y="2384" width="210" height="82" rx="6" fill="#EEEEEE" stroke="#666666" stroke-width="1.3"/>
+<text x="1476.0" y="2399" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">ID-SVC</text>
+<text x="1476.0" y="2419.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">session and token exchange ·</text>
+<text x="1476.0" y="2428.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">member ↔ platform identity</text>
+<rect x="681.0" y="2624" width="210" height="82" rx="6" fill="#F5F5F5" stroke="#666666" stroke-width="1.3"/>
+<text x="786.0" y="2639" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Secrets Management</text>
+<text x="786.0" y="2659.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">Azure Key Vault + External Secrets</text>
+<text x="786.0" y="2668.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">· &lt;comp&gt;-conn injection</text>
+<rect x="911.0" y="2624" width="210" height="82" rx="6" fill="#F5F5F5" stroke="#666666" stroke-width="1.3"/>
+<text x="1016.0" y="2639" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Declarative</text>
+<text x="1016.0" y="2650" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Provisioning</text>
+<text x="1016.0" y="2670.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">KubeVela + Crossplane + ArgoCD ·</text>
+<text x="1016.0" y="2679.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">OAM control plane (GitOps)</text>
+<rect x="1141.0" y="2624" width="210" height="82" rx="6" fill="#F5F5F5" stroke="#666666" stroke-width="1.3"/>
+<text x="1246.0" y="2639" font-size="9.7" text-anchor="middle" font-weight="bold" fill="#1c1c1c">Observability</text>
+<text x="1246.0" y="2659.0" font-size="7.3" text-anchor="middle" fill="#5a5a5a">Prometheus · Grafana · Jaeger ·</text>
+<text x="1246.0" y="2668.5" font-size="7.3" text-anchor="middle" fill="#5a5a5a">Kiali</text>
+<line x1="196" y1="2746" x2="226" y2="2746" stroke="#1A1A1A" stroke-width="1.5" stroke-dasharray="none" marker-end="url(#a_sync)"/>
+<text x="233" y="2750" font-size="10" fill="#333">Synchronous HTTPS (internal)</text>
+<line x1="396.79999999999995" y1="2746" x2="426.79999999999995" y2="2746" stroke="#7A7A7A" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a_async)"/>
+<text x="433.79999999999995" y="2750" font-size="10" fill="#333">Async / event publish-consume</text>
+<line x1="603.1999999999999" y1="2746" x2="633.1999999999999" y2="2746" stroke="#B85450" stroke-width="2.4" stroke-dasharray="none" marker-end="url(#a_xtrust)"/>
+<text x="640.1999999999999" y="2750" font-size="10" fill="#333">Cross trust boundary (partner / settlement)</text>
+<line x1="887.9999999999999" y1="2746" x2="917.9999999999999" y2="2746" stroke="#9966AA" stroke-width="1.4" stroke-dasharray="3,4" marker-end="url(#a_identity)"/>
+<text x="924.9999999999999" y="2750" font-size="10" fill="#333">Identity / consent / read-secret</text>
+<rect x="1111.1999999999998" y="2739" width="26" height="15" rx="4" fill="none" stroke="#5A5A5A" stroke-width="1.6" stroke-dasharray="2,4"/>
+<text x="1143.1999999999998" y="2750" font-size="10" fill="#333">System / trust boundary (dotted)</text>
+</svg>

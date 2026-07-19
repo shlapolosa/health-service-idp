@@ -1,0 +1,184 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1620" height="880" viewBox="0 0 1620 880" font-family="Helvetica,Arial,sans-serif">
+<rect width="1620" height="880" fill="#fff"/>
+<defs><marker id="ak" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0L7,3L0,6Z" fill="#666"/></marker></defs>
+<text x="810.0" y="40" font-size="26" fill="#1F2937" font-weight="bold" text-anchor="middle">AI adoption — delivery roadmap (v0.2): two phases in parallel</text>
+<text x="810.0" y="66" font-size="13" fill="#6B7280" font-weight="bold" text-anchor="middle">Phase 1 (AI Agents) delivers now · Phase 2 (Agentic AI platform) runs in parallel — architecture &amp; pricing finalised</text>
+<rect x="966" y="80" width="15" height="15" rx="3" fill="#E7F5EC" stroke="#15803D" stroke-width="2"/>
+<text x="988" y="92" font-size="11" fill="#1F2937" font-weight="normal" text-anchor="start">Completed</text>
+<rect x="1128" y="80" width="15" height="15" rx="3" fill="#FEF3E2" stroke="#D97706" stroke-width="2"/>
+<text x="1150" y="92" font-size="11" fill="#1F2937" font-weight="normal" text-anchor="start">In progress</text>
+<rect x="1290" y="80" width="15" height="15" rx="3" fill="#2563EB" stroke="#2563EB" stroke-width="2"/>
+<text x="1312" y="92" font-size="11" fill="#1F2937" font-weight="normal" text-anchor="start">Milestone</text>
+<rect x="1452" y="80" width="15" height="15" rx="3" fill="#FFFFFF" stroke="#6B7280" stroke-width="2"/>
+<text x="1474" y="92" font-size="11" fill="#1F2937" font-weight="normal" text-anchor="start">Not started</text>
+<rect x="14" y="110" width="1592" height="206" rx="12" fill="#F1F2F4" stroke="#C9CDD3" stroke-width="1.4"/>
+<rect x="14" y="332" width="1592" height="332" rx="12" fill="#F1F2F4" stroke="#C9CDD3" stroke-width="1.4"/>
+<rect x="14" y="680" width="1592" height="118" rx="12" fill="#F1F2F4" stroke="#C9CDD3" stroke-width="1.4"/>
+<text x="26" y="150" font-size="13" fill="#1F2937" font-weight="bold" text-anchor="start">PHASE 1 · AI AGENTS</text>
+<text x="26" y="168" font-size="10" fill="#6B7280" font-weight="normal" text-anchor="start">deliver with AI agents</text>
+<text x="26" y="356" font-size="13" fill="#1F2937" font-weight="bold" text-anchor="start">PHASE 2 · AGENTIC AI</text>
+<text x="26" y="372" font-size="10" fill="#6B7280" font-weight="normal" text-anchor="start">(in parallel)</text>
+<text x="26" y="400" font-size="12" fill="#1F2937" font-weight="bold" text-anchor="start">Platform</text>
+<text x="26" y="492" font-size="12" fill="#1F2937" font-weight="bold" text-anchor="start">Process</text>
+<text x="26" y="584" font-size="12" fill="#1F2937" font-weight="bold" text-anchor="start">People</text>
+<text x="26" y="724" font-size="12" fill="#1F2937" font-weight="bold" text-anchor="start">CENTER OF EXCELLENCE</text>
+<rect x="200" y="150" width="132" height="84" rx="10" fill="#E7F5EC" stroke="#15803D" stroke-width="2.0"/>
+<circle cx="215" cy="165" r="10" fill="#15803D"/>
+<text x="215" y="169" font-size="10" fill="#fff" font-weight="bold" text-anchor="middle">1</text>
+<text x="231" y="167" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">Scope, mandate,</text>
+<text x="211" y="181" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">charter</text>
+<rect x="350" y="150" width="132" height="84" rx="10" fill="#E7F5EC" stroke="#15803D" stroke-width="2.0"/>
+<circle cx="365" cy="165" r="10" fill="#15803D"/>
+<text x="365" y="169" font-size="10" fill="#fff" font-weight="bold" text-anchor="middle">2</text>
+<text x="381" y="167" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">Collect use cases</text>
+<text x="361" y="184" font-size="9" fill="#6B7280" font-weight="normal" text-anchor="start">Intake from business</text>
+<path d="M 332 192.0 L 350 192.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<rect x="500" y="150" width="132" height="84" rx="10" fill="#E7F5EC" stroke="#15803D" stroke-width="2.0"/>
+<circle cx="515" cy="165" r="10" fill="#15803D"/>
+<text x="515" y="169" font-size="10" fill="#fff" font-weight="bold" text-anchor="middle">3</text>
+<text x="531" y="167" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">Create solutions</text>
+<text x="511" y="184" font-size="9" fill="#6B7280" font-weight="normal" text-anchor="start">Architecture per case</text>
+<path d="M 482 192.0 L 500 192.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<rect x="650" y="150" width="132" height="84" rx="10" fill="#E7F5EC" stroke="#15803D" stroke-width="2.0"/>
+<circle cx="665" cy="165" r="10" fill="#15803D"/>
+<text x="665" y="169" font-size="10" fill="#fff" font-weight="bold" text-anchor="middle">4</text>
+<text x="681" y="167" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">Allocate to teams</text>
+<text x="661" y="184" font-size="9" fill="#6B7280" font-weight="normal" text-anchor="start">Ownership assigned</text>
+<path d="M 632 192.0 L 650 192.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<rect x="800" y="150" width="132" height="84" rx="10" fill="#FEF3E2" stroke="#D97706" stroke-width="2.0"/>
+<circle cx="815" cy="165" r="10" fill="#D97706"/>
+<text x="815" y="169" font-size="10" fill="#fff" font-weight="bold" text-anchor="middle">5</text>
+<text x="831" y="167" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">Teams prioritise</text>
+<text x="811" y="184" font-size="9" fill="#6B7280" font-weight="normal" text-anchor="start">Sequencing per team</text>
+<path d="M 782 192.0 L 800 192.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<rect x="950" y="150" width="132" height="84" rx="10" fill="#FEF3E2" stroke="#D97706" stroke-width="2.0"/>
+<circle cx="965" cy="165" r="10" fill="#D97706"/>
+<text x="965" y="169" font-size="10" fill="#fff" font-weight="bold" text-anchor="middle">6</text>
+<text x="981" y="167" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">Implement phase 1</text>
+<text x="961" y="184" font-size="9" fill="#6B7280" font-weight="normal" text-anchor="start">Build skills, tools,</text>
+<text x="961" y="196" font-size="9" fill="#6B7280" font-weight="normal" text-anchor="start">agents</text>
+<path d="M 932 192.0 L 950 192.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<rect x="200" y="366" width="132" height="84" rx="10" fill="#E7F5EC" stroke="#15803D" stroke-width="2.0"/>
+<circle cx="215" cy="381" r="10" fill="#15803D"/>
+<text x="215" y="385" font-size="10" fill="#fff" font-weight="bold" text-anchor="middle">1</text>
+<text x="231" y="383" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">Architecture</text>
+<text x="211" y="397" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">definition</text>
+<rect x="350" y="366" width="132" height="84" rx="10" fill="#E7F5EC" stroke="#15803D" stroke-width="2.0"/>
+<circle cx="365" cy="381" r="10" fill="#15803D"/>
+<text x="365" y="385" font-size="10" fill="#fff" font-weight="bold" text-anchor="middle">2</text>
+<text x="381" y="383" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">MS reference</text>
+<text x="361" y="397" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">architecture</text>
+<path d="M 332 408.0 L 350 408.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<rect x="500" y="366" width="132" height="84" rx="10" fill="#E7F5EC" stroke="#15803D" stroke-width="2.0"/>
+<circle cx="515" cy="381" r="10" fill="#15803D"/>
+<text x="515" y="385" font-size="10" fill="#fff" font-weight="bold" text-anchor="middle">3</text>
+<text x="531" y="383" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">DHS discovery &amp;</text>
+<text x="511" y="397" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">consolidate</text>
+<path d="M 482 408.0 L 500 408.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<rect x="650" y="366" width="132" height="84" rx="10" fill="#FEF3E2" stroke="#D97706" stroke-width="2.0"/>
+<circle cx="665" cy="381" r="10" fill="#D97706"/>
+<text x="665" y="385" font-size="10" fill="#fff" font-weight="bold" text-anchor="middle">4</text>
+<text x="681" y="383" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">Cost estimate</text>
+<path d="M 632 408.0 L 650 408.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<rect x="800" y="366" width="132" height="84" rx="10" fill="#FFFFFF" stroke="#6B7280" stroke-width="2.0"/>
+<circle cx="815" cy="381" r="10" fill="#6B7280"/>
+<text x="815" y="385" font-size="10" fill="#fff" font-weight="bold" text-anchor="middle">5</text>
+<text x="831" y="383" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">Provisioning</text>
+<path d="M 782 408.0 L 800 408.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<rect x="200" y="458" width="132" height="84" rx="10" fill="#FFFFFF" stroke="#6B7280" stroke-width="2.0"/>
+<circle cx="215" cy="473" r="10" fill="#6B7280"/>
+<text x="215" y="477" font-size="10" fill="#fff" font-weight="bold" text-anchor="middle">1</text>
+<text x="231" y="475" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">Establish CoE</text>
+<rect x="350" y="458" width="132" height="84" rx="10" fill="#FFFFFF" stroke="#6B7280" stroke-width="2.0"/>
+<circle cx="365" cy="473" r="10" fill="#6B7280"/>
+<text x="365" y="477" font-size="10" fill="#fff" font-weight="bold" text-anchor="middle">2</text>
+<text x="381" y="475" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">Resourcing</text>
+<path d="M 332 500.0 L 350 500.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<rect x="500" y="458" width="132" height="84" rx="10" fill="#FFFFFF" stroke="#6B7280" stroke-width="2.0"/>
+<circle cx="515" cy="473" r="10" fill="#6B7280"/>
+<text x="515" y="477" font-size="10" fill="#fff" font-weight="bold" text-anchor="middle">3</text>
+<text x="531" y="475" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">Operating model</text>
+<text x="511" y="492" font-size="9" fill="#6B7280" font-weight="normal" text-anchor="start">phase 1 → phase 2</text>
+<path d="M 482 500.0 L 500 500.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<rect x="200" y="550" width="132" height="84" rx="10" fill="#FFFFFF" stroke="#6B7280" stroke-width="2.0"/>
+<circle cx="215" cy="565" r="10" fill="#6B7280"/>
+<text x="215" y="569" font-size="10" fill="#fff" font-weight="bold" text-anchor="middle">1</text>
+<text x="231" y="567" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">Team structure</text>
+<rect x="350" y="550" width="132" height="84" rx="10" fill="#FFFFFF" stroke="#6B7280" stroke-width="2.0"/>
+<circle cx="365" cy="565" r="10" fill="#6B7280"/>
+<text x="365" y="569" font-size="10" fill="#fff" font-weight="bold" text-anchor="middle">2</text>
+<text x="381" y="567" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">Internal talent</text>
+<path d="M 332 592.0 L 350 592.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<rect x="500" y="550" width="132" height="84" rx="10" fill="#FFFFFF" stroke="#6B7280" stroke-width="2.0"/>
+<circle cx="515" cy="565" r="10" fill="#6B7280"/>
+<text x="515" y="569" font-size="10" fill="#fff" font-weight="bold" text-anchor="middle">3</text>
+<text x="531" y="567" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">External talent</text>
+<path d="M 482 592.0 L 500 592.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<rect x="650" y="550" width="132" height="84" rx="10" fill="#FFFFFF" stroke="#6B7280" stroke-width="2.0"/>
+<circle cx="665" cy="565" r="10" fill="#6B7280"/>
+<text x="665" y="569" font-size="10" fill="#fff" font-weight="bold" text-anchor="middle">4</text>
+<text x="681" y="567" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">Training schedule</text>
+<path d="M 632 592.0 L 650 592.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<rect x="200" y="704" width="132" height="84" rx="10" fill="#FEF3E2" stroke="#D97706" stroke-width="2.0"/>
+<circle cx="215" cy="719" r="10" fill="#D97706"/>
+<text x="215" y="723" font-size="10" fill="#fff" font-weight="bold" text-anchor="middle">1</text>
+<text x="231" y="721" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">Scope, mandate,</text>
+<text x="211" y="735" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">charter</text>
+<rect x="350" y="704" width="132" height="84" rx="10" fill="#FEF3E2" stroke="#D97706" stroke-width="2.0"/>
+<circle cx="365" cy="719" r="10" fill="#D97706"/>
+<text x="365" y="723" font-size="10" fill="#fff" font-weight="bold" text-anchor="middle">2</text>
+<text x="381" y="721" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">Contract partners</text>
+<text x="361" y="738" font-size="9" fill="#6B7280" font-weight="normal" text-anchor="start">Microsoft · Delphi</text>
+<path d="M 332 746.0 L 350 746.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<rect x="500" y="704" width="132" height="84" rx="10" fill="#FEF3E2" stroke="#D97706" stroke-width="2.0"/>
+<circle cx="515" cy="719" r="10" fill="#D97706"/>
+<text x="515" y="723" font-size="10" fill="#fff" font-weight="bold" text-anchor="middle">3</text>
+<text x="531" y="721" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">Collect use cases</text>
+<path d="M 482 746.0 L 500 746.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<rect x="650" y="704" width="132" height="84" rx="10" fill="#FEF3E2" stroke="#D97706" stroke-width="2.0"/>
+<circle cx="665" cy="719" r="10" fill="#D97706"/>
+<text x="665" y="723" font-size="10" fill="#fff" font-weight="bold" text-anchor="middle">4</text>
+<text x="681" y="721" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">Operating model</text>
+<path d="M 632 746.0 L 650 746.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<rect x="800" y="704" width="132" height="84" rx="10" fill="#FEF3E2" stroke="#D97706" stroke-width="2.0"/>
+<circle cx="815" cy="719" r="10" fill="#D97706"/>
+<text x="815" y="723" font-size="10" fill="#fff" font-weight="bold" text-anchor="middle">5</text>
+<text x="831" y="721" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">Adopt architecture</text>
+<text x="811" y="735" font-size="11.5" fill="#1F2937" font-weight="bold" text-anchor="start">+ tools</text>
+<path d="M 782 746.0 L 800 746.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<rect x="1108" y="150" width="132" height="84" rx="12" fill="#2563EB" stroke="#2563EB" stroke-width="2"/>
+<text x="1174.0" y="175.2" font-size="22" fill="#fff" font-weight="bold" text-anchor="middle">★</text>
+<text x="1174.0" y="197.2" font-size="13" fill="#fff" font-weight="bold" text-anchor="middle">Agent</text>
+<text x="1174.0" y="215.2" font-size="13" fill="#fff" font-weight="bold" text-anchor="middle">Capabilities</text>
+<path d="M 1082 192.0 L 1108 192.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<rect x="200" y="250" width="882" height="52" rx="8" fill="#FDECEA" stroke="#DC2626" stroke-width="1.6"/>
+<text x="214" y="272" font-size="12.5" fill="#DC2626" font-weight="bold" text-anchor="start">⚠  Phase 1 challenges</text>
+<text x="214" y="290" font-size="11" fill="#1F2937" font-weight="normal" text-anchor="start">Audit finding (policy controls) · rate limits · ability to use agents</text>
+<rect x="1108" y="366" width="132" height="268" rx="12" fill="#2563EB" stroke="#2563EB" stroke-width="2"/>
+<text x="1174.0" y="446.4" font-size="22" fill="#fff" font-weight="bold" text-anchor="middle">★</text>
+<text x="1174.0" y="468.4" font-size="13" fill="#fff" font-weight="bold" text-anchor="middle">Agentic AI</text>
+<text x="1174.0" y="486.4" font-size="13" fill="#fff" font-weight="bold" text-anchor="middle">capability</text>
+<text x="1174.0" y="512.4" font-size="9.5" fill="#DCE7FB" font-weight="normal" text-anchor="middle">milestone</text>
+<path d="M 932 408.0 L 1108 408.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<path d="M 632 500.0 L 1108 500.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<path d="M 782 592.0 L 1108 592.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<rect x="1262" y="455" width="150" height="90" rx="10" fill="#FFFFFF" stroke="#6B7280" stroke-width="2"/>
+<text x="1337.0" y="486.0" font-size="12" fill="#1F2937" font-weight="bold" text-anchor="middle">Consolidated</text>
+<text x="1337.0" y="504.0" font-size="12" fill="#1F2937" font-weight="bold" text-anchor="middle">Accenture</text>
+<text x="1337.0" y="522.0" font-size="12" fill="#1F2937" font-weight="bold" text-anchor="middle">Agentic AI</text>
+<rect x="1438" y="455" width="150" height="90" rx="10" fill="#FFFFFF" stroke="#6B7280" stroke-width="2"/>
+<text x="1513.0" y="495.0" font-size="12" fill="#1F2937" font-weight="bold" text-anchor="middle">Kickoff</text>
+<text x="1513.0" y="513.0" font-size="12" fill="#1F2937" font-weight="bold" text-anchor="middle">factory</text>
+<path d="M 1240 500.0 L 1262 500.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<path d="M 1412 500.0 L 1438 500.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<rect x="1108" y="704" width="132" height="84" rx="12" fill="#2563EB" stroke="#2563EB" stroke-width="2"/>
+<text x="1174.0" y="729.2" font-size="22" fill="#fff" font-weight="bold" text-anchor="middle">★</text>
+<text x="1174.0" y="751.2" font-size="13" fill="#fff" font-weight="bold" text-anchor="middle">Agentic AI</text>
+<text x="1174.0" y="769.2" font-size="13" fill="#fff" font-weight="bold" text-anchor="middle">capability</text>
+<rect x="1438" y="704" width="150" height="84" rx="10" fill="#FFFFFF" stroke="#6B7280" stroke-width="2"/>
+<text x="1513.0" y="741.0" font-size="12" fill="#1F2937" font-weight="bold" text-anchor="middle">Kickoff</text>
+<text x="1513.0" y="759.0" font-size="12" fill="#1F2937" font-weight="bold" text-anchor="middle">factory</text>
+<path d="M 932 746.0 L 1108 746.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<path d="M 1240 746.0 L 1438 746.0" fill="none" stroke="#666" stroke-width="1.8" marker-end="url(#ak)"/>
+<text x="20" y="864" font-size="10" fill="#6B7280" font-weight="normal" text-anchor="start">HSO · Agentic AI delivery · v0.2</text>
+</svg>

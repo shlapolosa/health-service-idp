@@ -1,0 +1,211 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1780" height="1372" viewBox="0 0 1780 1372" font-family="Helvetica,Arial,sans-serif">
+<rect width="1780" height="1372" fill="#FFFFFF"/>
+<defs><marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#444"/></marker></defs>
+<text x="890.0" y="34" font-size="21" fill="#111" font-weight="bold" text-anchor="middle">View 2 — Serving Anthropic (Claude) via Microsoft Foundry + APIM on Azure AI Landing Zones</text>
+<text x="890.0" y="57" font-size="12.5" fill="#555555" font-weight="normal" text-anchor="middle">Same control plane as the current GPT-5.4 implementation — only the Foundry model deployment changes (Claude instead of GPT-5.4). Agent 365 / Foundry Agent Service · Entra ID · APIM AI Gateway · Defender/Purview.</text>
+<rect x="24" y="74" width="1732" height="58" rx="8" fill="#FDF1EC" stroke="#CC785C" stroke-width="1.6"/>
+<text x="36" y="93" font-size="13.5" fill="#8A4B38" font-weight="bold" text-anchor="start">Client / Consumer layer  (outside the Azure tenant)</text>
+<rect x="38" y="100" width="234" height="28" rx="5" fill="#FFFFFF" stroke="#CC785C" stroke-width="1.1"/>
+<text x="155.0" y="117.96" font-size="11" fill="#8A4B38" font-weight="normal" text-anchor="middle">Claude Code — Web (claude.ai/code)</text>
+<rect x="280" y="100" width="234" height="28" rx="5" fill="#FFFFFF" stroke="#CC785C" stroke-width="1.1"/>
+<text x="397.0" y="117.96" font-size="11" fill="#8A4B38" font-weight="normal" text-anchor="middle">Claude Code — CLI (terminal / IDE)</text>
+<rect x="522" y="100" width="190" height="28" rx="5" fill="#FFFFFF" stroke="#CC785C" stroke-width="1.1"/>
+<text x="617.0" y="117.96" font-size="11" fill="#8A4B38" font-weight="normal" text-anchor="middle">Application users (browser)</text>
+<rect x="720" y="100" width="432" height="28" rx="5" fill="#FFFFFF" stroke="#CC785C" stroke-width="1.1"/>
+<text x="936.0" y="117.96" font-size="11" fill="#8A4B38" font-weight="normal" text-anchor="middle">Programmatic consumers — architect-v1 · dev-agent · external apps</text>
+<text x="1320" y="118" font-size="10.5" fill="#555555" font-weight="bold" text-anchor="start">model calls → APIM (AI Gateway) · app UX → Application Gateway</text>
+<line x1="900" y1="132" x2="900" y2="142" stroke="#CC785C" stroke-width="1.6" marker-end="url(#arr)"/>
+<text x="900" y="158" font-size="10" fill="#8A4B38" font-weight="normal" text-anchor="middle">↓ Entra-authenticated calls into the landing zones</text>
+<rect x="24" y="168" width="1732" height="80" rx="8" fill="#EAF1FB" stroke="#0F6CBD" stroke-width="1.6"/>
+<text x="36" y="187" font-size="13.5" fill="#0F6CBD" font-weight="bold" text-anchor="start">Management Groups (Azure tenant) — landing-zone hierarchy + tenant governance</text>
+<rect x="38" y="192" width="69" height="28" rx="5" fill="#FFFFFF" stroke="#0F6CBD" stroke-width="1.1"/>
+<text x="72.5" y="209.96" font-size="11" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Org Root</text>
+<rect x="115" y="192" width="88" height="28" rx="5" fill="#FFFFFF" stroke="#0F6CBD" stroke-width="1.1"/>
+<text x="159.0" y="209.96" font-size="11" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Platform LZ</text>
+<rect x="211" y="192" width="94" height="28" rx="5" fill="#FFFFFF" stroke="#0F6CBD" stroke-width="1.1"/>
+<text x="258.0" y="209.96" font-size="11" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Connectivity</text>
+<rect x="313" y="192" width="107" height="28" rx="5" fill="#FFFFFF" stroke="#0F6CBD" stroke-width="1.1"/>
+<text x="366.5" y="209.96" font-size="11" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Application LZ</text>
+<rect x="428" y="192" width="43" height="28" rx="5" fill="#FFFFFF" stroke="#0F6CBD" stroke-width="1.1"/>
+<text x="449.5" y="209.96" font-size="11" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Corp</text>
+<rect x="479" y="192" width="209" height="28" rx="5" fill="#FFFFFF" stroke="#0F6CBD" stroke-width="1.1"/>
+<text x="583.5" y="209.96" font-size="11" fill="#1A1A1A" font-weight="normal" text-anchor="middle">AI Landing-Zone Governance Hub</text>
+<rect x="1010" y="192" width="164" height="28" rx="5" fill="#FFF4CE" stroke="#C9A227" stroke-width="1.1"/>
+<text x="1092.0" y="209.96" font-size="11" fill="#7A5F00" font-weight="normal" text-anchor="middle">Role assignments (RBAC)</text>
+<rect x="1182" y="192" width="228" height="28" rx="5" fill="#FFF4CE" stroke="#C9A227" stroke-width="1.1"/>
+<text x="1296.0" y="209.96" font-size="11" fill="#7A5F00" font-weight="normal" text-anchor="middle">Policy assignments (Azure Policy)</text>
+<rect x="1418" y="192" width="43" height="28" rx="5" fill="#FFF4CE" stroke="#C9A227" stroke-width="1.1"/>
+<text x="1439.5" y="209.96" font-size="11" fill="#7A5F00" font-weight="normal" text-anchor="middle">Tags</text>
+<rect x="1469" y="192" width="164" height="28" rx="5" fill="#FFF4CE" stroke="#C9A227" stroke-width="1.1"/>
+<text x="1551.0" y="209.96" font-size="11" fill="#7A5F00" font-weight="normal" text-anchor="middle">Blueprints / guardrails</text>
+<rect x="24" y="258" width="1732" height="112" rx="8" fill="#F4F8FE" stroke="#0F6CBD" stroke-width="1.6"/>
+<text x="36" y="277" font-size="13.5" fill="#0F6CBD" font-weight="bold" text-anchor="start">Connectivity Subscription (Platform) — Hub VNet (region 1..N) · DNS provided by hub</text>
+<rect x="38" y="286" width="183" height="28" rx="5" fill="#FFFFFF" stroke="#BBD6F2" stroke-width="1.1"/>
+<text x="129.5" y="303.96" font-size="11" fill="#1A1A1A" font-weight="normal" text-anchor="middle">On-premises / ExpressRoute</text>
+<rect x="229" y="286" width="190" height="28" rx="5" fill="#FFFFFF" stroke="#BBD6F2" stroke-width="1.1"/>
+<text x="324.0" y="303.96" font-size="11" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Azure Firewall (+ policies)</text>
+<rect x="427" y="286" width="145" height="28" rx="5" fill="#FFFFFF" stroke="#BBD6F2" stroke-width="1.1"/>
+<text x="499.5" y="303.96" font-size="11" fill="#1A1A1A" font-weight="normal" text-anchor="middle">DNS Private Resolver</text>
+<rect x="580" y="286" width="126" height="28" rx="5" fill="#FFFFFF" stroke="#BBD6F2" stroke-width="1.1"/>
+<text x="643.0" y="303.96" font-size="11" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Private DNS Zones</text>
+<rect x="714" y="286" width="190" height="28" rx="5" fill="#FFFFFF" stroke="#BBD6F2" stroke-width="1.1"/>
+<text x="809.0" y="303.96" font-size="11" fill="#1A1A1A" font-weight="normal" text-anchor="middle">VPN / ExpressRoute Gateways</text>
+<rect x="912" y="286" width="113" height="28" rx="5" fill="#FFFFFF" stroke="#BBD6F2" stroke-width="1.1"/>
+<text x="968.5" y="303.96" font-size="11" fill="#1A1A1A" font-weight="normal" text-anchor="middle">DDoS Protection</text>
+<rect x="1033" y="286" width="100" height="28" rx="5" fill="#FFFFFF" stroke="#BBD6F2" stroke-width="1.1"/>
+<text x="1083.0" y="303.96" font-size="11" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Azure Bastion</text>
+<text x="38" y="360" font-size="11" fill="#555555" font-weight="bold" text-anchor="start">↕ VNet peering to spoke landing zones (Foundry + AI Gateway)</text>
+<rect x="24" y="384" width="1732" height="452" rx="8" fill="#F4F8FE" stroke="#4A90D9" stroke-width="1.6" stroke-dasharray="7 5"/>
+<text x="36" y="403" font-size="13.5" fill="#4A90D9" font-weight="bold" text-anchor="start">Foundry Landing Zone Subscription  (spoke · region-1 stamp)</text>
+<rect x="40" y="414" width="1700" height="352" rx="8" fill="#FBFCFE" stroke="#9CC3EB" stroke-width="1.6"/>
+<text x="52" y="433" font-size="13.5" fill="#9CC3EB" font-weight="bold" text-anchor="start">AI Agent Resource Group</text>
+<rect x="56" y="448" width="550.6666666666666" height="294" rx="8" fill="#FFFFFF" stroke="#0F6CBD" stroke-width="1.6"/>
+<text x="68" y="467" font-size="13.5" fill="#0F6CBD" font-weight="bold" text-anchor="start">Microsoft Foundry · AI Foundry Project</text>
+<rect x="70" y="482" width="371" height="40" rx="5" fill="#F4E3DC" stroke="#CC785C" stroke-width="1.1"/>
+<text x="255.5" y="506.14" font-size="11.5" fill="#8A4B38" font-weight="normal" text-anchor="middle">Foundry models = ANTHROPIC CLAUDE (Opus/Sonnet/Haiku)</text>
+<rect x="70" y="532" width="273" height="30" rx="5" fill="#FFFFFF" stroke="#BBD6F2" stroke-width="1.1"/>
+<text x="206.5" y="550.78" font-size="10.5" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Agents = Agent 365 / Foundry Agent Service</text>
+<rect x="351" y="532" width="84" height="30" rx="5" fill="#FFFFFF" stroke="#BBD6F2" stroke-width="1.1"/>
+<text x="393.0" y="550.78" font-size="10.5" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Connections</text>
+<rect x="443" y="532" width="127" height="30" rx="5" fill="#FFFFFF" stroke="#BBD6F2" stroke-width="1.1"/>
+<text x="506.5" y="550.78" font-size="10.5" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Managed Identities</text>
+<rect x="70" y="570" width="145" height="30" rx="5" fill="#FFFFFF" stroke="#BBD6F2" stroke-width="1.1"/>
+<text x="142.5" y="588.78" font-size="10.5" fill="#1A1A1A" font-weight="normal" text-anchor="middle">AI Services endpoints</text>
+<rect x="70" y="610" width="180" height="28" rx="5" fill="#EFF6EF" stroke="#6Fae6f" stroke-width="1.1"/>
+<text x="160.0" y="627.6" font-size="10" fill="#1A1A1A" font-weight="normal" text-anchor="middle">architect-v1 (Foundry agent)</text>
+<rect x="258" y="610" width="116" height="28" rx="5" fill="#EFF6EF" stroke="#6Fae6f" stroke-width="1.1"/>
+<text x="316.0" y="627.6" font-size="10" fill="#1A1A1A" font-weight="normal" text-anchor="middle">grounding w/ Bing</text>
+<rect x="382" y="610" width="70" height="28" rx="5" fill="#EFF6EF" stroke="#6Fae6f" stroke-width="1.1"/>
+<text x="417.0" y="627.6" font-size="10" fill="#1A1A1A" font-weight="normal" text-anchor="middle">AI Search</text>
+<rect x="622.6666666666666" y="448" width="550.6666666666666" height="294" rx="8" fill="#FFFFFF" stroke="#0F6CBD" stroke-width="1.6"/>
+<text x="634.6666666666666" y="467" font-size="13.5" fill="#0F6CBD" font-weight="bold" text-anchor="start">Foundry dependencies (private)</text>
+<rect x="636.6666666666666" y="482" width="109" height="30" rx="5" fill="#FFFFFF" stroke="#BBD6F2" stroke-width="1.1"/>
+<text x="691.1666666666666" y="500.78" font-size="10.5" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Storage Account</text>
+<rect x="753.6666666666666" y="482" width="72" height="30" rx="5" fill="#FFFFFF" stroke="#BBD6F2" stroke-width="1.1"/>
+<text x="789.6666666666666" y="500.78" font-size="10.5" fill="#1A1A1A" font-weight="normal" text-anchor="middle">AI Search</text>
+<rect x="833.6666666666666" y="482" width="72" height="30" rx="5" fill="#FFFFFF" stroke="#BBD6F2" stroke-width="1.1"/>
+<text x="869.6666666666666" y="500.78" font-size="10.5" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Cosmos DB</text>
+<rect x="913.6666666666666" y="482" width="72" height="30" rx="5" fill="#FFFFFF" stroke="#BBD6F2" stroke-width="1.1"/>
+<text x="949.6666666666666" y="500.78" font-size="10.5" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Key Vault</text>
+<rect x="993.6666666666666" y="482" width="127" height="30" rx="5" fill="#FFFFFF" stroke="#BBD6F2" stroke-width="1.1"/>
+<text x="1057.1666666666665" y="500.78" font-size="10.5" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Container Registry</text>
+<rect x="636.6666666666666" y="520" width="121" height="30" rx="5" fill="#FFFFFF" stroke="#BBD6F2" stroke-width="1.1"/>
+<text x="697.1666666666666" y="538.78" font-size="10.5" fill="#1A1A1A" font-weight="normal" text-anchor="middle">App Configuration</text>
+<text x="636.6666666666666" y="598" font-size="10.5" fill="#555555" font-weight="normal" text-anchor="start">All reached over Private Endpoints</text>
+<rect x="636.6666666666666" y="613" width="157" height="28" rx="5" fill="#EAF1FB" stroke="#0F6CBD" stroke-width="1.1"/>
+<text x="715.1666666666666" y="630.6" font-size="10" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Private Endpoints subnet</text>
+<rect x="801.6666666666666" y="613" width="105" height="28" rx="5" fill="#EAF1FB" stroke="#0F6CBD" stroke-width="1.1"/>
+<text x="854.1666666666666" y="630.6" font-size="10" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Jump box subnet</text>
+<rect x="914.6666666666666" y="613" width="122" height="28" rx="5" fill="#EAF1FB" stroke="#0F6CBD" stroke-width="1.1"/>
+<text x="975.6666666666666" y="630.6" font-size="10" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Build agent subnet</text>
+<rect x="636.6666666666666" y="649" width="122" height="28" rx="5" fill="#EAF1FB" stroke="#0F6CBD" stroke-width="1.1"/>
+<text x="697.6666666666666" y="666.6" font-size="10" fill="#1A1A1A" font-weight="normal" text-anchor="middle">UDR → hub firewall</text>
+<rect x="1189.3333333333333" y="448" width="550.6666666666666" height="294" rx="8" fill="#FFFFFF" stroke="#0F6CBD" stroke-width="1.6"/>
+<text x="1201.3333333333333" y="467" font-size="13.5" fill="#0F6CBD" font-weight="bold" text-anchor="start">AI Services VNet (spoke) — App stamp</text>
+<rect x="1203.3333333333333" y="482" width="128" height="28" rx="5" fill="#EAF1FB" stroke="#0F6CBD" stroke-width="1.1"/>
+<text x="1267.3333333333333" y="499.6" font-size="10" fill="#1A1A1A" font-weight="normal" text-anchor="middle">App Gateway (+ WAF)</text>
+<rect x="1339.3333333333333" y="482" width="134" height="28" rx="5" fill="#EAF1FB" stroke="#0F6CBD" stroke-width="1.1"/>
+<text x="1406.3333333333333" y="499.6" font-size="10" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Foundry Agent subnet</text>
+<rect x="1481.3333333333333" y="482" width="203" height="28" rx="5" fill="#EAF1FB" stroke="#0F6CBD" stroke-width="1.1"/>
+<text x="1582.8333333333333" y="499.6" font-size="10" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Container App Environment subnet</text>
+<text x="1203.3333333333333" y="558" font-size="10.5" fill="#222" font-weight="bold" text-anchor="start">Container App Environment — GenAI microservices (Dapr):</text>
+<rect x="1203.3333333333333" y="570" width="134" height="28" rx="5" fill="#EAF1FB" stroke="#0F6CBD" stroke-width="1.1"/>
+<text x="1270.3333333333333" y="587.6" font-size="10" fill="#1A1A1A" font-weight="normal" text-anchor="middle">capability-mcp (MCP)</text>
+<rect x="1345.3333333333333" y="570" width="145" height="28" rx="5" fill="#EAF1FB" stroke="#0F6CBD" stroke-width="1.1"/>
+<text x="1417.8333333333333" y="587.6" font-size="10" fill="#1A1A1A" font-weight="normal" text-anchor="middle">architect orchestrator</text>
+<rect x="1498.3333333333333" y="570" width="134" height="28" rx="5" fill="#EAF1FB" stroke="#0F6CBD" stroke-width="1.1"/>
+<text x="1565.3333333333333" y="587.6" font-size="10" fill="#1A1A1A" font-weight="normal" text-anchor="middle">dev-agent (build/CI)</text>
+<rect x="1640.3333333333333" y="570" width="64" height="28" rx="5" fill="#EAF1FB" stroke="#0F6CBD" stroke-width="1.1"/>
+<text x="1672.3333333333333" y="587.6" font-size="10" fill="#1A1A1A" font-weight="normal" text-anchor="middle">frontend</text>
+<rect x="1203.3333333333333" y="606" width="70" height="28" rx="5" fill="#EAF1FB" stroke="#0F6CBD" stroke-width="1.1"/>
+<text x="1238.3333333333333" y="623.6" font-size="10" fill="#1A1A1A" font-weight="normal" text-anchor="middle">ingestion</text>
+<text x="1203.3333333333333" y="648" font-size="10" fill="#555555" font-weight="normal" text-anchor="start">Application users → App Gateway → microservices</text>
+<rect x="40" y="774" width="1700" height="40" rx="6" fill="#FAFAFC" stroke="#DDD" stroke-width="1.2"/>
+<text x="52" y="799" font-size="11" fill="#222" font-weight="bold" text-anchor="start">Security &amp; governance:</text>
+<rect x="190" y="779" width="127" height="30" rx="5" fill="#FDE7E9" stroke="#D26B72" stroke-width="1.1"/>
+<text x="253.5" y="797.78" font-size="10.5" fill="#8E2F36" font-weight="normal" text-anchor="middle">Microsoft Defender</text>
+<rect x="325" y="779" width="66" height="30" rx="5" fill="#FDE7E9" stroke="#D26B72" stroke-width="1.1"/>
+<text x="358.0" y="797.78" font-size="10.5" fill="#8E2F36" font-weight="normal" text-anchor="middle">Entra ID</text>
+<rect x="399" y="779" width="60" height="30" rx="5" fill="#FDE7E9" stroke="#D26B72" stroke-width="1.1"/>
+<text x="429.0" y="797.78" font-size="10.5" fill="#8E2F36" font-weight="normal" text-anchor="middle">Purview</text>
+<rect x="580" y="779" width="60" height="30" rx="5" fill="#EEE7F6" stroke="#8B6CB8" stroke-width="1.1"/>
+<text x="610.0" y="797.78" font-size="10.5" fill="#4E3A78" font-weight="normal" text-anchor="middle">Monitor</text>
+<rect x="648" y="779" width="133" height="30" rx="5" fill="#EEE7F6" stroke="#8B6CB8" stroke-width="1.1"/>
+<text x="714.5" y="797.78" font-size="10.5" fill="#4E3A78" font-weight="normal" text-anchor="middle">Diagnostic settings</text>
+<rect x="789" y="779" width="91" height="30" rx="5" fill="#EEE7F6" stroke="#8B6CB8" stroke-width="1.1"/>
+<text x="834.5" y="797.78" font-size="10.5" fill="#4E3A78" font-weight="normal" text-anchor="middle">App Insights</text>
+<rect x="888" y="779" width="97" height="30" rx="5" fill="#EEE7F6" stroke="#8B6CB8" stroke-width="1.1"/>
+<text x="936.5" y="797.78" font-size="10.5" fill="#4E3A78" font-weight="normal" text-anchor="middle">Log Analytics</text>
+<rect x="993" y="779" width="109" height="30" rx="5" fill="#EEE7F6" stroke="#8B6CB8" stroke-width="1.1"/>
+<text x="1047.5" y="797.78" font-size="10.5" fill="#4E3A78" font-weight="normal" text-anchor="middle">Network Watcher</text>
+<rect x="24" y="856" width="1732" height="470" rx="8" fill="#F4F8FE" stroke="#4A90D9" stroke-width="1.6" stroke-dasharray="7 5"/>
+<text x="36" y="875" font-size="13.5" fill="#4A90D9" font-weight="bold" text-anchor="start">AI Gateway Landing Zone Subscription  (spoke · region-1 stamp)</text>
+<rect x="40" y="886" width="1700" height="370" rx="8" fill="#FBFCFE" stroke="#9CC3EB" stroke-width="1.6"/>
+<text x="52" y="905" font-size="13.5" fill="#9CC3EB" font-weight="bold" text-anchor="start">AI Hub Resource Group</text>
+<rect x="56" y="920" width="550.6666666666666" height="312" rx="8" fill="#FFFFFF" stroke="#0F6CBD" stroke-width="1.6"/>
+<text x="68" y="939" font-size="13.5" fill="#0F6CBD" font-weight="bold" text-anchor="start">Microsoft Foundry Service</text>
+<rect x="70" y="954" width="84" height="30" rx="5" fill="#F4E3DC" stroke="#CC785C" stroke-width="1.1"/>
+<text x="112.0" y="972.78" font-size="10.5" fill="#8A4B38" font-weight="normal" text-anchor="middle">Connections</text>
+<rect x="162" y="954" width="158" height="30" rx="5" fill="#F4E3DC" stroke="#CC785C" stroke-width="1.1"/>
+<text x="241.0" y="972.78" font-size="10.5" fill="#8A4B38" font-weight="normal" text-anchor="middle">Foundry models (Claude)</text>
+<rect x="328" y="954" width="127" height="30" rx="5" fill="#F4E3DC" stroke="#CC785C" stroke-width="1.1"/>
+<text x="391.5" y="972.78" font-size="10.5" fill="#8A4B38" font-weight="normal" text-anchor="middle">Managed Identities</text>
+<text x="70" y="1070" font-size="10.5" fill="#222" font-weight="bold" text-anchor="start">AI Hub VNet (spoke) subnets:</text>
+<rect x="70" y="1082" width="116" height="28" rx="5" fill="#EAF1FB" stroke="#0F6CBD" stroke-width="1.1"/>
+<text x="128.0" y="1099.6" font-size="10" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Private Endpoints</text>
+<rect x="194" y="1082" width="110" height="28" rx="5" fill="#EAF1FB" stroke="#0F6CBD" stroke-width="1.1"/>
+<text x="249.0" y="1099.6" font-size="10" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Logic App subnet</text>
+<rect x="312" y="1082" width="122" height="28" rx="5" fill="#EAF1FB" stroke="#0F6CBD" stroke-width="1.1"/>
+<text x="373.0" y="1099.6" font-size="10" fill="#1A1A1A" font-weight="normal" text-anchor="middle">UDR → hub firewall</text>
+<rect x="622.6666666666666" y="920" width="550.6666666666666" height="312" rx="8" fill="#E2F1F0" stroke="#2E8B84" stroke-width="1.6"/>
+<text x="634.6666666666666" y="939" font-size="13.5" fill="#1E5C57" font-weight="bold" text-anchor="start">AI Gateway — API Management subnet</text>
+<rect x="636.6666666666666" y="954" width="311" height="40" rx="5" fill="#F4E3DC" stroke="#CC785C" stroke-width="1.1"/>
+<text x="792.1666666666666" y="977.96" font-size="11" fill="#8A4B38" font-weight="normal" text-anchor="middle">APIM (aigw-apim-dev) — serves ANTHROPIC models</text>
+<rect x="636.6666666666666" y="1004" width="304" height="30" rx="5" fill="#FFFFFF" stroke="#2E8B84" stroke-width="1.1"/>
+<text x="788.6666666666666" y="1022.78" font-size="10.5" fill="#1E5C57" font-weight="normal" text-anchor="middle">AI Gateway (API Center / Universal AI Registry)</text>
+<rect x="636.6666666666666" y="1042" width="249" height="30" rx="5" fill="#FFFFFF" stroke="#2E8B84" stroke-width="1.1"/>
+<text x="761.1666666666666" y="1060.78" font-size="10.5" fill="#1E5C57" font-weight="normal" text-anchor="middle">Entra-secured products &amp; subscriptions</text>
+<rect x="893.6666666666666" y="1042" width="249" height="30" rx="5" fill="#FFFFFF" stroke="#2E8B84" stroke-width="1.1"/>
+<text x="1018.1666666666666" y="1060.78" font-size="10.5" fill="#1E5C57" font-weight="normal" text-anchor="middle">token limits · quotas · semantic cache</text>
+<rect x="636.6666666666666" y="1080" width="188" height="30" rx="5" fill="#FFFFFF" stroke="#2E8B84" stroke-width="1.1"/>
+<text x="730.6666666666666" y="1098.78" font-size="10.5" fill="#1E5C57" font-weight="normal" text-anchor="middle">Logic Apps (usage ingestion)</text>
+<text x="636.6666666666666" y="1200" font-size="10" fill="#1E5C57" font-weight="normal" text-anchor="start">Consumers (architect-v1 · dev-agent · external apps) → APIM → Foundry (Claude)</text>
+<rect x="1189.3333333333333" y="920" width="550.6666666666666" height="312" rx="8" fill="#FFFFFF" stroke="#0F6CBD" stroke-width="1.6"/>
+<text x="1201.3333333333333" y="939" font-size="13.5" fill="#0F6CBD" font-weight="bold" text-anchor="start">Pluggable Safety + Governance Supporting Services</text>
+<rect x="1203.3333333333333" y="954" width="103" height="30" rx="5" fill="#FDE7E9" stroke="#D26B72" stroke-width="1.1"/>
+<text x="1254.8333333333333" y="972.78" font-size="10.5" fill="#8E2F36" font-weight="normal" text-anchor="middle">Content Safety</text>
+<rect x="1314.3333333333333" y="954" width="170" height="30" rx="5" fill="#FDE7E9" stroke="#D26B72" stroke-width="1.1"/>
+<text x="1399.3333333333333" y="972.78" font-size="10.5" fill="#8E2F36" font-weight="normal" text-anchor="middle">Language / PII processing</text>
+<rect x="1203.3333333333333" y="994" width="70" height="28" rx="5" fill="#FFFFFF" stroke="#BBD6F2" stroke-width="1.1"/>
+<text x="1238.3333333333333" y="1011.6" font-size="10" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Event Hub</text>
+<rect x="1281.3333333333333" y="994" width="70" height="28" rx="5" fill="#FFFFFF" stroke="#BBD6F2" stroke-width="1.1"/>
+<text x="1316.3333333333333" y="1011.6" font-size="10" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Cosmos DB</text>
+<rect x="1359.3333333333333" y="994" width="70" height="28" rx="5" fill="#FFFFFF" stroke="#BBD6F2" stroke-width="1.1"/>
+<text x="1394.3333333333333" y="1011.6" font-size="10" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Key Vault</text>
+<rect x="1437.3333333333333" y="994" width="58" height="28" rx="5" fill="#FFFFFF" stroke="#BBD6F2" stroke-width="1.1"/>
+<text x="1466.3333333333333" y="1011.6" font-size="10" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Storage</text>
+<rect x="1503.3333333333333" y="994" width="192" height="28" rx="5" fill="#FFFFFF" stroke="#BBD6F2" stroke-width="1.1"/>
+<text x="1599.3333333333333" y="1011.6" font-size="10" fill="#1A1A1A" font-weight="normal" text-anchor="middle">Managed Redis (semantic cache)</text>
+<rect x="1203.3333333333333" y="1066" width="168" height="28" rx="5" fill="#EEE7F6" stroke="#8B6CB8" stroke-width="1.1"/>
+<text x="1287.3333333333333" y="1083.6" font-size="10" fill="#4E3A78" font-weight="normal" text-anchor="middle">Gov Workflows (Logic Apps)</text>
+<rect x="1379.3333333333333" y="1066" width="157" height="28" rx="5" fill="#EEE7F6" stroke="#8B6CB8" stroke-width="1.1"/>
+<text x="1457.8333333333333" y="1083.6" font-size="10" fill="#4E3A78" font-weight="normal" text-anchor="middle">AI Registry (API Center)</text>
+<rect x="1203.3333333333333" y="1102" width="203" height="28" rx="5" fill="#EEE7F6" stroke="#8B6CB8" stroke-width="1.1"/>
+<text x="1304.8333333333333" y="1119.6" font-size="10" fill="#4E3A78" font-weight="normal" text-anchor="middle">Monitor · Alerts · Log Analytics</text>
+<rect x="40" y="1264" width="1700" height="40" rx="6" fill="#FAFAFC" stroke="#DDD" stroke-width="1.2"/>
+<text x="52" y="1289" font-size="11" fill="#222" font-weight="bold" text-anchor="start">Security &amp; governance:</text>
+<rect x="190" y="1269" width="127" height="30" rx="5" fill="#FDE7E9" stroke="#D26B72" stroke-width="1.1"/>
+<text x="253.5" y="1287.78" font-size="10.5" fill="#8E2F36" font-weight="normal" text-anchor="middle">Microsoft Defender</text>
+<rect x="325" y="1269" width="66" height="30" rx="5" fill="#FDE7E9" stroke="#D26B72" stroke-width="1.1"/>
+<text x="358.0" y="1287.78" font-size="10.5" fill="#8E2F36" font-weight="normal" text-anchor="middle">Entra ID</text>
+<rect x="399" y="1269" width="60" height="30" rx="5" fill="#FDE7E9" stroke="#D26B72" stroke-width="1.1"/>
+<text x="429.0" y="1287.78" font-size="10.5" fill="#8E2F36" font-weight="normal" text-anchor="middle">Purview</text>
+<text x="600" y="1289" font-size="10.5" fill="#7A5F00" font-weight="normal" text-anchor="start">Role assignments · Policy assignments · Tags (inherited from management group)</text>
+<line x1="14" y1="311" x2="14" y2="616" stroke="#4A90D9" stroke-width="2" stroke-dasharray="5 5"/>
+<line x1="14" y1="311" x2="24" y2="311" stroke="#4A90D9" stroke-width="2"/>
+<line x1="14" y1="576" x2="24" y2="576" stroke="#4A90D9" stroke-width="2" marker-end="url(#arr)"/>
+<line x1="14" y1="1076" x2="24" y2="1076" stroke="#4A90D9" stroke-width="2" marker-end="url(#arr)"/>
+<line x1="14" y1="616" x2="14" y2="1076" stroke="#4A90D9" stroke-width="2" stroke-dasharray="5 5"/>
+<text x="20" y="301" font-size="10" fill="#4A90D9" font-weight="normal" text-anchor="start">VNet peering</text>
+<text x="890.0" y="1354" font-size="11.5" fill="#222" font-weight="normal" text-anchor="middle">Request path: Consumer → APIM (AI Gateway, Entra-authenticated, quota/cache/safety) → Microsoft Foundry (Foundry model deployment = Claude) → response.   Identity: Entra ID · Agents: Agent 365 / Foundry Agent Service · Governance: Defender + Purview + Azure Policy.</text>
+</svg>

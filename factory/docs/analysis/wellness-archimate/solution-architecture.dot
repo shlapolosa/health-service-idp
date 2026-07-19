@@ -1,0 +1,138 @@
+digraph G{
+rankdir=TB; newrank=true; compound=true; splines=ortho;
+graph[fontname="Helvetica",fontsize=11,labelloc=t,nodesep=0.4,ranksep=0.8,bgcolor="white"];
+node[shape=box,style="rounded,filled",fontname="Helvetica",fontsize=9,margin="0.14,0.08"];
+edge[arrowsize=0.7];
+label="Wellness Platform - Solution Architecture (Graphviz, colors fixed)";
+subgraph cluster_z_client{
+  label="Client Surfaces — Sahatna Citizen App"; style=filled; color="#D79B00"; fillcolor="#FAFAFA"; penwidth=2; fontsize=10; fontcolor="#D79B00";
+  {rank=same; cl_chal; cl_wallet; cl_market}
+  cl_chal[label="Challenges",fillcolor="#FFE6CC",color="#D79B00"];
+  cl_wallet[label="Rewards and Wallet",fillcolor="#FFE6CC",color="#D79B00"];
+  cl_market[label="Marketplace and Redeem",fillcolor="#FFE6CC",color="#D79B00"];
+}
+subgraph cluster_z_apim_n{
+  label="API Gateway — North"; style=filled; color="#3A7CA5"; fillcolor="#FAFAFA"; penwidth=2; fontsize=10; fontcolor="#3A7CA5";
+  {rank=same; apim_n; idp_uaepass}
+  apim_n[label="Azure APIM - Citizen Gateway",fillcolor="#D7E8F2",color="#3A7CA5"];
+  idp_uaepass[label="UAE Pass IdP",fillcolor="#D7E8F2",color="#3A7CA5"];
+}
+subgraph cluster_z_bff{
+  label="BFF Layer — Sahatna BFF"; style=filled; color="#6C8EBF"; fillcolor="#FAFAFA"; penwidth=2; fontsize=10; fontcolor="#6C8EBF";
+  {rank=same; bff_member; bff_admin; cms_sahatna; sah_notify}
+  bff_member[label="Member BFF",fillcolor="#DAE8FC",color="#6C8EBF"];
+  bff_admin[label="Admin / Partner BFF",fillcolor="#DAE8FC",color="#6C8EBF"];
+  cms_sahatna[label="Sahatna CMS",fillcolor="#DAE8FC",color="#6C8EBF"];
+  sah_notify[label="Sahatna Notifications API",fillcolor="#DAE8FC",color="#6C8EBF"];
+}
+subgraph cluster_z_apim_s{
+  label="Integration Layer — South"; style=filled; color="#3A7CA5"; fillcolor="#FAFAFA"; penwidth=2; fontsize=10; fontcolor="#3A7CA5";
+  {rank=same; apim_s; eh_integration; idp_entra}
+  apim_s[label="Azure APIM - Platform Gateway",fillcolor="#D7E8F2",color="#3A7CA5"];
+  eh_integration[label="Event Hub (EVENT-SVC)",fillcolor="#D7E8F2",color="#3A7CA5"];
+  idp_entra[label="Microsoft Entra IdP",fillcolor="#D7E8F2",color="#3A7CA5"];
+}
+subgraph cluster_z_engine{
+  label="Gamification Platform — Core Engine"; style=filled; color="#82B366"; fillcolor="#FAFAFA"; penwidth=2; fontsize=10; fontcolor="#82B366";
+  {rank=same; en_enrol; en_cohort; en_chal; en_verify; en_score; en_engage; en_eligorch; en_maladapter}
+  en_enrol[label="Enrolment and Eligibility",fillcolor="#D5E8D4",color="#82B366"];
+  en_cohort[label="Local Segmentation",fillcolor="#D5E8D4",color="#82B366"];
+  en_chal[label="Challenge",fillcolor="#D5E8D4",color="#82B366"];
+  en_verify[label="Verification",fillcolor="#D5E8D4",color="#82B366"];
+  en_score[label="Scoring and Recognition",fillcolor="#D5E8D4",color="#82B366"];
+  en_engage[label="Engagement",fillcolor="#D5E8D4",color="#82B366"];
+  en_eligorch[label="Eligibility Resolver",fillcolor="#D5E8D4",color="#82B366"];
+  en_maladapter[label="Malaffi Adapter",fillcolor="#D5E8D4",color="#82B366"];
+}
+subgraph cluster_z_value{
+  label="Wallet & Marketplace Services"; style=filled; color="#9673A6"; fillcolor="#FAFAFA"; penwidth=2; fontsize=10; fontcolor="#9673A6";
+  {rank=same; wm_wallet; wm_market; wm_partner; wm_fraud; wm_redorch; wm_padapter}
+  wm_wallet[label="Wallet - Points Ledger",fillcolor="#E1D5E7",color="#9673A6"];
+  wm_market[label="Marketplace and Voucher",fillcolor="#E1D5E7",color="#9673A6"];
+  wm_partner[label="Partner and Settlement",fillcolor="#E1D5E7",color="#9673A6"];
+  wm_fraud[label="Fraud and Integrity",fillcolor="#E1D5E7",color="#9673A6"];
+  wm_redorch[label="Redemption Orchestrator (saga)",fillcolor="#E1D5E7",color="#9673A6"];
+  wm_padapter[label="Partner Adapter Framework",fillcolor="#E1D5E7",color="#9673A6"];
+}
+subgraph cluster_z_persist{
+  label="Persistence — Azure data stores"; style=filled; color="#D6B656"; fillcolor="#FAFAFA"; penwidth=2; fontsize=10; fontcolor="#D6B656";
+  {rank=same; ps_wallet; ps_engine; ps_market; ps_kv}
+  ps_wallet[label="Wallet stores",fillcolor="#FFF2CC",color="#D6B656"];
+  ps_engine[label="Challenge and Cohort stores",fillcolor="#FFF2CC",color="#D6B656"];
+  ps_market[label="Marketplace stores",fillcolor="#FFF2CC",color="#D6B656"];
+  ps_kv[label="Azure Key Vault",fillcolor="#FFF2CC",color="#D6B656"];
+}
+subgraph cluster_z_external{
+  label="External Partner APIs — outside the platform trust zone"; style=filled; color="#B85450"; fillcolor="#FAFAFA"; penwidth=2; fontsize=10; fontcolor="#B85450";
+  {rank=same; ex_malaffi; ex_providers; ex_doh}
+  ex_malaffi[label="Malaffi HIE",fillcolor="#F8CECC",color="#B85450"];
+  ex_providers[label="Reward Providers",fillcolor="#F8CECC",color="#B85450"];
+  ex_doh[label="DoH ESB",fillcolor="#F8CECC",color="#B85450"];
+}
+subgraph cluster_z_platform{
+  label="Platform Services — event consumers, identity, consent, analytics"; style=filled; color="#666666"; fillcolor="#FAFAFA"; penwidth=2; fontsize=10; fontcolor="#666666";
+  {rank=same; pf_fraud; pf_nudge; pf_consent; pf_id; pf_data}
+  pf_fraud[label="FRAUD-SVC",fillcolor="#EEEEEE",color="#666666"];
+  pf_nudge[label="NUDGE-SVC",fillcolor="#EEEEEE",color="#666666"];
+  pf_consent[label="CONS-SVC",fillcolor="#EEEEEE",color="#666666"];
+  pf_id[label="ID-SVC",fillcolor="#EEEEEE",color="#666666"];
+  pf_data[label="DATA-SVC",fillcolor="#EEEEEE",color="#666666"];
+}
+subgraph cluster_z_xcut{
+  label="Cross-cutting — secrets"; style=filled; color="#666666"; fillcolor="#FAFAFA"; penwidth=2; fontsize=10; fontcolor="#666666";
+  {rank=same; xc_secrets; xc_gitops; xc_obs}
+  xc_secrets[label="Secrets Management",fillcolor="#F5F5F5",color="#666666"];
+  xc_gitops[label="Declarative Provisioning",fillcolor="#F5F5F5",color="#666666"];
+  xc_obs[label="Observability",fillcolor="#F5F5F5",color="#666666"];
+}
+cl_chal->apim_n[style=invis,weight=1000];
+apim_n->bff_member[style=invis,weight=1000];
+bff_member->apim_s[style=invis,weight=1000];
+apim_s->en_enrol[style=invis,weight=1000];
+en_enrol->wm_wallet[style=invis,weight=1000];
+wm_wallet->ps_wallet[style=invis,weight=1000];
+ps_wallet->ex_malaffi[style=invis,weight=1000];
+ex_malaffi->pf_fraud[style=invis,weight=1000];
+pf_fraud->xc_secrets[style=invis,weight=1000];
+cl_chal->apim_n[color="#1A1A1A",constraint=false];
+cl_wallet->apim_n[color="#1A1A1A",constraint=false];
+cl_market->apim_n[color="#1A1A1A",constraint=false];
+apim_n->bff_member[color="#1A1A1A",constraint=false];
+apim_n->bff_admin[color="#1A1A1A",constraint=false];
+bff_member->apim_s[color="#1A1A1A",constraint=false];
+bff_admin->apim_s[color="#1A1A1A",constraint=false];
+apim_s->en_enrol[color="#1A1A1A",constraint=false];
+apim_s->en_chal[color="#1A1A1A",constraint=false];
+apim_s->wm_wallet[color="#1A1A1A",constraint=false];
+apim_s->wm_market[color="#1A1A1A",constraint=false];
+en_enrol->en_eligorch[color="#1A1A1A",constraint=false];
+en_eligorch->en_cohort[color="#1A1A1A",constraint=false];
+bff_member->cms_sahatna[color="#1A1A1A",constraint=false];
+bff_admin->cms_sahatna[color="#1A1A1A",constraint=false];
+wm_market->wm_redorch[color="#1A1A1A",constraint=false];
+wm_redorch->wm_wallet[color="#1A1A1A",constraint=false];
+wm_redorch->wm_fraud[color="#1A1A1A",constraint=false];
+wm_wallet->ps_wallet[color="#1A1A1A",constraint=false];
+wm_market->ps_market[color="#1A1A1A",constraint=false];
+en_chal->ps_engine[color="#1A1A1A",constraint=false];
+en_maladapter->ex_malaffi[color="#B85450",penwidth=2,constraint=false];
+wm_padapter->ex_providers[color="#B85450",penwidth=2,constraint=false];
+wm_partner->ex_doh[color="#B85450",penwidth=2,constraint=false];
+en_verify->eh_integration[color="#888888",style=dashed,constraint=false];
+wm_wallet->eh_integration[color="#888888",style=dashed,constraint=false];
+wm_market->eh_integration[color="#888888",style=dashed,constraint=false];
+eh_integration->pf_fraud[color="#888888",style=dashed,constraint=false];
+eh_integration->pf_nudge[color="#888888",style=dashed,constraint=false];
+eh_integration->pf_data[color="#888888",style=dashed,constraint=false];
+eh_integration->wm_fraud[color="#888888",style=dashed,constraint=false];
+bff_member->eh_integration[color="#888888",style=dashed,constraint=false];
+eh_integration->en_verify[color="#888888",style=dashed,constraint=false];
+idp_uaepass->apim_n[color="#9966AA",style=dashed,constraint=false];
+idp_entra->apim_s[color="#9966AA",style=dashed,constraint=false];
+pf_consent->en_enrol[color="#9966AA",style=dashed,constraint=false];
+xc_secrets->ps_kv[color="#9966AA",style=dashed,constraint=false];
+pf_nudge->pf_consent[color="#1A1A1A",constraint=false];
+pf_nudge->apim_n[color="#1A1A1A",constraint=false];
+apim_n->sah_notify[color="#1A1A1A",constraint=false];
+apim_s->pf_consent[color="#9966AA",style=dashed,constraint=false];
+}

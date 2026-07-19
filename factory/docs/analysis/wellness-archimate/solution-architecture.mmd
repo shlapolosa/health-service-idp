@@ -1,0 +1,117 @@
+flowchart TB
+  subgraph z_client["Client Surfaces - Sahatna Citizen App"]
+    direction LR
+    cl_chal["Challenges"]
+    cl_wallet["Rewards and Wallet"]
+    cl_market["Marketplace and Redeem"]
+  end
+  subgraph z_apim_n["API Gateway - North"]
+    direction LR
+    apim_n["Azure APIM - Citizen Gateway"]
+    idp_uaepass["UAE Pass IdP"]
+  end
+  subgraph z_bff["BFF Layer - Sahatna BFF"]
+    direction LR
+    bff_member["Member BFF"]
+    bff_admin["Admin / Partner BFF"]
+    cms_sahatna["Sahatna Renderer (thin)"]
+    sah_notify["Sahatna Notifications API"]
+  end
+  subgraph z_apim_s["Integration Layer - South"]
+    direction LR
+    apim_s["Azure APIM - Platform Gateway"]
+    eh_integration["Event Hub (EVENT-SVC)"]
+    idp_entra["Microsoft Entra IdP"]
+  end
+  subgraph z_engine["Gamification Platform - Core Engine"]
+    direction LR
+    en_enrol["Enrolment and Eligibility"]
+    en_cohort["Local Segmentation"]
+    en_chal["Challenge"]
+    en_verify["Verification"]
+    en_score["Scoring and Recognition"]
+    en_engage["Engagement"]
+    en_eligorch["Eligibility Resolver"]
+    en_maladapter["Malaffi Adapter"]
+  end
+  subgraph z_value["Wallet and Marketplace Services"]
+    direction LR
+    wm_wallet["Wallet - Points Ledger"]
+    wm_market["Marketplace and Voucher"]
+    wm_partner["Partner and Settlement"]
+    wm_fraud["Fraud and Integrity"]
+    wm_redorch["Redemption Orchestrator (saga)"]
+    wm_padapter["Partner Adapter Framework"]
+  end
+  subgraph z_persist["Persistence - Azure data stores"]
+    direction LR
+    ps_wallet["Wallet stores"]
+    ps_engine["Challenge and Cohort stores"]
+    ps_market["Marketplace stores"]
+    ps_kv["Azure Key Vault"]
+  end
+  subgraph z_external["External Partner APIs - outside the platform trust zone"]
+    direction LR
+    ex_malaffi["Malaffi HIE"]
+    ex_providers["Reward Providers"]
+    ex_doh["DoH ESB"]
+  end
+  subgraph z_platform["Platform Services - event consumers, identity, consent, analytics"]
+    direction LR
+    pf_fraud["FRAUD-SVC"]
+    pf_nudge["NUDGE-SVC"]
+    pf_consent["CONS-SVC"]
+    pf_id["ID-SVC"]
+    pf_data["DATA-SVC"]
+  end
+  subgraph z_xcut["Cross-cutting - secrets"]
+    direction LR
+    xc_secrets["Secrets Management"]
+    xc_gitops["Declarative Provisioning"]
+    xc_obs["Observability"]
+  end
+  cl_chal --> apim_n
+  cl_wallet --> apim_n
+  cl_market --> apim_n
+  apim_n --> bff_member
+  apim_n --> bff_admin
+  bff_member --> apim_s
+  bff_admin --> apim_s
+  apim_s --> en_enrol
+  apim_s --> en_chal
+  apim_s --> wm_wallet
+  apim_s --> wm_market
+  en_enrol --> en_eligorch
+  en_eligorch --> en_cohort
+  bff_member --> cms_sahatna
+  bff_admin --> cms_sahatna
+  wm_market --> wm_redorch
+  wm_redorch --> wm_wallet
+  wm_redorch --> wm_fraud
+  wm_wallet --> ps_wallet
+  wm_market --> ps_market
+  en_chal --> ps_engine
+  en_maladapter ==>|partner| ex_malaffi
+  wm_padapter ==>|partner| ex_providers
+  wm_partner ==>|partner| ex_doh
+  en_verify -.->|async| eh_integration
+  wm_wallet -.->|async| eh_integration
+  wm_market -.->|async| eh_integration
+  eh_integration -.->|async| pf_fraud
+  eh_integration -.->|async| pf_nudge
+  eh_integration -.->|async| pf_data
+  eh_integration -.->|async| wm_fraud
+  bff_member -.->|async| eh_integration
+  eh_integration -.->|async| en_verify
+  idp_uaepass -.->|identity| apim_n
+  idp_entra -.->|identity| apim_s
+  pf_consent -.->|identity| en_enrol
+  xc_secrets -.->|identity| ps_kv
+  pf_nudge --> pf_consent
+  pf_nudge --> apim_n
+  apim_n --> sah_notify
+  apim_s -.->|identity| pf_consent
+  classDef integ fill:#D7E8F2,stroke:#3A7CA5,color:#000;
+  classDef ext fill:#F8CECC,stroke:#B85450,color:#000;
+  class apim_n,apim_s,eh_integration integ;
+  class ex_malaffi,ex_providers,ex_doh ext;

@@ -1,0 +1,435 @@
+<mxfile host="app.diagrams.net" type="device">
+  <diagram id="banded" name="Solution Architecture">
+    <mxGraphModel dx="1200" dy="800" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1860" pageHeight="2172" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="c101" value="CLIENT  ·  outside Azure tenant" style="rounded=1;arcSize=4;fillColor=none;strokeColor=#CC785C;strokeWidth=3.5;dashed=1;dashPattern=3 7;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4;fontColor=#CC785C;fontStyle=1;fontSize=12;html=1;" vertex="1" parent="1">
+          <mxGeometry x="178" y="51" width="1504" height="183" as="geometry"/>
+        </mxCell>
+        <mxCell id="c102" value="PLATFORM — Identity &amp; Edge (Connectivity hub)" style="rounded=1;arcSize=4;fillColor=none;strokeColor=#8B5CF6;strokeWidth=3.5;dashed=1;dashPattern=3 7;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4;fontColor=#8B5CF6;fontStyle=1;fontSize=12;html=1;" vertex="1" parent="1">
+          <mxGeometry x="178" y="395" width="1504" height="183" as="geometry"/>
+        </mxCell>
+        <mxCell id="c103" value="AI GATEWAY LANDING ZONE  (spoke)" style="rounded=1;arcSize=4;fillColor=none;strokeColor=#2E8B84;strokeWidth=3.5;dashed=1;dashPattern=3 7;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4;fontColor=#2E8B84;fontStyle=1;fontSize=12;html=1;" vertex="1" parent="1">
+          <mxGeometry x="178" y="635" width="1504" height="183" as="geometry"/>
+        </mxCell>
+        <mxCell id="c104" value="FOUNDRY LANDING ZONE  (spoke)" style="rounded=1;arcSize=4;fillColor=none;strokeColor=#3A7CA5;strokeWidth=3.5;dashed=1;dashPattern=3 7;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4;fontColor=#3A7CA5;fontStyle=1;fontSize=12;html=1;" vertex="1" parent="1">
+          <mxGeometry x="178" y="979" width="1504" height="903" as="geometry"/>
+        </mxCell>
+        <mxCell id="c105" value="GOVERNANCE PLANE" style="rounded=1;arcSize=4;fillColor=none;strokeColor=#666666;strokeWidth=3.5;dashed=1;dashPattern=3 7;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4;fontColor=#666666;fontStyle=1;fontSize=12;html=1;" vertex="1" parent="1">
+          <mxGeometry x="178" y="1939" width="1504" height="183" as="geometry"/>
+        </mxCell>
+        <mxCell id="c106" value="AZURE TENANT BOUNDARY  ·  Entra ID identity (OAuth2 / OIDC)" style="rounded=1;arcSize=20;fillColor=#FBE9A0;strokeColor=#C9A100;strokeWidth=3.5;dashed=1;dashPattern=3 7;align=center;verticalAlign=middle;fontColor=#6b5200;fontStyle=1;fontSize=11;html=1;" vertex="1" parent="1">
+          <mxGeometry x="178" y="384" width="1504" height="36" as="geometry"/>
+        </mxCell>
+        <mxCell id="c107" value="B2B  ·  Entra-secured APIM products  ·  private network (Private Endpoints, no public model egress)" style="rounded=1;arcSize=20;fillColor=#FBE9A0;strokeColor=#C9A100;strokeWidth=3.5;dashed=1;dashPattern=3 7;align=center;verticalAlign=middle;fontColor=#6b5200;fontStyle=1;fontSize=11;html=1;" vertex="1" parent="1">
+          <mxGeometry x="178" y="968" width="1504" height="36" as="geometry"/>
+        </mxCell>
+        <mxCell id="c108" value="Client / Consumer Surfaces  (outside Azure tenant)" style="rounded=1;arcSize=6;fillColor=none;strokeColor=#CC785C;strokeWidth=2;verticalAlign=top;align=left;spacingLeft=13;spacingTop=3;fontColor=#CC785C;fontStyle=1;fontSize=12;html=1;" vertex="1" parent="1">
+          <mxGeometry x="196" y="86" width="1468" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="c109" value="Identity &amp; Edge  (platform / connectivity)" style="rounded=1;arcSize=6;fillColor=none;strokeColor=#8B5CF6;strokeWidth=2;verticalAlign=top;align=left;spacingLeft=13;spacingTop=3;fontColor=#8B5CF6;fontStyle=1;fontSize=12;html=1;" vertex="1" parent="1">
+          <mxGeometry x="196" y="430" width="1468" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="c110" value="🔒 Entra ID · workload identity (Agent 365) · WAF" style="text;html=1;align=right;verticalAlign=top;fontColor=#8B5CF6;fontSize=9;fontStyle=2;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1304" y="432" width="348" height="16" as="geometry"/>
+        </mxCell>
+        <mxCell id="c111" value="AI Gateway — Azure API Management" style="rounded=1;arcSize=6;fillColor=none;strokeColor=#2E8B84;strokeWidth=2;verticalAlign=top;align=left;spacingLeft=13;spacingTop=3;fontColor=#2E8B84;fontStyle=1;fontSize=12;html=1;" vertex="1" parent="1">
+          <mxGeometry x="196" y="670" width="1468" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="c112" value="🔒 JWT validate · quota · semantic cache · content safety · usage metering" style="text;html=1;align=right;verticalAlign=top;fontColor=#2E8B84;fontSize=9;fontStyle=2;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1304" y="672" width="348" height="16" as="geometry"/>
+        </mxCell>
+        <mxCell id="c113" value="GenAI Microservices  (Azure Container Apps · Dapr)" style="rounded=1;arcSize=6;fillColor=none;strokeColor=#0F6CBD;strokeWidth=2;verticalAlign=top;align=left;spacingLeft=13;spacingTop=3;fontColor=#0F6CBD;fontStyle=1;fontSize=12;html=1;" vertex="1" parent="1">
+          <mxGeometry x="196" y="1014" width="1468" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="c114" value="Microsoft Foundry / Agent platform" style="rounded=1;arcSize=6;fillColor=none;strokeColor=#3A7CA5;strokeWidth=2;verticalAlign=top;align=left;spacingLeft=13;spacingTop=3;fontColor=#3A7CA5;fontStyle=1;fontSize=12;html=1;" vertex="1" parent="1">
+          <mxGeometry x="196" y="1254" width="1468" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="c115" value="🔒 Managed Identity · Private Endpoints" style="text;html=1;align=right;verticalAlign=top;fontColor=#3A7CA5;fontSize=9;fontStyle=2;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1304" y="1256" width="348" height="16" as="geometry"/>
+        </mxCell>
+        <mxCell id="c116" value="Model deployment" style="rounded=1;arcSize=6;fillColor=none;strokeColor=#CC785C;strokeWidth=2;verticalAlign=top;align=left;spacingLeft=13;spacingTop=3;fontColor=#CC785C;fontStyle=1;fontSize=12;html=1;" vertex="1" parent="1">
+          <mxGeometry x="196" y="1494" width="1468" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="c117" value="Dependencies &amp; Data  (private endpoints)" style="rounded=1;arcSize=6;fillColor=none;strokeColor=#D6B656;strokeWidth=2;verticalAlign=top;align=left;spacingLeft=13;spacingTop=3;fontColor=#D6B656;fontStyle=1;fontSize=12;html=1;" vertex="1" parent="1">
+          <mxGeometry x="196" y="1734" width="1468" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="c118" value="🔒 Key Vault · KMS · Private Endpoints" style="text;html=1;align=right;verticalAlign=top;fontColor=#D6B656;fontSize=9;fontStyle=2;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1304" y="1736" width="348" height="16" as="geometry"/>
+        </mxCell>
+        <mxCell id="c119" value="Governance &amp; Observability plane  (cross-cutting)" style="rounded=1;arcSize=6;fillColor=none;strokeColor=#666666;strokeWidth=2;verticalAlign=top;align=left;spacingLeft=13;spacingTop=3;fontColor=#666666;fontStyle=1;fontSize=12;html=1;" vertex="1" parent="1">
+          <mxGeometry x="196" y="1974" width="1468" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="c120" value="🔒 Defender · Purview · Azure Policy · Monitor" style="text;html=1;align=right;verticalAlign=top;fontColor=#666666;fontSize=9;fontStyle=2;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1304" y="1976" width="348" height="16" as="geometry"/>
+        </mxCell>
+        <mxCell id="c121" value="&lt;b&gt;Claude Code — Web&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;claude.ai/code&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4E3DC;strokeColor=#CC785C;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="480.0" y="120" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c122" value="&lt;b&gt;Claude Code — CLI&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;terminal / IDE&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4E3DC;strokeColor=#CC785C;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="710.0" y="120" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c123" value="&lt;b&gt;Programmatic consumers&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;architect-v1 · dev-agent · external apps&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4E3DC;strokeColor=#CC785C;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="940.0" y="120" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c124" value="&lt;b&gt;Application users&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;browser&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4E3DC;strokeColor=#CC785C;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="1170.0" y="120" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c125" value="&lt;b&gt;Microsoft Entra ID&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;OAuth2/OIDC · app regs · workload identity&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EFEAFB;strokeColor=#8B5CF6;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="710.0" y="464" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c126" value="&lt;b&gt;Application Gateway + WAF&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;app UX ingress&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EFEAFB;strokeColor=#8B5CF6;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="940.0" y="464" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c127" value="&lt;b&gt;APIM — AI Gateway&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;Entra-secured products · JWT validate · quota · routing&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E2F1F0;strokeColor=#2E8B84;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="710.0" y="704" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c128" value="&lt;b&gt;AI Gateway (API Center)&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;Universal AI Registry · semantic cache · content safety&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E2F1F0;strokeColor=#2E8B84;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="940.0" y="704" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c129" value="&lt;b&gt;capability-mcp&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;MCP tools over APIM&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF1FB;strokeColor=#0F6CBD;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="480.0" y="1048" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c130" value="&lt;b&gt;dev-agent&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;build / CI (opencode)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF1FB;strokeColor=#0F6CBD;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="710.0" y="1048" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c131" value="&lt;b&gt;architect-v1 orchestrator&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;Foundry agent&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF1FB;strokeColor=#0F6CBD;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="940.0" y="1048" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c132" value="&lt;b&gt;frontend / ingestion&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;Dapr&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF1FB;strokeColor=#0F6CBD;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="1170.0" y="1048" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c133" value="&lt;b&gt;Foundry Agent Service&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;agent runtime (build &amp;amp; run)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D7E8F2;strokeColor=#3A7CA5;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="710.0" y="1288" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c134" value="&lt;b&gt;Microsoft Foundry / AI Foundry Project&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;Connections · Managed Identity&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D7E8F2;strokeColor=#3A7CA5;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="940.0" y="1288" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c135" value="&lt;b&gt;Anthropic CLAUDE&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;Foundry model deployment · Opus / Sonnet / Haiku&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4E3DC;strokeColor=#CC785C;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="825.0" y="1528" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c136" value="&lt;b&gt;Managed Redis&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;semantic cache&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="365.0" y="1768" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c137" value="&lt;b&gt;Cosmos DB&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;state&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="595.0" y="1768" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c138" value="&lt;b&gt;AI Search&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;grounding&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="825.0" y="1768" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c139" value="&lt;b&gt;Key Vault&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;secrets · keys&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="1055.0" y="1768" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c140" value="&lt;b&gt;Storage&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;blobs&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="1285.0" y="1768" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c141" value="&lt;b&gt;Azure Policy&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;guardrails&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEEEEE;strokeColor=#666666;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="365.0" y="2008" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c142" value="&lt;b&gt;Purview&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;data governance&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEEEEE;strokeColor=#666666;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="595.0" y="2008" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c143" value="&lt;b&gt;Agent 365&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;agent mgmt &amp;amp; governance · registry · Entra Agent ID · security · observability&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEEEEE;strokeColor=#666666;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="825.0" y="2008" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c144" value="&lt;b&gt;Monitor / Log Analytics&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;diagnostics · usage&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEEEEE;strokeColor=#666666;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="1055.0" y="2008" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c145" value="&lt;b&gt;Microsoft Defender&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:8px;color:#555&quot;&gt;threat protection&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEEEEE;strokeColor=#666666;strokeWidth=1.3;fontSize=10;align=center;verticalAlign=middle;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="1285.0" y="2008" width="210" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="c146" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#1A1A1A;" edge="1" parent="1" source="c121" target="c127">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="550.0" y="346"/>
+              <mxPoint x="178" y="346"/>
+              <mxPoint x="178" y="600"/>
+              <mxPoint x="794.0" y="600"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c147" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#1A1A1A;" edge="1" parent="1" source="c122" target="c127">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="780.0" y="332"/>
+              <mxPoint x="164" y="332"/>
+              <mxPoint x="164" y="586"/>
+              <mxPoint x="752.0" y="586"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c148" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#1A1A1A;" edge="1" parent="1" source="c123" target="c127">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1080.0" y="360"/>
+              <mxPoint x="1682" y="360"/>
+              <mxPoint x="1682" y="572"/>
+              <mxPoint x="878.0" y="572"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c149" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#1A1A1A;" edge="1" parent="1" source="c124" target="c126">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1310.0" y="346"/>
+              <mxPoint x="1045.0" y="346"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c150" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#1A1A1A;" edge="1" parent="1" source="c126" target="c132">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1080.0" y="586"/>
+              <mxPoint x="1696" y="586"/>
+              <mxPoint x="1696" y="916"/>
+              <mxPoint x="1275.0" y="916"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c151" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#9966AA;dashed=1;dashPattern=2 4;" edge="1" parent="1" source="c121" target="c125">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="620.0" y="346"/>
+              <mxPoint x="752.0" y="346"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c152" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#9966AA;dashed=1;dashPattern=2 4;" edge="1" parent="1" source="c122" target="c125">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="850.0" y="332"/>
+              <mxPoint x="794.0" y="332"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c153" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#9966AA;dashed=1;dashPattern=2 4;" edge="1" parent="1" source="c124" target="c125">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1240.0" y="332"/>
+              <mxPoint x="878.0" y="332"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c154" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#9966AA;dashed=1;dashPattern=2 4;" edge="1" parent="1" source="c123" target="c125">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1010.0" y="346"/>
+              <mxPoint x="836.0" y="346"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c155" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#9966AA;dashed=1;dashPattern=2 4;" edge="1" parent="1" source="c125" target="c127">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="794.0" y="572"/>
+              <mxPoint x="836.0" y="572"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c156" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#9966AA;dashed=1;dashPattern=2 4;" edge="1" parent="1" source="c125" target="c126">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="836.0" y="586"/>
+              <mxPoint x="1010.0" y="586"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c157" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#9966AA;dashed=1;dashPattern=2 4;" edge="1" parent="1" source="c125" target="c134">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="878.0" y="600"/>
+              <mxPoint x="1710" y="600"/>
+              <mxPoint x="1710" y="1156"/>
+              <mxPoint x="1010.0" y="1156"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c158" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#1A1A1A;" edge="1" parent="1" source="c127" target="c134">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="867.5" y="930"/>
+              <mxPoint x="1724" y="930"/>
+              <mxPoint x="1724" y="1184"/>
+              <mxPoint x="1080.0" y="1184"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c159" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#1A1A1A;" edge="1" parent="1" source="c131" target="c127">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1045.0" y="916"/>
+              <mxPoint x="841.25" y="916"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c160" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#1A1A1A;" edge="1" parent="1" source="c129" target="c127">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="585.0" y="944"/>
+              <mxPoint x="788.75" y="944"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c161" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#1A1A1A;" edge="1" parent="1" source="c130" target="c127">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="815.0" y="916"/>
+              <mxPoint x="815.0" y="916"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c162" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#1A1A1A;" edge="1" parent="1" source="c134" target="c135">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="975.0" y="1396"/>
+              <mxPoint x="965.0" y="1396"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c163" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#1A1A1A;" edge="1" parent="1" source="c133" target="c135">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="850.0" y="1396"/>
+              <mxPoint x="895.0" y="1396"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c164" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#9966AA;dashed=1;dashPattern=2 4;" edge="1" parent="1" source="c125" target="c143">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="752.0" y="572"/>
+              <mxPoint x="150" y="572"/>
+              <mxPoint x="150" y="1904"/>
+              <mxPoint x="930.0" y="1904"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c165" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#1A1A1A;" edge="1" parent="1" source="c143" target="c133">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="877.5" y="1890"/>
+              <mxPoint x="136" y="1890"/>
+              <mxPoint x="136" y="1396"/>
+              <mxPoint x="780.0" y="1396"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c166" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#1A1A1A;" edge="1" parent="1" source="c143" target="c131">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="982.5" y="1876"/>
+              <mxPoint x="1738" y="1876"/>
+              <mxPoint x="1738" y="1170"/>
+              <mxPoint x="1045.0" y="1170"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c167" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#1A1A1A;" edge="1" parent="1" source="c131" target="c137">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="992.5" y="1156"/>
+              <mxPoint x="122" y="1156"/>
+              <mxPoint x="122" y="1650"/>
+              <mxPoint x="700.0" y="1650"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c168" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#1A1A1A;" edge="1" parent="1" source="c131" target="c138">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1097.5" y="1198"/>
+              <mxPoint x="1752" y="1198"/>
+              <mxPoint x="1752" y="1636"/>
+              <mxPoint x="930.0" y="1636"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c169" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#1A1A1A;" edge="1" parent="1" source="c134" target="c139">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1010.0" y="1396"/>
+              <mxPoint x="1766" y="1396"/>
+              <mxPoint x="1766" y="1650"/>
+              <mxPoint x="1160.0" y="1650"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c170" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#1A1A1A;" edge="1" parent="1" source="c134" target="c140">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1045.0" y="1410"/>
+              <mxPoint x="1780" y="1410"/>
+              <mxPoint x="1780" y="1664"/>
+              <mxPoint x="1390.0" y="1664"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c171" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#1A1A1A;" edge="1" parent="1" source="c127" target="c136">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="762.5" y="930"/>
+              <mxPoint x="108" y="930"/>
+              <mxPoint x="108" y="1636"/>
+              <mxPoint x="470.0" y="1636"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c172" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#1A1A1A;" edge="1" parent="1" source="c141" target="c127">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="470.0" y="1876"/>
+              <mxPoint x="94" y="1876"/>
+              <mxPoint x="94" y="916"/>
+              <mxPoint x="736.25" y="916"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c173" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#1A1A1A;" edge="1" parent="1" source="c145" target="c134">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1390.0" y="1918"/>
+              <mxPoint x="1794" y="1918"/>
+              <mxPoint x="1794" y="1424"/>
+              <mxPoint x="1080.0" y="1424"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c174" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#1A1A1A;" edge="1" parent="1" source="c142" target="c137">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="700.0" y="1876"/>
+              <mxPoint x="700.0" y="1876"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c175" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#1A1A1A;" edge="1" parent="1" source="c144" target="c127">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1125.0" y="1890"/>
+              <mxPoint x="1808" y="1890"/>
+              <mxPoint x="1808" y="944"/>
+              <mxPoint x="893.75" y="944"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c176" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#1A1A1A;" edge="1" parent="1" source="c144" target="c134">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1195.0" y="1904"/>
+              <mxPoint x="1822" y="1904"/>
+              <mxPoint x="1822" y="1438"/>
+              <mxPoint x="1115.0" y="1438"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c177" value="&lt;b&gt;Legend:&lt;/b&gt;  Request (sync) · Identity (Entra) · Govern (Defender/Purview/Policy) · Observe (Monitor)  |  dotted box = system / trust boundary" style="text;html=1;align=left;verticalAlign=middle;fontSize=10;fontColor=#333;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="196" y="2134" width="1468" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="c178" value="View 2 — Serving Anthropic (Claude) via Microsoft Foundry + APIM on Azure AI Landing Zones" style="text;html=1;align=left;verticalAlign=middle;fontSize=15;fontStyle=1;fontColor=#1a1a1a;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="196" y="16" width="1468" height="22" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

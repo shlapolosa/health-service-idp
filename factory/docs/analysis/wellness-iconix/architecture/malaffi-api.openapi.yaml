@@ -1,0 +1,157 @@
+openapi: 3.0.3
+info:
+  title: Malaffi Clinical Segmentation API (proposed)
+  version: 0.1.0
+  description: |
+    **Proposed** contract for the Malaffi side of the clinical-segmentation integration, consumed by the
+    Gamification Platform through an **anti-corruption layer (ACL) inside `eligibility-svc`**. The GP never
+    talks to Malaffi directly and never stores clinical membership.
+
+    Two clearly separated capabilities — segmentation is an **upstream concern** owned by the clinical team
+    on Malaffi; the GP only **reads the segment catalogue** (no PHI) at authoring and **resolves scoped
+    membership** (PHI, minimised) at runtime:
+
+    | When | GP ACL method (vocabulary) | Malaffi operation | PHI? |
+    |---|---|---|---|
+    | Authoring — browse & bind | `listSegments()` | `GET /clinical-segments` | No (metadata only) |
+    | Publish — existence re-check | `getSegment(id)` | `GET /clinical-segments/{segmentId}` | No |
+    | Runtime — eligibility / snapshot | `getScopedMembership(memberId, segmentIds)` | `POST /clinical-segment-membership/resolve` | Yes (scoped, point-in-time) |
+
+    The catalogue endpoints expose **segment descriptions only** (id, name, description, clinical criteria
+    codes, status) so an authoring admin can browse and **manually bind** the correct segment(s) to a
+    challenge audience. Membership ("is this member in segment X") is resolved separately, scoped to an
+    explicit list of segment ids (data minimisation), and is never bulk-exported to the GP.
+servers:
+  - url: https://malaffi.example.ae/clinical-segmentation/v1
+    description: Malaffi clinical segmentation API (B2B, behind Entra OAuth2 + mTLS)
+security:
+  - entraClientCredentials: [clinical-segments.read, clinical-membership.resolve]
+
+paths:
+  /clinical-segments:
+    get:
+      operationId: listClinicalSegments
+      summary: List the clinical segment catalogue (metadata only — NO membership / NO PHI)
+      description: |
+        Returns the catalogue of clinical segments an authoring admin may bind to a challenge audience.
+        Contains **no member data**. This is the author-time `listSegments()` behind the ACL.
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string, enum: [active, retired, all], default: active } }
+        - { name: search, in: query, required: false, schema: { type: string }, description: free-text filter over name/description }
+      responses:
+        '200':
+          description: Clinical segment catalogue
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  segments: { type: array, items: { $ref: '#/components/schemas/ClinicalSegment' } }
+                required: [segments]
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /clinical-segments/{segmentId}:
+    get:
+      operationId: getClinicalSegment
+      summary: Get one clinical segment's metadata (existence / validity re-check at publish — NO PHI)
+      parameters:
+        - { name: segmentId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Segment metadata
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClinicalSegment' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /clinical-segment-membership/resolve:
+    post:
+      operationId: resolveClinicalMembership
+      summary: Resolve a member's membership for an EXPLICIT, scoped set of clinical segments (PHI, minimised)
+      description: |
+        Runtime scoped-membership query behind the ACL `getScopedMembership(memberId, segmentIds)`. Evaluates
+        ONLY the segment ids supplied (data minimisation), returns a point-in-time result (`asOf`), and does
+        not return the underlying clinical data. Used at eligibility discovery and frozen into the
+        `EligibilitySnapshot` at enrolment.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MembershipResolveRequest' }
+      responses:
+        '200':
+          description: Scoped membership result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MembershipResolveResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+components:
+  securitySchemes:
+    entraClientCredentials:
+      type: oauth2
+      description: Microsoft Entra B2B app-registration (client-credentials); transport additionally pinned with mTLS.
+      flows:
+        clientCredentials:
+          tokenUrl: https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token
+          scopes:
+            clinical-segments.read: Read the clinical segment catalogue (no PHI)
+            clinical-membership.resolve: Resolve scoped clinical membership (PHI)
+  schemas:
+    ClinicalSegment:
+      type: object
+      description: Clinical segment description — metadata only, no membership.
+      properties:
+        segmentId: { type: string, example: "seg-clin-diabetes-t2" }
+        name: { type: string, example: "Type 2 Diabetes" }
+        description: { type: string, example: "Members with an active Type 2 Diabetes clinical condition." }
+        type: { type: string, enum: [clinical], default: clinical }
+        clinicalCriteria:
+          type: array
+          description: Coded criteria defining the segment (e.g. ICD-10 / SNOMED), for transparency — not membership.
+          items: { type: string, example: "ICD10:E11" }
+        status: { type: string, enum: [active, retired] }
+        version: { type: string, example: "2026-06-01" }
+        lastUpdated: { type: string, format: date-time }
+      required: [segmentId, name, type, status]
+    MembershipResolveRequest:
+      type: object
+      properties:
+        memberId: { type: string, description: Malaffi-scoped member identifier }
+        segmentIds:
+          type: array
+          minItems: 1
+          description: Explicit, minimised set of clinical segment ids to evaluate (only the active challenge's segments).
+          items: { type: string }
+        asOf: { type: string, format: date-time, description: Optional point-in-time; defaults to now. }
+      required: [memberId, segmentIds]
+    MembershipResolveResponse:
+      type: object
+      properties:
+        memberId: { type: string }
+        asOf: { type: string, format: date-time }
+        memberships:
+          type: array
+          items:
+            type: object
+            properties:
+              segmentId: { type: string }
+              isMember: { type: boolean }
+            required: [segmentId, isMember]
+      required: [memberId, asOf, memberships]
+    Error:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
+      required: [code, message]
+  responses:
+    BadRequest:   { description: Invalid request, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Unauthorized: { description: Missing/invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Forbidden:    { description: Token lacks the required scope, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    NotFound:     { description: Segment not found, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }

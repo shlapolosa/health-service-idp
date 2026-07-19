@@ -1,0 +1,139 @@
+# Behaviour — Master Journey (end-to-end lifecycle)
+
+> The macro chain across all business processes — a **lifecycle with phases**, not one call stack.
+> Sub-flows are joined by **frozen shared state** (the challenge definition) and **async events** (Event
+> Hub), never by direct calls. Terminology per `18-eligibility-terminology-analysis.md`:
+> DoH **defines features**; clinical **segments + membership live on Malaffi** (built by the Clinical
+> Team), demographic/telemetry segments are **local**; a challenge's **definition AND localized
+> content (AR/EN) are owned by the Challenge service** (no CMS); eligibility returns **challenge_ids**
+> which the **Challenge service hydrates** to localized published content (**Sahatna is a thin renderer**);
+> enrolment is a **telemetry scoring subscription**; the membership query is **scoped** to active segments.
+> Render `master-journey.mmd` or paste the fenced block below into https://mermaid.live (only the block).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor DoH as DoH · defines features
+    actor Clinical as Clinical Team
+    actor Admin
+    actor Member
+    participant Sahatna as Sahatna · app, renderer, data source
+    participant Plat as Gamification Platform
+    participant FA as Challenge Definition store<br/>challenge_id, segment_id, ScoringPlan
+    participant EH as Event Hub · versioned spine
+    participant Malaffi as Malaffi HIE · metadata + membership APIs
+    actor Partner
+    participant Prov as Reward Provider · external
+
+    rect rgb(245,245,245)
+    note over DoH,Malaffi: PRECONDITION — define features · build segments · ingest data
+    DoH->>Plat: define features for a cohort
+    Sahatna->>Plat: BULK upload demographic + stream telemetry
+    Plat->>Plat: build LOCAL segment, store segment_id + membership
+    Clinical->>Malaffi: build CLINICAL segment, store segment_id + membership
+    note over Plat,Malaffi: clinical membership STAYS on Malaffi, queried per-user later · local membership stays on platform  ▶ detail Demographic Bulk Load
+    Partner->>Plat: onboard, push catalogue  ▶ detail Partner Onboarding
+    end
+
+    rect rgb(238,247,233)
+    note over Admin,FA: PHASE 1 — DESIGN-TIME, author and publish the challenge
+    Admin->>Plat: author challenge + localized content (AR/EN), bind challenge_id to segment_id + ScoringPlan
+    Plat->>Malaffi: get segment METADATA, no membership
+    Plat->>FA: FREEZE challenge definition + localized content, at version
+    Plat->>EH: challenge.published
+    note over FA: inv-2 Frozen-on-publish · Challenge service owns DEFINITION + localized CONTENT (no CMS)  ▶ detail Challenge Authoring
+    end
+
+    rect rgb(234,241,251)
+    note over Member,Malaffi: PHASE 2 — RUN-TIME, eligibility then enrol
+    Member->>Sahatna: login
+    Sahatna->>Plat: which challenge_ids is user X eligible for
+    alt clinical segments
+        Plat->>Malaffi: SCOPED membership, of active segment_ids which is X in
+    else demographic or telemetry segments
+        Plat->>Plat: local membership check, of active local segment_ids
+    end
+    Plat->>Plat: map segment_ids to challenge_ids via bindings
+    Plat->>Plat: hydrate localized published content for challenge_ids (challenge service)
+    Plat-->>Sahatna: localized published eligible challenges
+    Sahatna-->>Member: render eligible challenges
+    note over Plat,Malaffi: inv-1 OLAP/OLTP seam under 50ms · scoped query = data minimisation, c9  ▶ detail Eligibility Determination
+    Member->>Sahatna: enrol in challenge_id
+    Sahatna->>Plat: create enrolment, user X, challenge_id
+    Plat->>Plat: enrolment record = telemetry scoring SUBSCRIPTION, multiple concurrent
+    Plat->>EH: enrolment.created
+    end
+
+    rect rgb(243,238,248)
+    note over Member,EH: PHASE 3 — RUN-TIME, Earn loop, scored per active enrolment
+    loop per activity, for each enrolment subscription
+        Member->>Plat: activity captured, wearable or Sahatna telemetry
+        Plat->>EH: activity.verified, only after the verify gate
+        note over Plat,EH: inv-3 Verified-signal gate, scores advance ONLY on activity.verified  ▶ detail Earn Loop
+        EH->>Plat: consume activity.verified, score from frozen ScoringPlan for that challenge
+    end
+    note over Plat: at week close, WeeklyScore = min 100, Points = WeeklyScore x 10
+    Plat->>Plat: credit Wallet ledger, append-only and idempotent
+    Plat->>EH: points.credited  inv-4 inv-7
+    end
+
+    rect rgb(252,242,242)
+    note over Member,Prov: PHASE 4 — RUN-TIME, Redeem, member on-demand saga
+    Member->>Plat: redeem reward
+    Plat->>Plat: reserve points 300s, then fraud check
+    Plat->>Prov: call Partner API, 10s timeout, 3 retries  [cross-trust]
+    alt success
+        Plat->>Plat: confirm debit, issue voucher
+        Plat-->>Member: voucher
+    else timeout or exhausted
+        Plat->>Plat: release reservation, notify, log uncertain
+    end
+    Plat->>EH: voucher.issued, redemption.star
+    note over Plat,Prov: inv-5 inline fraud guard · inv-8 reserve timeout retry discipline  ▶ detail Redeem Saga
+    end
+
+    rect rgb(255,251,236)
+    note over EH,DoH: PHASE 5 — PERIODIC, Settlement monthly plus Conclusion period end
+    EH->>Plat: scheduled aggregate redemptions
+    Plat->>Plat: reconcile ledger vs redemptions, over 0.1 percent flag
+    Plat->>Partner: VAT invoice, route payment, release 5 percent holdback, 30-day window
+    note over Plat,Partner: inv-8 settlement discipline  ▶ detail Settlement
+    Plat->>FA: read final scores, compute standings
+    Plat->>DoH: hand winners and prizes, off-platform boundary
+    Plat->>EH: challenge.concluded
+    end
+```
+
+## How to read it
+- **Coloured bands = phases** (precondition · design-time · eligibility+enrol · earn · redeem · periodic).
+- **Arrows between phases are hand-offs, not calls:** writes to **`FA`** (challenge definition) = frozen
+  state; messages to/from **`EH`** = async events. That decoupling is the event spine (inv-6).
+- **Two Malaffi APIs:** *segment metadata* (authoring, no membership) and *scoped membership* (eligibility,
+  "of active segment_ids which is X in" — data-minimising, c9).
+- **`inv-N`** tags the load-bearing invariant each step carries; **`▶ detail`** names the runtime sequence.
+
+## Hand-off ledger (the glue between processes)
+| From | To | Hand-off | Type |
+|---|---|---|---|
+| DoH | Precondition | feature definitions | state |
+| Clinical Team | Eligibility (clinical) | clinical segment_id + membership (on Malaffi) | external state |
+| Sahatna (data) | Local segments | demographic (bulk) + telemetry (stream) | state + event |
+| 1 Author | 2 Eligibility | frozen challenge definition + **localized content** (challenge_id↔segment_id↔ScoringPlan) + `challenge.published` | state + event |
+| 2 Eligibility | Sahatna | localized published challenges (Challenge service hydrates; Sahatna renders) | state |
+| 2 Enrol | 3 Earn | enrolment record = telemetry **subscription** + `enrolment.created` | state + event |
+| 3 Earn | 4 Redeem | wallet balance + `points.credited` | state + event |
+| 4 Redeem | 5 Settle | `redemption.*`, `voucher.issued` | event |
+| 5 Conclude | DoH | final standings (off-platform) | boundary |
+
+## Detailed sequences to draw next (each a `▶ detail` above)
+1. **Challenge Authoring** (bind challenge_id↔segment_id + ScoringPlan, segment metadata, freeze) — inv-2
+2. **Eligibility Determination** (scoped membership · map segments→challenges · Challenge service hydrates localized content · enrol-subscribe) — inv-1
+3. **Earn Loop** (capture → verify-gate → score per enrolment → credit) — inv-3/7
+4. **Redeem Saga** (reserve → fraud → partner → confirm/release, timeouts) — inv-4/5/8
+5. **Settlement** (aggregate → reconcile → holdback) — inv-8
+6. **Demographic Bulk Load** + **Partner Onboarding** (preconditions)
+
+## Coverage check (every business process appears once)
+Define Features (DoH) ✓ · Cohort/Segment build — clinical (Malaffi) + local ✓ · Challenge Authoring ✓ ·
+Publish (challenge service, localized) ✓ · Eligibility + Enrolment ✓ · Earning Loop ✓ · Rewards & Redemption ✓ · Conclusion ✓ ·
+Partner Onboarding/Catalogue ✓ · Settlement ✓ · Offboarding ◑ (partner-track tail).

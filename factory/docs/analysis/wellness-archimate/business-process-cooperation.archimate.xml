@@ -1,0 +1,981 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<model xmlns="http://www.opengroup.org/xsd/archimate/3.0/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.opengroup.org/xsd/archimate/3.0/ http://www.opengroup.org/xsd/archimate/3.0/archimate3_Diagram.xsd" identifier="id-wellness-bizproc">
+<name xml:lang="en">Wellness Platform — Business Process Cooperation</name>
+<elements>
+<element identifier="act_member" xsi:type="BusinessRole"><name xml:lang="en">Member / Citizen</name></element>
+<element identifier="act_partner" xsi:type="BusinessRole"><name xml:lang="en">Partner (external)</name></element>
+<element identifier="obj_voucher" xsi:type="BusinessObject"><name xml:lang="en">Voucher</name></element>
+<element identifier="obj_wallet" xsi:type="BusinessObject"><name xml:lang="en">Sahatna Points (Wallet)</name></element>
+<element identifier="obj_catalogue" xsi:type="BusinessObject"><name xml:lang="en">Reward Catalogue</name></element>
+<element identifier="act_sahatna" xsi:type="BusinessActor"><name xml:lang="en">Sahatna</name></element>
+<element identifier="act_malaffi" xsi:type="BusinessActor"><name xml:lang="en">Malaffi (HIE)</name></element>
+<element identifier="act_gplatform" xsi:type="BusinessActor"><name xml:lang="en">Gamification Platform</name></element>
+<element identifier="obj_clinical" xsi:type="BusinessObject"><name xml:lang="en">Clinical Data  (diabetes, obesity, …)</name></element>
+<element identifier="obj_demo" xsi:type="BusinessObject"><name xml:lang="en">Demographic Data  (gender, nationality, age, …)</name></element>
+<element identifier="obj_telemetry" xsi:type="BusinessObject"><name xml:lang="en">Telemetry  (steps, sleep, nutrition, VO2, …)</name></element>
+<element identifier="bsv_app" xsi:type="BusinessService"><name xml:lang="en">Member App Service</name></element>
+<element identifier="bsv_demo" xsi:type="BusinessService"><name xml:lang="en">Demographic Data Service</name></element>
+<element identifier="bsv_tele" xsi:type="BusinessService"><name xml:lang="en">Telemetry Streaming Service</name></element>
+<element identifier="bsv_member" xsi:type="BusinessService"><name xml:lang="en">Membership Query Service</name></element>
+<element identifier="bsv_clin" xsi:type="BusinessService"><name xml:lang="en">Segment Metadata Service</name></element>
+<element identifier="fn_s_app" xsi:type="BusinessFunction"><name xml:lang="en">Member Mobile Experience</name></element>
+<element identifier="fn_s_demo" xsi:type="BusinessFunction"><name xml:lang="en">Demographics &amp; Profile</name></element>
+<element identifier="fn_s_tele" xsi:type="BusinessFunction"><name xml:lang="en">Telemetry Capture &amp; Streaming</name></element>
+<element identifier="fn_m_clin" xsi:type="BusinessFunction"><name xml:lang="en">Clinical Data Management</name></element>
+<element identifier="fn_m_member" xsi:type="BusinessFunction"><name xml:lang="en">Membership Registry</name></element>
+<element identifier="fn_m_cohort" xsi:type="BusinessFunction"><name xml:lang="en">Clinical Segment Build &amp; Membership (Clinical Team)</name></element>
+<element identifier="fn_p1" xsi:type="BusinessFunction"><name xml:lang="en">Cohort Planning</name></element>
+<element identifier="fn_p2" xsi:type="BusinessFunction"><name xml:lang="en">Challenge Lifecycle Management</name></element>
+<element identifier="fn_p3" xsi:type="BusinessFunction"><name xml:lang="en">Wellness Scoring &amp; Recognition</name></element>
+<element identifier="fn_p4" xsi:type="BusinessFunction"><name xml:lang="en">Activity Verification</name></element>
+<element identifier="fn_p5" xsi:type="BusinessFunction"><name xml:lang="en">Reward Points &amp; Wallet</name></element>
+<element identifier="fn_p6" xsi:type="BusinessFunction"><name xml:lang="en">Marketplace &amp; Redemption</name></element>
+<element identifier="fn_p7" xsi:type="BusinessFunction"><name xml:lang="en">Partner Lifecycle &amp; Settlement</name></element>
+<element identifier="fn_p8" xsi:type="BusinessFunction"><name xml:lang="en">Engagement &amp; Nudging</name></element>
+<element identifier="fn_p9" xsi:type="BusinessFunction"><name xml:lang="en">Eligibility Evaluation</name></element>
+<element identifier="fn_p10" xsi:type="BusinessFunction"><name xml:lang="en">Consent &amp; Identity</name></element>
+<element identifier="fn_p11" xsi:type="BusinessFunction"><name xml:lang="en">Fraud &amp; Integrity</name></element>
+<element identifier="fn_p12" xsi:type="BusinessFunction"><name xml:lang="en">Analytics &amp; Insight</name></element>
+<element identifier="fn_p13" xsi:type="BusinessFunction"><name xml:lang="en">Integration &amp; Interoperability</name></element>
+<element identifier="fn_concl" xsi:type="BusinessFunction"><name xml:lang="en">Programme Conclusion</name></element>
+<element identifier="e_start" xsi:type="BusinessEvent"><name xml:lang="en">Nightly cohort run (timer)</name></element>
+<element identifier="e_seg" xsi:type="BusinessEvent"><name xml:lang="en">segment.published</name></element>
+<element identifier="e_chal" xsi:type="BusinessEvent"><name xml:lang="en">challenge.published</name></element>
+<element identifier="e_inelig" xsi:type="BusinessEvent"><name xml:lang="en">Ineligible (end)</name></element>
+<element identifier="e_verified" xsi:type="BusinessEvent"><name xml:lang="en">activity.verified</name></element>
+<element identifier="e_week" xsi:type="BusinessEvent"><name xml:lang="en">Week close (timer)</name></element>
+<element identifier="e_points" xsi:type="BusinessEvent"><name xml:lang="en">points.credited</name></element>
+<element identifier="e_voucher" xsi:type="BusinessEvent"><name xml:lang="en">voucher.issued</name></element>
+<element identifier="e_pend" xsi:type="BusinessEvent"><name xml:lang="en">Challenge period ended (timer)</name></element>
+<element identifier="e_concl" xsi:type="BusinessEvent"><name xml:lang="en">challenge.concluded (end)</name></element>
+<element identifier="obj_features" xsi:type="BusinessObject"><name xml:lang="en">Feature Set</name></element>
+<element identifier="obj_cohort" xsi:type="BusinessObject"><name xml:lang="en">Cohort Definition</name></element>
+<element identifier="obj_dailyscore" xsi:type="BusinessObject"><name xml:lang="en">Daily Score</name></element>
+<element identifier="obj_standings" xsi:type="BusinessObject"><name xml:lang="en">Final Standings</name></element>
+<element identifier="r_analytics" xsi:type="BusinessRole"><name xml:lang="en">Analytics &amp; Data Team</name></element>
+<element identifier="r_admin" xsi:type="BusinessRole"><name xml:lang="en">Programme Administration</name></element>
+<element identifier="r_doh" xsi:type="BusinessRole"><name xml:lang="en">Department of Health</name></element>
+<element identifier="r_cms" xsi:type="BusinessRole"><name xml:lang="en">CMS Author</name></element>
+<element identifier="r_verify" xsi:type="BusinessRole"><name xml:lang="en">Verification Authority</name></element>
+<element identifier="c_cohort" xsi:type="BusinessProcess"><name xml:lang="en">Cohort Identification</name></element>
+<element identifier="c_create" xsi:type="BusinessProcess"><name xml:lang="en">Challenge Creation</name></element>
+<element identifier="c_enrol" xsi:type="BusinessProcess"><name xml:lang="en">Enrolment</name></element>
+<element identifier="c_earn" xsi:type="BusinessProcess"><name xml:lang="en">Earning Loop</name></element>
+<element identifier="c_reward" xsi:type="BusinessProcess"><name xml:lang="en">Rewards &amp; Redemption</name></element>
+<element identifier="c_conclude" xsi:type="BusinessProcess"><name xml:lang="en">Conclusion</name></element>
+<element identifier="s_cf" xsi:type="BusinessProcess"><name xml:lang="en">Define Features (DoH)</name></element>
+<element identifier="s_dc" xsi:type="BusinessProcess"><name xml:lang="en">Build Segment</name></element>
+<element identifier="s_ps" xsi:type="BusinessProcess"><name xml:lang="en">Publish Segment</name></element>
+<element identifier="s_ac" xsi:type="BusinessProcess"><name xml:lang="en">Author Challenge</name></element>
+<element identifier="s_be" xsi:type="BusinessProcess"><name xml:lang="en">Bind challenge_id to segment_id</name></element>
+<element identifier="s_ap" xsi:type="BusinessProcess"><name xml:lang="en">Author Presentation</name></element>
+<element identifier="s_pf" xsi:type="BusinessProcess"><name xml:lang="en">Publish &amp; Present</name></element>
+<element identifier="s_en" xsi:type="BusinessProcess"><name xml:lang="en">Enrol</name></element>
+<element identifier="s_ee" xsi:type="BusinessProcess"><name xml:lang="en">Evaluate Eligibility (return challenge_ids; CMS hydrates)</name></element>
+<element identifier="s_tc" xsi:type="BusinessProcess"><name xml:lang="en">Accept T&amp;C</name></element>
+<element identifier="s_cn" xsi:type="BusinessProcess"><name xml:lang="en">Create Enrolment Subscription</name></element>
+<element identifier="s_ca" xsi:type="BusinessProcess"><name xml:lang="en">Capture Activity</name></element>
+<element identifier="s_va" xsi:type="BusinessProcess"><name xml:lang="en">Verify Activity</name></element>
+<element identifier="s_sg" xsi:type="BusinessProcess"><name xml:lang="en">Score Daily Goals</name></element>
+<element identifier="s_ar" xsi:type="BusinessProcess"><name xml:lang="en">Apply Recognition</name></element>
+<element identifier="s_aw" xsi:type="BusinessProcess"><name xml:lang="en">Aggregate Weekly Score</name></element>
+<element identifier="s_cp" xsi:type="BusinessProcess"><name xml:lang="en">Credit Sahatna Points</name></element>
+<element identifier="s_br" xsi:type="BusinessProcess"><name xml:lang="en">Browse Rewards</name></element>
+<element identifier="s_rs" xsi:type="BusinessProcess"><name xml:lang="en">Reserve Points</name></element>
+<element identifier="s_rd" xsi:type="BusinessProcess"><name xml:lang="en">Redeem with Partner</name></element>
+<element identifier="s_rv" xsi:type="BusinessProcess"><name xml:lang="en">Receive Voucher</name></element>
+<element identifier="s_cc" xsi:type="BusinessProcess"><name xml:lang="en">Conclude Challenge</name></element>
+<element identifier="s_hw" xsi:type="BusinessProcess"><name xml:lang="en">Hand Winners &amp; Prizes</name></element>
+<element identifier="bsv_cohort" xsi:type="BusinessService"><name xml:lang="en">Segment Build Service (local + clinical)</name></element>
+<element identifier="bsv_create" xsi:type="BusinessService"><name xml:lang="en">Challenge Authoring Service</name></element>
+<element identifier="bsv_enrol" xsi:type="BusinessService"><name xml:lang="en">Enrolment Service</name></element>
+<element identifier="bsv_score" xsi:type="BusinessService"><name xml:lang="en">Wellness Scoring Service</name></element>
+<element identifier="bsv_redeem" xsi:type="BusinessService"><name xml:lang="en">Reward Redemption Service</name></element>
+<element identifier="bsv_concl" xsi:type="BusinessService"><name xml:lang="en">Programme Conclusion Service</name></element>
+<element identifier="obj_segment" xsi:type="BusinessObject"><name xml:lang="en">Segment (versioned)</name></element>
+<element identifier="obj_challenge" xsi:type="BusinessObject"><name xml:lang="en">Challenge Contract</name></element>
+<element identifier="obj_plan" xsi:type="BusinessObject"><name xml:lang="en">ScoringPlan</name></element>
+<element identifier="obj_enrol" xsi:type="BusinessObject"><name xml:lang="en">Enrolment</name></element>
+<element identifier="obj_activity" xsi:type="BusinessObject"><name xml:lang="en">Verified Activity</name></element>
+<element identifier="obj_score" xsi:type="BusinessObject"><name xml:lang="en">Weekly Score</name></element>
+<element identifier="obj_title" xsi:type="BusinessObject"><name xml:lang="en">Title / Badge</name></element>
+<element identifier="r_ponb" xsi:type="BusinessRole"><name xml:lang="en">Partner Onboarding (Admin)</name></element>
+<element identifier="r_market" xsi:type="BusinessRole"><name xml:lang="en">Marketplace Operations</name></element>
+<element identifier="r_redeem" xsi:type="BusinessRole"><name xml:lang="en">Redemption Ops</name></element>
+<element identifier="r_fin" xsi:type="BusinessRole"><name xml:lang="en">Finance &amp; Settlement</name></element>
+<element identifier="r_pexit" xsi:type="BusinessRole"><name xml:lang="en">Partner Exit (Admin)</name></element>
+<element identifier="r_wallet" xsi:type="BusinessRole"><name xml:lang="en">Wallet / Finance</name></element>
+<element identifier="r_fraud" xsi:type="BusinessRole"><name xml:lang="en">Fraud &amp; Compliance</name></element>
+<element identifier="c_onb" xsi:type="BusinessProcess"><name xml:lang="en">Onboarding &amp; KYB</name></element>
+<element identifier="c_cat" xsi:type="BusinessProcess"><name xml:lang="en">Contracting &amp; Catalogue</name></element>
+<element identifier="c_red" xsi:type="BusinessProcess"><name xml:lang="en">Member Redemption</name></element>
+<element identifier="c_set" xsi:type="BusinessProcess"><name xml:lang="en">Settlement</name></element>
+<element identifier="c_off" xsi:type="BusinessProcess"><name xml:lang="en">Offboarding &amp; Exit</name></element>
+<element identifier="p_sub" xsi:type="BusinessProcess"><name xml:lang="en">Submit Application</name></element>
+<element identifier="p_kyb" xsi:type="BusinessProcess"><name xml:lang="en">KYB Due Diligence</name></element>
+<element identifier="p_apr" xsi:type="BusinessProcess"><name xml:lang="en">Approval Decision</name></element>
+<element identifier="p_prov" xsi:type="BusinessProcess"><name xml:lang="en">Provision Sandbox Creds</name></element>
+<element identifier="p_push" xsi:type="BusinessProcess"><name xml:lang="en">Push Catalogue</name></element>
+<element identifier="p_val" xsi:type="BusinessProcess"><name xml:lang="en">Validate Items</name></element>
+<element identifier="p_idx" xsi:type="BusinessProcess"><name xml:lang="en">Index Catalogue</name></element>
+<element identifier="p_rel" xsi:type="BusinessProcess"><name xml:lang="en">Release Prod Creds</name></element>
+<element identifier="p_brw" xsi:type="BusinessProcess"><name xml:lang="en">Browse &amp; Select</name></element>
+<element identifier="p_res" xsi:type="BusinessProcess"><name xml:lang="en">Reserve Points (5-min)</name></element>
+<element identifier="p_api" xsi:type="BusinessProcess"><name xml:lang="en">Call Partner API (10s)</name></element>
+<element identifier="p_cmt" xsi:type="BusinessProcess"><name xml:lang="en">Commit Debit &amp; Voucher</name></element>
+<element identifier="p_ntf" xsi:type="BusinessProcess"><name xml:lang="en">Notify Member</name></element>
+<element identifier="p_agg" xsi:type="BusinessProcess"><name xml:lang="en">Aggregate Redemptions</name></element>
+<element identifier="p_rec" xsi:type="BusinessProcess"><name xml:lang="en">Reconcile Ledger</name></element>
+<element identifier="p_inv" xsi:type="BusinessProcess"><name xml:lang="en">Generate VAT Invoice</name></element>
+<element identifier="p_pay" xsi:type="BusinessProcess"><name xml:lang="en">Route Payment</name></element>
+<element identifier="p_hld" xsi:type="BusinessProcess"><name xml:lang="en">Release 5% Holdback</name></element>
+<element identifier="p_dec" xsi:type="BusinessProcess"><name xml:lang="en">Offboarding Decision</name></element>
+<element identifier="p_wrn" xsi:type="BusinessProcess"><name xml:lang="en">Issue 30-day Warning</name></element>
+<element identifier="p_rev" xsi:type="BusinessProcess"><name xml:lang="en">Revoke &amp; Depublish</name></element>
+<element identifier="p_wnd" xsi:type="BusinessProcess"><name xml:lang="en">90-day Wind-down</name></element>
+<element identifier="p_fin" xsi:type="BusinessProcess"><name xml:lang="en">Final Settlement</name></element>
+<element identifier="p_ret" xsi:type="BusinessProcess"><name xml:lang="en">Retain Data / Mask PII</name></element>
+<element identifier="bsv_onb" xsi:type="BusinessService"><name xml:lang="en">Partner Onboarding Service</name></element>
+<element identifier="bsv_cat" xsi:type="BusinessService"><name xml:lang="en">Catalogue Management Service</name></element>
+<element identifier="bsv_fulfil" xsi:type="BusinessService"><name xml:lang="en">Redemption Fulfilment Service</name></element>
+<element identifier="bsv_settle" xsi:type="BusinessService"><name xml:lang="en">Settlement Service</name></element>
+<element identifier="bsv_off" xsi:type="BusinessService"><name xml:lang="en">Offboarding Service</name></element>
+<element identifier="obj_kyb" xsi:type="BusinessObject"><name xml:lang="en">KYB / Application Record</name></element>
+<element identifier="obj_contract" xsi:type="BusinessObject"><name xml:lang="en">Partner Contract</name></element>
+<element identifier="obj_reservation" xsi:type="BusinessObject"><name xml:lang="en">Point Reservation</name></element>
+<element identifier="obj_redemption" xsi:type="BusinessObject"><name xml:lang="en">Redemption</name></element>
+<element identifier="obj_settlement" xsi:type="BusinessObject"><name xml:lang="en">Settlement / VAT Invoice</name></element>
+</elements>
+<relationships>
+<relationship identifier="rel-1" source="r_analytics" target="c_cohort" xsi:type="Assignment"/>
+<relationship identifier="rel-2" source="r_admin" target="c_create" xsi:type="Assignment"/>
+<relationship identifier="rel-3" source="act_member" target="c_enrol" xsi:type="Assignment"/>
+<relationship identifier="rel-4" source="act_member" target="c_earn" xsi:type="Assignment"/>
+<relationship identifier="rel-5" source="act_member" target="c_reward" xsi:type="Assignment"/>
+<relationship identifier="rel-6" source="r_doh" target="c_conclude" xsi:type="Assignment"/>
+<relationship identifier="rel-7" source="r_cms" target="s_ap" xsi:type="Assignment"/>
+<relationship identifier="rel-8" source="r_verify" target="s_va" xsi:type="Assignment"/>
+<relationship identifier="rel-9" source="c_cohort" target="bsv_cohort" xsi:type="Realization"/>
+<relationship identifier="rel-10" source="bsv_cohort" target="r_admin" xsi:type="Serving"/>
+<relationship identifier="rel-11" source="c_create" target="bsv_create" xsi:type="Realization"/>
+<relationship identifier="rel-12" source="bsv_create" target="r_admin" xsi:type="Serving"/>
+<relationship identifier="rel-13" source="c_enrol" target="bsv_enrol" xsi:type="Realization"/>
+<relationship identifier="rel-14" source="bsv_enrol" target="act_member" xsi:type="Serving"/>
+<relationship identifier="rel-15" source="c_earn" target="bsv_score" xsi:type="Realization"/>
+<relationship identifier="rel-16" source="bsv_score" target="act_member" xsi:type="Serving"/>
+<relationship identifier="rel-17" source="c_reward" target="bsv_redeem" xsi:type="Realization"/>
+<relationship identifier="rel-18" source="bsv_redeem" target="act_member" xsi:type="Serving"/>
+<relationship identifier="rel-19" source="c_conclude" target="bsv_concl" xsi:type="Realization"/>
+<relationship identifier="rel-20" source="bsv_concl" target="r_doh" xsi:type="Serving"/>
+<relationship identifier="rel-21" source="c_cohort" target="s_cf" xsi:type="Composition"/>
+<relationship identifier="rel-22" source="c_cohort" target="s_dc" xsi:type="Composition"/>
+<relationship identifier="rel-23" source="c_cohort" target="s_ps" xsi:type="Composition"/>
+<relationship identifier="rel-24" source="c_create" target="s_ac" xsi:type="Composition"/>
+<relationship identifier="rel-25" source="c_create" target="s_be" xsi:type="Composition"/>
+<relationship identifier="rel-26" source="c_create" target="s_ap" xsi:type="Composition"/>
+<relationship identifier="rel-27" source="c_create" target="s_pf" xsi:type="Composition"/>
+<relationship identifier="rel-28" source="c_enrol" target="s_en" xsi:type="Composition"/>
+<relationship identifier="rel-29" source="c_enrol" target="s_ee" xsi:type="Composition"/>
+<relationship identifier="rel-30" source="c_enrol" target="s_tc" xsi:type="Composition"/>
+<relationship identifier="rel-31" source="c_enrol" target="s_cn" xsi:type="Composition"/>
+<relationship identifier="rel-32" source="c_earn" target="s_ca" xsi:type="Composition"/>
+<relationship identifier="rel-33" source="c_earn" target="s_va" xsi:type="Composition"/>
+<relationship identifier="rel-34" source="c_earn" target="s_sg" xsi:type="Composition"/>
+<relationship identifier="rel-35" source="c_earn" target="s_ar" xsi:type="Composition"/>
+<relationship identifier="rel-36" source="c_earn" target="s_aw" xsi:type="Composition"/>
+<relationship identifier="rel-37" source="c_earn" target="s_cp" xsi:type="Composition"/>
+<relationship identifier="rel-38" source="c_reward" target="s_br" xsi:type="Composition"/>
+<relationship identifier="rel-39" source="c_reward" target="s_rs" xsi:type="Composition"/>
+<relationship identifier="rel-40" source="c_reward" target="s_rd" xsi:type="Composition"/>
+<relationship identifier="rel-41" source="c_reward" target="s_rv" xsi:type="Composition"/>
+<relationship identifier="rel-42" source="c_conclude" target="s_cc" xsi:type="Composition"/>
+<relationship identifier="rel-43" source="c_conclude" target="s_hw" xsi:type="Composition"/>
+<relationship identifier="rel-44" source="s_cf" target="s_dc" xsi:type="Triggering"/>
+<relationship identifier="rel-45" source="s_dc" target="s_ps" xsi:type="Triggering"/>
+<relationship identifier="rel-46" source="s_ps" target="s_ac" xsi:type="Triggering"/>
+<relationship identifier="rel-47" source="s_ac" target="s_be" xsi:type="Triggering"/>
+<relationship identifier="rel-48" source="s_be" target="s_ap" xsi:type="Triggering"/>
+<relationship identifier="rel-49" source="s_ap" target="s_pf" xsi:type="Triggering"/>
+<relationship identifier="rel-50" source="s_pf" target="s_en" xsi:type="Triggering"/>
+<relationship identifier="rel-51" source="s_en" target="s_ee" xsi:type="Triggering"/>
+<relationship identifier="rel-52" source="s_ee" target="s_tc" xsi:type="Triggering"/>
+<relationship identifier="rel-53" source="s_tc" target="s_cn" xsi:type="Triggering"/>
+<relationship identifier="rel-54" source="s_cn" target="s_ca" xsi:type="Triggering"/>
+<relationship identifier="rel-55" source="s_ca" target="s_va" xsi:type="Triggering"/>
+<relationship identifier="rel-56" source="s_va" target="s_sg" xsi:type="Triggering"/>
+<relationship identifier="rel-57" source="s_sg" target="s_ar" xsi:type="Triggering"/>
+<relationship identifier="rel-58" source="s_ar" target="s_aw" xsi:type="Triggering"/>
+<relationship identifier="rel-59" source="s_aw" target="s_cp" xsi:type="Triggering"/>
+<relationship identifier="rel-60" source="s_cp" target="s_br" xsi:type="Triggering"/>
+<relationship identifier="rel-61" source="s_br" target="s_rs" xsi:type="Triggering"/>
+<relationship identifier="rel-62" source="s_rs" target="s_rd" xsi:type="Triggering"/>
+<relationship identifier="rel-63" source="s_rd" target="s_rv" xsi:type="Triggering"/>
+<relationship identifier="rel-64" source="s_rv" target="s_cc" xsi:type="Triggering"/>
+<relationship identifier="rel-65" source="s_cc" target="s_hw" xsi:type="Triggering"/>
+<relationship identifier="rel-66" source="s_cf" target="obj_demo" xsi:type="Access" accessType="Read"/>
+<relationship identifier="rel-67" source="s_cf" target="obj_telemetry" xsi:type="Access" accessType="Read"/>
+<relationship identifier="rel-68" source="s_dc" target="obj_clinical" xsi:type="Access" accessType="Read"/>
+<relationship identifier="rel-69" source="s_ps" target="obj_segment" xsi:type="Access" accessType="Write"/>
+<relationship identifier="rel-70" source="s_ac" target="obj_challenge" xsi:type="Access" accessType="Write"/>
+<relationship identifier="rel-71" source="s_be" target="obj_challenge" xsi:type="Access" accessType="Write"/>
+<relationship identifier="rel-72" source="s_ee" target="obj_challenge" xsi:type="Access" accessType="Read"/>
+<relationship identifier="rel-73" source="s_cn" target="obj_enrol" xsi:type="Access" accessType="Write"/>
+<relationship identifier="rel-74" source="s_va" target="obj_activity" xsi:type="Access" accessType="Write"/>
+<relationship identifier="rel-75" source="s_va" target="obj_telemetry" xsi:type="Access"/>
+<relationship identifier="rel-76" source="s_sg" target="obj_plan" xsi:type="Access" accessType="Read"/>
+<relationship identifier="rel-77" source="s_sg" target="obj_score" xsi:type="Access"/>
+<relationship identifier="rel-78" source="s_ar" target="obj_title" xsi:type="Access" accessType="Write"/>
+<relationship identifier="rel-79" source="s_cp" target="obj_wallet" xsi:type="Access" accessType="Write"/>
+<relationship identifier="rel-80" source="s_br" target="obj_catalogue" xsi:type="Access" accessType="Read"/>
+<relationship identifier="rel-81" source="s_rs" target="obj_wallet" xsi:type="Access" accessType="Read"/>
+<relationship identifier="rel-82" source="s_rd" target="obj_catalogue" xsi:type="Access" accessType="Read"/>
+<relationship identifier="rel-83" source="s_rv" target="obj_voucher" xsi:type="Access" accessType="Write"/>
+<relationship identifier="rel-84" source="r_ponb" target="c_onb" xsi:type="Assignment"/>
+<relationship identifier="rel-85" source="r_market" target="c_cat" xsi:type="Assignment"/>
+<relationship identifier="rel-86" source="r_redeem" target="c_red" xsi:type="Assignment"/>
+<relationship identifier="rel-87" source="r_fin" target="c_set" xsi:type="Assignment"/>
+<relationship identifier="rel-88" source="r_pexit" target="c_off" xsi:type="Assignment"/>
+<relationship identifier="rel-89" source="act_partner" target="p_sub" xsi:type="Assignment"/>
+<relationship identifier="rel-90" source="act_partner" target="p_push" xsi:type="Assignment"/>
+<relationship identifier="rel-91" source="act_member" target="p_brw" xsi:type="Assignment"/>
+<relationship identifier="rel-92" source="r_wallet" target="p_res" xsi:type="Assignment"/>
+<relationship identifier="rel-93" source="r_wallet" target="p_cmt" xsi:type="Assignment"/>
+<relationship identifier="rel-94" source="r_fraud" target="p_api" xsi:type="Assignment"/>
+<relationship identifier="rel-95" source="c_onb" target="bsv_onb" xsi:type="Realization"/>
+<relationship identifier="rel-96" source="bsv_onb" target="act_partner" xsi:type="Serving"/>
+<relationship identifier="rel-97" source="c_cat" target="bsv_cat" xsi:type="Realization"/>
+<relationship identifier="rel-98" source="bsv_cat" target="act_partner" xsi:type="Serving"/>
+<relationship identifier="rel-99" source="c_red" target="bsv_fulfil" xsi:type="Realization"/>
+<relationship identifier="rel-100" source="bsv_fulfil" target="act_member" xsi:type="Serving"/>
+<relationship identifier="rel-101" source="c_set" target="bsv_settle" xsi:type="Realization"/>
+<relationship identifier="rel-102" source="bsv_settle" target="act_partner" xsi:type="Serving"/>
+<relationship identifier="rel-103" source="c_off" target="bsv_off" xsi:type="Realization"/>
+<relationship identifier="rel-104" source="bsv_off" target="act_partner" xsi:type="Serving"/>
+<relationship identifier="rel-105" source="c_onb" target="p_sub" xsi:type="Composition"/>
+<relationship identifier="rel-106" source="c_onb" target="p_kyb" xsi:type="Composition"/>
+<relationship identifier="rel-107" source="c_onb" target="p_apr" xsi:type="Composition"/>
+<relationship identifier="rel-108" source="c_cat" target="p_prov" xsi:type="Composition"/>
+<relationship identifier="rel-109" source="c_cat" target="p_push" xsi:type="Composition"/>
+<relationship identifier="rel-110" source="c_cat" target="p_val" xsi:type="Composition"/>
+<relationship identifier="rel-111" source="c_cat" target="p_idx" xsi:type="Composition"/>
+<relationship identifier="rel-112" source="c_cat" target="p_rel" xsi:type="Composition"/>
+<relationship identifier="rel-113" source="c_red" target="p_brw" xsi:type="Composition"/>
+<relationship identifier="rel-114" source="c_red" target="p_res" xsi:type="Composition"/>
+<relationship identifier="rel-115" source="c_red" target="p_api" xsi:type="Composition"/>
+<relationship identifier="rel-116" source="c_red" target="p_cmt" xsi:type="Composition"/>
+<relationship identifier="rel-117" source="c_red" target="p_ntf" xsi:type="Composition"/>
+<relationship identifier="rel-118" source="c_set" target="p_agg" xsi:type="Composition"/>
+<relationship identifier="rel-119" source="c_set" target="p_rec" xsi:type="Composition"/>
+<relationship identifier="rel-120" source="c_set" target="p_inv" xsi:type="Composition"/>
+<relationship identifier="rel-121" source="c_set" target="p_pay" xsi:type="Composition"/>
+<relationship identifier="rel-122" source="c_set" target="p_hld" xsi:type="Composition"/>
+<relationship identifier="rel-123" source="c_off" target="p_dec" xsi:type="Composition"/>
+<relationship identifier="rel-124" source="c_off" target="p_wrn" xsi:type="Composition"/>
+<relationship identifier="rel-125" source="c_off" target="p_rev" xsi:type="Composition"/>
+<relationship identifier="rel-126" source="c_off" target="p_wnd" xsi:type="Composition"/>
+<relationship identifier="rel-127" source="c_off" target="p_fin" xsi:type="Composition"/>
+<relationship identifier="rel-128" source="c_off" target="p_ret" xsi:type="Composition"/>
+<relationship identifier="rel-129" source="p_sub" target="p_kyb" xsi:type="Triggering"/>
+<relationship identifier="rel-130" source="p_kyb" target="p_apr" xsi:type="Triggering"/>
+<relationship identifier="rel-131" source="p_apr" target="p_prov" xsi:type="Triggering"/>
+<relationship identifier="rel-132" source="p_prov" target="p_push" xsi:type="Triggering"/>
+<relationship identifier="rel-133" source="p_push" target="p_val" xsi:type="Triggering"/>
+<relationship identifier="rel-134" source="p_val" target="p_idx" xsi:type="Triggering"/>
+<relationship identifier="rel-135" source="p_idx" target="p_rel" xsi:type="Triggering"/>
+<relationship identifier="rel-136" source="p_rel" target="p_brw" xsi:type="Triggering"/>
+<relationship identifier="rel-137" source="p_brw" target="p_res" xsi:type="Triggering"/>
+<relationship identifier="rel-138" source="p_res" target="p_api" xsi:type="Triggering"/>
+<relationship identifier="rel-139" source="p_api" target="p_cmt" xsi:type="Triggering"/>
+<relationship identifier="rel-140" source="p_cmt" target="p_ntf" xsi:type="Triggering"/>
+<relationship identifier="rel-141" source="p_ntf" target="p_agg" xsi:type="Triggering"/>
+<relationship identifier="rel-142" source="p_agg" target="p_rec" xsi:type="Triggering"/>
+<relationship identifier="rel-143" source="p_rec" target="p_inv" xsi:type="Triggering"/>
+<relationship identifier="rel-144" source="p_inv" target="p_pay" xsi:type="Triggering"/>
+<relationship identifier="rel-145" source="p_pay" target="p_hld" xsi:type="Triggering"/>
+<relationship identifier="rel-146" source="p_hld" target="p_dec" xsi:type="Triggering"/>
+<relationship identifier="rel-147" source="p_dec" target="p_wrn" xsi:type="Triggering"/>
+<relationship identifier="rel-148" source="p_wrn" target="p_rev" xsi:type="Triggering"/>
+<relationship identifier="rel-149" source="p_rev" target="p_wnd" xsi:type="Triggering"/>
+<relationship identifier="rel-150" source="p_wnd" target="p_fin" xsi:type="Triggering"/>
+<relationship identifier="rel-151" source="p_fin" target="p_ret" xsi:type="Triggering"/>
+<relationship identifier="rel-152" source="p_kyb" target="obj_kyb" xsi:type="Access"/>
+<relationship identifier="rel-153" source="p_prov" target="obj_contract" xsi:type="Access"/>
+<relationship identifier="rel-154" source="p_push" target="obj_catalogue" xsi:type="Access"/>
+<relationship identifier="rel-155" source="p_idx" target="obj_catalogue" xsi:type="Access"/>
+<relationship identifier="rel-156" source="p_rel" target="obj_contract" xsi:type="Access"/>
+<relationship identifier="rel-157" source="p_res" target="obj_reservation" xsi:type="Access"/>
+<relationship identifier="rel-158" source="p_cmt" target="obj_redemption" xsi:type="Access"/>
+<relationship identifier="rel-159" source="p_cmt" target="obj_voucher" xsi:type="Access"/>
+<relationship identifier="rel-160" source="p_agg" target="obj_redemption" xsi:type="Access"/>
+<relationship identifier="rel-161" source="p_rec" target="obj_redemption" xsi:type="Access"/>
+<relationship identifier="rel-162" source="p_inv" target="obj_settlement" xsi:type="Access"/>
+<relationship identifier="rel-163" source="act_sahatna" target="fn_s_app" xsi:type="Assignment"/>
+<relationship identifier="rel-164" source="act_sahatna" target="fn_s_demo" xsi:type="Assignment"/>
+<relationship identifier="rel-165" source="act_sahatna" target="fn_s_tele" xsi:type="Assignment"/>
+<relationship identifier="rel-166" source="act_gplatform" target="fn_p1" xsi:type="Assignment"/>
+<relationship identifier="rel-167" source="act_gplatform" target="fn_p2" xsi:type="Assignment"/>
+<relationship identifier="rel-168" source="act_gplatform" target="fn_p3" xsi:type="Assignment"/>
+<relationship identifier="rel-169" source="act_gplatform" target="fn_p4" xsi:type="Assignment"/>
+<relationship identifier="rel-170" source="act_gplatform" target="fn_p5" xsi:type="Assignment"/>
+<relationship identifier="rel-171" source="act_gplatform" target="fn_p6" xsi:type="Assignment"/>
+<relationship identifier="rel-172" source="act_gplatform" target="fn_p7" xsi:type="Assignment"/>
+<relationship identifier="rel-173" source="act_gplatform" target="fn_p8" xsi:type="Assignment"/>
+<relationship identifier="rel-174" source="act_gplatform" target="fn_p9" xsi:type="Assignment"/>
+<relationship identifier="rel-175" source="act_gplatform" target="fn_p10" xsi:type="Assignment"/>
+<relationship identifier="rel-176" source="act_gplatform" target="fn_p11" xsi:type="Assignment"/>
+<relationship identifier="rel-177" source="act_gplatform" target="fn_p12" xsi:type="Assignment"/>
+<relationship identifier="rel-178" source="act_gplatform" target="fn_p13" xsi:type="Assignment"/>
+<relationship identifier="rel-179" source="act_malaffi" target="fn_m_clin" xsi:type="Assignment"/>
+<relationship identifier="rel-180" source="act_malaffi" target="fn_m_member" xsi:type="Assignment"/>
+<relationship identifier="rel-181" source="act_malaffi" target="fn_m_cohort" xsi:type="Assignment"/>
+<relationship identifier="rel-182" source="fn_s_app" target="bsv_app" xsi:type="Realization"/>
+<relationship identifier="rel-183" source="fn_s_demo" target="bsv_demo" xsi:type="Realization"/>
+<relationship identifier="rel-184" source="fn_s_tele" target="bsv_tele" xsi:type="Realization"/>
+<relationship identifier="rel-185" source="fn_m_member" target="bsv_member" xsi:type="Realization"/>
+<relationship identifier="rel-186" source="fn_m_cohort" target="bsv_clin" xsi:type="Realization"/>
+<relationship identifier="rel-187" source="fn_p2" target="bsv_enrol" xsi:type="Realization"/>
+<relationship identifier="rel-188" source="fn_p3" target="bsv_score" xsi:type="Realization"/>
+<relationship identifier="rel-189" source="fn_p6" target="bsv_redeem" xsi:type="Realization"/>
+<relationship identifier="rel-190" source="bsv_app" target="act_member" xsi:type="Serving"/>
+<relationship identifier="rel-191" source="bsv_enrol" target="fn_s_app" xsi:type="Serving"/>
+<relationship identifier="rel-192" source="bsv_score" target="fn_s_app" xsi:type="Serving"/>
+<relationship identifier="rel-193" source="bsv_redeem" target="fn_s_app" xsi:type="Serving"/>
+<relationship identifier="rel-194" source="bsv_demo" target="fn_p1" xsi:type="Serving"/>
+<relationship identifier="rel-195" source="bsv_tele" target="fn_p1" xsi:type="Serving"/>
+<relationship identifier="rel-196" source="bsv_clin" target="fn_p1" xsi:type="Serving"/>
+<relationship identifier="rel-197" source="bsv_tele" target="fn_p3" xsi:type="Serving"/>
+<relationship identifier="rel-198" source="bsv_tele" target="fn_p4" xsi:type="Serving"/>
+<relationship identifier="rel-199" source="bsv_member" target="fn_p9" xsi:type="Serving"/>
+<relationship identifier="rel-200" source="fn_s_demo" target="obj_demo" xsi:type="Access"/>
+<relationship identifier="rel-201" source="fn_s_tele" target="obj_telemetry" xsi:type="Access"/>
+<relationship identifier="rel-202" source="fn_m_clin" target="obj_clinical" xsi:type="Access"/>
+<relationship identifier="rel-203" source="fn_p1" target="obj_demo" xsi:type="Access"/>
+<relationship identifier="rel-204" source="fn_p1" target="obj_telemetry" xsi:type="Access"/>
+<relationship identifier="rel-205" source="fn_p1" target="s_cf" xsi:type="Composition"/>
+<relationship identifier="rel-206" source="fn_p1" target="s_dc" xsi:type="Composition"/>
+<relationship identifier="rel-207" source="fn_p1" target="s_ps" xsi:type="Composition"/>
+<relationship identifier="rel-208" source="fn_p2" target="s_ac" xsi:type="Composition"/>
+<relationship identifier="rel-209" source="fn_p2" target="s_be" xsi:type="Composition"/>
+<relationship identifier="rel-210" source="fn_p2" target="s_ap" xsi:type="Composition"/>
+<relationship identifier="rel-211" source="fn_p2" target="s_pf" xsi:type="Composition"/>
+<relationship identifier="rel-212" source="fn_p9" target="s_en" xsi:type="Composition"/>
+<relationship identifier="rel-213" source="fn_p9" target="s_ee" xsi:type="Composition"/>
+<relationship identifier="rel-214" source="fn_p9" target="s_tc" xsi:type="Composition"/>
+<relationship identifier="rel-215" source="fn_p9" target="s_cn" xsi:type="Composition"/>
+<relationship identifier="rel-216" source="fn_p4" target="s_ca" xsi:type="Composition"/>
+<relationship identifier="rel-217" source="fn_p4" target="s_va" xsi:type="Composition"/>
+<relationship identifier="rel-218" source="fn_p3" target="s_sg" xsi:type="Composition"/>
+<relationship identifier="rel-219" source="fn_p3" target="s_ar" xsi:type="Composition"/>
+<relationship identifier="rel-220" source="fn_p3" target="s_aw" xsi:type="Composition"/>
+<relationship identifier="rel-221" source="fn_p5" target="s_cp" xsi:type="Composition"/>
+<relationship identifier="rel-222" source="fn_p6" target="s_br" xsi:type="Composition"/>
+<relationship identifier="rel-223" source="fn_p6" target="s_rs" xsi:type="Composition"/>
+<relationship identifier="rel-224" source="fn_p6" target="s_rd" xsi:type="Composition"/>
+<relationship identifier="rel-225" source="fn_p6" target="s_rv" xsi:type="Composition"/>
+<relationship identifier="rel-226" source="fn_concl" target="s_cc" xsi:type="Composition"/>
+<relationship identifier="rel-227" source="fn_concl" target="s_hw" xsi:type="Composition"/>
+<relationship identifier="rel-228" source="e_start" target="s_cf" xsi:type="Triggering"/>
+<relationship identifier="rel-229" source="s_ps" target="e_seg" xsi:type="Triggering"/>
+<relationship identifier="rel-230" source="e_seg" target="s_ac" xsi:type="Triggering"/>
+<relationship identifier="rel-231" source="s_pf" target="e_chal" xsi:type="Triggering"/>
+<relationship identifier="rel-232" source="e_chal" target="s_en" xsi:type="Triggering"/>
+<relationship identifier="rel-233" source="s_ee" target="e_inelig" xsi:type="Triggering"/>
+<relationship identifier="rel-234" source="s_va" target="e_verified" xsi:type="Triggering"/>
+<relationship identifier="rel-235" source="e_verified" target="s_sg" xsi:type="Triggering"/>
+<relationship identifier="rel-236" source="e_week" target="s_aw" xsi:type="Triggering"/>
+<relationship identifier="rel-237" source="s_cp" target="e_points" xsi:type="Triggering"/>
+<relationship identifier="rel-238" source="e_points" target="s_br" xsi:type="Triggering"/>
+<relationship identifier="rel-239" source="s_rv" target="e_voucher" xsi:type="Triggering"/>
+<relationship identifier="rel-240" source="e_pend" target="s_cc" xsi:type="Triggering"/>
+<relationship identifier="rel-241" source="s_hw" target="e_concl" xsi:type="Triggering"/>
+<relationship identifier="rel-242" source="r_analytics" target="s_cf" xsi:type="Assignment"/>
+<relationship identifier="rel-243" source="r_analytics" target="s_dc" xsi:type="Assignment"/>
+<relationship identifier="rel-244" source="r_analytics" target="s_ps" xsi:type="Assignment"/>
+<relationship identifier="rel-245" source="r_admin" target="s_ac" xsi:type="Assignment"/>
+<relationship identifier="rel-246" source="r_admin" target="s_be" xsi:type="Assignment"/>
+<relationship identifier="rel-247" source="r_admin" target="s_pf" xsi:type="Assignment"/>
+<relationship identifier="rel-248" source="r_admin" target="s_cc" xsi:type="Assignment"/>
+<relationship identifier="rel-249" source="act_member" target="s_en" xsi:type="Assignment"/>
+<relationship identifier="rel-250" source="act_member" target="s_tc" xsi:type="Assignment"/>
+<relationship identifier="rel-251" source="act_member" target="s_ca" xsi:type="Assignment"/>
+<relationship identifier="rel-252" source="act_member" target="s_br" xsi:type="Assignment"/>
+<relationship identifier="rel-253" source="fn_p9" target="bsv_enrol" xsi:type="Realization"/>
+<relationship identifier="rel-254" source="r_doh" target="s_hw" xsi:type="Assignment"/>
+<relationship identifier="rel-255" source="s_cf" target="obj_features" xsi:type="Access" accessType="Write"/>
+<relationship identifier="rel-256" source="s_dc" target="obj_features" xsi:type="Access" accessType="Read"/>
+<relationship identifier="rel-257" source="s_dc" target="obj_cohort" xsi:type="Access" accessType="Write"/>
+<relationship identifier="rel-258" source="s_ps" target="obj_cohort" xsi:type="Access" accessType="Read"/>
+<relationship identifier="rel-259" source="s_be" target="obj_segment" xsi:type="Access" accessType="Read"/>
+<relationship identifier="rel-260" source="s_pf" target="obj_challenge" xsi:type="Access" accessType="Read"/>
+<relationship identifier="rel-261" source="s_ee" target="obj_segment" xsi:type="Access" accessType="Read"/>
+<relationship identifier="rel-262" source="s_ca" target="obj_telemetry" xsi:type="Access" accessType="Read"/>
+<relationship identifier="rel-263" source="s_ca" target="obj_activity" xsi:type="Access" accessType="Write"/>
+<relationship identifier="rel-264" source="s_sg" target="obj_activity" xsi:type="Access" accessType="Read"/>
+<relationship identifier="rel-265" source="s_sg" target="obj_dailyscore" xsi:type="Access" accessType="Write"/>
+<relationship identifier="rel-266" source="s_ar" target="obj_dailyscore" xsi:type="Access" accessType="Read"/>
+<relationship identifier="rel-267" source="s_aw" target="obj_dailyscore" xsi:type="Access" accessType="Read"/>
+<relationship identifier="rel-268" source="s_aw" target="obj_score" xsi:type="Access" accessType="Write"/>
+<relationship identifier="rel-269" source="s_cp" target="obj_score" xsi:type="Access" accessType="Read"/>
+<relationship identifier="rel-270" source="s_rs" target="obj_reservation" xsi:type="Access" accessType="Write"/>
+<relationship identifier="rel-271" source="s_rd" target="obj_reservation" xsi:type="Access" accessType="Read"/>
+<relationship identifier="rel-272" source="s_rd" target="obj_redemption" xsi:type="Access" accessType="Write"/>
+<relationship identifier="rel-273" source="s_cc" target="obj_score" xsi:type="Access" accessType="Read"/>
+<relationship identifier="rel-274" source="s_cc" target="obj_standings" xsi:type="Access" accessType="Write"/>
+<relationship identifier="rel-275" source="s_hw" target="obj_standings" xsi:type="Access" accessType="Read"/>
+</relationships>
+<views><diagrams>
+<view identifier="view-data-cooperation" xsi:type="Diagram"><name xml:lang="en">Cross-Organisation Cooperation — Sahatna · Platform · Malaffi</name>
+<node identifier="n-view-data-cooperation-act_member" elementRef="act_member" xsi:type="Element" x="30" y="116" w="190" h="64"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-act_sahatna" elementRef="act_sahatna" xsi:type="Element" x="270" y="70" w="400" h="576">
+<style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="11"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-data-cooperation-fn_s_app" elementRef="fn_s_app" xsi:type="Element" x="320" y="116" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-fn_s_demo" elementRef="fn_s_demo" xsi:type="Element" x="320" y="200" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-fn_s_tele" elementRef="fn_s_tele" xsi:type="Element" x="320" y="284" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-bsv_app" elementRef="bsv_app" xsi:type="Element" x="320" y="368" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-bsv_demo" elementRef="bsv_demo" xsi:type="Element" x="320" y="452" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-bsv_tele" elementRef="bsv_tele" xsi:type="Element" x="320" y="536" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="n-view-data-cooperation-act_gplatform" elementRef="act_gplatform" xsi:type="Element" x="840" y="70" w="400" h="1416">
+<style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="11"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-data-cooperation-bsv_enrol" elementRef="bsv_enrol" xsi:type="Element" x="890" y="116" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-bsv_score" elementRef="bsv_score" xsi:type="Element" x="890" y="200" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-bsv_redeem" elementRef="bsv_redeem" xsi:type="Element" x="890" y="284" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-fn_p1" elementRef="fn_p1" xsi:type="Element" x="890" y="368" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-fn_p2" elementRef="fn_p2" xsi:type="Element" x="890" y="452" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-fn_p3" elementRef="fn_p3" xsi:type="Element" x="890" y="536" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-fn_p4" elementRef="fn_p4" xsi:type="Element" x="890" y="620" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-fn_p5" elementRef="fn_p5" xsi:type="Element" x="890" y="704" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-fn_p6" elementRef="fn_p6" xsi:type="Element" x="890" y="788" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-fn_p7" elementRef="fn_p7" xsi:type="Element" x="890" y="872" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-fn_p8" elementRef="fn_p8" xsi:type="Element" x="890" y="956" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-fn_p9" elementRef="fn_p9" xsi:type="Element" x="890" y="1040" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-fn_p10" elementRef="fn_p10" xsi:type="Element" x="890" y="1124" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-fn_p11" elementRef="fn_p11" xsi:type="Element" x="890" y="1208" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-fn_p12" elementRef="fn_p12" xsi:type="Element" x="890" y="1292" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-fn_p13" elementRef="fn_p13" xsi:type="Element" x="890" y="1376" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="n-view-data-cooperation-act_malaffi" elementRef="act_malaffi" xsi:type="Element" x="1410" y="70" w="400" h="492">
+<style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="11"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-data-cooperation-fn_m_clin" elementRef="fn_m_clin" xsi:type="Element" x="1460" y="116" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-fn_m_member" elementRef="fn_m_member" xsi:type="Element" x="1460" y="200" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-fn_m_cohort" elementRef="fn_m_cohort" xsi:type="Element" x="1460" y="284" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-bsv_member" elementRef="bsv_member" xsi:type="Element" x="1460" y="368" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-bsv_clin" elementRef="bsv_clin" xsi:type="Element" x="1460" y="452" w="300" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="n-view-data-cooperation-objlane" xsi:type="Container" x="20" y="1530" w="1800" h="184">
+<label xml:lang="en">Data (passive structure) — owned by its source organisation</label>
+<style><fillColor r="250" g="250" b="250" a="0"/><lineColor r="175" g="175" b="175"/><font name="Sans" size="9"><color r="95" g="95" b="95"/></font></style>
+<node identifier="n-view-data-cooperation-obj_demo" elementRef="obj_demo" xsi:type="Element" x="290" y="1556" w="210" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-obj_telemetry" elementRef="obj_telemetry" xsi:type="Element" x="290" y="1624" w="210" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-data-cooperation-obj_clinical" elementRef="obj_clinical" xsi:type="Element" x="1430" y="1556" w="210" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<connection identifier="c-view-data-cooperation-rel-163-act_sahatna-fn_s_app" relationshipRef="rel-163" source="n-view-data-cooperation-act_sahatna" target="n-view-data-cooperation-fn_s_app" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-164-act_sahatna-fn_s_demo" relationshipRef="rel-164" source="n-view-data-cooperation-act_sahatna" target="n-view-data-cooperation-fn_s_demo" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-165-act_sahatna-fn_s_tele" relationshipRef="rel-165" source="n-view-data-cooperation-act_sahatna" target="n-view-data-cooperation-fn_s_tele" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-166-act_gplatform-fn_p1" relationshipRef="rel-166" source="n-view-data-cooperation-act_gplatform" target="n-view-data-cooperation-fn_p1" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-167-act_gplatform-fn_p2" relationshipRef="rel-167" source="n-view-data-cooperation-act_gplatform" target="n-view-data-cooperation-fn_p2" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-168-act_gplatform-fn_p3" relationshipRef="rel-168" source="n-view-data-cooperation-act_gplatform" target="n-view-data-cooperation-fn_p3" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-169-act_gplatform-fn_p4" relationshipRef="rel-169" source="n-view-data-cooperation-act_gplatform" target="n-view-data-cooperation-fn_p4" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-170-act_gplatform-fn_p5" relationshipRef="rel-170" source="n-view-data-cooperation-act_gplatform" target="n-view-data-cooperation-fn_p5" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-171-act_gplatform-fn_p6" relationshipRef="rel-171" source="n-view-data-cooperation-act_gplatform" target="n-view-data-cooperation-fn_p6" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-172-act_gplatform-fn_p7" relationshipRef="rel-172" source="n-view-data-cooperation-act_gplatform" target="n-view-data-cooperation-fn_p7" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-173-act_gplatform-fn_p8" relationshipRef="rel-173" source="n-view-data-cooperation-act_gplatform" target="n-view-data-cooperation-fn_p8" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-174-act_gplatform-fn_p9" relationshipRef="rel-174" source="n-view-data-cooperation-act_gplatform" target="n-view-data-cooperation-fn_p9" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-175-act_gplatform-fn_p10" relationshipRef="rel-175" source="n-view-data-cooperation-act_gplatform" target="n-view-data-cooperation-fn_p10" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-176-act_gplatform-fn_p11" relationshipRef="rel-176" source="n-view-data-cooperation-act_gplatform" target="n-view-data-cooperation-fn_p11" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-177-act_gplatform-fn_p12" relationshipRef="rel-177" source="n-view-data-cooperation-act_gplatform" target="n-view-data-cooperation-fn_p12" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-178-act_gplatform-fn_p13" relationshipRef="rel-178" source="n-view-data-cooperation-act_gplatform" target="n-view-data-cooperation-fn_p13" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-179-act_malaffi-fn_m_clin" relationshipRef="rel-179" source="n-view-data-cooperation-act_malaffi" target="n-view-data-cooperation-fn_m_clin" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-180-act_malaffi-fn_m_member" relationshipRef="rel-180" source="n-view-data-cooperation-act_malaffi" target="n-view-data-cooperation-fn_m_member" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-181-act_malaffi-fn_m_cohort" relationshipRef="rel-181" source="n-view-data-cooperation-act_malaffi" target="n-view-data-cooperation-fn_m_cohort" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-182-fn_s_app-bsv_app" relationshipRef="rel-182" source="n-view-data-cooperation-fn_s_app" target="n-view-data-cooperation-bsv_app" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-183-fn_s_demo-bsv_demo" relationshipRef="rel-183" source="n-view-data-cooperation-fn_s_demo" target="n-view-data-cooperation-bsv_demo" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-184-fn_s_tele-bsv_tele" relationshipRef="rel-184" source="n-view-data-cooperation-fn_s_tele" target="n-view-data-cooperation-bsv_tele" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-185-fn_m_member-bsv_member" relationshipRef="rel-185" source="n-view-data-cooperation-fn_m_member" target="n-view-data-cooperation-bsv_member" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-186-fn_m_cohort-bsv_clin" relationshipRef="rel-186" source="n-view-data-cooperation-fn_m_cohort" target="n-view-data-cooperation-bsv_clin" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-187-fn_p2-bsv_enrol" relationshipRef="rel-187" source="n-view-data-cooperation-fn_p2" target="n-view-data-cooperation-bsv_enrol" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-188-fn_p3-bsv_score" relationshipRef="rel-188" source="n-view-data-cooperation-fn_p3" target="n-view-data-cooperation-bsv_score" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-189-fn_p6-bsv_redeem" relationshipRef="rel-189" source="n-view-data-cooperation-fn_p6" target="n-view-data-cooperation-bsv_redeem" xsi:type="Relationship"/>
+<connection identifier="c-view-data-cooperation-rel-190-bsv_app-act_member" relationshipRef="rel-190" source="n-view-data-cooperation-bsv_app" target="n-view-data-cooperation-act_member" xsi:type="Relationship"><bendpoint x="470" y="270"/><bendpoint x="125" y="270"/></connection>
+<connection identifier="c-view-data-cooperation-rel-191-bsv_enrol-fn_s_app" relationshipRef="rel-191" source="n-view-data-cooperation-bsv_enrol" target="n-view-data-cooperation-fn_s_app" xsi:type="Relationship"><bendpoint x="1040" y="144"/><bendpoint x="470" y="144"/></connection>
+<connection identifier="c-view-data-cooperation-rel-192-bsv_score-fn_s_app" relationshipRef="rel-192" source="n-view-data-cooperation-bsv_score" target="n-view-data-cooperation-fn_s_app" xsi:type="Relationship"><bendpoint x="1040" y="186"/><bendpoint x="470" y="186"/></connection>
+<connection identifier="c-view-data-cooperation-rel-193-bsv_redeem-fn_s_app" relationshipRef="rel-193" source="n-view-data-cooperation-bsv_redeem" target="n-view-data-cooperation-fn_s_app" xsi:type="Relationship"><bendpoint x="1040" y="228"/><bendpoint x="470" y="228"/></connection>
+<connection identifier="c-view-data-cooperation-rel-194-bsv_demo-fn_p1" relationshipRef="rel-194" source="n-view-data-cooperation-bsv_demo" target="n-view-data-cooperation-fn_p1" xsi:type="Relationship"><bendpoint x="470" y="438"/><bendpoint x="1040" y="438"/></connection>
+<connection identifier="c-view-data-cooperation-rel-195-bsv_tele-fn_p1" relationshipRef="rel-195" source="n-view-data-cooperation-bsv_tele" target="n-view-data-cooperation-fn_p1" xsi:type="Relationship"><bendpoint x="470" y="480"/><bendpoint x="1040" y="480"/></connection>
+<connection identifier="c-view-data-cooperation-rel-196-bsv_clin-fn_p1" relationshipRef="rel-196" source="n-view-data-cooperation-bsv_clin" target="n-view-data-cooperation-fn_p1" xsi:type="Relationship"><bendpoint x="1610" y="438"/><bendpoint x="1040" y="438"/></connection>
+<connection identifier="c-view-data-cooperation-rel-197-bsv_tele-fn_p3" relationshipRef="rel-197" source="n-view-data-cooperation-bsv_tele" target="n-view-data-cooperation-fn_p3" xsi:type="Relationship"><bendpoint x="470" y="564"/><bendpoint x="1040" y="564"/></connection>
+<connection identifier="c-view-data-cooperation-rel-198-bsv_tele-fn_p4" relationshipRef="rel-198" source="n-view-data-cooperation-bsv_tele" target="n-view-data-cooperation-fn_p4" xsi:type="Relationship"><bendpoint x="470" y="606"/><bendpoint x="1040" y="606"/></connection>
+<connection identifier="c-view-data-cooperation-rel-199-bsv_member-fn_p9" relationshipRef="rel-199" source="n-view-data-cooperation-bsv_member" target="n-view-data-cooperation-fn_p9" xsi:type="Relationship"><bendpoint x="1610" y="732"/><bendpoint x="1040" y="732"/></connection>
+<connection identifier="c-view-data-cooperation-rel-200-fn_s_demo-obj_demo" relationshipRef="rel-200" source="n-view-data-cooperation-fn_s_demo" target="n-view-data-cooperation-obj_demo" xsi:type="Relationship"><bendpoint x="470" y="906"/><bendpoint x="395" y="906"/></connection>
+<connection identifier="c-view-data-cooperation-rel-201-fn_s_tele-obj_telemetry" relationshipRef="rel-201" source="n-view-data-cooperation-fn_s_tele" target="n-view-data-cooperation-obj_telemetry" xsi:type="Relationship"><bendpoint x="470" y="982"/><bendpoint x="395" y="982"/></connection>
+<connection identifier="c-view-data-cooperation-rel-202-fn_m_clin-obj_clinical" relationshipRef="rel-202" source="n-view-data-cooperation-fn_m_clin" target="n-view-data-cooperation-obj_clinical" xsi:type="Relationship"><bendpoint x="1610" y="864"/><bendpoint x="1535" y="864"/></connection>
+<connection identifier="c-view-data-cooperation-rel-203-fn_p1-obj_demo" relationshipRef="rel-203" source="n-view-data-cooperation-fn_p1" target="n-view-data-cooperation-obj_demo" xsi:type="Relationship"><bendpoint x="1040" y="990"/><bendpoint x="395" y="990"/></connection>
+<connection identifier="c-view-data-cooperation-rel-204-fn_p1-obj_telemetry" relationshipRef="rel-204" source="n-view-data-cooperation-fn_p1" target="n-view-data-cooperation-obj_telemetry" xsi:type="Relationship"><bendpoint x="1040" y="1024"/><bendpoint x="395" y="1024"/></connection>
+</view>
+<view identifier="view-platform-detail" xsi:type="Diagram"><name xml:lang="en">Platform — Detailed Business Flow</name>
+<node identifier="g-view-platform-detail-act" xsi:type="Container" x="40" y="12" w="7500" h="94">
+<label xml:lang="en">Business Roles / Actors (active structure)</label>
+<style><fillColor r="250" g="250" b="250" a="0"/><lineColor r="185" g="185" b="185"/><font name="Sans" size="10"><color r="95" g="95" b="95"/></font></style>
+<node identifier="n-view-platform-detail-r_analytics" elementRef="r_analytics" xsi:type="Element" x="325" y="30" w="200" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-r_admin" elementRef="r_admin" xsi:type="Element" x="1405" y="30" w="200" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-r_cms" elementRef="r_cms" xsi:type="Element" x="1639" y="30" w="200" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-act_member" elementRef="act_member" xsi:type="Element" x="2605" y="30" w="200" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-r_verify" elementRef="r_verify" xsi:type="Element" x="3565" y="30" w="200" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-r_doh" elementRef="r_doh" xsi:type="Element" x="6925" y="30" w="200" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="g-view-platform-detail-svc" xsi:type="Container" x="40" y="232" w="7500" h="88">
+<label xml:lang="en">Business Services (external behaviour)</label>
+<style><fillColor r="250" g="250" b="250" a="0"/><lineColor r="185" g="185" b="185"/><font name="Sans" size="10"><color r="95" g="95" b="95"/></font></style>
+<node identifier="n-view-platform-detail-bsv_enrol" elementRef="bsv_enrol" xsi:type="Element" x="2605" y="250" w="200" h="52"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-bsv_score" elementRef="bsv_score" xsi:type="Element" x="4405" y="250" w="200" h="52"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-bsv_redeem" elementRef="bsv_redeem" xsi:type="Element" x="5965" y="250" w="200" h="52"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="n-view-platform-detail-fn_p1" elementRef="fn_p1" xsi:type="Element" x="70" y="520" w="710" h="156">
+<style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-platform-detail-s_cf" elementRef="s_cf" xsi:type="Element" x="110" y="586" w="150" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-s_dc" elementRef="s_dc" xsi:type="Element" x="350" y="586" w="150" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-s_ps" elementRef="s_ps" xsi:type="Element" x="590" y="586" w="150" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="n-view-platform-detail-fn_p2" elementRef="fn_p2" xsi:type="Element" x="1030" y="520" w="950" h="156">
+<style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-platform-detail-s_ac" elementRef="s_ac" xsi:type="Element" x="1070" y="586" w="150" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-s_be" elementRef="s_be" xsi:type="Element" x="1310" y="586" w="150" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-s_ap" elementRef="s_ap" xsi:type="Element" x="1550" y="586" w="150" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-s_pf" elementRef="s_pf" xsi:type="Element" x="1790" y="586" w="150" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="n-view-platform-detail-fn_p9" elementRef="fn_p9" xsi:type="Element" x="2230" y="520" w="950" h="156">
+<style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-platform-detail-s_en" elementRef="s_en" xsi:type="Element" x="2270" y="586" w="150" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-s_ee" elementRef="s_ee" xsi:type="Element" x="2510" y="586" w="150" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-s_tc" elementRef="s_tc" xsi:type="Element" x="2750" y="586" w="150" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-s_cn" elementRef="s_cn" xsi:type="Element" x="2990" y="586" w="150" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="n-view-platform-detail-fn_p4" elementRef="fn_p4" xsi:type="Element" x="3430" y="520" w="470" h="156">
+<style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-platform-detail-s_ca" elementRef="s_ca" xsi:type="Element" x="3470" y="586" w="150" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-s_va" elementRef="s_va" xsi:type="Element" x="3710" y="586" w="150" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="n-view-platform-detail-fn_p3" elementRef="fn_p3" xsi:type="Element" x="4150" y="520" w="710" h="156">
+<style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-platform-detail-s_sg" elementRef="s_sg" xsi:type="Element" x="4190" y="586" w="150" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-s_ar" elementRef="s_ar" xsi:type="Element" x="4430" y="586" w="150" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-s_aw" elementRef="s_aw" xsi:type="Element" x="4670" y="586" w="150" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="n-view-platform-detail-fn_p5" elementRef="fn_p5" xsi:type="Element" x="5110" y="520" w="230" h="156">
+<style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-platform-detail-s_cp" elementRef="s_cp" xsi:type="Element" x="5150" y="586" w="150" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="n-view-platform-detail-fn_p6" elementRef="fn_p6" xsi:type="Element" x="5590" y="520" w="950" h="156">
+<style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-platform-detail-s_br" elementRef="s_br" xsi:type="Element" x="5630" y="586" w="150" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-s_rs" elementRef="s_rs" xsi:type="Element" x="5870" y="586" w="150" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-s_rd" elementRef="s_rd" xsi:type="Element" x="6110" y="586" w="150" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-s_rv" elementRef="s_rv" xsi:type="Element" x="6350" y="586" w="150" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="n-view-platform-detail-fn_concl" elementRef="fn_concl" xsi:type="Element" x="6790" y="520" w="470" h="156">
+<style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-platform-detail-s_cc" elementRef="s_cc" xsi:type="Element" x="6830" y="586" w="150" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-s_hw" elementRef="s_hw" xsi:type="Element" x="7070" y="586" w="150" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="n-view-platform-detail-e_start" elementRef="e_start" xsi:type="Element" x="-142" y="590" w="158" h="48"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-e_seg" elementRef="e_seg" xsi:type="Element" x="826" y="590" w="158" h="48"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-e_chal" elementRef="e_chal" xsi:type="Element" x="2026" y="590" w="158" h="48"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-e_inelig" elementRef="e_inelig" xsi:type="Element" x="2506" y="710" w="158" h="48"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-e_verified" elementRef="e_verified" xsi:type="Element" x="3946" y="590" w="158" h="48"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-e_week" elementRef="e_week" xsi:type="Element" x="4666" y="438" w="158" h="48"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-e_points" elementRef="e_points" xsi:type="Element" x="5386" y="590" w="158" h="48"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-e_voucher" elementRef="e_voucher" xsi:type="Element" x="6586" y="540" w="158" h="48"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-e_pend" elementRef="e_pend" xsi:type="Element" x="6586" y="644" w="158" h="48"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-e_concl" elementRef="e_concl" xsi:type="Element" x="7314" y="590" w="158" h="48"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="g-view-platform-detail-data" xsi:type="Container" x="40" y="938" w="7500" h="92">
+<label xml:lang="en">Input / Output Data (passive structure — Read=input, Write=output)</label>
+<style><fillColor r="250" g="250" b="250" a="0"/><lineColor r="185" g="185" b="185"/><font name="Sans" size="10"><color r="95" g="95" b="95"/></font></style>
+<node identifier="n-view-platform-detail-obj_demo" elementRef="obj_demo" xsi:type="Element" x="70" y="956" w="164" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-obj_telemetry" elementRef="obj_telemetry" xsi:type="Element" x="268" y="956" w="164" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-obj_clinical" elementRef="obj_clinical" xsi:type="Element" x="466" y="956" w="164" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-obj_features" elementRef="obj_features" xsi:type="Element" x="664" y="956" w="164" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-obj_cohort" elementRef="obj_cohort" xsi:type="Element" x="862" y="956" w="164" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-obj_segment" elementRef="obj_segment" xsi:type="Element" x="1060" y="956" w="164" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-obj_challenge" elementRef="obj_challenge" xsi:type="Element" x="1258" y="956" w="164" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-obj_enrol" elementRef="obj_enrol" xsi:type="Element" x="1456" y="956" w="164" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-obj_activity" elementRef="obj_activity" xsi:type="Element" x="1654" y="956" w="164" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-obj_plan" elementRef="obj_plan" xsi:type="Element" x="1852" y="956" w="164" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-obj_dailyscore" elementRef="obj_dailyscore" xsi:type="Element" x="2050" y="956" w="164" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-obj_title" elementRef="obj_title" xsi:type="Element" x="2248" y="956" w="164" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-obj_score" elementRef="obj_score" xsi:type="Element" x="2446" y="956" w="164" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-obj_wallet" elementRef="obj_wallet" xsi:type="Element" x="2644" y="956" w="164" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-obj_catalogue" elementRef="obj_catalogue" xsi:type="Element" x="2842" y="956" w="164" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-obj_reservation" elementRef="obj_reservation" xsi:type="Element" x="3040" y="956" w="164" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-obj_redemption" elementRef="obj_redemption" xsi:type="Element" x="3238" y="956" w="164" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-obj_voucher" elementRef="obj_voucher" xsi:type="Element" x="3436" y="956" w="164" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-platform-detail-obj_standings" elementRef="obj_standings" xsi:type="Element" x="3634" y="956" w="164" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<connection identifier="c-view-platform-detail-rel-44-s_cf-s_dc" relationshipRef="rel-44" source="n-view-platform-detail-s_cf" target="n-view-platform-detail-s_dc" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-45-s_dc-s_ps" relationshipRef="rel-45" source="n-view-platform-detail-s_dc" target="n-view-platform-detail-s_ps" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-47-s_ac-s_be" relationshipRef="rel-47" source="n-view-platform-detail-s_ac" target="n-view-platform-detail-s_be" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-48-s_be-s_ap" relationshipRef="rel-48" source="n-view-platform-detail-s_be" target="n-view-platform-detail-s_ap" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-49-s_ap-s_pf" relationshipRef="rel-49" source="n-view-platform-detail-s_ap" target="n-view-platform-detail-s_pf" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-51-s_en-s_ee" relationshipRef="rel-51" source="n-view-platform-detail-s_en" target="n-view-platform-detail-s_ee" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-52-s_ee-s_tc" relationshipRef="rel-52" source="n-view-platform-detail-s_ee" target="n-view-platform-detail-s_tc" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-53-s_tc-s_cn" relationshipRef="rel-53" source="n-view-platform-detail-s_tc" target="n-view-platform-detail-s_cn" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-54-s_cn-s_ca" relationshipRef="rel-54" source="n-view-platform-detail-s_cn" target="n-view-platform-detail-s_ca" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-55-s_ca-s_va" relationshipRef="rel-55" source="n-view-platform-detail-s_ca" target="n-view-platform-detail-s_va" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-57-s_sg-s_ar" relationshipRef="rel-57" source="n-view-platform-detail-s_sg" target="n-view-platform-detail-s_ar" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-58-s_ar-s_aw" relationshipRef="rel-58" source="n-view-platform-detail-s_ar" target="n-view-platform-detail-s_aw" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-59-s_aw-s_cp" relationshipRef="rel-59" source="n-view-platform-detail-s_aw" target="n-view-platform-detail-s_cp" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-61-s_br-s_rs" relationshipRef="rel-61" source="n-view-platform-detail-s_br" target="n-view-platform-detail-s_rs" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-62-s_rs-s_rd" relationshipRef="rel-62" source="n-view-platform-detail-s_rs" target="n-view-platform-detail-s_rd" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-63-s_rd-s_rv" relationshipRef="rel-63" source="n-view-platform-detail-s_rd" target="n-view-platform-detail-s_rv" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-65-s_cc-s_hw" relationshipRef="rel-65" source="n-view-platform-detail-s_cc" target="n-view-platform-detail-s_hw" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-228-e_start-s_cf" relationshipRef="rel-228" source="n-view-platform-detail-e_start" target="n-view-platform-detail-s_cf" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-229-s_ps-e_seg" relationshipRef="rel-229" source="n-view-platform-detail-s_ps" target="n-view-platform-detail-e_seg" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-230-e_seg-s_ac" relationshipRef="rel-230" source="n-view-platform-detail-e_seg" target="n-view-platform-detail-s_ac" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-231-s_pf-e_chal" relationshipRef="rel-231" source="n-view-platform-detail-s_pf" target="n-view-platform-detail-e_chal" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-232-e_chal-s_en" relationshipRef="rel-232" source="n-view-platform-detail-e_chal" target="n-view-platform-detail-s_en" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-233-s_ee-e_inelig" relationshipRef="rel-233" source="n-view-platform-detail-s_ee" target="n-view-platform-detail-e_inelig" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-234-s_va-e_verified" relationshipRef="rel-234" source="n-view-platform-detail-s_va" target="n-view-platform-detail-e_verified" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-235-e_verified-s_sg" relationshipRef="rel-235" source="n-view-platform-detail-e_verified" target="n-view-platform-detail-s_sg" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-236-e_week-s_aw" relationshipRef="rel-236" source="n-view-platform-detail-e_week" target="n-view-platform-detail-s_aw" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-237-s_cp-e_points" relationshipRef="rel-237" source="n-view-platform-detail-s_cp" target="n-view-platform-detail-e_points" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-238-e_points-s_br" relationshipRef="rel-238" source="n-view-platform-detail-e_points" target="n-view-platform-detail-s_br" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-239-s_rv-e_voucher" relationshipRef="rel-239" source="n-view-platform-detail-s_rv" target="n-view-platform-detail-e_voucher" xsi:type="Relationship"><bendpoint x="6425" y="589"/><bendpoint x="6665" y="589"/></connection>
+<connection identifier="c-view-platform-detail-rel-240-e_pend-s_cc" relationshipRef="rel-240" source="n-view-platform-detail-e_pend" target="n-view-platform-detail-s_cc" xsi:type="Relationship"><bendpoint x="6665" y="641"/><bendpoint x="6905" y="641"/></connection>
+<connection identifier="c-view-platform-detail-rel-241-s_hw-e_concl" relationshipRef="rel-241" source="n-view-platform-detail-s_hw" target="n-view-platform-detail-e_concl" xsi:type="Relationship"/>
+<connection identifier="c-view-platform-detail-rel-242-r_analytics-s_cf" relationshipRef="rel-242" source="n-view-platform-detail-r_analytics" target="n-view-platform-detail-s_cf" xsi:type="Relationship"><bendpoint x="425" y="328"/><bendpoint x="185" y="328"/></connection>
+<connection identifier="c-view-platform-detail-rel-243-r_analytics-s_dc" relationshipRef="rel-243" source="n-view-platform-detail-r_analytics" target="n-view-platform-detail-s_dc" xsi:type="Relationship"><bendpoint x="425" y="338"/><bendpoint x="425" y="338"/></connection>
+<connection identifier="c-view-platform-detail-rel-244-r_analytics-s_ps" relationshipRef="rel-244" source="n-view-platform-detail-r_analytics" target="n-view-platform-detail-s_ps" xsi:type="Relationship"><bendpoint x="425" y="349"/><bendpoint x="665" y="349"/></connection>
+<connection identifier="c-view-platform-detail-rel-245-r_admin-s_ac" relationshipRef="rel-245" source="n-view-platform-detail-r_admin" target="n-view-platform-detail-s_ac" xsi:type="Relationship"><bendpoint x="1505" y="359"/><bendpoint x="1145" y="359"/></connection>
+<connection identifier="c-view-platform-detail-rel-246-r_admin-s_be" relationshipRef="rel-246" source="n-view-platform-detail-r_admin" target="n-view-platform-detail-s_be" xsi:type="Relationship"><bendpoint x="1505" y="369"/><bendpoint x="1385" y="369"/></connection>
+<connection identifier="c-view-platform-detail-rel-247-r_admin-s_pf" relationshipRef="rel-247" source="n-view-platform-detail-r_admin" target="n-view-platform-detail-s_pf" xsi:type="Relationship"><bendpoint x="1505" y="380"/><bendpoint x="1865" y="380"/></connection>
+<connection identifier="c-view-platform-detail-rel-248-r_admin-s_cc" relationshipRef="rel-248" source="n-view-platform-detail-r_admin" target="n-view-platform-detail-s_cc" xsi:type="Relationship"><bendpoint x="1505" y="390"/><bendpoint x="6905" y="390"/></connection>
+<connection identifier="c-view-platform-detail-rel-7-r_cms-s_ap" relationshipRef="rel-7" source="n-view-platform-detail-r_cms" target="n-view-platform-detail-s_ap" xsi:type="Relationship"><bendpoint x="1739" y="400"/><bendpoint x="1625" y="400"/></connection>
+<connection identifier="c-view-platform-detail-rel-249-act_member-s_en" relationshipRef="rel-249" source="n-view-platform-detail-act_member" target="n-view-platform-detail-s_en" xsi:type="Relationship"><bendpoint x="2705" y="411"/><bendpoint x="2345" y="411"/></connection>
+<connection identifier="c-view-platform-detail-rel-250-act_member-s_tc" relationshipRef="rel-250" source="n-view-platform-detail-act_member" target="n-view-platform-detail-s_tc" xsi:type="Relationship"><bendpoint x="2705" y="421"/><bendpoint x="2825" y="421"/></connection>
+<connection identifier="c-view-platform-detail-rel-251-act_member-s_ca" relationshipRef="rel-251" source="n-view-platform-detail-act_member" target="n-view-platform-detail-s_ca" xsi:type="Relationship"><bendpoint x="2705" y="431"/><bendpoint x="3545" y="431"/></connection>
+<connection identifier="c-view-platform-detail-rel-252-act_member-s_br" relationshipRef="rel-252" source="n-view-platform-detail-act_member" target="n-view-platform-detail-s_br" xsi:type="Relationship"><bendpoint x="2705" y="442"/><bendpoint x="5705" y="442"/></connection>
+<connection identifier="c-view-platform-detail-rel-253-fn_p9-bsv_enrol" relationshipRef="rel-253" source="n-view-platform-detail-fn_p9" target="n-view-platform-detail-bsv_enrol" xsi:type="Relationship"><bendpoint x="2705" y="452"/><bendpoint x="2705" y="452"/></connection>
+<connection identifier="c-view-platform-detail-rel-8-r_verify-s_va" relationshipRef="rel-8" source="n-view-platform-detail-r_verify" target="n-view-platform-detail-s_va" xsi:type="Relationship"><bendpoint x="3665" y="462"/><bendpoint x="3785" y="462"/></connection>
+<connection identifier="c-view-platform-detail-rel-188-fn_p3-bsv_score" relationshipRef="rel-188" source="n-view-platform-detail-fn_p3" target="n-view-platform-detail-bsv_score" xsi:type="Relationship"><bendpoint x="4505" y="473"/><bendpoint x="4505" y="473"/></connection>
+<connection identifier="c-view-platform-detail-rel-189-fn_p6-bsv_redeem" relationshipRef="rel-189" source="n-view-platform-detail-fn_p6" target="n-view-platform-detail-bsv_redeem" xsi:type="Relationship"><bendpoint x="6065" y="483"/><bendpoint x="6065" y="483"/></connection>
+<connection identifier="c-view-platform-detail-rel-254-r_doh-s_hw" relationshipRef="rel-254" source="n-view-platform-detail-r_doh" target="n-view-platform-detail-s_hw" xsi:type="Relationship"><bendpoint x="7025" y="493"/><bendpoint x="7145" y="493"/></connection>
+<connection identifier="c-view-platform-detail-rel-14-bsv_enrol-act_member" relationshipRef="rel-14" source="n-view-platform-detail-bsv_enrol" target="n-view-platform-detail-act_member" xsi:type="Relationship"><bendpoint x="2705" y="136"/><bendpoint x="2705" y="136"/></connection>
+<connection identifier="c-view-platform-detail-rel-16-bsv_score-act_member" relationshipRef="rel-16" source="n-view-platform-detail-bsv_score" target="n-view-platform-detail-act_member" xsi:type="Relationship"><bendpoint x="4505" y="169"/><bendpoint x="2705" y="169"/></connection>
+<connection identifier="c-view-platform-detail-rel-18-bsv_redeem-act_member" relationshipRef="rel-18" source="n-view-platform-detail-bsv_redeem" target="n-view-platform-detail-act_member" xsi:type="Relationship"><bendpoint x="6065" y="201"/><bendpoint x="2705" y="201"/></connection>
+<connection identifier="c-view-platform-detail-rel-66-s_cf-obj_demo" relationshipRef="rel-66" source="n-view-platform-detail-s_cf" target="n-view-platform-detail-obj_demo" xsi:type="Relationship"><bendpoint x="185" y="698"/><bendpoint x="152" y="698"/></connection>
+<connection identifier="c-view-platform-detail-rel-67-s_cf-obj_telemetry" relationshipRef="rel-67" source="n-view-platform-detail-s_cf" target="n-view-platform-detail-obj_telemetry" xsi:type="Relationship"><bendpoint x="185" y="705"/><bendpoint x="350" y="705"/></connection>
+<connection identifier="c-view-platform-detail-rel-255-s_cf-obj_features" relationshipRef="rel-255" source="n-view-platform-detail-s_cf" target="n-view-platform-detail-obj_features" xsi:type="Relationship"><bendpoint x="185" y="711"/><bendpoint x="746" y="711"/></connection>
+<connection identifier="c-view-platform-detail-rel-256-s_dc-obj_features" relationshipRef="rel-256" source="n-view-platform-detail-s_dc" target="n-view-platform-detail-obj_features" xsi:type="Relationship"><bendpoint x="425" y="718"/><bendpoint x="746" y="718"/></connection>
+<connection identifier="c-view-platform-detail-rel-68-s_dc-obj_clinical" relationshipRef="rel-68" source="n-view-platform-detail-s_dc" target="n-view-platform-detail-obj_clinical" xsi:type="Relationship"><bendpoint x="425" y="724"/><bendpoint x="548" y="724"/></connection>
+<connection identifier="c-view-platform-detail-rel-257-s_dc-obj_cohort" relationshipRef="rel-257" source="n-view-platform-detail-s_dc" target="n-view-platform-detail-obj_cohort" xsi:type="Relationship"><bendpoint x="425" y="731"/><bendpoint x="944" y="731"/></connection>
+<connection identifier="c-view-platform-detail-rel-258-s_ps-obj_cohort" relationshipRef="rel-258" source="n-view-platform-detail-s_ps" target="n-view-platform-detail-obj_cohort" xsi:type="Relationship"><bendpoint x="665" y="737"/><bendpoint x="944" y="737"/></connection>
+<connection identifier="c-view-platform-detail-rel-69-s_ps-obj_segment" relationshipRef="rel-69" source="n-view-platform-detail-s_ps" target="n-view-platform-detail-obj_segment" xsi:type="Relationship"><bendpoint x="665" y="744"/><bendpoint x="1142" y="744"/></connection>
+<connection identifier="c-view-platform-detail-rel-70-s_ac-obj_challenge" relationshipRef="rel-70" source="n-view-platform-detail-s_ac" target="n-view-platform-detail-obj_challenge" xsi:type="Relationship"><bendpoint x="1145" y="750"/><bendpoint x="1340" y="750"/></connection>
+<connection identifier="c-view-platform-detail-rel-259-s_be-obj_segment" relationshipRef="rel-259" source="n-view-platform-detail-s_be" target="n-view-platform-detail-obj_segment" xsi:type="Relationship"><bendpoint x="1385" y="757"/><bendpoint x="1142" y="757"/></connection>
+<connection identifier="c-view-platform-detail-rel-71-s_be-obj_challenge" relationshipRef="rel-71" source="n-view-platform-detail-s_be" target="n-view-platform-detail-obj_challenge" xsi:type="Relationship"><bendpoint x="1385" y="763"/><bendpoint x="1340" y="763"/></connection>
+<connection identifier="c-view-platform-detail-rel-260-s_pf-obj_challenge" relationshipRef="rel-260" source="n-view-platform-detail-s_pf" target="n-view-platform-detail-obj_challenge" xsi:type="Relationship"><bendpoint x="1865" y="770"/><bendpoint x="1340" y="770"/></connection>
+<connection identifier="c-view-platform-detail-rel-261-s_ee-obj_segment" relationshipRef="rel-261" source="n-view-platform-detail-s_ee" target="n-view-platform-detail-obj_segment" xsi:type="Relationship"><bendpoint x="2585" y="776"/><bendpoint x="1142" y="776"/></connection>
+<connection identifier="c-view-platform-detail-rel-72-s_ee-obj_challenge" relationshipRef="rel-72" source="n-view-platform-detail-s_ee" target="n-view-platform-detail-obj_challenge" xsi:type="Relationship"><bendpoint x="2585" y="783"/><bendpoint x="1340" y="783"/></connection>
+<connection identifier="c-view-platform-detail-rel-73-s_cn-obj_enrol" relationshipRef="rel-73" source="n-view-platform-detail-s_cn" target="n-view-platform-detail-obj_enrol" xsi:type="Relationship"><bendpoint x="3065" y="789"/><bendpoint x="1538" y="789"/></connection>
+<connection identifier="c-view-platform-detail-rel-262-s_ca-obj_telemetry" relationshipRef="rel-262" source="n-view-platform-detail-s_ca" target="n-view-platform-detail-obj_telemetry" xsi:type="Relationship"><bendpoint x="3545" y="796"/><bendpoint x="350" y="796"/></connection>
+<connection identifier="c-view-platform-detail-rel-263-s_ca-obj_activity" relationshipRef="rel-263" source="n-view-platform-detail-s_ca" target="n-view-platform-detail-obj_activity" xsi:type="Relationship"><bendpoint x="3545" y="802"/><bendpoint x="1736" y="802"/></connection>
+<connection identifier="c-view-platform-detail-rel-74-s_va-obj_activity" relationshipRef="rel-74" source="n-view-platform-detail-s_va" target="n-view-platform-detail-obj_activity" xsi:type="Relationship"><bendpoint x="3785" y="809"/><bendpoint x="1736" y="809"/></connection>
+<connection identifier="c-view-platform-detail-rel-264-s_sg-obj_activity" relationshipRef="rel-264" source="n-view-platform-detail-s_sg" target="n-view-platform-detail-obj_activity" xsi:type="Relationship"><bendpoint x="4265" y="816"/><bendpoint x="1736" y="816"/></connection>
+<connection identifier="c-view-platform-detail-rel-76-s_sg-obj_plan" relationshipRef="rel-76" source="n-view-platform-detail-s_sg" target="n-view-platform-detail-obj_plan" xsi:type="Relationship"><bendpoint x="4265" y="822"/><bendpoint x="1934" y="822"/></connection>
+<connection identifier="c-view-platform-detail-rel-265-s_sg-obj_dailyscore" relationshipRef="rel-265" source="n-view-platform-detail-s_sg" target="n-view-platform-detail-obj_dailyscore" xsi:type="Relationship"><bendpoint x="4265" y="829"/><bendpoint x="2132" y="829"/></connection>
+<connection identifier="c-view-platform-detail-rel-266-s_ar-obj_dailyscore" relationshipRef="rel-266" source="n-view-platform-detail-s_ar" target="n-view-platform-detail-obj_dailyscore" xsi:type="Relationship"><bendpoint x="4505" y="835"/><bendpoint x="2132" y="835"/></connection>
+<connection identifier="c-view-platform-detail-rel-78-s_ar-obj_title" relationshipRef="rel-78" source="n-view-platform-detail-s_ar" target="n-view-platform-detail-obj_title" xsi:type="Relationship"><bendpoint x="4505" y="842"/><bendpoint x="2330" y="842"/></connection>
+<connection identifier="c-view-platform-detail-rel-267-s_aw-obj_dailyscore" relationshipRef="rel-267" source="n-view-platform-detail-s_aw" target="n-view-platform-detail-obj_dailyscore" xsi:type="Relationship"><bendpoint x="4745" y="848"/><bendpoint x="2132" y="848"/></connection>
+<connection identifier="c-view-platform-detail-rel-268-s_aw-obj_score" relationshipRef="rel-268" source="n-view-platform-detail-s_aw" target="n-view-platform-detail-obj_score" xsi:type="Relationship"><bendpoint x="4745" y="855"/><bendpoint x="2528" y="855"/></connection>
+<connection identifier="c-view-platform-detail-rel-269-s_cp-obj_score" relationshipRef="rel-269" source="n-view-platform-detail-s_cp" target="n-view-platform-detail-obj_score" xsi:type="Relationship"><bendpoint x="5225" y="861"/><bendpoint x="2528" y="861"/></connection>
+<connection identifier="c-view-platform-detail-rel-79-s_cp-obj_wallet" relationshipRef="rel-79" source="n-view-platform-detail-s_cp" target="n-view-platform-detail-obj_wallet" xsi:type="Relationship"><bendpoint x="5225" y="868"/><bendpoint x="2726" y="868"/></connection>
+<connection identifier="c-view-platform-detail-rel-80-s_br-obj_catalogue" relationshipRef="rel-80" source="n-view-platform-detail-s_br" target="n-view-platform-detail-obj_catalogue" xsi:type="Relationship"><bendpoint x="5705" y="874"/><bendpoint x="2924" y="874"/></connection>
+<connection identifier="c-view-platform-detail-rel-81-s_rs-obj_wallet" relationshipRef="rel-81" source="n-view-platform-detail-s_rs" target="n-view-platform-detail-obj_wallet" xsi:type="Relationship"><bendpoint x="5945" y="881"/><bendpoint x="2726" y="881"/></connection>
+<connection identifier="c-view-platform-detail-rel-270-s_rs-obj_reservation" relationshipRef="rel-270" source="n-view-platform-detail-s_rs" target="n-view-platform-detail-obj_reservation" xsi:type="Relationship"><bendpoint x="5945" y="887"/><bendpoint x="3122" y="887"/></connection>
+<connection identifier="c-view-platform-detail-rel-271-s_rd-obj_reservation" relationshipRef="rel-271" source="n-view-platform-detail-s_rd" target="n-view-platform-detail-obj_reservation" xsi:type="Relationship"><bendpoint x="6185" y="894"/><bendpoint x="3122" y="894"/></connection>
+<connection identifier="c-view-platform-detail-rel-82-s_rd-obj_catalogue" relationshipRef="rel-82" source="n-view-platform-detail-s_rd" target="n-view-platform-detail-obj_catalogue" xsi:type="Relationship"><bendpoint x="6185" y="900"/><bendpoint x="2924" y="900"/></connection>
+<connection identifier="c-view-platform-detail-rel-272-s_rd-obj_redemption" relationshipRef="rel-272" source="n-view-platform-detail-s_rd" target="n-view-platform-detail-obj_redemption" xsi:type="Relationship"><bendpoint x="6185" y="907"/><bendpoint x="3320" y="907"/></connection>
+<connection identifier="c-view-platform-detail-rel-83-s_rv-obj_voucher" relationshipRef="rel-83" source="n-view-platform-detail-s_rv" target="n-view-platform-detail-obj_voucher" xsi:type="Relationship"><bendpoint x="6425" y="913"/><bendpoint x="3518" y="913"/></connection>
+<connection identifier="c-view-platform-detail-rel-273-s_cc-obj_score" relationshipRef="rel-273" source="n-view-platform-detail-s_cc" target="n-view-platform-detail-obj_score" xsi:type="Relationship"><bendpoint x="6905" y="920"/><bendpoint x="2528" y="920"/></connection>
+<connection identifier="c-view-platform-detail-rel-274-s_cc-obj_standings" relationshipRef="rel-274" source="n-view-platform-detail-s_cc" target="n-view-platform-detail-obj_standings" xsi:type="Relationship"><bendpoint x="6905" y="926"/><bendpoint x="3716" y="926"/></connection>
+<connection identifier="c-view-platform-detail-rel-275-s_hw-obj_standings" relationshipRef="rel-275" source="n-view-platform-detail-s_hw" target="n-view-platform-detail-obj_standings" xsi:type="Relationship"><bendpoint x="7145" y="933"/><bendpoint x="3716" y="933"/></connection>
+</view>
+<view identifier="view-member-journey" xsi:type="Diagram"><name xml:lang="en">Member Journey — Cohort to Reward</name>
+<node identifier="g-view-member-journey-role" xsi:type="Container" x="18" y="8" w="6056" h="148">
+<label xml:lang="en">Business Roles / Actors  ·  ACTIVE STRUCTURE</label>
+<style><fillColor r="250" g="250" b="250" a="0"/><lineColor r="175" g="175" b="175"/><font name="Sans" size="9"><color r="95" g="95" b="95"/></font></style>
+</node>
+<node identifier="g-view-member-journey-svc" xsi:type="Container" x="18" y="226" w="6056" h="86">
+<label xml:lang="en">Business Services  ·  BEHAVIOUR (external)</label>
+<style><fillColor r="250" g="250" b="250" a="0"/><lineColor r="175" g="175" b="175"/><font name="Sans" size="9"><color r="95" g="95" b="95"/></font></style>
+</node>
+<node identifier="g-view-member-journey-proc" xsi:type="Container" x="18" y="380" w="6056" h="182">
+<label xml:lang="en">Business Processes  ·  BEHAVIOUR (internal flow, composite -&gt; steps)</label>
+<style><fillColor r="250" g="250" b="250" a="0"/><lineColor r="175" g="175" b="175"/><font name="Sans" size="9"><color r="95" g="95" b="95"/></font></style>
+</node>
+<node identifier="g-view-member-journey-obj" xsi:type="Container" x="18" y="630" w="6056" h="88">
+<label xml:lang="en">Business Objects  ·  PASSIVE STRUCTURE</label>
+<style><fillColor r="250" g="250" b="250" a="0"/><lineColor r="175" g="175" b="175"/><font name="Sans" size="9"><color r="95" g="95" b="95"/></font></style>
+</node>
+<node identifier="n-view-member-journey-r_analytics" elementRef="r_analytics" xsi:type="Element" x="290" y="24" w="176" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-r_admin" elementRef="r_admin" xsi:type="Element" x="1215" y="24" w="176" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-act_member" elementRef="act_member" xsi:type="Element" x="3541" y="24" w="176" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-r_doh" elementRef="r_doh" xsi:type="Element" x="5629" y="24" w="176" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-r_cms" elementRef="r_cms" xsi:type="Element" x="1334" y="90" w="176" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-r_verify" elementRef="r_verify" xsi:type="Element" x="3184" y="90" w="176" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-bsv_cohort" elementRef="bsv_cohort" xsi:type="Element" x="285" y="244" w="186" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-bsv_create" elementRef="bsv_create" xsi:type="Element" x="1210" y="244" w="186" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-bsv_enrol" elementRef="bsv_enrol" xsi:type="Element" x="2254" y="244" w="186" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-bsv_score" elementRef="bsv_score" xsi:type="Element" x="3536" y="244" w="186" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-bsv_redeem" elementRef="bsv_redeem" xsi:type="Element" x="4818" y="244" w="186" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-bsv_concl" elementRef="bsv_concl" xsi:type="Element" x="5624" y="244" w="186" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="g-view-member-journey-c_cohort" elementRef="c_cohort" xsi:type="Element" x="30" y="398" w="696" h="146">
+<style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-member-journey-s_cf" elementRef="s_cf" xsi:type="Element" x="64" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-s_dc" elementRef="s_dc" xsi:type="Element" x="302" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-s_ps" elementRef="s_ps" xsi:type="Element" x="540" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="g-view-member-journey-c_create" elementRef="c_create" xsi:type="Element" x="836" y="398" w="934" h="146">
+<style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-member-journey-s_ac" elementRef="s_ac" xsi:type="Element" x="870" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-s_be" elementRef="s_be" xsi:type="Element" x="1108" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-s_ap" elementRef="s_ap" xsi:type="Element" x="1346" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-s_pf" elementRef="s_pf" xsi:type="Element" x="1584" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="g-view-member-journey-c_enrol" elementRef="c_enrol" xsi:type="Element" x="1880" y="398" w="934" h="146">
+<style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-member-journey-s_en" elementRef="s_en" xsi:type="Element" x="1914" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-s_ee" elementRef="s_ee" xsi:type="Element" x="2152" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-s_tc" elementRef="s_tc" xsi:type="Element" x="2390" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-s_cn" elementRef="s_cn" xsi:type="Element" x="2628" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="g-view-member-journey-c_earn" elementRef="c_earn" xsi:type="Element" x="2924" y="398" w="1410" h="146">
+<style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-member-journey-s_ca" elementRef="s_ca" xsi:type="Element" x="2958" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-s_va" elementRef="s_va" xsi:type="Element" x="3196" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-s_sg" elementRef="s_sg" xsi:type="Element" x="3434" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-s_ar" elementRef="s_ar" xsi:type="Element" x="3672" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-s_aw" elementRef="s_aw" xsi:type="Element" x="3910" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-s_cp" elementRef="s_cp" xsi:type="Element" x="4148" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="g-view-member-journey-c_reward" elementRef="c_reward" xsi:type="Element" x="4444" y="398" w="934" h="146">
+<style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-member-journey-s_br" elementRef="s_br" xsi:type="Element" x="4478" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-s_rs" elementRef="s_rs" xsi:type="Element" x="4716" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-s_rd" elementRef="s_rd" xsi:type="Element" x="4954" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-s_rv" elementRef="s_rv" xsi:type="Element" x="5192" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="g-view-member-journey-c_conclude" elementRef="c_conclude" xsi:type="Element" x="5488" y="398" w="458" h="146">
+<style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-member-journey-s_cc" elementRef="s_cc" xsi:type="Element" x="5522" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-s_hw" elementRef="s_hw" xsi:type="Element" x="5760" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="n-view-member-journey-obj_demo" elementRef="obj_demo" xsi:type="Element" x="30" y="648" w="176" h="52"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-obj_telemetry" elementRef="obj_telemetry" xsi:type="Element" x="254" y="648" w="176" h="52"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-obj_clinical" elementRef="obj_clinical" xsi:type="Element" x="478" y="648" w="176" h="52"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-obj_segment" elementRef="obj_segment" xsi:type="Element" x="702" y="648" w="176" h="52"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-obj_challenge" elementRef="obj_challenge" xsi:type="Element" x="926" y="648" w="176" h="52"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-obj_plan" elementRef="obj_plan" xsi:type="Element" x="1150" y="648" w="176" h="52"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-obj_enrol" elementRef="obj_enrol" xsi:type="Element" x="1374" y="648" w="176" h="52"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-obj_activity" elementRef="obj_activity" xsi:type="Element" x="1598" y="648" w="176" h="52"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-obj_score" elementRef="obj_score" xsi:type="Element" x="1822" y="648" w="176" h="52"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-obj_wallet" elementRef="obj_wallet" xsi:type="Element" x="2046" y="648" w="176" h="52"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-obj_catalogue" elementRef="obj_catalogue" xsi:type="Element" x="2270" y="648" w="176" h="52"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-obj_voucher" elementRef="obj_voucher" xsi:type="Element" x="2494" y="648" w="176" h="52"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-member-journey-obj_title" elementRef="obj_title" xsi:type="Element" x="2718" y="648" w="176" h="52"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<connection identifier="c-view-member-journey-rel-44-s_cf-s_dc" relationshipRef="rel-44" source="n-view-member-journey-s_cf" target="n-view-member-journey-s_dc" xsi:type="Relationship"/>
+<connection identifier="c-view-member-journey-rel-45-s_dc-s_ps" relationshipRef="rel-45" source="n-view-member-journey-s_dc" target="n-view-member-journey-s_ps" xsi:type="Relationship"/>
+<connection identifier="c-view-member-journey-rel-46-s_ps-s_ac" relationshipRef="rel-46" source="n-view-member-journey-s_ps" target="n-view-member-journey-s_ac" xsi:type="Relationship"/>
+<connection identifier="c-view-member-journey-rel-47-s_ac-s_be" relationshipRef="rel-47" source="n-view-member-journey-s_ac" target="n-view-member-journey-s_be" xsi:type="Relationship"/>
+<connection identifier="c-view-member-journey-rel-48-s_be-s_ap" relationshipRef="rel-48" source="n-view-member-journey-s_be" target="n-view-member-journey-s_ap" xsi:type="Relationship"/>
+<connection identifier="c-view-member-journey-rel-49-s_ap-s_pf" relationshipRef="rel-49" source="n-view-member-journey-s_ap" target="n-view-member-journey-s_pf" xsi:type="Relationship"/>
+<connection identifier="c-view-member-journey-rel-50-s_pf-s_en" relationshipRef="rel-50" source="n-view-member-journey-s_pf" target="n-view-member-journey-s_en" xsi:type="Relationship"/>
+<connection identifier="c-view-member-journey-rel-51-s_en-s_ee" relationshipRef="rel-51" source="n-view-member-journey-s_en" target="n-view-member-journey-s_ee" xsi:type="Relationship"/>
+<connection identifier="c-view-member-journey-rel-52-s_ee-s_tc" relationshipRef="rel-52" source="n-view-member-journey-s_ee" target="n-view-member-journey-s_tc" xsi:type="Relationship"/>
+<connection identifier="c-view-member-journey-rel-53-s_tc-s_cn" relationshipRef="rel-53" source="n-view-member-journey-s_tc" target="n-view-member-journey-s_cn" xsi:type="Relationship"/>
+<connection identifier="c-view-member-journey-rel-54-s_cn-s_ca" relationshipRef="rel-54" source="n-view-member-journey-s_cn" target="n-view-member-journey-s_ca" xsi:type="Relationship"/>
+<connection identifier="c-view-member-journey-rel-55-s_ca-s_va" relationshipRef="rel-55" source="n-view-member-journey-s_ca" target="n-view-member-journey-s_va" xsi:type="Relationship"/>
+<connection identifier="c-view-member-journey-rel-56-s_va-s_sg" relationshipRef="rel-56" source="n-view-member-journey-s_va" target="n-view-member-journey-s_sg" xsi:type="Relationship"/>
+<connection identifier="c-view-member-journey-rel-57-s_sg-s_ar" relationshipRef="rel-57" source="n-view-member-journey-s_sg" target="n-view-member-journey-s_ar" xsi:type="Relationship"/>
+<connection identifier="c-view-member-journey-rel-58-s_ar-s_aw" relationshipRef="rel-58" source="n-view-member-journey-s_ar" target="n-view-member-journey-s_aw" xsi:type="Relationship"/>
+<connection identifier="c-view-member-journey-rel-59-s_aw-s_cp" relationshipRef="rel-59" source="n-view-member-journey-s_aw" target="n-view-member-journey-s_cp" xsi:type="Relationship"/>
+<connection identifier="c-view-member-journey-rel-60-s_cp-s_br" relationshipRef="rel-60" source="n-view-member-journey-s_cp" target="n-view-member-journey-s_br" xsi:type="Relationship"/>
+<connection identifier="c-view-member-journey-rel-61-s_br-s_rs" relationshipRef="rel-61" source="n-view-member-journey-s_br" target="n-view-member-journey-s_rs" xsi:type="Relationship"/>
+<connection identifier="c-view-member-journey-rel-62-s_rs-s_rd" relationshipRef="rel-62" source="n-view-member-journey-s_rs" target="n-view-member-journey-s_rd" xsi:type="Relationship"/>
+<connection identifier="c-view-member-journey-rel-63-s_rd-s_rv" relationshipRef="rel-63" source="n-view-member-journey-s_rd" target="n-view-member-journey-s_rv" xsi:type="Relationship"/>
+<connection identifier="c-view-member-journey-rel-64-s_rv-s_cc" relationshipRef="rel-64" source="n-view-member-journey-s_rv" target="n-view-member-journey-s_cc" xsi:type="Relationship"/>
+<connection identifier="c-view-member-journey-rel-65-s_cc-s_hw" relationshipRef="rel-65" source="n-view-member-journey-s_cc" target="n-view-member-journey-s_hw" xsi:type="Relationship"/>
+<connection identifier="c-view-member-journey-rel-1-r_analytics-c_cohort" relationshipRef="rel-1" source="n-view-member-journey-r_analytics" target="g-view-member-journey-c_cohort" xsi:type="Relationship"><bendpoint x="378" y="316"/><bendpoint x="378" y="316"/></connection>
+<connection identifier="c-view-member-journey-rel-9-c_cohort-bsv_cohort" relationshipRef="rel-9" source="g-view-member-journey-c_cohort" target="n-view-member-journey-bsv_cohort" xsi:type="Relationship"><bendpoint x="378" y="321"/><bendpoint x="378" y="321"/></connection>
+<connection identifier="c-view-member-journey-rel-2-r_admin-c_create" relationshipRef="rel-2" source="n-view-member-journey-r_admin" target="g-view-member-journey-c_create" xsi:type="Relationship"><bendpoint x="1303" y="325"/><bendpoint x="1303" y="325"/></connection>
+<connection identifier="c-view-member-journey-rel-11-c_create-bsv_create" relationshipRef="rel-11" source="g-view-member-journey-c_create" target="n-view-member-journey-bsv_create" xsi:type="Relationship"><bendpoint x="1303" y="330"/><bendpoint x="1303" y="330"/></connection>
+<connection identifier="c-view-member-journey-rel-7-r_cms-s_ap" relationshipRef="rel-7" source="n-view-member-journey-r_cms" target="n-view-member-journey-s_ap" xsi:type="Relationship"><bendpoint x="1422" y="334"/><bendpoint x="1422" y="334"/></connection>
+<connection identifier="c-view-member-journey-rel-13-c_enrol-bsv_enrol" relationshipRef="rel-13" source="g-view-member-journey-c_enrol" target="n-view-member-journey-bsv_enrol" xsi:type="Relationship"><bendpoint x="2347" y="339"/><bendpoint x="2347" y="339"/></connection>
+<connection identifier="c-view-member-journey-rel-8-r_verify-s_va" relationshipRef="rel-8" source="n-view-member-journey-r_verify" target="n-view-member-journey-s_va" xsi:type="Relationship"><bendpoint x="3272" y="343"/><bendpoint x="3272" y="343"/></connection>
+<connection identifier="c-view-member-journey-rel-3-act_member-c_enrol" relationshipRef="rel-3" source="n-view-member-journey-act_member" target="g-view-member-journey-c_enrol" xsi:type="Relationship"><bendpoint x="3629" y="348"/><bendpoint x="2347" y="348"/></connection>
+<connection identifier="c-view-member-journey-rel-4-act_member-c_earn" relationshipRef="rel-4" source="n-view-member-journey-act_member" target="g-view-member-journey-c_earn" xsi:type="Relationship"><bendpoint x="3629" y="352"/><bendpoint x="3629" y="352"/></connection>
+<connection identifier="c-view-member-journey-rel-5-act_member-c_reward" relationshipRef="rel-5" source="n-view-member-journey-act_member" target="g-view-member-journey-c_reward" xsi:type="Relationship"><bendpoint x="3629" y="357"/><bendpoint x="4911" y="357"/></connection>
+<connection identifier="c-view-member-journey-rel-15-c_earn-bsv_score" relationshipRef="rel-15" source="g-view-member-journey-c_earn" target="n-view-member-journey-bsv_score" xsi:type="Relationship"><bendpoint x="3629" y="361"/><bendpoint x="3629" y="361"/></connection>
+<connection identifier="c-view-member-journey-rel-17-c_reward-bsv_redeem" relationshipRef="rel-17" source="g-view-member-journey-c_reward" target="n-view-member-journey-bsv_redeem" xsi:type="Relationship"><bendpoint x="4911" y="366"/><bendpoint x="4911" y="366"/></connection>
+<connection identifier="c-view-member-journey-rel-6-r_doh-c_conclude" relationshipRef="rel-6" source="n-view-member-journey-r_doh" target="g-view-member-journey-c_conclude" xsi:type="Relationship"><bendpoint x="5717" y="370"/><bendpoint x="5717" y="370"/></connection>
+<connection identifier="c-view-member-journey-rel-19-c_conclude-bsv_concl" relationshipRef="rel-19" source="g-view-member-journey-c_conclude" target="n-view-member-journey-bsv_concl" xsi:type="Relationship"><bendpoint x="5717" y="375"/><bendpoint x="5717" y="375"/></connection>
+<connection identifier="c-view-member-journey-rel-10-bsv_cohort-r_admin" relationshipRef="rel-10" source="n-view-member-journey-bsv_cohort" target="n-view-member-journey-r_admin" xsi:type="Relationship"><bendpoint x="378" y="167"/><bendpoint x="1303" y="167"/></connection>
+<connection identifier="c-view-member-journey-rel-12-bsv_create-r_admin" relationshipRef="rel-12" source="n-view-member-journey-bsv_create" target="n-view-member-journey-r_admin" xsi:type="Relationship"><bendpoint x="1303" y="177"/><bendpoint x="1303" y="177"/></connection>
+<connection identifier="c-view-member-journey-rel-14-bsv_enrol-act_member" relationshipRef="rel-14" source="n-view-member-journey-bsv_enrol" target="n-view-member-journey-act_member" xsi:type="Relationship"><bendpoint x="2347" y="187"/><bendpoint x="3629" y="187"/></connection>
+<connection identifier="c-view-member-journey-rel-16-bsv_score-act_member" relationshipRef="rel-16" source="n-view-member-journey-bsv_score" target="n-view-member-journey-act_member" xsi:type="Relationship"><bendpoint x="3629" y="196"/><bendpoint x="3629" y="196"/></connection>
+<connection identifier="c-view-member-journey-rel-18-bsv_redeem-act_member" relationshipRef="rel-18" source="n-view-member-journey-bsv_redeem" target="n-view-member-journey-act_member" xsi:type="Relationship"><bendpoint x="4911" y="206"/><bendpoint x="3629" y="206"/></connection>
+<connection identifier="c-view-member-journey-rel-20-bsv_concl-r_doh" relationshipRef="rel-20" source="n-view-member-journey-bsv_concl" target="n-view-member-journey-r_doh" xsi:type="Relationship"><bendpoint x="5717" y="216"/><bendpoint x="5717" y="216"/></connection>
+<connection identifier="c-view-member-journey-rel-66-s_cf-obj_demo" relationshipRef="rel-66" source="n-view-member-journey-s_cf" target="n-view-member-journey-obj_demo" xsi:type="Relationship"><bendpoint x="140" y="565"/><bendpoint x="118" y="565"/></connection>
+<connection identifier="c-view-member-journey-rel-67-s_cf-obj_telemetry" relationshipRef="rel-67" source="n-view-member-journey-s_cf" target="n-view-member-journey-obj_telemetry" xsi:type="Relationship"><bendpoint x="140" y="569"/><bendpoint x="342" y="569"/></connection>
+<connection identifier="c-view-member-journey-rel-68-s_dc-obj_clinical" relationshipRef="rel-68" source="n-view-member-journey-s_dc" target="n-view-member-journey-obj_clinical" xsi:type="Relationship"><bendpoint x="378" y="572"/><bendpoint x="566" y="572"/></connection>
+<connection identifier="c-view-member-journey-rel-69-s_ps-obj_segment" relationshipRef="rel-69" source="n-view-member-journey-s_ps" target="n-view-member-journey-obj_segment" xsi:type="Relationship"><bendpoint x="616" y="576"/><bendpoint x="790" y="576"/></connection>
+<connection identifier="c-view-member-journey-rel-70-s_ac-obj_challenge" relationshipRef="rel-70" source="n-view-member-journey-s_ac" target="n-view-member-journey-obj_challenge" xsi:type="Relationship"><bendpoint x="946" y="579"/><bendpoint x="1014" y="579"/></connection>
+<connection identifier="c-view-member-journey-rel-71-s_be-obj_challenge" relationshipRef="rel-71" source="n-view-member-journey-s_be" target="n-view-member-journey-obj_challenge" xsi:type="Relationship"><bendpoint x="1184" y="583"/><bendpoint x="1014" y="583"/></connection>
+<connection identifier="c-view-member-journey-rel-72-s_ee-obj_challenge" relationshipRef="rel-72" source="n-view-member-journey-s_ee" target="n-view-member-journey-obj_challenge" xsi:type="Relationship"><bendpoint x="2228" y="587"/><bendpoint x="1014" y="587"/></connection>
+<connection identifier="c-view-member-journey-rel-73-s_cn-obj_enrol" relationshipRef="rel-73" source="n-view-member-journey-s_cn" target="n-view-member-journey-obj_enrol" xsi:type="Relationship"><bendpoint x="2704" y="590"/><bendpoint x="1462" y="590"/></connection>
+<connection identifier="c-view-member-journey-rel-74-s_va-obj_activity" relationshipRef="rel-74" source="n-view-member-journey-s_va" target="n-view-member-journey-obj_activity" xsi:type="Relationship"><bendpoint x="3272" y="594"/><bendpoint x="1686" y="594"/></connection>
+<connection identifier="c-view-member-journey-rel-75-s_va-obj_telemetry" relationshipRef="rel-75" source="n-view-member-journey-s_va" target="n-view-member-journey-obj_telemetry" xsi:type="Relationship"><bendpoint x="3272" y="597"/><bendpoint x="342" y="597"/></connection>
+<connection identifier="c-view-member-journey-rel-76-s_sg-obj_plan" relationshipRef="rel-76" source="n-view-member-journey-s_sg" target="n-view-member-journey-obj_plan" xsi:type="Relationship"><bendpoint x="3510" y="601"/><bendpoint x="1238" y="601"/></connection>
+<connection identifier="c-view-member-journey-rel-77-s_sg-obj_score" relationshipRef="rel-77" source="n-view-member-journey-s_sg" target="n-view-member-journey-obj_score" xsi:type="Relationship"><bendpoint x="3510" y="604"/><bendpoint x="1910" y="604"/></connection>
+<connection identifier="c-view-member-journey-rel-78-s_ar-obj_title" relationshipRef="rel-78" source="n-view-member-journey-s_ar" target="n-view-member-journey-obj_title" xsi:type="Relationship"><bendpoint x="3748" y="608"/><bendpoint x="2806" y="608"/></connection>
+<connection identifier="c-view-member-journey-rel-79-s_cp-obj_wallet" relationshipRef="rel-79" source="n-view-member-journey-s_cp" target="n-view-member-journey-obj_wallet" xsi:type="Relationship"><bendpoint x="4224" y="612"/><bendpoint x="2134" y="612"/></connection>
+<connection identifier="c-view-member-journey-rel-80-s_br-obj_catalogue" relationshipRef="rel-80" source="n-view-member-journey-s_br" target="n-view-member-journey-obj_catalogue" xsi:type="Relationship"><bendpoint x="4554" y="615"/><bendpoint x="2358" y="615"/></connection>
+<connection identifier="c-view-member-journey-rel-81-s_rs-obj_wallet" relationshipRef="rel-81" source="n-view-member-journey-s_rs" target="n-view-member-journey-obj_wallet" xsi:type="Relationship"><bendpoint x="4792" y="619"/><bendpoint x="2134" y="619"/></connection>
+<connection identifier="c-view-member-journey-rel-82-s_rd-obj_catalogue" relationshipRef="rel-82" source="n-view-member-journey-s_rd" target="n-view-member-journey-obj_catalogue" xsi:type="Relationship"><bendpoint x="5030" y="622"/><bendpoint x="2358" y="622"/></connection>
+<connection identifier="c-view-member-journey-rel-83-s_rv-obj_voucher" relationshipRef="rel-83" source="n-view-member-journey-s_rv" target="n-view-member-journey-obj_voucher" xsi:type="Relationship"><bendpoint x="5268" y="626"/><bendpoint x="2582" y="626"/></connection>
+</view>
+<view identifier="view-partner-lifecycle" xsi:type="Diagram"><name xml:lang="en">Partner Lifecycle</name>
+<node identifier="g-view-partner-lifecycle-role" xsi:type="Container" x="18" y="8" w="6202" h="148">
+<label xml:lang="en">Business Roles / Actors  ·  ACTIVE STRUCTURE</label>
+<style><fillColor r="250" g="250" b="250" a="0"/><lineColor r="175" g="175" b="175"/><font name="Sans" size="9"><color r="95" g="95" b="95"/></font></style>
+</node>
+<node identifier="g-view-partner-lifecycle-svc" xsi:type="Container" x="18" y="226" w="6202" h="86">
+<label xml:lang="en">Business Services  ·  BEHAVIOUR (external)</label>
+<style><fillColor r="250" g="250" b="250" a="0"/><lineColor r="175" g="175" b="175"/><font name="Sans" size="9"><color r="95" g="95" b="95"/></font></style>
+</node>
+<node identifier="g-view-partner-lifecycle-proc" xsi:type="Container" x="18" y="380" w="6202" h="182">
+<label xml:lang="en">Business Processes  ·  BEHAVIOUR (internal flow, composite -&gt; steps)</label>
+<style><fillColor r="250" g="250" b="250" a="0"/><lineColor r="175" g="175" b="175"/><font name="Sans" size="9"><color r="95" g="95" b="95"/></font></style>
+</node>
+<node identifier="g-view-partner-lifecycle-obj" xsi:type="Container" x="18" y="630" w="6202" h="88">
+<label xml:lang="en">Business Objects  ·  PASSIVE STRUCTURE</label>
+<style><fillColor r="250" g="250" b="250" a="0"/><lineColor r="175" g="175" b="175"/><font name="Sans" size="9"><color r="95" g="95" b="95"/></font></style>
+</node>
+<node identifier="n-view-partner-lifecycle-r_ponb" elementRef="r_ponb" xsi:type="Element" x="290" y="24" w="176" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-r_market" elementRef="r_market" xsi:type="Element" x="1334" y="24" w="176" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-r_redeem" elementRef="r_redeem" xsi:type="Element" x="2616" y="24" w="176" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-r_fin" elementRef="r_fin" xsi:type="Element" x="3898" y="24" w="176" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-r_pexit" elementRef="r_pexit" xsi:type="Element" x="5299" y="24" w="176" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-act_partner" elementRef="act_partner" xsi:type="Element" x="1096" y="90" w="176" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-act_partner" elementRef="act_partner" xsi:type="Element" x="1096" y="90" w="176" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-act_member" elementRef="act_member" xsi:type="Element" x="2140" y="90" w="176" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-r_wallet" elementRef="r_wallet" xsi:type="Element" x="2854" y="90" w="176" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-r_wallet" elementRef="r_wallet" xsi:type="Element" x="2854" y="90" w="176" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-r_fraud" elementRef="r_fraud" xsi:type="Element" x="2616" y="90" w="176" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-bsv_onb" elementRef="bsv_onb" xsi:type="Element" x="285" y="244" w="186" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-bsv_cat" elementRef="bsv_cat" xsi:type="Element" x="1329" y="244" w="186" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-bsv_fulfil" elementRef="bsv_fulfil" xsi:type="Element" x="2611" y="244" w="186" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-bsv_settle" elementRef="bsv_settle" xsi:type="Element" x="3893" y="244" w="186" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-bsv_off" elementRef="bsv_off" xsi:type="Element" x="5294" y="244" w="186" h="50"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="g-view-partner-lifecycle-c_onb" elementRef="c_onb" xsi:type="Element" x="30" y="398" w="696" h="146">
+<style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-partner-lifecycle-p_sub" elementRef="p_sub" xsi:type="Element" x="64" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-p_kyb" elementRef="p_kyb" xsi:type="Element" x="302" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-p_apr" elementRef="p_apr" xsi:type="Element" x="540" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="g-view-partner-lifecycle-c_cat" elementRef="c_cat" xsi:type="Element" x="836" y="398" w="1172" h="146">
+<style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-partner-lifecycle-p_prov" elementRef="p_prov" xsi:type="Element" x="870" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-p_push" elementRef="p_push" xsi:type="Element" x="1108" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-p_val" elementRef="p_val" xsi:type="Element" x="1346" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-p_idx" elementRef="p_idx" xsi:type="Element" x="1584" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-p_rel" elementRef="p_rel" xsi:type="Element" x="1822" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="g-view-partner-lifecycle-c_red" elementRef="c_red" xsi:type="Element" x="2118" y="398" w="1172" h="146">
+<style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-partner-lifecycle-p_brw" elementRef="p_brw" xsi:type="Element" x="2152" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-p_res" elementRef="p_res" xsi:type="Element" x="2390" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-p_api" elementRef="p_api" xsi:type="Element" x="2628" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-p_cmt" elementRef="p_cmt" xsi:type="Element" x="2866" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-p_ntf" elementRef="p_ntf" xsi:type="Element" x="3104" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="g-view-partner-lifecycle-c_set" elementRef="c_set" xsi:type="Element" x="3400" y="398" w="1172" h="146">
+<style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-partner-lifecycle-p_agg" elementRef="p_agg" xsi:type="Element" x="3434" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-p_rec" elementRef="p_rec" xsi:type="Element" x="3672" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-p_inv" elementRef="p_inv" xsi:type="Element" x="3910" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-p_pay" elementRef="p_pay" xsi:type="Element" x="4148" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-p_hld" elementRef="p_hld" xsi:type="Element" x="4386" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="g-view-partner-lifecycle-c_off" elementRef="c_off" xsi:type="Element" x="4682" y="398" w="1410" h="146">
+<style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-view-partner-lifecycle-p_dec" elementRef="p_dec" xsi:type="Element" x="4716" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-p_wrn" elementRef="p_wrn" xsi:type="Element" x="4954" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-p_rev" elementRef="p_rev" xsi:type="Element" x="5192" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-p_wnd" elementRef="p_wnd" xsi:type="Element" x="5430" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-p_fin" elementRef="p_fin" xsi:type="Element" x="5668" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-p_ret" elementRef="p_ret" xsi:type="Element" x="5906" y="458" w="152" h="56"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="n-view-partner-lifecycle-obj_kyb" elementRef="obj_kyb" xsi:type="Element" x="30" y="648" w="176" h="52"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-obj_contract" elementRef="obj_contract" xsi:type="Element" x="254" y="648" w="176" h="52"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-obj_catalogue" elementRef="obj_catalogue" xsi:type="Element" x="478" y="648" w="176" h="52"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-obj_reservation" elementRef="obj_reservation" xsi:type="Element" x="702" y="648" w="176" h="52"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-obj_redemption" elementRef="obj_redemption" xsi:type="Element" x="926" y="648" w="176" h="52"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-obj_voucher" elementRef="obj_voucher" xsi:type="Element" x="1150" y="648" w="176" h="52"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="n-view-partner-lifecycle-obj_settlement" elementRef="obj_settlement" xsi:type="Element" x="1374" y="648" w="176" h="52"><style><fillColor r="255" g="255" b="181"/><lineColor r="120" g="120" b="120"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style></node>
+<connection identifier="c-view-partner-lifecycle-rel-129-p_sub-p_kyb" relationshipRef="rel-129" source="n-view-partner-lifecycle-p_sub" target="n-view-partner-lifecycle-p_kyb" xsi:type="Relationship"/>
+<connection identifier="c-view-partner-lifecycle-rel-130-p_kyb-p_apr" relationshipRef="rel-130" source="n-view-partner-lifecycle-p_kyb" target="n-view-partner-lifecycle-p_apr" xsi:type="Relationship"/>
+<connection identifier="c-view-partner-lifecycle-rel-131-p_apr-p_prov" relationshipRef="rel-131" source="n-view-partner-lifecycle-p_apr" target="n-view-partner-lifecycle-p_prov" xsi:type="Relationship"/>
+<connection identifier="c-view-partner-lifecycle-rel-132-p_prov-p_push" relationshipRef="rel-132" source="n-view-partner-lifecycle-p_prov" target="n-view-partner-lifecycle-p_push" xsi:type="Relationship"/>
+<connection identifier="c-view-partner-lifecycle-rel-133-p_push-p_val" relationshipRef="rel-133" source="n-view-partner-lifecycle-p_push" target="n-view-partner-lifecycle-p_val" xsi:type="Relationship"/>
+<connection identifier="c-view-partner-lifecycle-rel-134-p_val-p_idx" relationshipRef="rel-134" source="n-view-partner-lifecycle-p_val" target="n-view-partner-lifecycle-p_idx" xsi:type="Relationship"/>
+<connection identifier="c-view-partner-lifecycle-rel-135-p_idx-p_rel" relationshipRef="rel-135" source="n-view-partner-lifecycle-p_idx" target="n-view-partner-lifecycle-p_rel" xsi:type="Relationship"/>
+<connection identifier="c-view-partner-lifecycle-rel-136-p_rel-p_brw" relationshipRef="rel-136" source="n-view-partner-lifecycle-p_rel" target="n-view-partner-lifecycle-p_brw" xsi:type="Relationship"/>
+<connection identifier="c-view-partner-lifecycle-rel-137-p_brw-p_res" relationshipRef="rel-137" source="n-view-partner-lifecycle-p_brw" target="n-view-partner-lifecycle-p_res" xsi:type="Relationship"/>
+<connection identifier="c-view-partner-lifecycle-rel-138-p_res-p_api" relationshipRef="rel-138" source="n-view-partner-lifecycle-p_res" target="n-view-partner-lifecycle-p_api" xsi:type="Relationship"/>
+<connection identifier="c-view-partner-lifecycle-rel-139-p_api-p_cmt" relationshipRef="rel-139" source="n-view-partner-lifecycle-p_api" target="n-view-partner-lifecycle-p_cmt" xsi:type="Relationship"/>
+<connection identifier="c-view-partner-lifecycle-rel-140-p_cmt-p_ntf" relationshipRef="rel-140" source="n-view-partner-lifecycle-p_cmt" target="n-view-partner-lifecycle-p_ntf" xsi:type="Relationship"/>
+<connection identifier="c-view-partner-lifecycle-rel-141-p_ntf-p_agg" relationshipRef="rel-141" source="n-view-partner-lifecycle-p_ntf" target="n-view-partner-lifecycle-p_agg" xsi:type="Relationship"/>
+<connection identifier="c-view-partner-lifecycle-rel-142-p_agg-p_rec" relationshipRef="rel-142" source="n-view-partner-lifecycle-p_agg" target="n-view-partner-lifecycle-p_rec" xsi:type="Relationship"/>
+<connection identifier="c-view-partner-lifecycle-rel-143-p_rec-p_inv" relationshipRef="rel-143" source="n-view-partner-lifecycle-p_rec" target="n-view-partner-lifecycle-p_inv" xsi:type="Relationship"/>
+<connection identifier="c-view-partner-lifecycle-rel-144-p_inv-p_pay" relationshipRef="rel-144" source="n-view-partner-lifecycle-p_inv" target="n-view-partner-lifecycle-p_pay" xsi:type="Relationship"/>
+<connection identifier="c-view-partner-lifecycle-rel-145-p_pay-p_hld" relationshipRef="rel-145" source="n-view-partner-lifecycle-p_pay" target="n-view-partner-lifecycle-p_hld" xsi:type="Relationship"/>
+<connection identifier="c-view-partner-lifecycle-rel-146-p_hld-p_dec" relationshipRef="rel-146" source="n-view-partner-lifecycle-p_hld" target="n-view-partner-lifecycle-p_dec" xsi:type="Relationship"/>
+<connection identifier="c-view-partner-lifecycle-rel-147-p_dec-p_wrn" relationshipRef="rel-147" source="n-view-partner-lifecycle-p_dec" target="n-view-partner-lifecycle-p_wrn" xsi:type="Relationship"/>
+<connection identifier="c-view-partner-lifecycle-rel-148-p_wrn-p_rev" relationshipRef="rel-148" source="n-view-partner-lifecycle-p_wrn" target="n-view-partner-lifecycle-p_rev" xsi:type="Relationship"/>
+<connection identifier="c-view-partner-lifecycle-rel-149-p_rev-p_wnd" relationshipRef="rel-149" source="n-view-partner-lifecycle-p_rev" target="n-view-partner-lifecycle-p_wnd" xsi:type="Relationship"/>
+<connection identifier="c-view-partner-lifecycle-rel-150-p_wnd-p_fin" relationshipRef="rel-150" source="n-view-partner-lifecycle-p_wnd" target="n-view-partner-lifecycle-p_fin" xsi:type="Relationship"/>
+<connection identifier="c-view-partner-lifecycle-rel-151-p_fin-p_ret" relationshipRef="rel-151" source="n-view-partner-lifecycle-p_fin" target="n-view-partner-lifecycle-p_ret" xsi:type="Relationship"/>
+<connection identifier="c-view-partner-lifecycle-rel-84-r_ponb-c_onb" relationshipRef="rel-84" source="n-view-partner-lifecycle-r_ponb" target="g-view-partner-lifecycle-c_onb" xsi:type="Relationship"><bendpoint x="378" y="316"/><bendpoint x="378" y="316"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-95-c_onb-bsv_onb" relationshipRef="rel-95" source="g-view-partner-lifecycle-c_onb" target="n-view-partner-lifecycle-bsv_onb" xsi:type="Relationship"><bendpoint x="378" y="320"/><bendpoint x="378" y="320"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-89-act_partner-p_sub" relationshipRef="rel-89" source="n-view-partner-lifecycle-act_partner" target="n-view-partner-lifecycle-p_sub" xsi:type="Relationship"><bendpoint x="1184" y="324"/><bendpoint x="140" y="324"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-90-act_partner-p_push" relationshipRef="rel-90" source="n-view-partner-lifecycle-act_partner" target="n-view-partner-lifecycle-p_push" xsi:type="Relationship"><bendpoint x="1184" y="328"/><bendpoint x="1184" y="328"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-85-r_market-c_cat" relationshipRef="rel-85" source="n-view-partner-lifecycle-r_market" target="g-view-partner-lifecycle-c_cat" xsi:type="Relationship"><bendpoint x="1422" y="332"/><bendpoint x="1422" y="332"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-97-c_cat-bsv_cat" relationshipRef="rel-97" source="g-view-partner-lifecycle-c_cat" target="n-view-partner-lifecycle-bsv_cat" xsi:type="Relationship"><bendpoint x="1422" y="336"/><bendpoint x="1422" y="336"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-91-act_member-p_brw" relationshipRef="rel-91" source="n-view-partner-lifecycle-act_member" target="n-view-partner-lifecycle-p_brw" xsi:type="Relationship"><bendpoint x="2228" y="340"/><bendpoint x="2228" y="340"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-86-r_redeem-c_red" relationshipRef="rel-86" source="n-view-partner-lifecycle-r_redeem" target="g-view-partner-lifecycle-c_red" xsi:type="Relationship"><bendpoint x="2704" y="344"/><bendpoint x="2704" y="344"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-94-r_fraud-p_api" relationshipRef="rel-94" source="n-view-partner-lifecycle-r_fraud" target="n-view-partner-lifecycle-p_api" xsi:type="Relationship"><bendpoint x="2704" y="348"/><bendpoint x="2704" y="348"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-99-c_red-bsv_fulfil" relationshipRef="rel-99" source="g-view-partner-lifecycle-c_red" target="n-view-partner-lifecycle-bsv_fulfil" xsi:type="Relationship"><bendpoint x="2704" y="352"/><bendpoint x="2704" y="352"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-92-r_wallet-p_res" relationshipRef="rel-92" source="n-view-partner-lifecycle-r_wallet" target="n-view-partner-lifecycle-p_res" xsi:type="Relationship"><bendpoint x="2942" y="356"/><bendpoint x="2466" y="356"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-93-r_wallet-p_cmt" relationshipRef="rel-93" source="n-view-partner-lifecycle-r_wallet" target="n-view-partner-lifecycle-p_cmt" xsi:type="Relationship"><bendpoint x="2942" y="360"/><bendpoint x="2942" y="360"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-87-r_fin-c_set" relationshipRef="rel-87" source="n-view-partner-lifecycle-r_fin" target="g-view-partner-lifecycle-c_set" xsi:type="Relationship"><bendpoint x="3986" y="364"/><bendpoint x="3986" y="364"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-101-c_set-bsv_settle" relationshipRef="rel-101" source="g-view-partner-lifecycle-c_set" target="n-view-partner-lifecycle-bsv_settle" xsi:type="Relationship"><bendpoint x="3986" y="368"/><bendpoint x="3986" y="368"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-88-r_pexit-c_off" relationshipRef="rel-88" source="n-view-partner-lifecycle-r_pexit" target="g-view-partner-lifecycle-c_off" xsi:type="Relationship"><bendpoint x="5387" y="372"/><bendpoint x="5387" y="372"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-103-c_off-bsv_off" relationshipRef="rel-103" source="g-view-partner-lifecycle-c_off" target="n-view-partner-lifecycle-bsv_off" xsi:type="Relationship"><bendpoint x="5387" y="376"/><bendpoint x="5387" y="376"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-96-bsv_onb-act_partner" relationshipRef="rel-96" source="n-view-partner-lifecycle-bsv_onb" target="n-view-partner-lifecycle-act_partner" xsi:type="Relationship"><bendpoint x="378" y="169"/><bendpoint x="1184" y="169"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-98-bsv_cat-act_partner" relationshipRef="rel-98" source="n-view-partner-lifecycle-bsv_cat" target="n-view-partner-lifecycle-act_partner" xsi:type="Relationship"><bendpoint x="1422" y="180"/><bendpoint x="1184" y="180"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-100-bsv_fulfil-act_member" relationshipRef="rel-100" source="n-view-partner-lifecycle-bsv_fulfil" target="n-view-partner-lifecycle-act_member" xsi:type="Relationship"><bendpoint x="2704" y="192"/><bendpoint x="2228" y="192"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-102-bsv_settle-act_partner" relationshipRef="rel-102" source="n-view-partner-lifecycle-bsv_settle" target="n-view-partner-lifecycle-act_partner" xsi:type="Relationship"><bendpoint x="3986" y="203"/><bendpoint x="1184" y="203"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-104-bsv_off-act_partner" relationshipRef="rel-104" source="n-view-partner-lifecycle-bsv_off" target="n-view-partner-lifecycle-act_partner" xsi:type="Relationship"><bendpoint x="5387" y="214"/><bendpoint x="1184" y="214"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-152-p_kyb-obj_kyb" relationshipRef="rel-152" source="n-view-partner-lifecycle-p_kyb" target="n-view-partner-lifecycle-obj_kyb" xsi:type="Relationship"><bendpoint x="378" y="567"/><bendpoint x="118" y="567"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-153-p_prov-obj_contract" relationshipRef="rel-153" source="n-view-partner-lifecycle-p_prov" target="n-view-partner-lifecycle-obj_contract" xsi:type="Relationship"><bendpoint x="946" y="573"/><bendpoint x="342" y="573"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-154-p_push-obj_catalogue" relationshipRef="rel-154" source="n-view-partner-lifecycle-p_push" target="n-view-partner-lifecycle-obj_catalogue" xsi:type="Relationship"><bendpoint x="1184" y="579"/><bendpoint x="566" y="579"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-155-p_idx-obj_catalogue" relationshipRef="rel-155" source="n-view-partner-lifecycle-p_idx" target="n-view-partner-lifecycle-obj_catalogue" xsi:type="Relationship"><bendpoint x="1660" y="584"/><bendpoint x="566" y="584"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-156-p_rel-obj_contract" relationshipRef="rel-156" source="n-view-partner-lifecycle-p_rel" target="n-view-partner-lifecycle-obj_contract" xsi:type="Relationship"><bendpoint x="1898" y="590"/><bendpoint x="342" y="590"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-157-p_res-obj_reservation" relationshipRef="rel-157" source="n-view-partner-lifecycle-p_res" target="n-view-partner-lifecycle-obj_reservation" xsi:type="Relationship"><bendpoint x="2466" y="596"/><bendpoint x="790" y="596"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-158-p_cmt-obj_redemption" relationshipRef="rel-158" source="n-view-partner-lifecycle-p_cmt" target="n-view-partner-lifecycle-obj_redemption" xsi:type="Relationship"><bendpoint x="2942" y="601"/><bendpoint x="1014" y="601"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-159-p_cmt-obj_voucher" relationshipRef="rel-159" source="n-view-partner-lifecycle-p_cmt" target="n-view-partner-lifecycle-obj_voucher" xsi:type="Relationship"><bendpoint x="2942" y="607"/><bendpoint x="1238" y="607"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-160-p_agg-obj_redemption" relationshipRef="rel-160" source="n-view-partner-lifecycle-p_agg" target="n-view-partner-lifecycle-obj_redemption" xsi:type="Relationship"><bendpoint x="3510" y="613"/><bendpoint x="1014" y="613"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-161-p_rec-obj_redemption" relationshipRef="rel-161" source="n-view-partner-lifecycle-p_rec" target="n-view-partner-lifecycle-obj_redemption" xsi:type="Relationship"><bendpoint x="3748" y="618"/><bendpoint x="1014" y="618"/></connection>
+<connection identifier="c-view-partner-lifecycle-rel-162-p_inv-obj_settlement" relationshipRef="rel-162" source="n-view-partner-lifecycle-p_inv" target="n-view-partner-lifecycle-obj_settlement" xsi:type="Relationship"><bendpoint x="3986" y="624"/><bendpoint x="1462" y="624"/></connection>
+</view>
+</diagrams></views></model>

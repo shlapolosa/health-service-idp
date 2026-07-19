@@ -1,0 +1,542 @@
+{
+ "zones": [
+  {
+   "id": "z_client",
+   "label": "Sahatna Client (citizen app)",
+   "stroke": "#D79B00",
+   "nodefill": "#FFE6CC"
+  },
+  {
+   "id": "z_apim_n",
+   "label": "Integration North",
+   "stroke": "#3A7CA5",
+   "nodefill": "#D7E8F2"
+  },
+  {
+   "id": "z_bff",
+   "label": "Sahatna (server-side)",
+   "stroke": "#6C8EBF",
+   "nodefill": "#DAE8FC"
+  },
+  {
+   "id": "z_admin",
+   "label": "Platform Client (admin / partner console)",
+   "stroke": "#2E6E8E",
+   "nodefill": "#CCE5F5"
+  },
+  {
+   "id": "z_apim_s",
+   "label": "Integration South",
+   "stroke": "#3A7CA5",
+   "nodefill": "#D7E8F2"
+  },
+  {
+   "id": "z_engine",
+   "label": "Gamification Engine",
+   "stroke": "#82B366",
+   "nodefill": "#D5E8D4"
+  },
+  {
+   "id": "z_value",
+   "label": "Wallet & Marketplace",
+   "stroke": "#9673A6",
+   "nodefill": "#E1D5E7"
+  },
+  {
+   "id": "z_persist",
+   "label": "Persistence",
+   "stroke": "#D6B656",
+   "nodefill": "#FFF2CC"
+  },
+  {
+   "id": "z_external",
+   "label": "External Partner APIs",
+   "stroke": "#B85450",
+   "nodefill": "#F8CECC"
+  },
+  {
+   "id": "z_platform",
+   "label": "Platform Services",
+   "stroke": "#666666",
+   "nodefill": "#EEEEEE"
+  },
+  {
+   "id": "z_xcut",
+   "label": "Cross-cutting",
+   "stroke": "#666666",
+   "nodefill": "#F5F5F5"
+  }
+ ],
+ "comps": [
+  {
+   "id": "cl_chal",
+   "zone": "z_client",
+   "title": "Challenges",
+   "desc": "active list \u00b7 join \u00b7 progress \u00b7 clinical / demographic / telemetry mix"
+  },
+  {
+   "id": "cl_wallet",
+   "zone": "z_client",
+   "title": "Rewards and Wallet",
+   "desc": "points balance \u00b7 transactions \u00b7 vouchers \u00b7 re-display voucher (rate-limited)"
+  },
+  {
+   "id": "cl_market",
+   "zone": "z_client",
+   "title": "Marketplace and Redeem",
+   "desc": "item detail \u00b7 confirm redemption \u00b7 Idempotency-Key (client UUIDv4)"
+  },
+  {
+   "id": "cl_health",
+   "zone": "z_client",
+   "title": "Health Connect SDK",
+   "desc": "on-device wearable telemetry source \u00b7 steps \u00b7 heart-rate \u00b7 sleep \u00b7 workouts"
+  },
+  {
+   "id": "apim_n",
+   "zone": "z_apim_n",
+   "title": "Azure APIM - Citizen Gateway",
+   "desc": "JWT validation \u00b7 rate-limit \u00b7 routing \u00b7 products \u00b7 subscription keys"
+  },
+  {
+   "id": "idp_uaepass",
+   "zone": "z_apim_n",
+   "title": "UAE Pass IdP",
+   "desc": "citizen identity federation (OIDC) \u00b7 national ID \u00b7 mints platform JWT"
+  },
+  {
+   "id": "bff_member",
+   "zone": "z_bff",
+   "title": "Gamification Service",
+   "desc": "gameplay BFF \u00b7 JWT relay \u00b7 session \u00b7 fan-out: challenges \u00b7 wallet \u00b7 market"
+  },
+  {
+   "id": "wearable_svc",
+   "zone": "z_bff",
+   "title": "Wearable Service",
+   "desc": "ingest Health Connect SDK telemetry \u00b7 writes telemetry to Event Hub"
+  },
+  {
+   "id": "bff_admin",
+   "zone": "z_admin",
+   "title": "Admin / Partner Console",
+   "desc": "partner onboarding \u00b7 item approval \u00b7 reconciliation \u00b7 no APIM ingress \u00b7 connects to Platform APIM (south)"
+  },
+  {
+   "id": "cms_sahatna",
+   "zone": "z_bff",
+   "title": "Sahatna CMS",
+   "desc": "challenge CONTENT (copy \u00b7 imagery \u00b7 TandC) \u00b7 hydrates eligible challenge_ids \u2192 published"
+  },
+  {
+   "id": "sah_notify",
+   "zone": "z_bff",
+   "title": "Sahatna Notifications API",
+   "desc": "Sahatna OWNS end-user delivery (push\u00b7email\u00b7SMS\u00b7in-app) \u00b7 platform calls via APIM \u00b7 consent-gated \u00b7 captures notify-consent \u2192 propagates down"
+  },
+  {
+   "id": "apim_s",
+   "zone": "z_apim_s",
+   "title": "Azure APIM - Platform Gateway",
+   "desc": "service-to-service (sync) \u00b7 JWT \u00b7 policy \u00b7 per-OAM product \u00b7 mTLS"
+  },
+  {
+   "id": "eh_integration",
+   "zone": "z_apim_s",
+   "title": "Event Hub (EVENT-SVC)",
+   "desc": "async integration \u00b7 Kafka + Lenses spine \u00b7 schema registry \u00b7 activity.* \u00b7 wallet.* \u00b7 voucher.*"
+  },
+  {
+   "id": "idp_entra",
+   "zone": "z_apim_s",
+   "title": "Microsoft Entra IdP",
+   "desc": "workforce / service identity (OAuth2) \u00b7 B2B: Sahatna app-registration \u00b7 client-credentials \u2192 token (via APIM) \u00b7 workload/managed identity for direct Event-Hub ingest ACL"
+  },
+  {
+   "id": "en_enrol",
+   "zone": "z_engine",
+   "title": "Enrolment and Eligibility",
+   "desc": "resolve eligible challenges \u00b7 local-vs-Malaffi branch"
+  },
+  {
+   "id": "en_cohort",
+   "zone": "z_engine",
+   "title": "Local Segmentation",
+   "desc": "demographic/telemetry segments (local) \u00b7 clinical segments are external (Malaffi)"
+  },
+  {
+   "id": "en_chal",
+   "zone": "z_engine",
+   "title": "Challenge",
+   "desc": "authoring \u2192 publish \u2192 conclude \u00b7 eligibility binding"
+  },
+  {
+   "id": "en_verify",
+   "zone": "z_engine",
+   "title": "Verification",
+   "desc": "wearable / activity verify \u00b7 emits activity.verified"
+  },
+  {
+   "id": "en_score",
+   "zone": "z_engine",
+   "title": "Scoring and Recognition",
+   "desc": "daily/weekly scoring \u00b7 titles \u00b7 badges \u00b7 streaks"
+  },
+  {
+   "id": "en_engage",
+   "zone": "z_engine",
+   "title": "Engagement",
+   "desc": "nudges \u00b7 goals \u00b7 cohort plans"
+  },
+  {
+   "id": "en_eligorch",
+   "zone": "z_engine",
+   "title": "Eligibility Resolver",
+   "desc": "membership \u2192 segments \u2192 map to challenge_ids \u00b7 returns ids; Sahatna CMS hydrates"
+  },
+  {
+   "id": "en_maladapter",
+   "zone": "z_engine",
+   "title": "Malaffi Adapter",
+   "desc": "segment metadata (author, no membership) \u00b7 scoped membership query (eligibility)"
+  },
+  {
+   "id": "wm_wallet",
+   "zone": "z_value",
+   "title": "Wallet - Points Ledger",
+   "desc": "authoritative balance (versioned) \u00b7 append-only \u00b7 idempotent"
+  },
+  {
+   "id": "wm_market",
+   "zone": "z_value",
+   "title": "Marketplace and Voucher",
+   "desc": "catalog \u00b7 reserve \u00b7 issue voucher \u00b7 encrypted code/PIN"
+  },
+  {
+   "id": "wm_partner",
+   "zone": "z_value",
+   "title": "Partner and Settlement",
+   "desc": "contracting \u00b7 reconciliation \u00b7 DoH settlement (Phase 4)"
+  },
+  {
+   "id": "wm_fraud",
+   "zone": "z_value",
+   "title": "Fraud and Integrity",
+   "desc": "anomaly detection \u00b7 velocity / duplicate checks"
+  },
+  {
+   "id": "wm_redorch",
+   "zone": "z_value",
+   "title": "Redemption Orchestrator (saga)",
+   "desc": "reserve \u2192 fraud \u2192 dispatch partner \u2192 confirm/release \u00b7 state: reserved \u00b7 partner_pending \u00b7 fulfilled \u00b7 uncertain"
+  },
+  {
+   "id": "wm_padapter",
+   "zone": "z_value",
+   "title": "Partner Adapter Framework",
+   "desc": "routing \u00b7 auth \u00b7 idempotency overlay \u00b7 YGG adapter \u00b7 aggregator adapters"
+  },
+  {
+   "id": "ps_wallet",
+   "zone": "z_persist",
+   "title": "Wallet stores",
+   "desc": "WalletBalance \u00b7 Transaction \u00b7 Reservation (idempotency_key)"
+  },
+  {
+   "id": "ps_engine",
+   "zone": "z_persist",
+   "title": "Challenge and Cohort stores",
+   "desc": "Challenge \u00b7 Segment \u00b7 Score \u00b7 Eligibility Result"
+  },
+  {
+   "id": "ps_market",
+   "zone": "z_persist",
+   "title": "Marketplace stores",
+   "desc": "Item \u00b7 Redemption \u00b7 Voucher \u00b7 (encrypted columns)"
+  },
+  {
+   "id": "ps_kv",
+   "zone": "z_persist",
+   "title": "Azure Key Vault",
+   "desc": "per-partner credentials \u00b7 version-bumped rotation"
+  },
+  {
+   "id": "ex_malaffi",
+   "zone": "z_external",
+   "title": "Malaffi HIE",
+   "desc": "clinical membership / eligibility \u00b7 black box \u00b7 API only"
+  },
+  {
+   "id": "ex_providers",
+   "zone": "z_external",
+   "title": "Reward Providers",
+   "desc": "YouGotaGift (eGift v2.4) \u00b7 aggregators \u00b7 voucher issue / redeem"
+  },
+  {
+   "id": "ex_doh",
+   "zone": "z_external",
+   "title": "DoH ESB",
+   "desc": "sponsor \u00b7 settlement (Phase 4) \u00b7 IBAN payouts \u00b7 VAT invoice"
+  },
+  {
+   "id": "pf_fraud",
+   "zone": "z_platform",
+   "title": "FRAUD-SVC",
+   "desc": "anomaly detection \u00b7 DLQ signals"
+  },
+  {
+   "id": "pf_nudge",
+   "zone": "z_platform",
+   "title": "NUDGE-SVC",
+   "desc": "compose notification request (no channels of its own) \u00b7 consent-checked \u2192 calls Sahatna Notifications API via APIM"
+  },
+  {
+   "id": "pf_consent",
+   "zone": "z_platform",
+   "title": "CONS-SVC",
+   "desc": "consent purpose \u00b7 voucher / data sharing \u00b7 NOTIFY consent propagated from Sahatna \u00b7 checked before notify"
+  },
+  {
+   "id": "pf_id",
+   "zone": "z_platform",
+   "title": "ID-SVC",
+   "desc": "session and token exchange \u00b7 member \u2194 platform identity"
+  },
+  {
+   "id": "pf_data",
+   "zone": "z_platform",
+   "title": "DATA-SVC",
+   "desc": "warehouse + analytics (OLAP) \u00b7 settlement aggregation \u00b7 dashboards"
+  },
+  {
+   "id": "xc_secrets",
+   "zone": "z_xcut",
+   "title": "Secrets Management",
+   "desc": "Azure Key Vault + External Secrets \u00b7 <comp>-conn injection"
+  },
+  {
+   "id": "xc_gitops",
+   "zone": "z_xcut",
+   "title": "Declarative Provisioning",
+   "desc": "KubeVela + Crossplane + ArgoCD \u00b7 OAM control plane (GitOps)"
+  },
+  {
+   "id": "xc_obs",
+   "zone": "z_xcut",
+   "title": "Observability",
+   "desc": "Prometheus \u00b7 Grafana \u00b7 Jaeger \u00b7 Kiali"
+  }
+ ],
+ "edges": [
+  {
+   "s": "cl_chal",
+   "t": "apim_n",
+   "type": "sync"
+  },
+  {
+   "s": "cl_wallet",
+   "t": "apim_n",
+   "type": "sync"
+  },
+  {
+   "s": "cl_market",
+   "t": "apim_n",
+   "type": "sync"
+  },
+  {
+   "s": "apim_n",
+   "t": "bff_member",
+   "type": "sync"
+  },
+  {
+   "s": "apim_n",
+   "t": "cms_sahatna",
+   "type": "sync"
+  },
+  {
+   "s": "bff_member",
+   "t": "apim_s",
+   "type": "sync"
+  },
+  {
+   "s": "bff_admin",
+   "t": "apim_s",
+   "type": "sync"
+  },
+  {
+   "s": "apim_s",
+   "t": "en_enrol",
+   "type": "sync"
+  },
+  {
+   "s": "apim_s",
+   "t": "en_chal",
+   "type": "sync"
+  },
+  {
+   "s": "apim_s",
+   "t": "wm_wallet",
+   "type": "sync"
+  },
+  {
+   "s": "apim_s",
+   "t": "wm_market",
+   "type": "sync"
+  },
+  {
+   "s": "en_enrol",
+   "t": "en_eligorch",
+   "type": "sync"
+  },
+  {
+   "s": "en_eligorch",
+   "t": "en_cohort",
+   "type": "sync"
+  },
+  {
+   "s": "bff_member",
+   "t": "cms_sahatna",
+   "type": "sync"
+  },
+  {
+   "s": "wm_market",
+   "t": "wm_redorch",
+   "type": "sync"
+  },
+  {
+   "s": "wm_redorch",
+   "t": "wm_wallet",
+   "type": "sync"
+  },
+  {
+   "s": "wm_redorch",
+   "t": "wm_fraud",
+   "type": "sync"
+  },
+  {
+   "s": "wm_wallet",
+   "t": "ps_wallet",
+   "type": "sync"
+  },
+  {
+   "s": "wm_market",
+   "t": "ps_market",
+   "type": "sync"
+  },
+  {
+   "s": "en_chal",
+   "t": "ps_engine",
+   "type": "sync"
+  },
+  {
+   "s": "en_maladapter",
+   "t": "ex_malaffi",
+   "type": "xtrust"
+  },
+  {
+   "s": "wm_padapter",
+   "t": "ex_providers",
+   "type": "xtrust"
+  },
+  {
+   "s": "wm_partner",
+   "t": "ex_doh",
+   "type": "xtrust"
+  },
+  {
+   "s": "en_verify",
+   "t": "eh_integration",
+   "type": "async"
+  },
+  {
+   "s": "wm_wallet",
+   "t": "eh_integration",
+   "type": "async"
+  },
+  {
+   "s": "wm_market",
+   "t": "eh_integration",
+   "type": "async"
+  },
+  {
+   "s": "eh_integration",
+   "t": "pf_fraud",
+   "type": "async"
+  },
+  {
+   "s": "eh_integration",
+   "t": "pf_nudge",
+   "type": "async"
+  },
+  {
+   "s": "eh_integration",
+   "t": "pf_data",
+   "type": "async"
+  },
+  {
+   "s": "eh_integration",
+   "t": "wm_fraud",
+   "type": "async"
+  },
+  {
+   "s": "cl_health",
+   "t": "apim_n",
+   "type": "async"
+  },
+  {
+   "s": "apim_n",
+   "t": "wearable_svc",
+   "type": "async"
+  },
+  {
+   "s": "wearable_svc",
+   "t": "eh_integration",
+   "type": "async"
+  },
+  {
+   "s": "eh_integration",
+   "t": "en_verify",
+   "type": "async"
+  },
+  {
+   "s": "idp_uaepass",
+   "t": "apim_n",
+   "type": "identity"
+  },
+  {
+   "s": "idp_entra",
+   "t": "apim_s",
+   "type": "identity"
+  },
+  {
+   "s": "pf_consent",
+   "t": "en_enrol",
+   "type": "identity"
+  },
+  {
+   "s": "xc_secrets",
+   "t": "ps_kv",
+   "type": "identity"
+  },
+  {
+   "s": "pf_nudge",
+   "t": "pf_consent",
+   "type": "sync"
+  },
+  {
+   "s": "pf_nudge",
+   "t": "apim_n",
+   "type": "sync"
+  },
+  {
+   "s": "apim_n",
+   "t": "sah_notify",
+   "type": "sync"
+  },
+  {
+   "s": "apim_s",
+   "t": "pf_consent",
+   "type": "identity"
+  }
+ ]
+}

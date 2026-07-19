@@ -1,0 +1,970 @@
+{
+  "id": "root",
+  "layoutOptions": {
+    "elk.algorithm": "layered",
+    "elk.direction": "DOWN",
+    "elk.edgeRouting": "ORTHOGONAL",
+    "elk.hierarchyHandling": "INCLUDE_CHILDREN",
+    "elk.partitioning.activate": "true",
+    "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
+    "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+    "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
+    "elk.spacing.nodeNode": "34",
+    "elk.layered.spacing.nodeNodeBetweenLayers": "60",
+    "elk.spacing.edgeNode": "18",
+    "elk.spacing.edgeEdge": "12"
+  },
+  "children": [
+    {
+      "id": "z_client",
+      "labels": [
+        {
+          "text": "Client Surfaces — Sahatna Citizen App"
+        }
+      ],
+      "layoutOptions": {
+        "elk.partitioning.partition": "0",
+        "elk.direction": "RIGHT",
+        "elk.padding": "[top=42,left=18,bottom=18,right=18]",
+        "elk.nodeSize.constraints": "[MINIMUM_SIZE]",
+        "elk.nodeSize.minimum": "1914,138"
+      },
+      "children": [
+        {
+          "id": "cl_chal",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Challenges"
+            }
+          ]
+        },
+        {
+          "id": "cl_wallet",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Rewards and Wallet"
+            }
+          ]
+        },
+        {
+          "id": "cl_market",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Marketplace and Redeem"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "z_apim_n",
+      "labels": [
+        {
+          "text": "API Gateway — North"
+        }
+      ],
+      "layoutOptions": {
+        "elk.partitioning.partition": "1",
+        "elk.direction": "RIGHT",
+        "elk.padding": "[top=42,left=18,bottom=18,right=18]",
+        "elk.nodeSize.constraints": "[MINIMUM_SIZE]",
+        "elk.nodeSize.minimum": "1914,138"
+      },
+      "children": [
+        {
+          "id": "apim_n",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Azure APIM - Citizen Gateway"
+            }
+          ]
+        },
+        {
+          "id": "idp_uaepass",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "UAE Pass IdP"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "z_bff",
+      "labels": [
+        {
+          "text": "BFF Layer — Sahatna BFF"
+        }
+      ],
+      "layoutOptions": {
+        "elk.partitioning.partition": "2",
+        "elk.direction": "RIGHT",
+        "elk.padding": "[top=42,left=18,bottom=18,right=18]",
+        "elk.nodeSize.constraints": "[MINIMUM_SIZE]",
+        "elk.nodeSize.minimum": "1914,138"
+      },
+      "children": [
+        {
+          "id": "bff_member",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Member BFF"
+            }
+          ]
+        },
+        {
+          "id": "bff_admin",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Admin / Partner BFF"
+            }
+          ]
+        },
+        {
+          "id": "cms_sahatna",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Sahatna CMS"
+            }
+          ]
+        },
+        {
+          "id": "sah_notify",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Sahatna Notifications API"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "z_apim_s",
+      "labels": [
+        {
+          "text": "Integration Layer — South"
+        }
+      ],
+      "layoutOptions": {
+        "elk.partitioning.partition": "3",
+        "elk.direction": "RIGHT",
+        "elk.padding": "[top=42,left=18,bottom=18,right=18]",
+        "elk.nodeSize.constraints": "[MINIMUM_SIZE]",
+        "elk.nodeSize.minimum": "1914,138"
+      },
+      "children": [
+        {
+          "id": "apim_s",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Azure APIM - Platform Gateway"
+            }
+          ]
+        },
+        {
+          "id": "eh_integration",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Event Hub (EVENT-SVC)"
+            }
+          ]
+        },
+        {
+          "id": "idp_entra",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Microsoft Entra IdP"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "z_engine",
+      "labels": [
+        {
+          "text": "Gamification Platform — Core Engine"
+        }
+      ],
+      "layoutOptions": {
+        "elk.partitioning.partition": "4",
+        "elk.direction": "RIGHT",
+        "elk.padding": "[top=42,left=18,bottom=18,right=18]",
+        "elk.nodeSize.constraints": "[MINIMUM_SIZE]",
+        "elk.nodeSize.minimum": "1914,138"
+      },
+      "children": [
+        {
+          "id": "en_enrol",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Enrolment and Eligibility"
+            }
+          ]
+        },
+        {
+          "id": "en_cohort",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Local Segmentation"
+            }
+          ]
+        },
+        {
+          "id": "en_chal",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Challenge"
+            }
+          ]
+        },
+        {
+          "id": "en_verify",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Verification"
+            }
+          ]
+        },
+        {
+          "id": "en_score",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Scoring and Recognition"
+            }
+          ]
+        },
+        {
+          "id": "en_engage",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Engagement"
+            }
+          ]
+        },
+        {
+          "id": "en_eligorch",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Eligibility Resolver"
+            }
+          ]
+        },
+        {
+          "id": "en_maladapter",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Malaffi Adapter"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "z_value",
+      "labels": [
+        {
+          "text": "Wallet & Marketplace Services"
+        }
+      ],
+      "layoutOptions": {
+        "elk.partitioning.partition": "5",
+        "elk.direction": "RIGHT",
+        "elk.padding": "[top=42,left=18,bottom=18,right=18]",
+        "elk.nodeSize.constraints": "[MINIMUM_SIZE]",
+        "elk.nodeSize.minimum": "1914,138"
+      },
+      "children": [
+        {
+          "id": "wm_wallet",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Wallet - Points Ledger"
+            }
+          ]
+        },
+        {
+          "id": "wm_market",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Marketplace and Voucher"
+            }
+          ]
+        },
+        {
+          "id": "wm_partner",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Partner and Settlement"
+            }
+          ]
+        },
+        {
+          "id": "wm_fraud",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Fraud and Integrity"
+            }
+          ]
+        },
+        {
+          "id": "wm_redorch",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Redemption Orchestrator (saga)"
+            }
+          ]
+        },
+        {
+          "id": "wm_padapter",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Partner Adapter Framework"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "z_persist",
+      "labels": [
+        {
+          "text": "Persistence — Azure data stores"
+        }
+      ],
+      "layoutOptions": {
+        "elk.partitioning.partition": "6",
+        "elk.direction": "RIGHT",
+        "elk.padding": "[top=42,left=18,bottom=18,right=18]",
+        "elk.nodeSize.constraints": "[MINIMUM_SIZE]",
+        "elk.nodeSize.minimum": "1914,138"
+      },
+      "children": [
+        {
+          "id": "ps_wallet",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Wallet stores"
+            }
+          ]
+        },
+        {
+          "id": "ps_engine",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Challenge and Cohort stores"
+            }
+          ]
+        },
+        {
+          "id": "ps_market",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Marketplace stores"
+            }
+          ]
+        },
+        {
+          "id": "ps_kv",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Azure Key Vault"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "z_external",
+      "labels": [
+        {
+          "text": "External Partner APIs — outside the platform trust zone"
+        }
+      ],
+      "layoutOptions": {
+        "elk.partitioning.partition": "7",
+        "elk.direction": "RIGHT",
+        "elk.padding": "[top=42,left=18,bottom=18,right=18]",
+        "elk.nodeSize.constraints": "[MINIMUM_SIZE]",
+        "elk.nodeSize.minimum": "1914,138"
+      },
+      "children": [
+        {
+          "id": "ex_malaffi",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Malaffi HIE"
+            }
+          ]
+        },
+        {
+          "id": "ex_providers",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Reward Providers"
+            }
+          ]
+        },
+        {
+          "id": "ex_doh",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "DoH ESB"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "z_platform",
+      "labels": [
+        {
+          "text": "Platform Services — event consumers, identity, consent, analytics"
+        }
+      ],
+      "layoutOptions": {
+        "elk.partitioning.partition": "8",
+        "elk.direction": "RIGHT",
+        "elk.padding": "[top=42,left=18,bottom=18,right=18]",
+        "elk.nodeSize.constraints": "[MINIMUM_SIZE]",
+        "elk.nodeSize.minimum": "1914,138"
+      },
+      "children": [
+        {
+          "id": "pf_fraud",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "FRAUD-SVC"
+            }
+          ]
+        },
+        {
+          "id": "pf_nudge",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "NUDGE-SVC"
+            }
+          ]
+        },
+        {
+          "id": "pf_consent",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "CONS-SVC"
+            }
+          ]
+        },
+        {
+          "id": "pf_id",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "ID-SVC"
+            }
+          ]
+        },
+        {
+          "id": "pf_data",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "DATA-SVC"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "z_xcut",
+      "labels": [
+        {
+          "text": "Cross-cutting — secrets"
+        }
+      ],
+      "layoutOptions": {
+        "elk.partitioning.partition": "9",
+        "elk.direction": "RIGHT",
+        "elk.padding": "[top=42,left=18,bottom=18,right=18]",
+        "elk.nodeSize.constraints": "[MINIMUM_SIZE]",
+        "elk.nodeSize.minimum": "1914,138"
+      },
+      "children": [
+        {
+          "id": "xc_secrets",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Secrets Management"
+            }
+          ]
+        },
+        {
+          "id": "xc_gitops",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Declarative Provisioning"
+            }
+          ]
+        },
+        {
+          "id": "xc_obs",
+          "width": 200,
+          "height": 78,
+          "labels": [
+            {
+              "text": "Observability"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "sources": [
+        "cl_chal"
+      ],
+      "targets": [
+        "apim_n"
+      ]
+    },
+    {
+      "id": "e1",
+      "sources": [
+        "cl_wallet"
+      ],
+      "targets": [
+        "apim_n"
+      ]
+    },
+    {
+      "id": "e2",
+      "sources": [
+        "cl_market"
+      ],
+      "targets": [
+        "apim_n"
+      ]
+    },
+    {
+      "id": "e3",
+      "sources": [
+        "apim_n"
+      ],
+      "targets": [
+        "bff_member"
+      ]
+    },
+    {
+      "id": "e4",
+      "sources": [
+        "apim_n"
+      ],
+      "targets": [
+        "bff_admin"
+      ]
+    },
+    {
+      "id": "e5",
+      "sources": [
+        "bff_member"
+      ],
+      "targets": [
+        "apim_s"
+      ]
+    },
+    {
+      "id": "e6",
+      "sources": [
+        "bff_admin"
+      ],
+      "targets": [
+        "apim_s"
+      ]
+    },
+    {
+      "id": "e7",
+      "sources": [
+        "apim_s"
+      ],
+      "targets": [
+        "en_enrol"
+      ]
+    },
+    {
+      "id": "e8",
+      "sources": [
+        "apim_s"
+      ],
+      "targets": [
+        "en_chal"
+      ]
+    },
+    {
+      "id": "e9",
+      "sources": [
+        "apim_s"
+      ],
+      "targets": [
+        "wm_wallet"
+      ]
+    },
+    {
+      "id": "e10",
+      "sources": [
+        "apim_s"
+      ],
+      "targets": [
+        "wm_market"
+      ]
+    },
+    {
+      "id": "e11",
+      "sources": [
+        "en_enrol"
+      ],
+      "targets": [
+        "en_eligorch"
+      ]
+    },
+    {
+      "id": "e12",
+      "sources": [
+        "en_eligorch"
+      ],
+      "targets": [
+        "en_cohort"
+      ]
+    },
+    {
+      "id": "e13",
+      "sources": [
+        "bff_member"
+      ],
+      "targets": [
+        "cms_sahatna"
+      ]
+    },
+    {
+      "id": "e14",
+      "sources": [
+        "bff_admin"
+      ],
+      "targets": [
+        "cms_sahatna"
+      ]
+    },
+    {
+      "id": "e15",
+      "sources": [
+        "wm_market"
+      ],
+      "targets": [
+        "wm_redorch"
+      ]
+    },
+    {
+      "id": "e16",
+      "sources": [
+        "wm_redorch"
+      ],
+      "targets": [
+        "wm_wallet"
+      ]
+    },
+    {
+      "id": "e17",
+      "sources": [
+        "wm_redorch"
+      ],
+      "targets": [
+        "wm_fraud"
+      ]
+    },
+    {
+      "id": "e18",
+      "sources": [
+        "wm_wallet"
+      ],
+      "targets": [
+        "ps_wallet"
+      ]
+    },
+    {
+      "id": "e19",
+      "sources": [
+        "wm_market"
+      ],
+      "targets": [
+        "ps_market"
+      ]
+    },
+    {
+      "id": "e20",
+      "sources": [
+        "en_chal"
+      ],
+      "targets": [
+        "ps_engine"
+      ]
+    },
+    {
+      "id": "e21",
+      "sources": [
+        "en_maladapter"
+      ],
+      "targets": [
+        "ex_malaffi"
+      ]
+    },
+    {
+      "id": "e22",
+      "sources": [
+        "wm_padapter"
+      ],
+      "targets": [
+        "ex_providers"
+      ]
+    },
+    {
+      "id": "e23",
+      "sources": [
+        "wm_partner"
+      ],
+      "targets": [
+        "ex_doh"
+      ]
+    },
+    {
+      "id": "e24",
+      "sources": [
+        "en_verify"
+      ],
+      "targets": [
+        "eh_integration"
+      ]
+    },
+    {
+      "id": "e25",
+      "sources": [
+        "wm_wallet"
+      ],
+      "targets": [
+        "eh_integration"
+      ]
+    },
+    {
+      "id": "e26",
+      "sources": [
+        "wm_market"
+      ],
+      "targets": [
+        "eh_integration"
+      ]
+    },
+    {
+      "id": "e27",
+      "sources": [
+        "eh_integration"
+      ],
+      "targets": [
+        "pf_fraud"
+      ]
+    },
+    {
+      "id": "e28",
+      "sources": [
+        "eh_integration"
+      ],
+      "targets": [
+        "pf_nudge"
+      ]
+    },
+    {
+      "id": "e29",
+      "sources": [
+        "eh_integration"
+      ],
+      "targets": [
+        "pf_data"
+      ]
+    },
+    {
+      "id": "e30",
+      "sources": [
+        "eh_integration"
+      ],
+      "targets": [
+        "wm_fraud"
+      ]
+    },
+    {
+      "id": "e31",
+      "sources": [
+        "bff_member"
+      ],
+      "targets": [
+        "eh_integration"
+      ]
+    },
+    {
+      "id": "e32",
+      "sources": [
+        "eh_integration"
+      ],
+      "targets": [
+        "en_verify"
+      ]
+    },
+    {
+      "id": "e33",
+      "sources": [
+        "idp_uaepass"
+      ],
+      "targets": [
+        "apim_n"
+      ]
+    },
+    {
+      "id": "e34",
+      "sources": [
+        "idp_entra"
+      ],
+      "targets": [
+        "apim_s"
+      ]
+    },
+    {
+      "id": "e35",
+      "sources": [
+        "pf_consent"
+      ],
+      "targets": [
+        "en_enrol"
+      ]
+    },
+    {
+      "id": "e36",
+      "sources": [
+        "xc_secrets"
+      ],
+      "targets": [
+        "ps_kv"
+      ]
+    },
+    {
+      "id": "e37",
+      "sources": [
+        "pf_nudge"
+      ],
+      "targets": [
+        "pf_consent"
+      ]
+    },
+    {
+      "id": "e38",
+      "sources": [
+        "pf_nudge"
+      ],
+      "targets": [
+        "apim_n"
+      ]
+    },
+    {
+      "id": "e39",
+      "sources": [
+        "apim_n"
+      ],
+      "targets": [
+        "sah_notify"
+      ]
+    },
+    {
+      "id": "e40",
+      "sources": [
+        "apim_s"
+      ],
+      "targets": [
+        "pf_consent"
+      ]
+    }
+  ]
+}

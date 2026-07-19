@@ -102,3 +102,6 @@ node-compile-cache/
 # Snowflake key-pair (never commit)
 *.p8
 rsa_key.*
+
+# Playwright browser download artifact (105MB, exceeds GitHub 100MB limit)
+playwright-download-*.zip

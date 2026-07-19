@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="880" viewBox="0 0 1320 880" font-family="Helvetica,Arial,sans-serif">
+<rect width="1320" height="880" fill="#fff"/>
+<defs><marker id="mreq" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0L7,3L0,6Z" fill="#1A1A1A"/></marker><marker id="mresp" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0L7,3L0,6Z" fill="#7A7A7A"/></marker><marker id="mid" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0L7,3L0,6Z" fill="#8B5CF6"/></marker><marker id="mdep" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0L7,3L0,6Z" fill="#2E6FAE"/></marker><marker id="mgov" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0L7,3L0,6Z" fill="#D26B72"/></marker></defs>
+<text x="660.0" y="34" font-size="20" font-weight="bold" text-anchor="middle">View 2 (logical) — Anthropic (Claude) via Microsoft Foundry + APIM</text>
+<text x="660.0" y="55" font-size="12" fill="#555" text-anchor="middle">Grid-aligned · orthogonal connectors · request · response · identity · dependency · govern</text>
+<rect x="60" y="690" width="1210" height="140" rx="8" fill="#FBFBFD" stroke="#9AA0A6" stroke-width="1.6"/>
+<text x="72" y="712" font-size="13" font-weight="bold" fill="#444">Cross-cutting governance &amp; observability — governs / observes APIM · Foundry · microservices · data</text>
+<rect x="78" y="734" width="224" height="36" rx="6" fill="#fff" stroke="#D26B72" stroke-width="1.3"/>
+<text x="190" y="757" font-size="11" fill="#222" text-anchor="middle">Microsoft Defender</text>
+<rect x="316" y="734" width="224" height="36" rx="6" fill="#fff" stroke="#D26B72" stroke-width="1.3"/>
+<text x="428" y="757" font-size="11" fill="#222" text-anchor="middle">Purview (data governance)</text>
+<rect x="554" y="734" width="224" height="36" rx="6" fill="#fff" stroke="#C9A227" stroke-width="1.3"/>
+<text x="666" y="757" font-size="11" fill="#222" text-anchor="middle">Azure Policy (guardrails)</text>
+<rect x="792" y="734" width="224" height="36" rx="6" fill="#fff" stroke="#8B6CB8" stroke-width="1.3"/>
+<text x="904" y="757" font-size="11" fill="#222" text-anchor="middle">Monitor / Log Analytics</text>
+<rect x="1030" y="734" width="224" height="36" rx="6" fill="#fff" stroke="#8B5CF6" stroke-width="1.3"/>
+<text x="1142" y="757" font-size="11" fill="#222" text-anchor="middle">Entra ID (identity)</text>
+<path d="M 185 290 L 185 132 L 390 132" fill="none" stroke="#8B5CF6" stroke-width="1.7" stroke-dasharray="6 4" marker-end="url(#mid)"/>
+<rect x="144.0" y="115" width="104.0" height="15" rx="3" fill="#fff" fill-opacity="0.9"/>
+<text x="196" y="126" font-size="10" fill="#8B5CF6" text-anchor="middle">1 acquire token</text>
+<path d="M 310 355 L 390 355" fill="none" stroke="#1A1A1A" stroke-width="1.7" marker-end="url(#mreq)"/>
+<rect x="307.6" y="336" width="84.80000000000001" height="15" rx="3" fill="#fff" fill-opacity="0.9"/>
+<text x="350" y="347" font-size="10" fill="#1A1A1A" text-anchor="middle">2 call + JWT</text>
+<path d="M 510 164 L 510 290" fill="none" stroke="#8B5CF6" stroke-width="1.7" stroke-dasharray="6 4" marker-end="url(#mid)"/>
+<rect x="512.0" y="224" width="72.0" height="15" rx="3" fill="#fff" fill-opacity="0.9"/>
+<text x="548" y="235" font-size="10" fill="#8B5CF6" text-anchor="middle">3 validate</text>
+<path d="M 630 355 L 710 355" fill="none" stroke="#1A1A1A" stroke-width="1.7" marker-end="url(#mreq)"/>
+<rect x="643.6" y="336" width="52.800000000000004" height="15" rx="3" fill="#fff" fill-opacity="0.9"/>
+<text x="670" y="347" font-size="10" fill="#1A1A1A" text-anchor="middle">5 route</text>
+<path d="M 950 355 L 1030 355" fill="none" stroke="#1A1A1A" stroke-width="1.7" marker-end="url(#mreq)"/>
+<rect x="950.8" y="336" width="78.4" height="15" rx="3" fill="#fff" fill-opacity="0.9"/>
+<text x="990" y="347" font-size="10" fill="#1A1A1A" text-anchor="middle">6 inference</text>
+<path d="M 185 420 L 185 480" fill="none" stroke="#1A1A1A" stroke-width="1.7" marker-end="url(#mreq)"/>
+<rect x="196.8" y="442" width="46.400000000000006" height="15" rx="3" fill="#fff" fill-opacity="0.9"/>
+<text x="220" y="453" font-size="10" fill="#1A1A1A" text-anchor="middle">app UX</text>
+<path d="M 310 540 L 390 540" fill="none" stroke="#1A1A1A" stroke-width="1.7" marker-end="url(#mreq)"/>
+<rect x="320.4" y="521" width="59.2" height="15" rx="3" fill="#fff" fill-opacity="0.9"/>
+<text x="350" y="532" font-size="10" fill="#1A1A1A" text-anchor="middle">8 app UX</text>
+<path d="M 510 480 L 510 420" fill="none" stroke="#1A1A1A" stroke-width="1.7" marker-end="url(#mreq)"/>
+<rect x="510.4" y="442" width="91.2" height="15" rx="3" fill="#fff" fill-opacity="0.9"/>
+<text x="556" y="453" font-size="10" fill="#1A1A1A" text-anchor="middle">9 model calls</text>
+<path d="M 830 420 L 830 480" fill="none" stroke="#2E6FAE" stroke-width="1.7" marker-end="url(#mdep)"/>
+<rect x="835.6" y="442" width="52.800000000000004" height="15" rx="3" fill="#fff" fill-opacity="0.9"/>
+<text x="862" y="453" font-size="10" fill="#2E6FAE" text-anchor="middle">11 deps</text>
+<path d="M 630 540 L 710 540" fill="none" stroke="#2E6FAE" stroke-width="1.7" marker-end="url(#mdep)"/>
+<rect x="602.0" y="521" width="136.0" height="15" rx="3" fill="#fff" fill-opacity="0.9"/>
+<text x="670" y="532" font-size="10" fill="#2E6FAE" text-anchor="middle">10 grounding / state</text>
+<path d="M 1210 420 L 1210 650 L 30 650 L 30 355 L 60 355" fill="none" stroke="#7A7A7A" stroke-width="1.7" stroke-dasharray="6 4" marker-end="url(#mresp)"/>
+<rect x="552.8" y="632" width="174.4" height="15" rx="3" fill="#fff" fill-opacity="0.9"/>
+<text x="640" y="643" font-size="10" fill="#7A7A7A" text-anchor="middle">7 response (usage metered)</text>
+<path d="M 830 690 L 830 600" fill="none" stroke="#D26B72" stroke-width="1.7" stroke-dasharray="6 4" marker-end="url(#mgov)"/>
+<rect x="826.8" y="639" width="78.4" height="15" rx="3" fill="#fff" fill-opacity="0.9"/>
+<text x="866" y="650" font-size="10" fill="#D26B72" text-anchor="middle">govern data</text>
+<rect x="390" y="100" width="240" height="64" rx="8" fill="#EFEAFB" stroke="#8B5CF6" stroke-width="1.8"/>
+<text x="402" y="124" font-size="13.5" font-weight="bold" fill="#5B3FA6">Microsoft Entra ID</text>
+<text x="402" y="143" font-size="10.6" fill="#333">OAuth2 / OIDC · workload identity (Agent 365)</text>
+<rect x="60" y="290" width="250" height="130" rx="8" fill="#F4E3DC" stroke="#CC785C" stroke-width="1.8"/>
+<text x="72" y="314" font-size="13.5" font-weight="bold" fill="#8A4B38">Clients / consumers</text>
+<text x="72" y="333" font-size="10.6" fill="#333">Claude Code Web + CLI</text>
+<text x="72" y="348" font-size="10.6" fill="#333">app users · architect-v1 · dev-agent · external apps</text>
+<rect x="390" y="290" width="240" height="130" rx="8" fill="#E2F1F0" stroke="#2E8B84" stroke-width="1.8"/>
+<text x="402" y="314" font-size="13.5" font-weight="bold" fill="#1E5C57">APIM — AI Gateway</text>
+<text x="402" y="333" font-size="10.6" fill="#333">JWT validate · quota · semantic cache</text>
+<text x="402" y="348" font-size="10.6" fill="#333">content safety · usage metering · routing</text>
+<rect x="710" y="290" width="240" height="130" rx="8" fill="#fff" stroke="#0F6CBD" stroke-width="1.8"/>
+<text x="722" y="314" font-size="13.5" font-weight="bold" fill="#0F6CBD">Microsoft Foundry</text>
+<text x="722" y="333" font-size="10.6" fill="#333">AI Foundry Project · Agent 365 /</text>
+<text x="722" y="348" font-size="10.6" fill="#333">Foundry Agent Service · Managed Identity</text>
+<rect x="1030" y="290" width="240" height="130" rx="8" fill="#F4E3DC" stroke="#CC785C" stroke-width="1.8"/>
+<text x="1042" y="314" font-size="13.5" font-weight="bold" fill="#8A4B38">Anthropic CLAUDE</text>
+<text x="1042" y="333" font-size="10.6" fill="#333">Foundry model deployment</text>
+<text x="1042" y="348" font-size="10.6" fill="#333">Opus / Sonnet / Haiku</text>
+<rect x="60" y="480" width="250" height="120" rx="8" fill="#EAF1FB" stroke="#0F6CBD" stroke-width="1.8"/>
+<text x="72" y="504" font-size="13.5" font-weight="bold" fill="#0F6CBD">Application Gateway + WAF</text>
+<text x="72" y="523" font-size="10.6" fill="#333">app UX ingress</text>
+<rect x="390" y="480" width="240" height="120" rx="8" fill="#EAF1FB" stroke="#0F6CBD" stroke-width="1.8"/>
+<text x="402" y="504" font-size="13.5" font-weight="bold" fill="#0F6CBD">GenAI microservices</text>
+<text x="402" y="523" font-size="10.6" fill="#333">Container Apps (Dapr)</text>
+<text x="402" y="538" font-size="10.6" fill="#333">architect-v1 · capability-mcp · dev-agent</text>
+<rect x="710" y="480" width="240" height="120" rx="8" fill="#FFF6E0" stroke="#C9A227" stroke-width="1.8"/>
+<text x="722" y="504" font-size="13.5" font-weight="bold" fill="#7A5F00">Dependencies &amp; data</text>
+<text x="722" y="523" font-size="10.6" fill="#333">Key Vault · AI Search</text>
+<text x="722" y="538" font-size="10.6" fill="#333">Cosmos DB · Storage</text>
+<text x="1300" y="78" font-size="10.5" fill="#333" text-anchor="end" font-weight="bold">── request   ┄ response   ┄ identity   ── dependency   ┄ govern</text>
+</svg>

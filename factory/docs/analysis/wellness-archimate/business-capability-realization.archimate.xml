@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<model xmlns="http://www.opengroup.org/xsd/archimate/3.0/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.opengroup.org/xsd/archimate/3.0/ http://www.opengroup.org/xsd/archimate/3.0/archimate3_Diagram.xsd" identifier="id-wellness-caprealization">
+<name xml:lang="en">Wellness Platform — Business Capability Realization</name>
+<documentation xml:lang="en">Business services + functions that realize the strategy capabilities (one capability realized by one or more services). See gen_business_capability_realization.py.</documentation>
+<elements>
+<element identifier="cap1" xsi:type="Capability"><name xml:lang="en">Segmentation — Local (platform) &amp; Clinical (external)</name></element>
+<element identifier="bs_cohortdef" xsi:type="BusinessService"><name xml:lang="en">Local Segment Build Service</name></element>
+<element identifier="bf_cohorta" xsi:type="BusinessFunction"><name xml:lang="en">Local Segmentation (demographic/telemetry)</name></element>
+<element identifier="bs_segpub" xsi:type="BusinessService"><name xml:lang="en">Malaffi Segment Service</name></element>
+<element identifier="bf_segpub" xsi:type="BusinessFunction"><name xml:lang="en">Segment Metadata (author) · Membership Query (eligibility)</name></element>
+<element identifier="cap2" xsi:type="Capability"><name xml:lang="en">Challenge Lifecycle Management</name></element>
+<element identifier="bs_chalauth" xsi:type="BusinessService"><name xml:lang="en">Challenge Authoring Service</name></element>
+<element identifier="bf_chal" xsi:type="BusinessFunction"><name xml:lang="en">Challenge Management</name></element>
+<element identifier="bs_chalpres" xsi:type="BusinessService"><name xml:lang="en">Challenge Presentation Service</name></element>
+<element identifier="bf_pres" xsi:type="BusinessFunction"><name xml:lang="en">Presentation</name></element>
+<element identifier="bs_chalconcl" xsi:type="BusinessService"><name xml:lang="en">Challenge Conclusion Service</name></element>
+<element identifier="bf_concl" xsi:type="BusinessFunction"><name xml:lang="en">Programme Conclusion</name></element>
+<element identifier="cap3" xsi:type="Capability"><name xml:lang="en">Wellness Scoring &amp; Recognition</name></element>
+<element identifier="bs_dailyscore" xsi:type="BusinessService"><name xml:lang="en">Daily Scoring Service</name></element>
+<element identifier="bf_score" xsi:type="BusinessFunction"><name xml:lang="en">Wellness Scoring</name></element>
+<element identifier="bf_goal" xsi:type="BusinessFunction"><name xml:lang="en">Goal Management</name></element>
+<element identifier="bs_weekagg" xsi:type="BusinessService"><name xml:lang="en">Weekly Aggregation Service</name></element>
+<element identifier="bf_agg" xsi:type="BusinessFunction"><name xml:lang="en">Score Aggregation</name></element>
+<element identifier="bs_recog" xsi:type="BusinessService"><name xml:lang="en">Recognition &amp; Titles Service</name></element>
+<element identifier="bf_streak" xsi:type="BusinessFunction"><name xml:lang="en">Streak Management</name></element>
+<element identifier="bf_badge" xsi:type="BusinessFunction"><name xml:lang="en">Badge Management</name></element>
+<element identifier="bf_title" xsi:type="BusinessFunction"><name xml:lang="en">Title &amp; Progression</name></element>
+<element identifier="cap4" xsi:type="Capability"><name xml:lang="en">Activity &amp; Clinical Verification</name></element>
+<element identifier="bs_actv" xsi:type="BusinessService"><name xml:lang="en">Activity Verification Service</name></element>
+<element identifier="bf_actv" xsi:type="BusinessFunction"><name xml:lang="en">Activity Verification</name></element>
+<element identifier="bs_clin" xsi:type="BusinessService"><name xml:lang="en">Clinical Verification Service</name></element>
+<element identifier="bf_clin" xsi:type="BusinessFunction"><name xml:lang="en">Clinical Verification</name></element>
+<element identifier="cap5" xsi:type="Capability"><name xml:lang="en">Reward Points &amp; Wallet</name></element>
+<element identifier="bs_wallet" xsi:type="BusinessService"><name xml:lang="en">Wallet Balance Service</name></element>
+<element identifier="bf_wallet" xsi:type="BusinessFunction"><name xml:lang="en">Reward Points Wallet</name></element>
+<element identifier="bs_credit" xsi:type="BusinessService"><name xml:lang="en">Points Crediting Service</name></element>
+<element identifier="bf_credit" xsi:type="BusinessFunction"><name xml:lang="en">Points Crediting</name></element>
+<element identifier="bs_reserve" xsi:type="BusinessService"><name xml:lang="en">Point Reservation Service</name></element>
+<element identifier="bf_reserve" xsi:type="BusinessFunction"><name xml:lang="en">Reservation</name></element>
+<element identifier="cap6" xsi:type="Capability"><name xml:lang="en">Marketplace &amp; Redemption</name></element>
+<element identifier="bs_browse" xsi:type="BusinessService"><name xml:lang="en">Catalogue Browse Service</name></element>
+<element identifier="bf_catalog" xsi:type="BusinessFunction"><name xml:lang="en">Catalogue Management</name></element>
+<element identifier="bs_redeem" xsi:type="BusinessService"><name xml:lang="en">Reward Redemption Service</name></element>
+<element identifier="bf_market" xsi:type="BusinessFunction"><name xml:lang="en">Reward Marketplace</name></element>
+<element identifier="bs_voucher" xsi:type="BusinessService"><name xml:lang="en">Voucher Issuance Service</name></element>
+<element identifier="bf_voucher" xsi:type="BusinessFunction"><name xml:lang="en">Voucher Management</name></element>
+<element identifier="cap7" xsi:type="Capability"><name xml:lang="en">Partner Lifecycle &amp; Settlement</name></element>
+<element identifier="bs_ponb" xsi:type="BusinessService"><name xml:lang="en">Partner Onboarding Service</name></element>
+<element identifier="bf_plm" xsi:type="BusinessFunction"><name xml:lang="en">Partner Lifecycle Management</name></element>
+<element identifier="bs_pcat" xsi:type="BusinessService"><name xml:lang="en">Catalogue Management Service</name></element>
+<element identifier="bf_pcat" xsi:type="BusinessFunction"><name xml:lang="en">Partner Catalogue Management</name></element>
+<element identifier="bs_settle" xsi:type="BusinessService"><name xml:lang="en">Settlement Service</name></element>
+<element identifier="bf_settle" xsi:type="BusinessFunction"><name xml:lang="en">Settlement</name></element>
+<element identifier="cap8" xsi:type="Capability"><name xml:lang="en">Engagement &amp; Nudging</name></element>
+<element identifier="bs_nudge" xsi:type="BusinessService"><name xml:lang="en">Engagement &amp; Nudge Service</name></element>
+<element identifier="bf_nudge" xsi:type="BusinessFunction"><name xml:lang="en">Engagement &amp; Nudge</name></element>
+<element identifier="cap9" xsi:type="Capability"><name xml:lang="en">Consent, Identity &amp; Compliance</name></element>
+<element identifier="bs_consent" xsi:type="BusinessService"><name xml:lang="en">Consent Management Service</name></element>
+<element identifier="bf_cons" xsi:type="BusinessFunction"><name xml:lang="en">Consent Management</name></element>
+<element identifier="bs_identity" xsi:type="BusinessService"><name xml:lang="en">Identity &amp; Authentication Service</name></element>
+<element identifier="bf_id" xsi:type="BusinessFunction"><name xml:lang="en">Identity &amp; Authentication</name></element>
+<element identifier="cap10" xsi:type="Capability"><name xml:lang="en">Fraud &amp; Integrity</name></element>
+<element identifier="bs_integrity" xsi:type="BusinessService"><name xml:lang="en">Integrity Check Service</name></element>
+<element identifier="bf_fraud" xsi:type="BusinessFunction"><name xml:lang="en">Fraud &amp; Integrity</name></element>
+<element identifier="cap11" xsi:type="Capability"><name xml:lang="en">Integration &amp; Interoperability</name></element>
+<element identifier="bs_events" xsi:type="BusinessService"><name xml:lang="en">Event Streaming Service</name></element>
+<element identifier="bf_event" xsi:type="BusinessFunction"><name xml:lang="en">Event &amp; Integration Management</name></element>
+<element identifier="bs_integ" xsi:type="BusinessService"><name xml:lang="en">Partner / Data Integration Service</name></element>
+<element identifier="bf_integ" xsi:type="BusinessFunction"><name xml:lang="en">Integration</name></element>
+<element identifier="cap12" xsi:type="Capability"><name xml:lang="en">Analytics &amp; Insight</name></element>
+<element identifier="bs_analytics" xsi:type="BusinessService"><name xml:lang="en">Analytics Service</name></element>
+<element identifier="bf_data" xsi:type="BusinessFunction"><name xml:lang="en">Data Management</name></element>
+<element identifier="bs_reporting" xsi:type="BusinessService"><name xml:lang="en">Reporting Service</name></element>
+<element identifier="bf_report" xsi:type="BusinessFunction"><name xml:lang="en">Reporting</name></element>
+</elements>
+<relationships>
+<relationship identifier="rel-1" source="bs_cohortdef" target="cap1" xsi:type="Realization"/>
+<relationship identifier="rel-2" source="bf_cohorta" target="bs_cohortdef" xsi:type="Realization"/>
+<relationship identifier="rel-3" source="bs_segpub" target="cap1" xsi:type="Realization"/>
+<relationship identifier="rel-4" source="bf_segpub" target="bs_segpub" xsi:type="Realization"/>
+<relationship identifier="rel-5" source="bs_chalauth" target="cap2" xsi:type="Realization"/>
+<relationship identifier="rel-6" source="bf_chal" target="bs_chalauth" xsi:type="Realization"/>
+<relationship identifier="rel-7" source="bs_chalpres" target="cap2" xsi:type="Realization"/>
+<relationship identifier="rel-8" source="bf_pres" target="bs_chalpres" xsi:type="Realization"/>
+<relationship identifier="rel-9" source="bs_chalconcl" target="cap2" xsi:type="Realization"/>
+<relationship identifier="rel-10" source="bf_concl" target="bs_chalconcl" xsi:type="Realization"/>
+<relationship identifier="rel-11" source="bs_dailyscore" target="cap3" xsi:type="Realization"/>
+<relationship identifier="rel-12" source="bf_score" target="bs_dailyscore" xsi:type="Realization"/>
+<relationship identifier="rel-13" source="bf_goal" target="bs_dailyscore" xsi:type="Realization"/>
+<relationship identifier="rel-14" source="bs_weekagg" target="cap3" xsi:type="Realization"/>
+<relationship identifier="rel-15" source="bf_agg" target="bs_weekagg" xsi:type="Realization"/>
+<relationship identifier="rel-16" source="bs_recog" target="cap3" xsi:type="Realization"/>
+<relationship identifier="rel-17" source="bf_streak" target="bs_recog" xsi:type="Realization"/>
+<relationship identifier="rel-18" source="bf_badge" target="bs_recog" xsi:type="Realization"/>
+<relationship identifier="rel-19" source="bf_title" target="bs_recog" xsi:type="Realization"/>
+<relationship identifier="rel-20" source="bs_actv" target="cap4" xsi:type="Realization"/>
+<relationship identifier="rel-21" source="bf_actv" target="bs_actv" xsi:type="Realization"/>
+<relationship identifier="rel-22" source="bs_clin" target="cap4" xsi:type="Realization"/>
+<relationship identifier="rel-23" source="bf_clin" target="bs_clin" xsi:type="Realization"/>
+<relationship identifier="rel-24" source="bs_wallet" target="cap5" xsi:type="Realization"/>
+<relationship identifier="rel-25" source="bf_wallet" target="bs_wallet" xsi:type="Realization"/>
+<relationship identifier="rel-26" source="bs_credit" target="cap5" xsi:type="Realization"/>
+<relationship identifier="rel-27" source="bf_credit" target="bs_credit" xsi:type="Realization"/>
+<relationship identifier="rel-28" source="bs_reserve" target="cap5" xsi:type="Realization"/>
+<relationship identifier="rel-29" source="bf_reserve" target="bs_reserve" xsi:type="Realization"/>
+<relationship identifier="rel-30" source="bs_browse" target="cap6" xsi:type="Realization"/>
+<relationship identifier="rel-31" source="bf_catalog" target="bs_browse" xsi:type="Realization"/>
+<relationship identifier="rel-32" source="bs_redeem" target="cap6" xsi:type="Realization"/>
+<relationship identifier="rel-33" source="bf_market" target="bs_redeem" xsi:type="Realization"/>
+<relationship identifier="rel-34" source="bs_voucher" target="cap6" xsi:type="Realization"/>
+<relationship identifier="rel-35" source="bf_voucher" target="bs_voucher" xsi:type="Realization"/>
+<relationship identifier="rel-36" source="bs_ponb" target="cap7" xsi:type="Realization"/>
+<relationship identifier="rel-37" source="bf_plm" target="bs_ponb" xsi:type="Realization"/>
+<relationship identifier="rel-38" source="bs_pcat" target="cap7" xsi:type="Realization"/>
+<relationship identifier="rel-39" source="bf_pcat" target="bs_pcat" xsi:type="Realization"/>
+<relationship identifier="rel-40" source="bs_settle" target="cap7" xsi:type="Realization"/>
+<relationship identifier="rel-41" source="bf_settle" target="bs_settle" xsi:type="Realization"/>
+<relationship identifier="rel-42" source="bs_nudge" target="cap8" xsi:type="Realization"/>
+<relationship identifier="rel-43" source="bf_nudge" target="bs_nudge" xsi:type="Realization"/>
+<relationship identifier="rel-44" source="bs_consent" target="cap9" xsi:type="Realization"/>
+<relationship identifier="rel-45" source="bf_cons" target="bs_consent" xsi:type="Realization"/>
+<relationship identifier="rel-46" source="bs_identity" target="cap9" xsi:type="Realization"/>
+<relationship identifier="rel-47" source="bf_id" target="bs_identity" xsi:type="Realization"/>
+<relationship identifier="rel-48" source="bs_integrity" target="cap10" xsi:type="Realization"/>
+<relationship identifier="rel-49" source="bf_fraud" target="bs_integrity" xsi:type="Realization"/>
+<relationship identifier="rel-50" source="bs_events" target="cap11" xsi:type="Realization"/>
+<relationship identifier="rel-51" source="bf_event" target="bs_events" xsi:type="Realization"/>
+<relationship identifier="rel-52" source="bs_integ" target="cap11" xsi:type="Realization"/>
+<relationship identifier="rel-53" source="bf_integ" target="bs_integ" xsi:type="Realization"/>
+<relationship identifier="rel-54" source="bs_analytics" target="cap12" xsi:type="Realization"/>
+<relationship identifier="rel-55" source="bf_data" target="bs_analytics" xsi:type="Realization"/>
+<relationship identifier="rel-56" source="bs_reporting" target="cap12" xsi:type="Realization"/>
+<relationship identifier="rel-57" source="bf_report" target="bs_reporting" xsi:type="Realization"/>
+</relationships>
+<views><diagrams>
+<view identifier="view-caprealization" xsi:type="Diagram">
+<name xml:lang="en">Capability Realization View</name>
+<node identifier="grp-cap" xsi:type="Container" x="24" y="24" w="8060" h="172">
+<label xml:lang="en">Strategy · Capabilities</label>
+<style><fillColor r="252" g="252" b="252" a="0"/><lineColor r="140" g="140" b="140"/><font name="Sans" size="10"><color r="80" g="80" b="80"/></font></style>
+<node identifier="node-cap1" elementRef="cap1" xsi:type="Element" x="181" y="90" w="190" h="66"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-cap2" elementRef="cap2" xsi:type="Element" x="851" y="90" w="190" h="66"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-cap3" elementRef="cap3" xsi:type="Element" x="2001" y="90" w="190" h="66"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-cap4" elementRef="cap4" xsi:type="Element" x="3031" y="90" w="190" h="66"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-cap5" elementRef="cap5" xsi:type="Element" x="3701" y="90" w="190" h="66"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-cap6" elementRef="cap6" xsi:type="Element" x="4491" y="90" w="190" h="66"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-cap7" elementRef="cap7" xsi:type="Element" x="5281" y="90" w="190" h="66"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-cap8" elementRef="cap8" xsi:type="Element" x="5831" y="90" w="190" h="66"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-cap9" elementRef="cap9" xsi:type="Element" x="6261" y="90" w="190" h="66"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-cap10" elementRef="cap10" xsi:type="Element" x="6691" y="90" w="190" h="66"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-cap11" elementRef="cap11" xsi:type="Element" x="7121" y="90" w="190" h="66"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-cap12" elementRef="cap12" xsi:type="Element" x="7671" y="90" w="190" h="66"><style><fillColor r="245" g="222" b="170"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="grp-svc" xsi:type="Container" x="24" y="260" w="8060" h="172">
+<label xml:lang="en">Capability Realization · Business Services</label>
+<style><fillColor r="252" g="252" b="252" a="0"/><lineColor r="140" g="140" b="140"/><font name="Sans" size="10"><color r="80" g="80" b="80"/></font></style>
+<node identifier="node-bs_cohortdef" elementRef="bs_cohortdef" xsi:type="Element" x="61" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_segpub" elementRef="bs_segpub" xsi:type="Element" x="301" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_chalauth" elementRef="bs_chalauth" xsi:type="Element" x="611" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_chalpres" elementRef="bs_chalpres" xsi:type="Element" x="851" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_chalconcl" elementRef="bs_chalconcl" xsi:type="Element" x="1091" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_dailyscore" elementRef="bs_dailyscore" xsi:type="Element" x="1521" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_weekagg" elementRef="bs_weekagg" xsi:type="Element" x="1881" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_recog" elementRef="bs_recog" xsi:type="Element" x="2361" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_actv" elementRef="bs_actv" xsi:type="Element" x="2911" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_clin" elementRef="bs_clin" xsi:type="Element" x="3151" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_wallet" elementRef="bs_wallet" xsi:type="Element" x="3461" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_credit" elementRef="bs_credit" xsi:type="Element" x="3701" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_reserve" elementRef="bs_reserve" xsi:type="Element" x="3941" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_browse" elementRef="bs_browse" xsi:type="Element" x="4251" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_redeem" elementRef="bs_redeem" xsi:type="Element" x="4491" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_voucher" elementRef="bs_voucher" xsi:type="Element" x="4731" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_ponb" elementRef="bs_ponb" xsi:type="Element" x="5041" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_pcat" elementRef="bs_pcat" xsi:type="Element" x="5281" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_settle" elementRef="bs_settle" xsi:type="Element" x="5521" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_nudge" elementRef="bs_nudge" xsi:type="Element" x="5831" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_consent" elementRef="bs_consent" xsi:type="Element" x="6141" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_identity" elementRef="bs_identity" xsi:type="Element" x="6381" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_integrity" elementRef="bs_integrity" xsi:type="Element" x="6691" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_events" elementRef="bs_events" xsi:type="Element" x="7001" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_integ" elementRef="bs_integ" xsi:type="Element" x="7241" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_analytics" elementRef="bs_analytics" xsi:type="Element" x="7551" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bs_reporting" elementRef="bs_reporting" xsi:type="Element" x="7791" y="326" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<node identifier="grp-fun" xsi:type="Container" x="24" y="496" w="8060" h="172">
+<label xml:lang="en">Behaviour · Business Functions</label>
+<style><fillColor r="252" g="252" b="252" a="0"/><lineColor r="140" g="140" b="140"/><font name="Sans" size="10"><color r="80" g="80" b="80"/></font></style>
+<node identifier="node-bf_cohorta" elementRef="bf_cohorta" xsi:type="Element" x="61" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_segpub" elementRef="bf_segpub" xsi:type="Element" x="301" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_chal" elementRef="bf_chal" xsi:type="Element" x="611" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_pres" elementRef="bf_pres" xsi:type="Element" x="851" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_concl" elementRef="bf_concl" xsi:type="Element" x="1091" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_score" elementRef="bf_score" xsi:type="Element" x="1401" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_goal" elementRef="bf_goal" xsi:type="Element" x="1641" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_agg" elementRef="bf_agg" xsi:type="Element" x="1881" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_streak" elementRef="bf_streak" xsi:type="Element" x="2121" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_badge" elementRef="bf_badge" xsi:type="Element" x="2361" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_title" elementRef="bf_title" xsi:type="Element" x="2601" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_actv" elementRef="bf_actv" xsi:type="Element" x="2911" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_clin" elementRef="bf_clin" xsi:type="Element" x="3151" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_wallet" elementRef="bf_wallet" xsi:type="Element" x="3461" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_credit" elementRef="bf_credit" xsi:type="Element" x="3701" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_reserve" elementRef="bf_reserve" xsi:type="Element" x="3941" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_catalog" elementRef="bf_catalog" xsi:type="Element" x="4251" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_market" elementRef="bf_market" xsi:type="Element" x="4491" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_voucher" elementRef="bf_voucher" xsi:type="Element" x="4731" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_plm" elementRef="bf_plm" xsi:type="Element" x="5041" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_pcat" elementRef="bf_pcat" xsi:type="Element" x="5281" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_settle" elementRef="bf_settle" xsi:type="Element" x="5521" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_nudge" elementRef="bf_nudge" xsi:type="Element" x="5831" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_cons" elementRef="bf_cons" xsi:type="Element" x="6141" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_id" elementRef="bf_id" xsi:type="Element" x="6381" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_fraud" elementRef="bf_fraud" xsi:type="Element" x="6691" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_event" elementRef="bf_event" xsi:type="Element" x="7001" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_integ" elementRef="bf_integ" xsi:type="Element" x="7241" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_data" elementRef="bf_data" xsi:type="Element" x="7551" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+<node identifier="node-bf_report" elementRef="bf_report" xsi:type="Element" x="7791" y="562" w="190" h="66"><style><fillColor r="255" g="255" b="181"/><lineColor r="110" g="110" b="120"/><font name="Sans" size="9"><color r="0" g="0" b="0"/></font></style></node>
+</node>
+<connection identifier="conn-1" relationshipRef="rel-1" source="node-bs_cohortdef" target="node-cap1" xsi:type="Relationship"><bendpoint x="156" y="241"/><bendpoint x="276" y="241"/></connection>
+<connection identifier="conn-2" relationshipRef="rel-2" source="node-bf_cohorta" target="node-bs_cohortdef" xsi:type="Relationship"/>
+<connection identifier="conn-3" relationshipRef="rel-3" source="node-bs_segpub" target="node-cap1" xsi:type="Relationship"><bendpoint x="396" y="241"/><bendpoint x="276" y="241"/></connection>
+<connection identifier="conn-4" relationshipRef="rel-4" source="node-bf_segpub" target="node-bs_segpub" xsi:type="Relationship"/>
+<connection identifier="conn-5" relationshipRef="rel-5" source="node-bs_chalauth" target="node-cap2" xsi:type="Relationship"><bendpoint x="706" y="241"/><bendpoint x="946" y="241"/></connection>
+<connection identifier="conn-6" relationshipRef="rel-6" source="node-bf_chal" target="node-bs_chalauth" xsi:type="Relationship"/>
+<connection identifier="conn-7" relationshipRef="rel-7" source="node-bs_chalpres" target="node-cap2" xsi:type="Relationship"/>
+<connection identifier="conn-8" relationshipRef="rel-8" source="node-bf_pres" target="node-bs_chalpres" xsi:type="Relationship"/>
+<connection identifier="conn-9" relationshipRef="rel-9" source="node-bs_chalconcl" target="node-cap2" xsi:type="Relationship"><bendpoint x="1186" y="241"/><bendpoint x="946" y="241"/></connection>
+<connection identifier="conn-10" relationshipRef="rel-10" source="node-bf_concl" target="node-bs_chalconcl" xsi:type="Relationship"/>
+<connection identifier="conn-11" relationshipRef="rel-11" source="node-bs_dailyscore" target="node-cap3" xsi:type="Relationship"><bendpoint x="1616" y="241"/><bendpoint x="2096" y="241"/></connection>
+<connection identifier="conn-12" relationshipRef="rel-12" source="node-bf_score" target="node-bs_dailyscore" xsi:type="Relationship"><bendpoint x="1496" y="477"/><bendpoint x="1616" y="477"/></connection>
+<connection identifier="conn-13" relationshipRef="rel-13" source="node-bf_goal" target="node-bs_dailyscore" xsi:type="Relationship"><bendpoint x="1736" y="477"/><bendpoint x="1616" y="477"/></connection>
+<connection identifier="conn-14" relationshipRef="rel-14" source="node-bs_weekagg" target="node-cap3" xsi:type="Relationship"><bendpoint x="1976" y="241"/><bendpoint x="2096" y="241"/></connection>
+<connection identifier="conn-15" relationshipRef="rel-15" source="node-bf_agg" target="node-bs_weekagg" xsi:type="Relationship"/>
+<connection identifier="conn-16" relationshipRef="rel-16" source="node-bs_recog" target="node-cap3" xsi:type="Relationship"><bendpoint x="2456" y="241"/><bendpoint x="2096" y="241"/></connection>
+<connection identifier="conn-17" relationshipRef="rel-17" source="node-bf_streak" target="node-bs_recog" xsi:type="Relationship"><bendpoint x="2216" y="477"/><bendpoint x="2456" y="477"/></connection>
+<connection identifier="conn-18" relationshipRef="rel-18" source="node-bf_badge" target="node-bs_recog" xsi:type="Relationship"/>
+<connection identifier="conn-19" relationshipRef="rel-19" source="node-bf_title" target="node-bs_recog" xsi:type="Relationship"><bendpoint x="2696" y="477"/><bendpoint x="2456" y="477"/></connection>
+<connection identifier="conn-20" relationshipRef="rel-20" source="node-bs_actv" target="node-cap4" xsi:type="Relationship"><bendpoint x="3006" y="241"/><bendpoint x="3126" y="241"/></connection>
+<connection identifier="conn-21" relationshipRef="rel-21" source="node-bf_actv" target="node-bs_actv" xsi:type="Relationship"/>
+<connection identifier="conn-22" relationshipRef="rel-22" source="node-bs_clin" target="node-cap4" xsi:type="Relationship"><bendpoint x="3246" y="241"/><bendpoint x="3126" y="241"/></connection>
+<connection identifier="conn-23" relationshipRef="rel-23" source="node-bf_clin" target="node-bs_clin" xsi:type="Relationship"/>
+<connection identifier="conn-24" relationshipRef="rel-24" source="node-bs_wallet" target="node-cap5" xsi:type="Relationship"><bendpoint x="3556" y="241"/><bendpoint x="3796" y="241"/></connection>
+<connection identifier="conn-25" relationshipRef="rel-25" source="node-bf_wallet" target="node-bs_wallet" xsi:type="Relationship"/>
+<connection identifier="conn-26" relationshipRef="rel-26" source="node-bs_credit" target="node-cap5" xsi:type="Relationship"/>
+<connection identifier="conn-27" relationshipRef="rel-27" source="node-bf_credit" target="node-bs_credit" xsi:type="Relationship"/>
+<connection identifier="conn-28" relationshipRef="rel-28" source="node-bs_reserve" target="node-cap5" xsi:type="Relationship"><bendpoint x="4036" y="241"/><bendpoint x="3796" y="241"/></connection>
+<connection identifier="conn-29" relationshipRef="rel-29" source="node-bf_reserve" target="node-bs_reserve" xsi:type="Relationship"/>
+<connection identifier="conn-30" relationshipRef="rel-30" source="node-bs_browse" target="node-cap6" xsi:type="Relationship"><bendpoint x="4346" y="241"/><bendpoint x="4586" y="241"/></connection>
+<connection identifier="conn-31" relationshipRef="rel-31" source="node-bf_catalog" target="node-bs_browse" xsi:type="Relationship"/>
+<connection identifier="conn-32" relationshipRef="rel-32" source="node-bs_redeem" target="node-cap6" xsi:type="Relationship"/>
+<connection identifier="conn-33" relationshipRef="rel-33" source="node-bf_market" target="node-bs_redeem" xsi:type="Relationship"/>
+<connection identifier="conn-34" relationshipRef="rel-34" source="node-bs_voucher" target="node-cap6" xsi:type="Relationship"><bendpoint x="4826" y="241"/><bendpoint x="4586" y="241"/></connection>
+<connection identifier="conn-35" relationshipRef="rel-35" source="node-bf_voucher" target="node-bs_voucher" xsi:type="Relationship"/>
+<connection identifier="conn-36" relationshipRef="rel-36" source="node-bs_ponb" target="node-cap7" xsi:type="Relationship"><bendpoint x="5136" y="241"/><bendpoint x="5376" y="241"/></connection>
+<connection identifier="conn-37" relationshipRef="rel-37" source="node-bf_plm" target="node-bs_ponb" xsi:type="Relationship"/>
+<connection identifier="conn-38" relationshipRef="rel-38" source="node-bs_pcat" target="node-cap7" xsi:type="Relationship"/>
+<connection identifier="conn-39" relationshipRef="rel-39" source="node-bf_pcat" target="node-bs_pcat" xsi:type="Relationship"/>
+<connection identifier="conn-40" relationshipRef="rel-40" source="node-bs_settle" target="node-cap7" xsi:type="Relationship"><bendpoint x="5616" y="241"/><bendpoint x="5376" y="241"/></connection>
+<connection identifier="conn-41" relationshipRef="rel-41" source="node-bf_settle" target="node-bs_settle" xsi:type="Relationship"/>
+<connection identifier="conn-42" relationshipRef="rel-42" source="node-bs_nudge" target="node-cap8" xsi:type="Relationship"/>
+<connection identifier="conn-43" relationshipRef="rel-43" source="node-bf_nudge" target="node-bs_nudge" xsi:type="Relationship"/>
+<connection identifier="conn-44" relationshipRef="rel-44" source="node-bs_consent" target="node-cap9" xsi:type="Relationship"><bendpoint x="6236" y="241"/><bendpoint x="6356" y="241"/></connection>
+<connection identifier="conn-45" relationshipRef="rel-45" source="node-bf_cons" target="node-bs_consent" xsi:type="Relationship"/>
+<connection identifier="conn-46" relationshipRef="rel-46" source="node-bs_identity" target="node-cap9" xsi:type="Relationship"><bendpoint x="6476" y="241"/><bendpoint x="6356" y="241"/></connection>
+<connection identifier="conn-47" relationshipRef="rel-47" source="node-bf_id" target="node-bs_identity" xsi:type="Relationship"/>
+<connection identifier="conn-48" relationshipRef="rel-48" source="node-bs_integrity" target="node-cap10" xsi:type="Relationship"/>
+<connection identifier="conn-49" relationshipRef="rel-49" source="node-bf_fraud" target="node-bs_integrity" xsi:type="Relationship"/>
+<connection identifier="conn-50" relationshipRef="rel-50" source="node-bs_events" target="node-cap11" xsi:type="Relationship"><bendpoint x="7096" y="241"/><bendpoint x="7216" y="241"/></connection>
+<connection identifier="conn-51" relationshipRef="rel-51" source="node-bf_event" target="node-bs_events" xsi:type="Relationship"/>
+<connection identifier="conn-52" relationshipRef="rel-52" source="node-bs_integ" target="node-cap11" xsi:type="Relationship"><bendpoint x="7336" y="241"/><bendpoint x="7216" y="241"/></connection>
+<connection identifier="conn-53" relationshipRef="rel-53" source="node-bf_integ" target="node-bs_integ" xsi:type="Relationship"/>
+<connection identifier="conn-54" relationshipRef="rel-54" source="node-bs_analytics" target="node-cap12" xsi:type="Relationship"><bendpoint x="7646" y="241"/><bendpoint x="7766" y="241"/></connection>
+<connection identifier="conn-55" relationshipRef="rel-55" source="node-bf_data" target="node-bs_analytics" xsi:type="Relationship"/>
+<connection identifier="conn-56" relationshipRef="rel-56" source="node-bs_reporting" target="node-cap12" xsi:type="Relationship"><bendpoint x="7886" y="241"/><bendpoint x="7766" y="241"/></connection>
+<connection identifier="conn-57" relationshipRef="rel-57" source="node-bf_report" target="node-bs_reporting" xsi:type="Relationship"/>
+</view></diagrams></views></model>

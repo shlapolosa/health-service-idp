@@ -1,0 +1,110 @@
+<model xmlns="http://www.opengroup.org/xsd/archimate/3.0/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" identifier="m-elig">
+<name xml:lang="en">Eligibility Determination (manual)</name>
+<elements>
+<element identifier="act_member" xsi:type="BusinessActor"><name xml:lang="en">Member</name></element>
+<element identifier="fn_p9" xsi:type="BusinessFunction"><name xml:lang="en">Eligibility Evaluation</name></element>
+<element identifier="as_elig" xsi:type="ApplicationService"><name xml:lang="en">Eligibility Service</name></element>
+<element identifier="ev_login" xsi:type="ApplicationEvent"><name xml:lang="en">User Logged In</name></element>
+<element identifier="ac_mobile" xsi:type="ApplicationComponent"><name xml:lang="en">Sahatna Mobile App</name></element>
+<element identifier="fn_present" xsi:type="ApplicationFunction"><name xml:lang="en">Presentation &amp; Aggregation</name></element>
+<element identifier="if_pubapi" xsi:type="ApplicationInterface"><name xml:lang="en">Platform Public API</name></element>
+<element identifier="col_elig" xsi:type="ApplicationCollaboration"><name xml:lang="en">Eligibility Determination</name></element>
+<element identifier="ia_elig" xsi:type="ApplicationInteraction"><name xml:lang="en">Determine Eligible Challenges</name></element>
+<element identifier="fn_elig" xsi:type="ApplicationFunction"><name xml:lang="en">Eligibility Resolution</name></element>
+<element identifier="fn_localmem" xsi:type="ApplicationFunction"><name xml:lang="en">Local Membership Check</name></element>
+<element identifier="ev_elig" xsi:type="ApplicationEvent"><name xml:lang="en">Eligibility Resolved</name></element>
+<element identifier="as_malmember" xsi:type="ApplicationService"><name xml:lang="en">Membership &amp; Eligibility Service</name></element>
+<element identifier="ac_malaffi" xsi:type="ApplicationComponent"><name xml:lang="en">Malaffi HIE (external)</name></element>
+<element identifier="if_malapi" xsi:type="ApplicationInterface"><name xml:lang="en">Malaffi API</name></element>
+<element identifier="do_challenge" xsi:type="DataObject"><name xml:lang="en">Challenge Data</name></element>
+<element identifier="do_eligresult" xsi:type="DataObject"><name xml:lang="en">Eligibility Result</name></element>
+<element identifier="do_segment" xsi:type="DataObject"><name xml:lang="en">Segment Data</name></element>
+<element identifier="do_demographic" xsi:type="DataObject"><name xml:lang="en">Demographic Data</name></element>
+<element identifier="do_telemetry" xsi:type="DataObject"><name xml:lang="en">Telemetry Data</name></element>
+<element identifier="do_clinical" xsi:type="DataObject"><name xml:lang="en">Clinical Data</name></element>
+</elements><relationships>
+<relationship identifier="r1" source="act_member" target="ev_login" xsi:type="Triggering"/>
+<relationship identifier="r2" source="ev_login" target="fn_present" xsi:type="Triggering"/>
+<relationship identifier="r3" source="fn_present" target="if_pubapi" xsi:type="Triggering"/>
+<relationship identifier="r4" source="if_pubapi" target="ia_elig" xsi:type="Triggering"/>
+<relationship identifier="r5" source="ia_elig" target="fn_elig" xsi:type="Triggering"/>
+<relationship identifier="r6" source="fn_elig" target="fn_localmem" xsi:type="Triggering"/>
+<relationship identifier="r7" source="fn_localmem" target="ev_elig" xsi:type="Triggering"/>
+<relationship identifier="r8" source="as_elig" target="fn_p9" xsi:type="Serving"/>
+<relationship identifier="r9" source="ia_elig" target="as_elig" xsi:type="Realization"/>
+<relationship identifier="r10" source="ac_malaffi" target="if_malapi" xsi:type="Assignment"/>
+<relationship identifier="r11" source="ac_malaffi" target="as_malmember" xsi:type="Realization"/>
+<relationship identifier="r12" source="if_malapi" target="fn_elig" xsi:type="Serving"/>
+<relationship identifier="r13" source="as_malmember" target="fn_elig" xsi:type="Serving"/>
+<relationship identifier="a0" source="fn_elig" target="do_challenge" xsi:type="Access" accessType="Read"/>
+<relationship identifier="a1" source="fn_elig" target="do_eligresult" xsi:type="Access" accessType="Write"/>
+<relationship identifier="a2" source="fn_elig" target="do_segment" xsi:type="Access" accessType="Read"/>
+<relationship identifier="a3" source="fn_localmem" target="do_segment" xsi:type="Access" accessType="Read"/>
+<relationship identifier="a4" source="fn_localmem" target="do_demographic" xsi:type="Access" accessType="Read"/>
+<relationship identifier="a5" source="fn_localmem" target="do_telemetry" xsi:type="Access" accessType="Read"/>
+<relationship identifier="a6" source="ac_malaffi" target="do_clinical" xsi:type="Access" accessType="Write"/>
+</relationships><views><diagrams>
+<view identifier="v-elig" xsi:type="Diagram"><name xml:lang="en">Eligibility Determination</name>
+<node identifier="n-act_member" elementRef="act_member" xsi:type="Element" x="80" y="60" w="170" h="64"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-fn_p9" elementRef="fn_p9" xsi:type="Element" x="854" y="60" w="210" h="58"><style><fillColor r="255" g="255" b="181"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-as_elig" elementRef="as_elig" xsi:type="Element" x="854" y="210" w="210" h="54"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-ev_login" elementRef="ev_login" xsi:type="Element" x="90" y="416" w="150" h="46"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-ac_mobile" elementRef="ac_mobile" xsi:type="Element" x="320" y="380" w="222" h="100"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="11"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-fn_present" elementRef="fn_present" xsi:type="Element" x="336" y="410" w="190" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+</node>
+<node identifier="n-if_pubapi" elementRef="if_pubapi" xsi:type="Element" x="622" y="416" w="146" h="46"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-col_elig" elementRef="col_elig" xsi:type="Element" x="848" y="380" w="742" h="100"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="11"><color r="0" g="0" b="0"/></font></style>
+<node identifier="n-ia_elig" elementRef="ia_elig" xsi:type="Element" x="864" y="410" w="190" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-fn_elig" elementRef="fn_elig" xsi:type="Element" x="1124" y="410" w="190" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-fn_localmem" elementRef="fn_localmem" xsi:type="Element" x="1384" y="410" w="190" h="58"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+</node>
+<node identifier="n-ev_elig" elementRef="ev_elig" xsi:type="Element" x="1670" y="416" w="150" h="46"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-as_malmember" elementRef="as_malmember" xsi:type="Element" x="1900" y="500" w="210" h="50"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-ac_malaffi" elementRef="ac_malaffi" xsi:type="Element" x="1900" y="620" w="210" h="64"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-if_malapi" elementRef="if_malapi" xsi:type="Element" x="1700" y="629" w="146" h="46"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-do_challenge" elementRef="do_challenge" xsi:type="Element" x="200" y="760" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-do_eligresult" elementRef="do_eligresult" xsi:type="Element" x="436" y="760" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-do_segment" elementRef="do_segment" xsi:type="Element" x="672" y="760" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-do_demographic" elementRef="do_demographic" xsi:type="Element" x="908" y="760" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-do_telemetry" elementRef="do_telemetry" xsi:type="Element" x="1144" y="760" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<node identifier="n-do_clinical" elementRef="do_clinical" xsi:type="Element" x="1380" y="760" w="180" h="52"><style><fillColor r="181" g="255" b="255"/><lineColor r="90" g="110" b="130"/><font name="Sans" size="8"><color r="0" g="0" b="0"/></font></style>
+</node>
+<connection identifier="c-r1" relationshipRef="r1" source="n-act_member" target="n-ev_login" xsi:type="Relationship"></connection>
+<connection identifier="c-r2" relationshipRef="r2" source="n-ev_login" target="n-fn_present" xsi:type="Relationship"></connection>
+<connection identifier="c-r3" relationshipRef="r3" source="n-fn_present" target="n-if_pubapi" xsi:type="Relationship"></connection>
+<connection identifier="c-r4" relationshipRef="r4" source="n-if_pubapi" target="n-ia_elig" xsi:type="Relationship"></connection>
+<connection identifier="c-r5" relationshipRef="r5" source="n-ia_elig" target="n-fn_elig" xsi:type="Relationship"></connection>
+<connection identifier="c-r6" relationshipRef="r6" source="n-fn_elig" target="n-fn_localmem" xsi:type="Relationship"></connection>
+<connection identifier="c-r7" relationshipRef="r7" source="n-fn_localmem" target="n-ev_elig" xsi:type="Relationship"></connection>
+<connection identifier="c-r8" relationshipRef="r8" source="n-as_elig" target="n-fn_p9" xsi:type="Relationship"></connection>
+<connection identifier="c-r9" relationshipRef="r9" source="n-ia_elig" target="n-as_elig" xsi:type="Relationship"></connection>
+<connection identifier="c-r10" relationshipRef="r10" source="n-ac_malaffi" target="n-if_malapi" xsi:type="Relationship"></connection>
+<connection identifier="c-r11" relationshipRef="r11" source="n-ac_malaffi" target="n-as_malmember" xsi:type="Relationship"></connection>
+<connection identifier="c-r12" relationshipRef="r12" source="n-if_malapi" target="n-fn_elig" xsi:type="Relationship"><bendpoint x="1773" y="613"/><bendpoint x="1219" y="613"/></connection>
+<connection identifier="c-r13" relationshipRef="r13" source="n-as_malmember" target="n-fn_elig" xsi:type="Relationship"><bendpoint x="2005" y="484"/><bendpoint x="1219" y="484"/></connection>
+<connection identifier="c-a0" relationshipRef="a0" source="n-fn_elig" target="n-do_challenge" xsi:type="Relationship"><bendpoint x="1219" y="499"/><bendpoint x="290" y="499"/></connection>
+<connection identifier="c-a1" relationshipRef="a1" source="n-fn_elig" target="n-do_eligresult" xsi:type="Relationship"><bendpoint x="1219" y="469"/><bendpoint x="526" y="469"/></connection>
+<connection identifier="c-a2" relationshipRef="a2" source="n-fn_elig" target="n-do_segment" xsi:type="Relationship"><bendpoint x="1219" y="514"/><bendpoint x="762" y="514"/></connection>
+<connection identifier="c-a3" relationshipRef="a3" source="n-fn_localmem" target="n-do_segment" xsi:type="Relationship"><bendpoint x="1479" y="529"/><bendpoint x="762" y="529"/></connection>
+<connection identifier="c-a4" relationshipRef="a4" source="n-fn_localmem" target="n-do_demographic" xsi:type="Relationship"><bendpoint x="1479" y="544"/><bendpoint x="998" y="544"/></connection>
+<connection identifier="c-a5" relationshipRef="a5" source="n-fn_localmem" target="n-do_telemetry" xsi:type="Relationship"><bendpoint x="1479" y="559"/><bendpoint x="1234" y="559"/></connection>
+<connection identifier="c-a6" relationshipRef="a6" source="n-ac_malaffi" target="n-do_clinical" xsi:type="Relationship"><bendpoint x="2005" y="700"/><bendpoint x="1470" y="700"/></connection>
+</view></diagrams></views></model>
